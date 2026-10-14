@@ -2,6 +2,7 @@
 //! Every `unsafe` block in the workspace lives here; the other crates forbid it.
 
 pub mod app;
+pub mod audio_tap;
 pub mod ax;
 pub mod event_tap;
 pub mod hotkey;
