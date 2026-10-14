@@ -1,0 +1,21 @@
+[package]
+name = "macos-sys"
+version.workspace = true
+edition.workspace = true
+rust-version.workspace = true
+publish.workspace = true
+
+[dependencies]
+objc2.workspace = true
+block2.workspace = true
+objc2-service-management.workspace = true
+objc2-core-graphics.workspace = true
+dispatch2.workspace = true
+objc2-web-kit.workspace = true
+objc2-foundation.workspace = true
+objc2-app-kit.workspace = true
+core-foundation.workspace = true
+libc.workspace = true
+
+[dev-dependencies]
+core-window.workspace = true

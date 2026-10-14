@@ -1,0 +1,33 @@
+[workspace]
+resolver = "3"
+members = ["crates/*"]
+
+[workspace.package]
+version = "0.1.0"
+edition = "2024"
+rust-version = "1.85"
+publish = false
+
+[workspace.dependencies]
+macos-sys = { path = "crates/macos-sys" }
+core-mouse = { path = "crates/core-mouse" }
+objc2 = "0.6"
+objc2-foundation = "0.3"
+objc2-app-kit = "0.3"
+block2 = "0.6"
+objc2-service-management = "0.3"
+objc2-core-graphics = "0.3"
+dispatch2 = "0.3"
+objc2-web-kit = "0.3"
+core-foundation = "0.10"
+libc = "0.2"
+rusqlite = "0.40"
+serde = { version = "1", features = ["derive"] }
+serde_json = "1"
+core-clipboard = { path = "crates/core-clipboard" }
+core-window = { path = "crates/core-window" }
+
+[profile.release]
+lto = "thin"
+codegen-units = 1
+strip = true

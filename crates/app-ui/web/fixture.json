@@ -1,0 +1,39 @@
+{
+  "app": { "version": "0.2.0", "bundled": true, "config_dir": "/Users/you/Library/Application Support/Figghost" },
+  "env": { "accessibility": true, "login": "disabled", "language": "en", "reduce_transparency": false, "reduce_motion": false, "increase_contrast": false },
+  "general": { "language": "auto", "show_on_launch": true },
+  "mouse": {
+    "smooth": true, "reverse": false, "step_px": 36, "speed": 1, "duration_ms": 360,
+    "shift_horizontal": true, "option_boost": true, "boost": 5, "command_zoom": false,
+    "apps": [
+      { "id": "com.apple.dt.Xcode", "name": "Xcode", "smooth": false, "reverse": null },
+      { "id": "com.blender.blender", "name": "Blender", "smooth": false, "reverse": true }
+    ]
+  },
+  "clipboard": {
+    "hotkey": "cmd+shift+c", "auto_paste": true, "paste_plain": false, "history_limit": 500, "count": 128,
+    "ignored": [
+      { "id": "com.1password.1password", "name": "1Password" },
+      { "id": "com.bitwarden.desktop", "name": "Bitwarden" }
+    ]
+  },
+  "notch": { "enabled": true, "volume_hud": false, "shelf_count": 4 },
+  "tiling": {
+    "enabled": true,
+    "layouts": [
+      { "key": "left", "shortcut": "ctrl+opt+left", "default": "ctrl+opt+left" },
+      { "key": "right", "shortcut": "ctrl+opt+right", "default": "ctrl+opt+right" },
+      { "key": "top", "shortcut": "ctrl+opt+up", "default": "ctrl+opt+up" },
+      { "key": "bottom", "shortcut": "ctrl+opt+down", "default": "ctrl+opt+down" },
+      { "key": "top_left", "shortcut": "ctrl+opt+u", "default": "ctrl+opt+u" },
+      { "key": "top_right", "shortcut": "ctrl+opt+i", "default": "ctrl+opt+i" },
+      { "key": "bottom_left", "shortcut": "ctrl+opt+j", "default": "ctrl+opt+j" },
+      { "key": "bottom_right", "shortcut": "ctrl+opt+k", "default": "ctrl+opt+k" },
+      { "key": "maximize", "shortcut": "ctrl+opt+return", "default": "ctrl+opt+return" },
+      { "key": "center", "shortcut": "", "default": "ctrl+opt+c" },
+      { "key": "first_third", "shortcut": "ctrl+opt+d", "default": "ctrl+opt+d" },
+      { "key": "center_third", "shortcut": "ctrl+opt+f", "default": "ctrl+opt+f" },
+      { "key": "last_third", "shortcut": "ctrl+opt+g", "default": "ctrl+opt+g" }
+    ]
+  }
+}
