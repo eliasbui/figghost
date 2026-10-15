@@ -347,6 +347,10 @@ impl CaptureFeature {
     pub fn take(&self, kind: Kind) {
         trace::log(&format!("capture: {} requested", kind.key()));
         let text = i18n::current();
+        if !screen_capture::capture_supported() {
+            capture_ui::toast(self.mtm, text.capture_needs_newer_macos());
+            return;
+        }
         if kind.records() {
             let current = self.recording.borrow().clone();
             if let Some(recorder) = current {

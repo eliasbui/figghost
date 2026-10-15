@@ -233,6 +233,13 @@ impl Language {
         }
     }
 
+    pub fn capture_needs_newer_macos(self) -> &'static str {
+        match self {
+            Language::English => "Screenshots need macOS 14 or later",
+            Language::Vietnamese => "Chụp màn hình cần macOS 14 trở lên",
+        }
+    }
+
     pub fn record_needs_newer_macos(self) -> &'static str {
         match self {
             Language::English => "Screen recording needs macOS 15 or later",

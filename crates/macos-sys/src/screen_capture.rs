@@ -25,6 +25,12 @@ use std::{
 /// floating control.
 const MIN_WINDOW: f64 = 40.0;
 
+/// Whether this system has ScreenCaptureKit's screenshots (macOS 14 and later); the app itself starts on
+/// older systems.
+pub fn capture_supported() -> bool {
+    objc2::runtime::AnyClass::get(c"SCScreenshotManager").is_some()
+}
+
 /// Whether this app may record the screen. With `prompt`, macOS asks the user the first time and opens
 /// System Settings after that.
 pub fn screen_access(prompt: bool) -> bool {
