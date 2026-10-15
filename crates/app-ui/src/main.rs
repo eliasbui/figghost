@@ -2,6 +2,7 @@
 //! Composition root: starts each feature and keeps its handles alive.
 
 mod audio;
+mod capture;
 mod clipboard;
 mod config;
 mod context;
@@ -17,6 +18,7 @@ mod trace;
 mod volume_hud;
 
 use audio::AudioFeature;
+use capture::CaptureFeature;
 use clipboard::Clipboard;
 use config::{Config, home_dir};
 use context::AppContext;
@@ -52,6 +54,7 @@ struct Shell {
     shelf: Option<Rc<ShelfFeature>>,
     media: Option<MediaFeature>,
     audio: AudioFeature,
+    capture: Rc<CaptureFeature>,
     tiling: Rc<Tiling>,
     volume_hud: Rc<VolumeHud>,
     settings: Rc<SettingsFeature>,
@@ -91,6 +94,7 @@ impl Shell {
         let media = notch.as_ref().map(|notch| MediaFeature::attach(mtm, notch));
         let config = Rc::new(RefCell::new(config));
         let audio = AudioFeature::start(mtm, &config, home.clone(), notch.as_deref());
+        let capture = CaptureFeature::start(mtm, &config);
         let volume_hud = Rc::new(VolumeHud::new(mtm, audio.engine.soft_volume()));
         if config.borrow().volume_hud {
             volume_hud.enable_when_possible();
@@ -115,7 +119,7 @@ impl Shell {
         app::set_settings_handler(move || on_settings.show());
         let on_reopen = Rc::clone(&settings);
         let reopen = app::on_reopen(mtm, move || on_reopen.show());
-        let status = menu::build(&ctx, &settings);
+        let status = menu::build(&ctx, &settings, &capture);
         if show_settings {
             settings.show();
         }
@@ -125,6 +129,7 @@ impl Shell {
             shelf,
             media,
             audio,
+            capture,
             tiling,
             volume_hud,
             settings,

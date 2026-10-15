@@ -1,4 +1,4 @@
-use crate::audio::model::AudioConfig;
+use crate::{audio::model::AudioConfig, capture::CaptureConfig};
 use core_mouse::Settings;
 use core_window::Layout;
 use macos_sys::hotkey::modifier;
@@ -81,6 +81,8 @@ pub struct Config {
     pub ignored_apps: Vec<String>,
     /// The per-app mixer: volumes, output devices and effects.
     pub audio: AudioConfig,
+    /// Screenshots: where they go, what happens after, shortcuts.
+    pub capture: CaptureConfig,
 }
 
 impl Default for Config {
@@ -98,6 +100,7 @@ impl Default for Config {
             history_limit: 500,
             ignored_apps: Vec::new(),
             audio: AudioConfig::default(),
+            capture: CaptureConfig::default(),
         }
     }
 }
@@ -135,6 +138,7 @@ impl Config {
                 cfg.mouse = cfg.mouse.sanitized();
                 cfg.history_limit = cfg.history_limit.clamp(10, 100_000);
                 cfg.audio = cfg.audio.sanitized();
+                cfg.capture = cfg.capture.sanitized();
                 (cfg, None)
             }
             Err(e) => {

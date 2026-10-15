@@ -4,6 +4,8 @@
 pub mod app;
 pub mod audio_tap;
 pub mod ax;
+pub mod capture_overlay;
+pub mod capture_ui;
 pub mod event_tap;
 pub mod hotkey;
 pub mod hud;
@@ -14,10 +16,13 @@ pub mod media_ui;
 pub mod mixer_ui;
 pub mod notch;
 pub mod now_playing;
+pub mod ocr;
 pub mod panel;
 pub mod pasteboard;
 pub mod permissions;
 pub mod qos;
+pub mod reply;
+pub mod screen_capture;
 pub mod shelf_ui;
 pub mod status_item;
 pub mod synth;
@@ -30,3 +35,4 @@ pub mod window;
 pub mod workspace;
 
 pub use objc2::MainThreadMarker;
+pub use objc2_foundation::{NSPoint, NSRect, NSSize};

@@ -1,6 +1,11 @@
 //! The "Fig" menu bar item. Dynamic entries are recomputed each time the menu opens.
 
-use crate::{context::AppContext, i18n, settings::SettingsFeature};
+use crate::{
+    capture::{CaptureFeature, Kind},
+    context::AppContext,
+    i18n,
+    settings::SettingsFeature,
+};
 use core_mouse::Settings;
 use macos_sys::{
     app,
@@ -13,7 +18,11 @@ use std::{cell::RefCell, fs, rc::Rc, sync::Arc};
 
 type ChangeSettings = Rc<dyn Fn(&dyn Fn(&mut Settings))>;
 
-pub fn build(ctx: &AppContext, settings: &Rc<SettingsFeature>) -> StatusMenu {
+pub fn build(
+    ctx: &AppContext,
+    settings: &Rc<SettingsFeature>,
+    capture: &Rc<CaptureFeature>,
+) -> StatusMenu {
     let mtm = ctx.mtm;
     let home = ctx.home.clone();
     let (config, control) = (Rc::clone(&ctx.config), Arc::clone(&ctx.control));
@@ -146,8 +155,29 @@ pub fn build(ctx: &AppContext, settings: &Rc<SettingsFeature>) -> StatusMenu {
         }))
     };
 
+    // Menu items run after the menu has closed, so the capture never shows the menu itself.
+    let take = |title: &str, kind: Kind| {
+        let capture = Rc::clone(capture);
+        Entry::Item(Item::new(title, move || {
+            let capture = Rc::clone(&capture);
+            app::after(0.25, move || capture.take(kind));
+        }))
+    };
+    let timer_seconds = config.borrow().capture.timer_seconds;
     let entries = vec![
         open_settings,
+        Entry::Separator,
+        take(text.menu_capture_area(), Kind::Area),
+        take(text.menu_capture_window(), Kind::Window),
+        take(text.menu_capture_screen(), Kind::Screen),
+        take(&text.menu_capture_timer(timer_seconds), Kind::Timer),
+        take(text.menu_capture_text(), Kind::Text),
+        {
+            let capture = Rc::clone(capture);
+            Entry::Item(Item::new(text.menu_capture_folder(), move || {
+                capture.open_folder()
+            }))
+        },
         Entry::Separator,
         Entry::Item(
             Item::new(text.menu_accessibility(), || {
