@@ -172,6 +172,7 @@ pub fn build(
         take(text.menu_capture_screen(), Kind::Screen),
         take(&text.menu_capture_timer(timer_seconds), Kind::Timer),
         take(text.menu_capture_text(), Kind::Text),
+        take(text.menu_capture_scroll(), Kind::Scroll),
         {
             let capture = Rc::clone(capture);
             Entry::Item(Item::new(text.menu_capture_folder(), move || {

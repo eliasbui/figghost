@@ -30,6 +30,45 @@ impl Language {
         }
     }
 
+    pub fn capture_hint_scroll(self) -> &'static str {
+        match self {
+            Language::English => {
+                "Drag over the content to capture; it will scroll down by itself. Esc: cancel."
+            }
+            Language::Vietnamese => {
+                "Kéo chọn vùng nội dung cần chụp; nội dung sẽ tự cuộn xuống. Esc: hủy."
+            }
+        }
+    }
+
+    pub fn capture_scroll_done(self) -> &'static str {
+        match self {
+            Language::English => "Done",
+            Language::Vietnamese => "Xong",
+        }
+    }
+
+    pub fn capture_scroll_cancel(self) -> &'static str {
+        match self {
+            Language::English => "Cancel",
+            Language::Vietnamese => "Hủy",
+        }
+    }
+
+    pub fn capture_scroll_status(self, rows: usize) -> String {
+        match self {
+            Language::English => format!("{rows} px"),
+            Language::Vietnamese => format!("{rows} px"),
+        }
+    }
+
+    pub fn menu_capture_scroll(self) -> &'static str {
+        match self {
+            Language::English => "Scrolling Capture",
+            Language::Vietnamese => "Chụp cuộn",
+        }
+    }
+
     pub fn capture_copy(self) -> &'static str {
         match self {
             Language::English => "Copy",

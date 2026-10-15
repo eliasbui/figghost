@@ -2,6 +2,7 @@
 //! overlay picks an area, a window or a display, and the picture is saved, copied and shown in a quick
 //! panel with copy, save, edit and pin. Text recognition copies the text of an area instead.
 
+mod scroll;
 mod text;
 
 use crate::{
@@ -41,6 +42,8 @@ pub enum Kind {
     Timer,
     /// The text of an area, copied as text.
     Text,
+    /// An area whose content scrolls by itself, stitched into one tall picture.
+    Scroll,
 }
 
 impl Kind {
@@ -60,6 +63,7 @@ impl Kind {
             Kind::Screen => "screen",
             Kind::Timer => "timer",
             Kind::Text => "text",
+            Kind::Scroll => "scroll",
         }
     }
 
@@ -68,7 +72,7 @@ impl Kind {
         match self {
             Kind::Area => "cmd+shift+2",
             Kind::Text => "cmd+shift+1",
-            Kind::Window | Kind::Screen | Kind::Timer => "",
+            Kind::Window | Kind::Screen | Kind::Timer | Kind::Scroll => "",
         }
     }
 }
@@ -84,7 +88,8 @@ pub struct CaptureConfig {
     /// How long the quick panel stays; 0 keeps it until closed.
     pub quick_seconds: f64,
     pub timer_seconds: u32,
-    /// Shortcut per capture kind (`area`, `window`, `screen`, `timer`, `text`); empty turns it off.
+    /// Shortcut per capture kind (`area`, `window`, `screen`, `timer`, `text`, `scroll`); empty turns
+    /// it off.
     pub shortcuts: BTreeMap<String, String>,
 }
 
@@ -216,6 +221,7 @@ pub struct CaptureFeature {
     busy: Cell<bool>,
     quick: RefCell<Vec<(u64, Rc<QuickPanel>)>>,
     pins: RefCell<Vec<(u64, Rc<Pin>)>>,
+    scrolling: RefCell<Option<Rc<scroll::Scrolling>>>,
     next_id: Cell<u64>,
 }
 
@@ -231,6 +237,7 @@ impl CaptureFeature {
             busy: Cell::new(false),
             quick: RefCell::new(Vec::new()),
             pins: RefCell::new(Vec::new()),
+            scrolling: RefCell::new(None),
             next_id: Cell::new(1),
         });
         for note in feature.configure() {
@@ -282,7 +289,7 @@ impl CaptureFeature {
     /// Starts a capture; ignored while another one is being picked.
     pub fn take(&self, kind: Kind) {
         trace::log(&format!("capture: {} requested", kind.key()));
-        if self.busy.get() {
+        if self.busy.get() || self.scrolling.borrow().is_some() {
             return;
         }
         let text = i18n::current();
@@ -344,6 +351,7 @@ impl CaptureFeature {
             Kind::Area => (Mode::Any, text.capture_hint_any()),
             Kind::Window => (Mode::Window, text.capture_hint_window()),
             Kind::Text => (Mode::AreaOnly, text.capture_hint_text()),
+            Kind::Scroll => (Mode::AreaOnly, text.capture_hint_scroll()),
         };
         let me = self.me.clone();
         let held = Rc::clone(&frozen);
@@ -371,6 +379,25 @@ impl CaptureFeature {
                 ),
                 None => self.fail("display gone"),
             },
+            Picked::Area { display, rect } if kind == Kind::Scroll => {
+                self.busy.set(false);
+                let (Some(d), Some(feature)) = (frozen.displays.get(display), self.me.upgrade())
+                else {
+                    return;
+                };
+                let Some(capture) = screen_capture::AreaCapture::new(frozen, display, rect) else {
+                    return self.fail("display gone");
+                };
+                let area = NSRect::new(
+                    NSPoint::new(
+                        d.frame.origin.x + rect.origin.x,
+                        d.frame.origin.y + rect.origin.y,
+                    ),
+                    rect.size,
+                );
+                let scrolling = scroll::Scrolling::start(&feature, capture, area, d.frame);
+                *self.scrolling.borrow_mut() = Some(scrolling);
+            }
             Picked::Area { display, rect } => {
                 let Some(d) = frozen.displays.get(display) else {
                     return self.fail("display gone");

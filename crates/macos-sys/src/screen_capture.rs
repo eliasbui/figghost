@@ -6,8 +6,11 @@ use crate::reply::{self, Ticket};
 use block2::RcBlock;
 use objc2::{AnyThread, MainThreadMarker, rc::Retained};
 use objc2_app_kit::{NSBitmapImageFileType, NSBitmapImageRep, NSImage, NSScreen};
-use objc2_core_foundation::{CFRetained, CGPoint, CGRect, CGSize};
-use objc2_core_graphics::{CGImage, CGPreflightScreenCaptureAccess, CGRequestScreenCaptureAccess};
+use objc2_core_foundation::{CFData, CFRetained, CGPoint, CGRect, CGSize};
+use objc2_core_graphics::{
+    CGColorRenderingIntent, CGDataProvider, CGImage, CGPreflightScreenCaptureAccess,
+    CGRequestScreenCaptureAccess, CGWarpMouseCursorPosition,
+};
 use objc2_foundation::{NSArray, NSDictionary, NSError, NSPoint, NSRect, NSSize};
 use objc2_screen_capture_kit::{
     SCCaptureResolutionType, SCContentFilter, SCRunningApplication, SCScreenshotManager,
@@ -71,6 +74,20 @@ pub fn local_time() -> (i32, u32, u32, u32, u32, u32) {
     )
 }
 
+/// Moves the pointer to a point in AppKit screen coordinates, without clicking.
+pub fn warp_pointer(to: NSPoint) {
+    CGWarpMouseCursorPosition(CGPoint::new(to.x, main_screen_height() - to.y));
+}
+
+/// The pixels of a shot: 4 bytes each in the picture's own byte order, rows `stride` bytes apart.
+#[derive(Debug, Clone, PartialEq, Eq)]
+pub struct Pixels {
+    pub data: Vec<u8>,
+    pub width: usize,
+    pub height: usize,
+    pub stride: usize,
+}
+
 /// A captured image and how many pixels it has per point.
 #[derive(Debug, Clone)]
 pub struct Shot {
@@ -106,6 +123,50 @@ impl Shot {
         // SAFETY: the pointer comes from a live CGImage; retaining it keeps it alive as a CF object.
         let image = unsafe { CFRetained::retain(NonNull::from(&*image)) };
         Some(Self { image, scale })
+    }
+
+    /// A copy of the pixels; `None` unless they are 4 bytes each, as screen captures are.
+    pub fn pixels(&self) -> Option<Pixels> {
+        let image = Some(&*self.image);
+        if CGImage::bits_per_pixel(image) != 32 {
+            return None;
+        }
+        let provider = CGImage::data_provider(image)?;
+        let data = CGDataProvider::data(Some(&provider))?;
+        Some(Pixels {
+            data: data.to_vec(),
+            width: CGImage::width(image),
+            height: CGImage::height(image),
+            stride: CGImage::bytes_per_row(image),
+        })
+    }
+
+    /// A shot of `pixels`, in the colour space and byte order of this one.
+    pub fn with_pixels(&self, pixels: &Pixels) -> Option<Shot> {
+        let image = Some(&*self.image);
+        let data = CFData::from_bytes(&pixels.data);
+        let provider = CGDataProvider::with_cf_data(Some(&data))?;
+        let space = CGImage::color_space(image);
+        // SAFETY: the provider holds `stride * height` bytes in the layout this shot already uses.
+        let made = unsafe {
+            CGImage::new(
+                pixels.width,
+                pixels.height,
+                CGImage::bits_per_component(image),
+                32,
+                pixels.stride,
+                space.as_deref(),
+                CGImage::bitmap_info(image),
+                Some(&provider),
+                std::ptr::null(),
+                false,
+                CGColorRenderingIntent::RenderingIntentDefault,
+            )
+        }?;
+        Some(Shot {
+            image: made,
+            scale: self.scale,
+        })
     }
 
     /// The pixels `x, y, w, h` (origin top-left).
@@ -396,6 +457,70 @@ fn capture_displays(content: Retained<SCShareableContent>, ticket: Ticket<Result
             SCScreenshotManager::captureImageWithFilter_configuration_completionHandler(
                 &filter,
                 &config,
+                Some(&block),
+            );
+        }
+    }
+}
+
+/// Captures one area of a display again and again, as it looks each time (for scrolling captures).
+pub struct AreaCapture {
+    filter: Retained<SCContentFilter>,
+    config: Retained<SCStreamConfiguration>,
+    scale: f64,
+}
+
+impl AreaCapture {
+    /// `rect` is in the display's points with the origin at its bottom-left, as the overlay reports it.
+    pub fn new(frozen: &Frozen, display: usize, rect: NSRect) -> Option<Self> {
+        let id = frozen.displays.get(display)?.id;
+        let content = &frozen.content.0;
+        // SAFETY: plain property reads on the retained snapshot; a filter over a live display, leaving
+        // out this app; plain setters on a new configuration.
+        unsafe {
+            let display = content.displays().iter().find(|d| d.displayID() == id)?;
+            let filter = SCContentFilter::initWithDisplay_excludingApplications_exceptingWindows(
+                SCContentFilter::alloc(),
+                &display,
+                &own_applications(content),
+                &NSArray::<SCWindow>::new(),
+            );
+            let scale = f64::from(filter.pointPixelScale()).max(1.0);
+            let height = display.height() as f64;
+            let config = SCStreamConfiguration::new();
+            config.setSourceRect(CGRect::new(
+                CGPoint::new(rect.origin.x, height - rect.origin.y - rect.size.height),
+                rect.size,
+            ));
+            config.setWidth((rect.size.width * scale).round() as usize);
+            config.setHeight((rect.size.height * scale).round() as usize);
+            config.setShowsCursor(false);
+            config.setCaptureResolution(SCCaptureResolutionType::Best);
+            Some(Self {
+                filter,
+                config,
+                scale,
+            })
+        }
+    }
+
+    pub fn capture(&self, done: impl FnOnce(Result<Shot, String>) + 'static) {
+        let ticket = Mutex::new(Some(reply::expect(done)));
+        let scale = self.scale;
+        let block = RcBlock::new(move |image: *mut CGImage, error: *mut NSError| {
+            if let Some(ticket) = ticket.lock().unwrap_or_else(PoisonError::into_inner).take() {
+                ticket.send(
+                    retain_image(image)
+                        .map(|image| Shot { image, scale })
+                        .ok_or_else(|| error_text(error)),
+                );
+            }
+        });
+        // SAFETY: the filter and configuration outlive the call; the block only touches Send data.
+        unsafe {
+            SCScreenshotManager::captureImageWithFilter_configuration_completionHandler(
+                &self.filter,
+                &self.config,
                 Some(&block),
             );
         }

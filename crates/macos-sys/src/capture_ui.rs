@@ -81,6 +81,14 @@ fn button(
     button
 }
 
+/// `rect` grown (or shrunk, for a negative `by`) by `by` on every side.
+fn outset(rect: NSRect, by: f64) -> NSRect {
+    NSRect::new(
+        NSPoint::new(rect.origin.x - by, rect.origin.y - by),
+        NSSize::new(rect.size.width + 2.0 * by, rect.size.height + 2.0 * by),
+    )
+}
+
 /// The largest size with the aspect of `size` that fits in `bounds`, never larger than `size` itself.
 fn fit(size: NSSize, bounds: NSSize) -> NSSize {
     if size.width <= 0.0 || size.height <= 0.0 {
@@ -663,6 +671,205 @@ pub fn toast(mtm: MainThreadMarker, text: &str) {
             }
         });
     });
+}
+
+define_class!(
+    // SAFETY: NSView allows subclassing; it only draws a border.
+    #[unsafe(super(NSView))]
+    #[thread_kind = MainThreadOnly]
+    #[name = "FigScrollBorder"]
+    struct BorderView;
+
+    impl BorderView {
+        #[unsafe(method(drawRect:))]
+        fn draw_rect(&self, _dirty: NSRect) {
+            let path = NSBezierPath::bezierPathWithRect(outset(self.bounds(), -1.5));
+            path.setLineWidth(2.0);
+            let dashes = [6.0, 4.0];
+            // SAFETY: the pattern has the two entries counted.
+            unsafe { path.setLineDash_count_phase(dashes.as_ptr(), 2, 0.0) };
+            NSColor::colorWithRed_green_blue_alpha(0.3, 0.6, 1.0, 0.95).setStroke();
+            path.stroke();
+        }
+    }
+);
+
+pub struct KeysIvars {
+    on_done: Rc<dyn Fn()>,
+    on_cancel: Rc<dyn Fn()>,
+}
+
+define_class!(
+    // SAFETY: NSView allows subclassing; the ivars are only touched on the main thread and need no Drop.
+    #[unsafe(super(NSView))]
+    #[thread_kind = MainThreadOnly]
+    #[name = "FigScrollControls"]
+    #[ivars = KeysIvars]
+    struct ControlsView;
+
+    impl ControlsView {
+        #[unsafe(method(acceptsFirstResponder))]
+        fn accepts_first_responder(&self) -> bool {
+            true
+        }
+
+        #[unsafe(method(drawRect:))]
+        fn draw_rect(&self, _dirty: NSRect) {
+            NSColor::colorWithWhite_alpha(0.08, 0.92).setFill();
+            NSBezierPath::bezierPathWithRoundedRect_xRadius_yRadius(self.bounds(), 10.0, 10.0).fill();
+        }
+
+        #[unsafe(method(keyDown:))]
+        fn key_down(&self, event: &NSEvent) {
+            match event.keyCode() {
+                53 => (self.ivars().on_cancel)(),
+                36 | 76 => (self.ivars().on_done)(),
+                _ => {}
+            }
+        }
+    }
+);
+
+define_class!(
+    // SAFETY: NSPanel allows subclassing; this one only allows key status, for Escape and Return.
+    #[unsafe(super(NSPanel))]
+    #[thread_kind = MainThreadOnly]
+    #[name = "FigScrollPanel"]
+    struct KeyPanel;
+
+    impl KeyPanel {
+        #[unsafe(method(canBecomeKeyWindow))]
+        fn can_become_key_window(&self) -> bool {
+            true
+        }
+    }
+);
+
+#[derive(Debug, Clone, Default)]
+pub struct ScrollTexts {
+    pub done: String,
+    pub cancel: String,
+}
+
+/// Shown while a scrolling capture runs: a border around the area (clicks and scrolling go through it)
+/// and a small bar with the progress, Done and Cancel. Return is Done, Escape is Cancel.
+pub struct ScrollSession {
+    border: Retained<NSPanel>,
+    controls: Retained<KeyPanel>,
+    status: Retained<objc2_app_kit::NSTextField>,
+    _targets: Vec<Retained<ActionTarget>>,
+}
+
+impl ScrollSession {
+    /// `area` is in AppKit screen coordinates.
+    pub fn show(
+        mtm: MainThreadMarker,
+        area: NSRect,
+        texts: &ScrollTexts,
+        on_done: impl Fn() + 'static,
+        on_cancel: impl Fn() + 'static,
+    ) -> Rc<Self> {
+        let border_frame = outset(area, 3.0);
+        let border = panel(mtm, border_frame, NSStatusWindowLevel);
+        border.setHasShadow(false);
+        border.setIgnoresMouseEvents(true);
+        // SAFETY: designated initializer with valid arguments on the main thread.
+        let view: Retained<BorderView> = unsafe {
+            msg_send![
+                super(mtm.alloc::<BorderView>().set_ivars(())),
+                initWithFrame: NSRect::new(NSPoint::ZERO, border_frame.size)
+            ]
+        };
+        border.setContentView(Some(&view));
+
+        let (width, height) = (300.0, 40.0);
+        let below = area.origin.y - height - 12.0;
+        let screen_bottom = NSScreen::screens(mtm)
+            .iter()
+            .map(|s| s.visibleFrame().origin.y)
+            .fold(f64::INFINITY, f64::min);
+        let y = if below > screen_bottom {
+            below
+        } else {
+            area.origin.y + area.size.height + 12.0
+        };
+        let frame = NSRect::new(
+            NSPoint::new(area.origin.x + (area.size.width - width) / 2.0, y),
+            NSSize::new(width, height),
+        );
+        // SAFETY: designated initializer with valid arguments on the main thread.
+        let controls: Retained<KeyPanel> = unsafe {
+            msg_send![
+                KeyPanel::alloc(mtm),
+                initWithContentRect: frame,
+                styleMask: NSWindowStyleMask::Borderless | NSWindowStyleMask::NonactivatingPanel,
+                backing: NSBackingStoreType::Buffered,
+                defer: false
+            ]
+        };
+        // SAFETY: false is the only value compatible with a window kept alive by `Retained`.
+        unsafe { controls.setReleasedWhenClosed(false) };
+        controls.setOpaque(false);
+        controls.setBackgroundColor(Some(&NSColor::clearColor()));
+        controls.setHidesOnDeactivate(false);
+        controls.setLevel(NSStatusWindowLevel);
+        let on_done: Rc<dyn Fn()> = Rc::new(on_done);
+        let on_cancel: Rc<dyn Fn()> = Rc::new(on_cancel);
+        let ivars = KeysIvars {
+            on_done: Rc::clone(&on_done),
+            on_cancel: Rc::clone(&on_cancel),
+        };
+        // SAFETY: designated initializer with valid arguments on the main thread.
+        let content: Retained<ControlsView> = unsafe {
+            msg_send![
+                super(mtm.alloc::<ControlsView>().set_ivars(ivars)),
+                initWithFrame: NSRect::new(NSPoint::ZERO, frame.size)
+            ]
+        };
+        controls.setContentView(Some(&content));
+        let status = objc2_app_kit::NSTextField::labelWithString(&NSString::from_str(""), mtm);
+        status.setFont(Some(&NSFont::monospacedDigitSystemFontOfSize_weight(
+            12.0, 0.0,
+        )));
+        status.setTextColor(Some(&NSColor::whiteColor()));
+        status.setFrame(NSRect::new(
+            NSPoint::new(14.0, 11.0),
+            NSSize::new(120.0, 18.0),
+        ));
+        content.addSubview(&status);
+        let done_target = ActionTarget::new(mtm, move || on_done());
+        let cancel_target = ActionTarget::new(mtm, move || on_cancel());
+        content.addSubview(&button(
+            mtm,
+            &texts.done,
+            NSRect::new(NSPoint::new(140.0, 8.0), NSSize::new(72.0, BUTTON_HEIGHT)),
+            &done_target,
+        ));
+        content.addSubview(&button(
+            mtm,
+            &texts.cancel,
+            NSRect::new(NSPoint::new(216.0, 8.0), NSSize::new(72.0, BUTTON_HEIGHT)),
+            &cancel_target,
+        ));
+        border.orderFrontRegardless();
+        controls.makeKeyAndOrderFront(None);
+        controls.makeFirstResponder(Some(&content));
+        Rc::new(Self {
+            border,
+            controls,
+            status,
+            _targets: vec![done_target, cancel_target],
+        })
+    }
+
+    pub fn set_status(&self, text: &str) {
+        self.status.setStringValue(&NSString::from_str(text));
+    }
+
+    pub fn close(&self) {
+        self.border.orderOut(None);
+        self.controls.orderOut(None);
+    }
 }
 
 /// Asks where to save a file, starting from `directory` with `name` filled in; `None` if cancelled.
