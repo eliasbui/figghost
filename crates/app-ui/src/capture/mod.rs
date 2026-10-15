@@ -14,6 +14,7 @@ use macos_sys::{
     MainThreadMarker, NSPoint, NSRect, app,
     capture_overlay::{self, Mode, Overlay, Picked},
     capture_ui::{self, Pin, PinActions, PinTexts, QuickActions, QuickPanel, QuickTexts},
+    editor_ui::{EditorActions, EditorTexts, EditorWindow},
     hotkey::Hotkey,
     ocr,
     pasteboard::{Pasteboard, Write},
@@ -222,6 +223,7 @@ pub struct CaptureFeature {
     quick: RefCell<Vec<(u64, Rc<QuickPanel>)>>,
     pins: RefCell<Vec<(u64, Rc<Pin>)>>,
     scrolling: RefCell<Option<Rc<scroll::Scrolling>>>,
+    editors: RefCell<Vec<(u64, Rc<EditorWindow>)>>,
     next_id: Cell<u64>,
 }
 
@@ -238,6 +240,7 @@ impl CaptureFeature {
             quick: RefCell::new(Vec::new()),
             pins: RefCell::new(Vec::new()),
             scrolling: RefCell::new(None),
+            editors: RefCell::new(Vec::new()),
             next_id: Cell::new(1),
         });
         for note in feature.configure() {
@@ -341,7 +344,10 @@ impl CaptureFeature {
     }
 
     fn frozen(&self, kind: Kind, frozen: Rc<Frozen>) {
-        trace::log(&format!("capture: froze {} display(s)", frozen.displays.len()));
+        trace::log(&format!(
+            "capture: froze {} display(s)",
+            frozen.displays.len()
+        ));
         let text = i18n::current();
         let (mode, hint) = match kind {
             Kind::Screen | Kind::Timer => {
@@ -530,9 +536,9 @@ impl CaptureFeature {
         let actions = QuickActions {
             on_copy: with(|f, _, t, _| f.copy(&t.shot)),
             on_save: with(|f, _, t, _| f.save_as(&t.shot)),
-            on_edit: with(|f, id, _, path| {
+            on_edit: with(|f, id, t, path| {
                 f.close_quick(id);
-                workspace::open_path(path);
+                f.edit(t, path);
             }),
             on_pin: with(|f, id, t, _| {
                 f.close_quick(id);
@@ -552,6 +558,95 @@ impl CaptureFeature {
         if seconds > 0.0 {
             self.close_quick_later(id, seconds);
         }
+    }
+
+    /// Opens the editor; Done writes the edited picture over the capture's file.
+    fn edit(&self, taken: &Rc<Taken>, path: &Path) {
+        let text = i18n::current();
+        let id = self.next_id.replace(self.next_id.get() + 1);
+        let me = self.me.clone();
+        let screen = taken.screen;
+        let with = |act: fn(&CaptureFeature, Shot, NSRect, &Path)| {
+            let (me, path) = (me.clone(), path.to_owned());
+            Box::new(move |shot: Shot| {
+                if let Some(feature) = me.upgrade() {
+                    act(&feature, shot, screen, &path);
+                }
+            }) as Box<dyn Fn(Shot)>
+        };
+        let actions = EditorActions {
+            on_copy: with(|f, shot, _, _| f.copy(&shot)),
+            on_save: with(|f, shot, _, _| f.save_as(&shot)),
+            on_pin: with(|f, shot, screen, _| {
+                let size = shot.point_size();
+                let place = NSRect::new(
+                    NSPoint::new(
+                        screen.origin.x + (screen.size.width - size.width).max(0.0) / 2.0,
+                        screen.origin.y + (screen.size.height - size.height).max(0.0) / 2.0,
+                    ),
+                    size,
+                );
+                f.pin(&Rc::new(Taken {
+                    shot,
+                    screen,
+                    place,
+                }));
+            }),
+            on_done: with(|f, shot, _, path| f.finish_edit(&shot, path)),
+            on_closed: {
+                let me = me.clone();
+                Box::new(move || {
+                    if let Some(feature) = me.upgrade() {
+                        feature.editors.borrow_mut().retain(|(i, _)| *i != id);
+                    }
+                })
+            },
+        };
+        let tools = [
+            text.editor_select(),
+            text.editor_arrow(),
+            text.editor_line(),
+            text.editor_frame(),
+            text.editor_ellipse(),
+            text.editor_highlight(),
+            text.editor_text(),
+            text.editor_counter(),
+            text.editor_pixelate(),
+            text.editor_crop(),
+        ];
+        let texts = EditorTexts {
+            title: text.editor_title().into(),
+            tools: tools.iter().map(|t| (*t).to_owned()).collect(),
+            undo: text.editor_undo().into(),
+            redo: text.editor_redo().into(),
+            background: text.editor_background().into(),
+            copy: text.capture_copy().into(),
+            save: text.capture_save().into(),
+            pin: text.capture_pin().into(),
+            done: text.editor_done().into(),
+        };
+        let window = EditorWindow::open(self.mtm, &taken.shot, &texts, actions);
+        self.editors.borrow_mut().push((id, window));
+    }
+
+    /// Done in the editor: the edited picture replaces the capture's file and, as configured, the clipboard.
+    fn finish_edit(&self, shot: &Shot, path: &Path) {
+        let text = i18n::current();
+        let Some(png) = shot.png() else {
+            return;
+        };
+        if let Err(e) = fs::write(path, &png) {
+            capture_ui::toast(self.mtm, &text.capture_write_failed(&e.to_string()));
+            return;
+        }
+        if self.config.borrow().capture.copy {
+            pasteboard().write(Write::Png(&png));
+        }
+        let name = path
+            .file_name()
+            .map(|n| n.to_string_lossy().into_owned())
+            .unwrap_or_default();
+        capture_ui::toast(self.mtm, &text.capture_saved(&name));
     }
 
     fn close_quick_later(&self, id: u64, seconds: f64) {

@@ -6,6 +6,7 @@ pub mod audio_tap;
 pub mod ax;
 pub mod capture_overlay;
 pub mod capture_ui;
+pub mod editor_ui;
 pub mod event_tap;
 pub mod hotkey;
 pub mod hud;

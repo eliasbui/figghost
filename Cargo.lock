@@ -197,6 +197,7 @@ name = "macos-sys"
 version = "0.1.0"
 dependencies = [
  "block2",
+ "core-capture",
  "core-foundation",
  "core-window",
  "dispatch2",

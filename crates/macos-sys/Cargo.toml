@@ -19,6 +19,7 @@ objc2-foundation.workspace = true
 objc2-app-kit.workspace = true
 core-foundation.workspace = true
 libc.workspace = true
+core-capture.workspace = true
 
 [dev-dependencies]
 core-window.workspace = true

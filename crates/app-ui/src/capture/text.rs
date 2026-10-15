@@ -165,6 +165,111 @@ impl Language {
         }
     }
 
+    pub fn editor_title(self) -> &'static str {
+        match self {
+            Language::English => "Edit Capture",
+            Language::Vietnamese => "Sửa ảnh chụp",
+        }
+    }
+
+    pub fn editor_select(self) -> &'static str {
+        match self {
+            Language::English => "Select",
+            Language::Vietnamese => "Chọn",
+        }
+    }
+
+    pub fn editor_arrow(self) -> &'static str {
+        match self {
+            Language::English => "Arrow",
+            Language::Vietnamese => "Mũi tên",
+        }
+    }
+
+    pub fn editor_line(self) -> &'static str {
+        match self {
+            Language::English => "Line",
+            Language::Vietnamese => "Đường",
+        }
+    }
+
+    pub fn editor_frame(self) -> &'static str {
+        match self {
+            Language::English => "Frame",
+            Language::Vietnamese => "Khung",
+        }
+    }
+
+    pub fn editor_ellipse(self) -> &'static str {
+        match self {
+            Language::English => "Ellipse",
+            Language::Vietnamese => "Elip",
+        }
+    }
+
+    pub fn editor_highlight(self) -> &'static str {
+        match self {
+            Language::English => "Highlight",
+            Language::Vietnamese => "Tô sáng",
+        }
+    }
+
+    pub fn editor_text(self) -> &'static str {
+        match self {
+            Language::English => "Text",
+            Language::Vietnamese => "Chữ",
+        }
+    }
+
+    pub fn editor_counter(self) -> &'static str {
+        match self {
+            Language::English => "Number",
+            Language::Vietnamese => "Số",
+        }
+    }
+
+    pub fn editor_pixelate(self) -> &'static str {
+        match self {
+            Language::English => "Pixelate",
+            Language::Vietnamese => "Che",
+        }
+    }
+
+    pub fn editor_crop(self) -> &'static str {
+        match self {
+            Language::English => "Crop",
+            Language::Vietnamese => "Cắt",
+        }
+    }
+
+    pub fn editor_undo(self) -> &'static str {
+        match self {
+            Language::English => "Undo",
+            Language::Vietnamese => "Hoàn tác",
+        }
+    }
+
+    pub fn editor_redo(self) -> &'static str {
+        match self {
+            Language::English => "Redo",
+            Language::Vietnamese => "Làm lại",
+        }
+    }
+
+    pub fn editor_background(self) -> &'static str {
+        match self {
+            Language::English => "Background",
+            Language::Vietnamese => "Nền",
+        }
+    }
+
+    pub fn editor_done(self) -> &'static str {
+        match self {
+            Language::English => "Done",
+            Language::Vietnamese => "Xong",
+        }
+    }
+
     pub fn menu_capture_area(self) -> &'static str {
         match self {
             Language::English => "Capture Area",
