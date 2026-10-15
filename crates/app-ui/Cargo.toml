@@ -10,5 +10,6 @@ macos-sys.workspace = true
 core-mouse.workspace = true
 core-clipboard.workspace = true
 core-window.workspace = true
+core-audio-fx.workspace = true
 serde.workspace = true
 serde_json.workspace = true

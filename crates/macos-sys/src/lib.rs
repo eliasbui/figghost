@@ -11,6 +11,7 @@ pub mod labels;
 pub mod locale;
 pub mod login_item;
 pub mod media_ui;
+pub mod mixer_ui;
 pub mod notch;
 pub mod now_playing;
 pub mod panel;

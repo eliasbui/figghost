@@ -1,6 +1,7 @@
 #![forbid(unsafe_code)]
 //! Composition root: starts each feature and keeps its handles alive.
 
+mod audio;
 mod clipboard;
 mod config;
 mod context;
@@ -15,6 +16,7 @@ mod tiling;
 mod trace;
 mod volume_hud;
 
+use audio::AudioFeature;
 use clipboard::Clipboard;
 use config::{Config, home_dir};
 use context::AppContext;
@@ -49,6 +51,7 @@ struct Shell {
     clipboard: Option<Rc<Clipboard>>,
     shelf: Option<Rc<ShelfFeature>>,
     media: Option<MediaFeature>,
+    audio: AudioFeature,
     tiling: Rc<Tiling>,
     volume_hud: Rc<VolumeHud>,
     settings: Rc<SettingsFeature>,
@@ -86,15 +89,21 @@ impl Shell {
             .as_ref()
             .map(|notch| Rc::new(ShelfFeature::attach(mtm, notch, &home)));
         let media = notch.as_ref().map(|notch| MediaFeature::attach(mtm, notch));
-        let volume_hud = Rc::new(VolumeHud::new(mtm));
-        if config.volume_hud {
+        let config = Rc::new(RefCell::new(config));
+        let audio = AudioFeature::start(mtm, &config, home.clone(), notch.as_deref());
+        let volume_hud = Rc::new(VolumeHud::new(mtm, audio.engine.soft_volume()));
+        if config.borrow().volume_hud {
             volume_hud.enable_when_possible();
+        }
+        {
+            let hud = Rc::clone(&volume_hud);
+            audio.engine.set_on_soft(move |on| hud.set_soft_keys(on));
         }
 
         let ctx = Rc::new(AppContext {
             mtm,
             home,
-            config: Rc::new(RefCell::new(config)),
+            config: Rc::clone(&config),
             control: Arc::clone(&mouse.control),
             clipboard: clipboard.clone(),
             shelf: shelf.clone(),
@@ -115,6 +124,7 @@ impl Shell {
             clipboard,
             shelf,
             media,
+            audio,
             tiling,
             volume_hud,
             settings,

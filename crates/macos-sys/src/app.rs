@@ -291,3 +291,8 @@ pub fn after(seconds: f64, f: impl FnOnce() + 'static) {
         }
     });
 }
+
+/// Runs `work` on the main thread soon, from any thread (an event tap, an audio callback's helper).
+pub fn on_main(work: impl FnOnce() + Send + 'static) {
+    dispatch2::DispatchQueue::main().exec_async(work);
+}
