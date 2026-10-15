@@ -1,8 +1,9 @@
 //! Records three seconds of an area of the main display into a temporary MP4 with the key display
 //! included, then checks the file: its length and picture size, that the key display shows in the
 //! video while a key is up and is gone once it fades, that a GIF made from it loops with the expected
-//! frames, and that a recording of a missing window reports an error instead of starting. Needs Screen
-//! Recording and Accessibility access for the terminal.
+//! frames, that a recording of a missing window reports an error instead of starting, and that the
+//! computer's audio adds a sound track. Needs Screen Recording and Accessibility access for the
+//! terminal. A recording with the microphone is tried last; its outcome depends on the hardware.
 //!
 //!     cargo run -p macos-sys --example record_check
 
@@ -14,7 +15,7 @@ use macos_sys::{
 };
 use objc2::{MainThreadMarker, rc::Retained};
 use objc2_app_kit::NSApplication;
-use objc2_av_foundation::{AVAssetImageGenerator, AVMediaTypeVideo, AVURLAsset};
+use objc2_av_foundation::{AVAssetImageGenerator, AVMediaTypeAudio, AVMediaTypeVideo, AVURLAsset};
 use objc2_core_foundation::CFRetained;
 use objc2_core_media::CMTime;
 use objc2_foundation::{NSDate, NSPoint, NSRect, NSRunLoop, NSSize, NSString, NSURL};
@@ -37,6 +38,59 @@ fn options(include_windows: Vec<u32>) -> RecordOptions {
         clicks: true,
         cursor: true,
         include_windows,
+    }
+}
+
+/// Records `target` for `seconds`, calling `during` once half a second in; the finished file or why not.
+fn record_for(
+    frozen: &Frozen,
+    target: Target,
+    path: &Path,
+    options: &RecordOptions,
+    seconds: f64,
+    during: impl FnOnce(),
+) -> Result<PathBuf, String> {
+    let recording: Slot<Result<Recording, String>> = Rc::default();
+    let finished: Slot<Result<PathBuf, String>> = Rc::default();
+    let (r, f) = (Rc::clone(&recording), Rc::clone(&finished));
+    Recording::start(
+        frozen,
+        target,
+        path,
+        options,
+        move |result| *r.borrow_mut() = Some(result),
+        move |result| *f.borrow_mut() = Some(result),
+    );
+    spin_until(10.0, || recording.borrow().is_some());
+    let recording = recording
+        .borrow_mut()
+        .take()
+        .unwrap_or(Err("did not start".into()))?;
+    spin_until(0.5, || false);
+    during();
+    spin_until(seconds - 0.5, || false);
+    println!("recorded {:.2} s so far", recording.duration());
+    recording.stop();
+    spin_until(10.0, || finished.borrow().is_some());
+    finished
+        .borrow_mut()
+        .take()
+        .unwrap_or(Err("did not finish".into()))
+}
+
+/// How many tracks of `kind` (video or audio) the movie has, and the first video track's size.
+fn tracks(file: &Path, audio: bool) -> usize {
+    let url = NSURL::fileURLWithPath(&NSString::from_str(&file.to_string_lossy()));
+    // SAFETY: plain reads of a local movie file's properties.
+    unsafe {
+        let asset = AVURLAsset::URLAssetWithURL_options(&url, None);
+        let kind = if audio {
+            AVMediaTypeAudio
+        } else {
+            AVMediaTypeVideo
+        };
+        #[allow(deprecated)]
+        asset.tracksWithMediaType(kind.unwrap()).count()
     }
 }
 
@@ -122,10 +176,8 @@ fn main() {
         area.size,
     );
     let keys = KeyDisplay::show(mtm, on_screen).expect("key display (Accessibility access)");
-    let recording: Slot<Result<Recording, String>> = Rc::default();
-    let finished: Slot<Result<PathBuf, String>> = Rc::default();
-    let (r, f) = (Rc::clone(&recording), Rc::clone(&finished));
-    Recording::start(
+    let started = Instant::now();
+    let result = record_for(
         &frozen,
         Target::Area {
             display: 0,
@@ -133,30 +185,17 @@ fn main() {
         },
         &path,
         &options(vec![keys.window_number()]),
-        move |result| *r.borrow_mut() = Some(result),
-        move |result| *f.borrow_mut() = Some(result),
+        3.0,
+        || keys.press("Shift + Cmd + 4"),
     );
-    spin_until(10.0, || recording.borrow().is_some());
-    let recording = match recording.borrow_mut().take() {
-        Some(Ok(recording)) => recording,
-        other => {
-            println!("FAIL: could not start: {:?}", other.map(|r| r.err()));
-            return;
-        }
-    };
-    let started = Instant::now();
-    spin_until(0.5, || false);
-    keys.press("Shift + Cmd + 4");
-    spin_until(2.5, || false);
-    println!("recorded {:.2} s so far", recording.duration());
-    recording.stop();
-    spin_until(10.0, || finished.borrow().is_some());
     keys.close();
     println!("stopped after {:?}", started.elapsed());
-    let result = finished.borrow_mut().take();
-    let Some(Ok(file)) = result else {
-        println!("FAIL: {result:?}");
-        return;
+    let file = match result {
+        Ok(file) => file,
+        Err(e) => {
+            println!("FAIL: {e}");
+            return;
+        }
     };
     let size = fs::metadata(&file).map(|m| m.len()).unwrap_or(0);
     let url = NSURL::fileURLWithPath(&NSString::from_str(&file.to_string_lossy()));
@@ -228,7 +267,41 @@ fn main() {
         }
     };
     let _ = fs::remove_file(&file);
-    let ok = missing_ok
+
+    let sound = RecordOptions {
+        system_audio: true,
+        ..options(Vec::new())
+    };
+    let target = Target::Area {
+        display: 0,
+        rect: area,
+    };
+    let audio_ok = match record_for(&frozen, target, &path, &sound, 1.5, || {}) {
+        Ok(file) => {
+            let found = tracks(&file, true);
+            println!("computer audio: {found} sound track(s)");
+            let _ = fs::remove_file(&file);
+            found == 1
+        }
+        Err(e) => {
+            println!("computer audio failed: {e}");
+            false
+        }
+    };
+    let microphone = RecordOptions {
+        microphone: true,
+        ..options(Vec::new())
+    };
+    match record_for(&frozen, target, &path, &microphone, 1.5, || {}) {
+        Ok(file) => {
+            println!("microphone: {} sound track(s)", tracks(&file, true));
+            let _ = fs::remove_file(&file);
+        }
+        Err(e) => println!("microphone: {e}"),
+    }
+
+    let ok = audio_ok
+        && missing_ok
         && keys_ok
         && gif_ok
         && poster.is_some()
