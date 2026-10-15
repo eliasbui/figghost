@@ -1,0 +1,12 @@
+{
+  "enabled": false,
+  "lead_minutes": 5,
+  "sound": true,
+  "reminders": true,
+  "all_day": true,
+  "events_access": "not_determined",
+  "reminders_access": "not_determined",
+  "can_prompt": true,
+  "calendars": [],
+  "lists": []
+}

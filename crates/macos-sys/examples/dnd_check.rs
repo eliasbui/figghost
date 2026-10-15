@@ -97,6 +97,8 @@ fn main() {
             on_drop: Box::new(|_| {}),
             on_remove: Box::new(|_| {}),
             on_open: Box::new(|_| {}),
+            actions_for: Box::new(|_| Vec::new()),
+            on_action: Box::new(|_, _| {}),
         };
         let frame = NSRect::new(NSPoint::ZERO, NSSize::new(420.0, 260.0));
         let source = ShelfView::new(mtm, frame, quiet());

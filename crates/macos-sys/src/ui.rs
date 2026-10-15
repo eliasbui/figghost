@@ -1,9 +1,11 @@
 //! Clipboard list UI: search field, scrolling list with thumbnails, footer hint, and the cursor popup.
 
 use crate::{
+    button::{Look, TouchButton},
     labels,
     panel::{FigPanel, Key},
-    widgets::{Fit, PageRoot, draw_text, text_attributes},
+    style::{self, Tone, Weight},
+    widgets::{ActionTarget, Fit, PageRoot, draw_text, text_attributes},
 };
 use block2::RcBlock;
 use objc2::{
@@ -13,10 +15,11 @@ use objc2::{
 };
 use objc2_app_kit::{
     NSAutoresizingMaskOptions, NSBezierPath, NSBorderType, NSColor, NSCompositingOperation,
-    NSControlTextDidChangeNotification, NSEvent, NSFocusRingType, NSFont, NSFontWeightMedium,
-    NSImage, NSScreen, NSScrollView, NSScrollerStyle, NSSearchField, NSTrackingArea,
-    NSTrackingAreaOptions, NSView, NSVisualEffectBlendingMode, NSVisualEffectMaterial,
-    NSVisualEffectState, NSVisualEffectView, NSWindowDidResignKeyNotification,
+    NSControlStateValueOn, NSControlTextDidChangeNotification, NSEvent, NSFocusRingType, NSFont,
+    NSFontWeightMedium, NSGraphicsContext, NSImage, NSMenu, NSMenuItem, NSScreen, NSScrollView,
+    NSScrollerStyle, NSSearchField, NSTrackingArea, NSTrackingAreaOptions, NSView,
+    NSVisualEffectBlendingMode, NSVisualEffectMaterial, NSVisualEffectState, NSVisualEffectView,
+    NSWindowDidResignKeyNotification,
 };
 use objc2_foundation::{
     NSNotification, NSNotificationCenter, NSObjectProtocol, NSPoint, NSRect, NSSize, NSString,
@@ -37,6 +40,68 @@ const FOOTER_HEIGHT: f64 = 24.0;
 const THUMB_CACHE_LIMIT: usize = 96;
 const PAGE_ROWS: isize = 7;
 const KEY_LABEL_WIDTH: f64 = 30.0;
+const CARD_ROW_HEIGHT: f64 = 60.0;
+const CARD_THUMB: f64 = 38.0;
+const CHIP_HEIGHT: f64 = 26.0;
+const CHIP_GAP: f64 = 6.0;
+/// What a hidden row shows in place of its text: dots, always the same count so the length is not given away.
+const HIDDEN_TEXT: &str = "\u{2022}\u{2022}\u{2022}\u{2022}\u{2022}\u{2022}\u{2022}\u{2022}\u{2022}\u{2022}\u{2022}\u{2022}";
+
+/// How the rows look: the flat list of the cursor popup, or the cards of the notch.
+#[derive(Debug, Clone, Copy, PartialEq, Eq)]
+pub enum ListStyle {
+    Plain,
+    Cards,
+}
+
+/// The words in a search that are filters (`@link`) and the one filter a chip stands for.
+const FILTERS: [&str; 6] = ["@pin", "@link", "@code", "@image", "@file", "@text"];
+
+/// A board that has a chip, and the word that searches it.
+#[derive(Debug, Clone, PartialEq, Eq)]
+pub struct BoardChip {
+    pub id: i64,
+    pub name: String,
+    /// `@` and the board's search word, as it is typed in the search field.
+    pub filter: String,
+}
+
+fn is_filter_word(word: &str, boards: &[BoardChip]) -> bool {
+    FILTERS
+        .iter()
+        .copied()
+        .chain(boards.iter().map(|b| b.filter.as_str()))
+        .any(|f| f.eq_ignore_ascii_case(word))
+}
+
+/// The first filter in a query, as the chip that is selected: one of the fixed filters or a board's.
+pub fn filter_of(query: &str, boards: &[BoardChip]) -> Option<String> {
+    query
+        .split_whitespace()
+        .find(|word| is_filter_word(word, boards))
+        .map(|word| {
+            FILTERS
+                .iter()
+                .copied()
+                .chain(boards.iter().map(|b| b.filter.as_str()))
+                .find(|f| f.eq_ignore_ascii_case(word))
+                .unwrap_or(word)
+                .to_owned()
+        })
+}
+
+/// The query with its filters replaced by `filter`, or removed when there is none; the other words stay.
+pub fn with_filter(query: &str, filter: Option<&str>, boards: &[BoardChip]) -> String {
+    let rest: Vec<&str> = query
+        .split_whitespace()
+        .filter(|word| !is_filter_word(word, boards))
+        .collect();
+    match filter {
+        Some(filter) if rest.is_empty() => format!("{filter} "),
+        Some(filter) => format!("{filter} {}", rest.join(" ")),
+        None => rest.join(" "),
+    }
+}
 
 pub const POPUP_SIZE: NSSize = NSSize::new(460.0, 440.0);
 
@@ -52,19 +117,38 @@ pub struct Row {
     pub thumb: Option<PathBuf>,
 }
 
+/// What a row is beyond its text. It is supplied next to the rows rather than inside `Row`, so a surface
+/// that builds plain rows needs nothing from it.
+#[derive(Debug, Clone, Copy, Default, PartialEq, Eq)]
+pub struct Mark {
+    /// A likely secret: drawn with a lock.
+    pub sensitive: bool,
+    /// Its text is not shown, and activating the row reveals it first instead of pasting it.
+    pub hidden: bool,
+    /// The board a pinned item is filed in.
+    pub board: Option<i64>,
+}
+
 struct ListState {
     rows: Vec<Row>,
+    marks: HashMap<i64, Mark>,
     selected: usize,
     min_height: f64,
     empty_text: String,
 }
 
 type RowActivate = Rc<dyn Fn(i64)>;
+type RowMenu = Rc<dyn Fn(i64, &NSEvent)>;
 
 pub struct ListIvars {
+    style: ListStyle,
     state: RefCell<ListState>,
     thumbs: RefCell<HashMap<PathBuf, Option<Retained<NSImage>>>>,
     on_activate: RefCell<Option<RowActivate>>,
+    /// Opens the board menu for a row; set by the surface that owns the list.
+    on_menu: RefCell<Option<RowMenu>>,
+    /// The menu being shown and the targets of its items, kept alive until it closes.
+    menu_targets: RefCell<Vec<Retained<ActionTarget>>>,
 }
 
 define_class!(
@@ -98,6 +182,18 @@ define_class!(
             }
         }
 
+        #[unsafe(method(rightMouseDown:))]
+        fn right_mouse_down(&self, event: &NSEvent) {
+            if let Some(row) = self.row_at(event) {
+                self.select(row, false);
+                let id = self.selected_id();
+                let callback = self.ivars().on_menu.borrow().clone();
+                if let (Some(id), Some(callback)) = (id, callback) {
+                    callback(id, event);
+                }
+            }
+        }
+
         #[unsafe(method(mouseDown:))]
         fn mouse_down(&self, event: &NSEvent) {
             if let Some(row) = self.row_at(event) {
@@ -114,16 +210,20 @@ define_class!(
 );
 
 impl ListView {
-    fn new(mtm: MainThreadMarker, frame: NSRect) -> Retained<Self> {
+    fn new(mtm: MainThreadMarker, frame: NSRect, style: ListStyle) -> Retained<Self> {
         let ivars = ListIvars {
+            style,
             state: RefCell::new(ListState {
                 rows: Vec::new(),
+                marks: HashMap::new(),
                 selected: 0,
                 min_height: frame.size.height,
                 empty_text: String::new(),
             }),
             thumbs: RefCell::new(HashMap::new()),
             on_activate: RefCell::new(None),
+            on_menu: RefCell::new(None),
+            menu_targets: RefCell::new(Vec::new()),
         };
         // SAFETY: designated initializer with valid arguments on the main thread.
         let this: Retained<Self> =
@@ -146,18 +246,31 @@ impl ListView {
         this
     }
 
+    fn row_height(&self) -> f64 {
+        match self.ivars().style {
+            ListStyle::Plain => ROW_HEIGHT,
+            ListStyle::Cards => CARD_ROW_HEIGHT,
+        }
+    }
+
     fn set_on_activate(&self, f: impl Fn(i64) + 'static) {
         *self.ivars().on_activate.borrow_mut() = Some(Rc::new(f));
     }
 
     /// Replaces the rows, selects the first and scrolls back to the top.
     pub fn set_rows(&self, rows: Vec<Row>, empty_text: &str) {
+        self.set_rows_marked(rows, HashMap::new(), empty_text);
+    }
+
+    /// `set_rows`, with what is known about some of the rows by their ids.
+    pub fn set_rows_marked(&self, rows: Vec<Row>, marks: HashMap<i64, Mark>, empty_text: &str) {
         let width = self.frame().size.width;
         {
             let mut state = self.ivars().state.borrow_mut();
-            let height = (rows.len() as f64 * ROW_HEIGHT).max(state.min_height);
+            let height = (rows.len() as f64 * self.row_height()).max(state.min_height);
             self.setFrameSize(NSSize::new(width, height));
             state.rows = rows;
+            state.marks = marks;
             state.selected = 0;
             state.empty_text = empty_text.to_owned();
         }
@@ -166,7 +279,51 @@ impl ListView {
     }
 
     fn set_min_height(&self, height: f64) {
-        self.ivars().state.borrow_mut().min_height = height;
+        let rows = {
+            let mut state = self.ivars().state.borrow_mut();
+            state.min_height = height;
+            state.rows.len()
+        };
+        let size = NSSize::new(
+            self.frame().size.width,
+            (rows as f64 * self.row_height()).max(height),
+        );
+        self.setFrameSize(size);
+        self.setNeedsDisplay(true);
+    }
+
+    pub fn mark_of(&self, id: i64) -> Mark {
+        self.ivars()
+            .state
+            .borrow()
+            .marks
+            .get(&id)
+            .copied()
+            .unwrap_or_default()
+    }
+
+    /// Shows the text of a hidden row, until the rows are replaced. Activating it again pastes it.
+    pub fn reveal(&self, id: i64, text: &str) {
+        {
+            let mut state = self.ivars().state.borrow_mut();
+            if let Some(row) = state.rows.iter_mut().find(|r| r.id == id) {
+                row.title = text.to_owned();
+            }
+            if let Some(mark) = state.marks.get_mut(&id) {
+                mark.hidden = false;
+            }
+        }
+        self.setNeedsDisplay(true);
+    }
+
+    fn set_on_menu(&self, f: impl Fn(i64, &NSEvent) + 'static) {
+        *self.ivars().on_menu.borrow_mut() = Some(Rc::new(f));
+    }
+
+    /// Shows a menu at the pointer; the targets of its items are kept until the next one.
+    fn pop_up(&self, menu: &NSMenu, targets: Vec<Retained<ActionTarget>>, event: &NSEvent) {
+        *self.ivars().menu_targets.borrow_mut() = targets;
+        NSMenu::popUpContextMenu_withEvent_forView(menu, event, self);
     }
 
     /// The row pinned with this letter.
@@ -231,8 +388,8 @@ impl ListView {
         }
         if reveal {
             let rect = NSRect::new(
-                NSPoint::new(0.0, row as f64 * ROW_HEIGHT),
-                NSSize::new(self.bounds().size.width, ROW_HEIGHT),
+                NSPoint::new(0.0, row as f64 * self.row_height()),
+                NSSize::new(self.bounds().size.width, self.row_height()),
             );
             self.scrollRectToVisible(rect);
         }
@@ -244,7 +401,7 @@ impl ListView {
         if point.y < 0.0 {
             return None;
         }
-        let row = (point.y / ROW_HEIGHT) as usize;
+        let row = (point.y / self.row_height()) as usize;
         (row < self.ivars().state.borrow().rows.len()).then_some(row)
     }
 
@@ -272,22 +429,145 @@ impl ListView {
                 Fit::Clip,
                 true,
             );
-            let rect = NSRect::new(
-                NSPoint::new(0.0, state.min_height / 2.0 - 10.0),
-                NSSize::new(width, 20.0),
-            );
+            let mut y = state.min_height / 2.0 - 10.0;
+            if self.ivars().style == ListStyle::Cards {
+                let centre = NSPoint::new(width / 2.0, state.min_height / 2.0 - 14.0);
+                style::draw_symbol("doc.on.clipboard", centre, 30.0, &style::white(0.32));
+                y += 30.0;
+            }
+            let rect = NSRect::new(NSPoint::new(0.0, y), NSSize::new(width, 20.0));
             draw_text(&state.empty_text, rect, &attrs);
             return;
         }
-        let first = (dirty.origin.y / ROW_HEIGHT).floor().max(0.0) as usize;
-        let last = (((dirty.origin.y + dirty.size.height) / ROW_HEIGHT).ceil() as usize)
-            .min(state.rows.len());
+        let height = self.row_height();
+        let first = (dirty.origin.y / height).floor().max(0.0) as usize;
+        let last =
+            (((dirty.origin.y + dirty.size.height) / height).ceil() as usize).min(state.rows.len());
         for index in first..last {
-            self.paint_row(&state.rows[index], index, index == state.selected, width);
+            let row = &state.rows[index];
+            let mark = state.marks.get(&row.id).copied().unwrap_or_default();
+            self.paint_row(row, mark, index, index == state.selected, width);
         }
     }
 
-    fn paint_row(&self, row: &Row, index: usize, selected: bool, width: f64) {
+    fn paint_row(&self, row: &Row, mark: Mark, index: usize, selected: bool, width: f64) {
+        match self.ivars().style {
+            ListStyle::Plain => self.paint_plain_row(row, mark, index, selected, width),
+            ListStyle::Cards => self.paint_card(row, mark, index, selected, width),
+        }
+    }
+
+    /// One row as a rounded card: a pin on the left, the picture or the text, the shortcut letter on the right.
+    fn paint_card(&self, row: &Row, mark: Mark, index: usize, selected: bool, width: f64) {
+        let top = index as f64 * CARD_ROW_HEIGHT;
+        let card = NSRect::new(
+            NSPoint::new(10.0, top + 3.0),
+            NSSize::new(width - 20.0, CARD_ROW_HEIGHT - 6.0),
+        );
+        if selected {
+            style::fill_rounded(card, 14.0, &style::white(0.17));
+            style::stroke_rounded(card, 14.0, &style::white(0.38), 1.5);
+        } else {
+            style::fill_rounded(card, 14.0, &style::white(0.07));
+        }
+        let middle = top + CARD_ROW_HEIGHT / 2.0;
+        let mut left = card.origin.x + 14.0;
+        if row.pinned {
+            style::draw_symbol(
+                "pin.fill",
+                NSPoint::new(left + 5.0, middle),
+                11.0,
+                &Tone::Orange.color(),
+            );
+            left += 20.0;
+        }
+        if mark.sensitive {
+            style::draw_symbol(
+                "lock.fill",
+                NSPoint::new(left + 5.0, middle),
+                12.0,
+                &style::white(0.7),
+            );
+            left += 20.0;
+        }
+        if let Some(image) = row.thumb.as_ref().and_then(|p| self.thumbnail(p)) {
+            let size = image.size();
+            let scale = (CARD_THUMB / size.width.max(1.0)).min(CARD_THUMB / size.height.max(1.0));
+            let (w, h) = (size.width * scale, size.height * scale);
+            let dst = NSRect::new(
+                NSPoint::new(left + (CARD_THUMB - w) / 2.0, middle - h / 2.0),
+                NSSize::new(w, h),
+            );
+            NSGraphicsContext::saveGraphicsState_class();
+            NSBezierPath::bezierPathWithRoundedRect_xRadius_yRadius(dst, 8.0, 8.0).addClip();
+            // Flipped view: plain drawInRect would render the image upside down.
+            // SAFETY: called from drawRect: with a valid graphics context; a zero source rect means the whole image.
+            unsafe {
+                image.drawInRect_fromRect_operation_fraction_respectFlipped_hints(
+                    dst,
+                    NSRect::ZERO,
+                    NSCompositingOperation::SourceOver,
+                    1.0,
+                    true,
+                    None,
+                );
+            }
+            NSGraphicsContext::restoreGraphicsState_class();
+            left += CARD_THUMB + 12.0;
+        }
+        let mut right = card.origin.x + card.size.width - 14.0;
+        if let Some(letter) = row.pin_key {
+            let label = format!("\u{2318}{}", letter.to_ascii_uppercase());
+            let key = NSRect::new(
+                NSPoint::new(right - 36.0, middle - 10.0),
+                NSSize::new(36.0, 20.0),
+            );
+            style::fill_capsule(key, &style::white(0.12));
+            draw_text(
+                &label,
+                NSRect::new(
+                    NSPoint::new(key.origin.x, key.origin.y + 3.0),
+                    NSSize::new(36.0, 14.0),
+                ),
+                &text_attributes(
+                    &NSFont::monospacedSystemFontOfSize_weight(11.0, unsafe { NSFontWeightMedium }),
+                    &style::white(0.7),
+                    Fit::Clip,
+                    true,
+                ),
+            );
+            right -= 36.0 + 10.0;
+        }
+        let text_width = (right - left).max(10.0);
+        let title_font = if row.mono && !mark.hidden {
+            NSFont::userFixedPitchFontOfSize(12.0).unwrap_or_else(|| NSFont::systemFontOfSize(13.0))
+        } else {
+            style::font(13.0, Weight::Medium)
+        };
+        draw_text(
+            if mark.hidden { HIDDEN_TEXT } else { &row.title },
+            NSRect::new(
+                NSPoint::new(left, top + 12.0),
+                NSSize::new(text_width, 18.0),
+            ),
+            &text_attributes(&title_font, &style::white(0.95), Fit::Tail, false),
+        );
+        draw_text(
+            &row.subtitle,
+            NSRect::new(
+                NSPoint::new(left, top + 32.0),
+                NSSize::new(text_width, 14.0),
+            ),
+            &text_attributes(
+                &style::font(11.0, Weight::Regular),
+                &style::white(0.52),
+                Fit::Tail,
+                false,
+            ),
+        );
+    }
+
+    fn paint_plain_row(&self, row: &Row, mark: Mark, index: usize, selected: bool, width: f64) {
         let top = index as f64 * ROW_HEIGHT;
         if selected {
             let rect = NSRect::new(
@@ -312,6 +592,16 @@ impl ListView {
         }
 
         let mut left = 20.0;
+        if mark.sensitive {
+            let tone = if selected { 0.9 } else { 0.6 };
+            style::draw_symbol(
+                "lock.fill",
+                NSPoint::new(left + 5.0, top + ROW_HEIGHT / 2.0),
+                12.0,
+                &style::white(tone),
+            );
+            left += 20.0;
+        }
         if let Some(image) = row.thumb.as_ref().and_then(|p| self.thumbnail(p)) {
             let size = image.size();
             let scale = (THUMB / size.width.max(1.0)).min(THUMB / size.height.max(1.0));
@@ -347,7 +637,7 @@ impl ListView {
                 NSColor::colorWithWhite_alpha(1.0, 0.52),
             )
         };
-        let title_font = if row.mono {
+        let title_font = if row.mono && !mark.hidden {
             NSFont::userFixedPitchFontOfSize(12.0).unwrap_or_else(|| NSFont::systemFontOfSize(13.0))
         } else {
             NSFont::systemFontOfSize(13.0)
@@ -384,7 +674,7 @@ impl ListView {
         };
         let text_width = (width - left - 16.0 - reserved).max(10.0);
         draw_text(
-            &row.title,
+            if mark.hidden { HIDDEN_TEXT } else { &row.title },
             NSRect::new(NSPoint::new(left, top + 7.0), NSSize::new(text_width, 18.0)),
             &text_attributes(&title_font, &title_color, Fit::Tail, false),
         );
@@ -410,6 +700,38 @@ pub struct ClipView {
     pub root: Retained<PageRoot>,
     pub search: Retained<NSSearchField>,
     pub list: Retained<ListView>,
+    scroll: Retained<NSScrollView>,
+    mtm: MainThreadMarker,
+    geometry: Rc<Geometry>,
+    /// The filter chips (empty on the cursor popup) and then the board chips.
+    chips: Rc<RefCell<Vec<Chip>>>,
+    boards: Rc<RefCell<Vec<BoardChip>>>,
+    extras: Rc<RefCell<Option<Rc<Extras>>>>,
+    callbacks: Rc<Callbacks>,
+}
+
+struct Chip {
+    /// The filter the chip stands for; `None` is "All".
+    filter: Option<String>,
+    button: Retained<TouchButton>,
+    board: bool,
+}
+
+/// Where things sit in the surface, from its size.
+struct Geometry {
+    size: NSSize,
+    search_top: f64,
+}
+
+/// What the application adds after the surface is built: what to do with a hidden row and with a board,
+/// and the words of the board menu.
+pub struct Extras {
+    /// A hidden row was activated: show its text so the next activation can paste it.
+    pub on_reveal: ItemHandler,
+    /// File an item in a board, or take it out of its board (`None`).
+    pub on_board: BoardHandler,
+    pub menu_title: String,
+    pub no_board_title: String,
 }
 
 impl ClipView {
@@ -419,10 +741,192 @@ impl ClipView {
 
     pub fn clear_query(&self) {
         self.search.setStringValue(&NSString::from_str(""));
+        self.sync_chips();
+    }
+
+    /// Selects the chip of the filter that is in the search text, or "All" when there is none.
+    pub fn sync_chips(&self) {
+        let current = filter_of(&self.query(), &self.boards.borrow());
+        for chip in self.chips.borrow().iter() {
+            chip.button
+                .set_selected(chip.filter.as_deref() == current.as_deref());
+        }
     }
 
     pub fn set_rows(&self, rows: Vec<Row>, empty_text: &str) {
         self.list.set_rows(rows, empty_text);
+    }
+
+    /// `set_rows`, with what is known about some of the rows by their ids.
+    pub fn set_rows_marked(&self, rows: Vec<Row>, marks: HashMap<i64, Mark>, empty_text: &str) {
+        self.list.set_rows_marked(rows, marks, empty_text);
+    }
+
+    pub fn set_extras(&self, extras: Extras) {
+        *self.extras.borrow_mut() = Some(Rc::new(extras));
+    }
+
+    /// Replaces the board chips, which sit below the filter chips (or alone, on the cursor popup).
+    pub fn set_boards(&self, boards: Vec<BoardChip>) {
+        if *self.boards.borrow() == boards {
+            return;
+        }
+        {
+            let mut chips = self.chips.borrow_mut();
+            chips.retain(|chip| {
+                if chip.board {
+                    chip.button.removeFromSuperview();
+                }
+                !chip.board
+            });
+            for board in &boards {
+                let button = TouchButton::new(self.mtm, NSRect::ZERO, Look::Chip);
+                button.set_title(&chip_title(&board.name));
+                self.root.addSubview(&button);
+                let (view, filter) = (self.clone(), board.filter.clone());
+                button.set_on_click(move || view.choose_filter(Some(&filter)));
+                chips.push(Chip {
+                    filter: Some(board.filter.clone()),
+                    button,
+                    board: true,
+                });
+            }
+        }
+        *self.boards.borrow_mut() = boards;
+        self.relayout();
+        self.sync_chips();
+    }
+
+    fn choose_filter(&self, filter: Option<&str>) {
+        let text = with_filter(&self.query(), filter, &self.boards.borrow());
+        self.search.setStringValue(&NSString::from_str(&text));
+        self.sync_chips();
+        (self.callbacks.on_query)(self, &text);
+    }
+
+    /// Places the chips and sizes the list below them. The filter chips share one row, shrinking their gaps
+    /// to fit; board chips wrap onto rows of their own.
+    fn relayout(&self) {
+        let chips = self.chips.borrow();
+        let room = self.geometry.size.width - 2.0 * MARGIN;
+        let top = self.geometry.search_top - SEARCH_HEIGHT - 8.0;
+        let mut rows = 0usize;
+        let place = |chip: &Chip, x: f64, row: usize, width: f64| {
+            let y = top - CHIP_HEIGHT - row as f64 * (CHIP_HEIGHT + CHIP_GAP);
+            chip.button.setFrame(NSRect::new(
+                NSPoint::new(x, y),
+                NSSize::new(width, CHIP_HEIGHT),
+            ));
+        };
+
+        let filters: Vec<&Chip> = chips.iter().filter(|c| !c.board).collect();
+        if !filters.is_empty() {
+            let widths: Vec<f64> = filters.iter().map(|c| c.button.fit_width()).collect();
+            let gap = CHIP_GAP
+                .min(((room - widths.iter().sum::<f64>()) / (widths.len() as f64 - 1.0)).max(2.0));
+            let mut x = MARGIN;
+            for (chip, width) in filters.iter().zip(&widths) {
+                place(chip, x, 0, *width);
+                x += width + gap;
+            }
+            rows = 1;
+        }
+
+        let mut x = MARGIN;
+        let mut started = false;
+        for chip in chips.iter().filter(|c| c.board) {
+            let width = chip.button.fit_width().min(room);
+            if started && x + width > MARGIN + room {
+                rows += 1;
+                x = MARGIN;
+            } else if !started {
+                started = true;
+                // Boards start a row of their own below the filters.
+                rows += 1;
+            }
+            place(chip, x, rows - 1, width);
+            x += width + CHIP_GAP;
+        }
+
+        let block = if rows == 0 {
+            0.0
+        } else {
+            rows as f64 * CHIP_HEIGHT + (rows - 1) as f64 * CHIP_GAP + 10.0
+        };
+        let list_height = top - block - FOOTER_HEIGHT;
+        self.scroll.setFrame(NSRect::new(
+            NSPoint::new(0.0, FOOTER_HEIGHT),
+            NSSize::new(self.geometry.size.width, list_height),
+        ));
+        self.list.set_min_height(list_height);
+    }
+
+    /// The board after `current` in the order they are shown; after the last comes none.
+    fn next_board(&self, current: Option<i64>) -> Option<Option<i64>> {
+        let boards = self.boards.borrow();
+        let first = boards.first()?;
+        Some(
+            match current.and_then(|c| boards.iter().position(|b| b.id == c)) {
+                None => Some(first.id),
+                Some(at) => boards.get(at + 1).map(|b| b.id),
+            },
+        )
+    }
+
+    /// The menu for moving a row to a board, and the targets its items need kept alive.
+    pub fn board_menu(&self, id: i64) -> Option<(Retained<NSMenu>, Vec<Retained<ActionTarget>>)> {
+        let extras = self.extras.borrow().clone()?;
+        let boards = self.boards.borrow().clone();
+        if boards.is_empty() {
+            return None;
+        }
+        let current = self.list.mark_of(id).board;
+        let menu = NSMenu::initWithTitle(
+            NSMenu::alloc(self.mtm),
+            &NSString::from_str(&extras.menu_title),
+        );
+        let header = NSMenuItem::new(self.mtm);
+        header.setTitle(&NSString::from_str(&extras.menu_title));
+        header.setEnabled(false);
+        menu.addItem(&header);
+        let mut targets = Vec::new();
+        let choices = std::iter::once((None, extras.no_board_title.clone()))
+            .chain(boards.iter().map(|b| (Some(b.id), b.name.clone())));
+        for (target_board, title) in choices {
+            let (view, extras) = (self.clone(), Rc::clone(&extras));
+            let target = ActionTarget::new(self.mtm, move || {
+                (extras.on_board)(&view, id, target_board);
+            });
+            // SAFETY: `fire:` is implemented by ActionTarget; the caller keeps the target alive with the menu.
+            let item = unsafe {
+                NSMenuItem::initWithTitle_action_keyEquivalent(
+                    NSMenuItem::alloc(self.mtm),
+                    &NSString::from_str(&title),
+                    Some(objc2::sel!(fire:)),
+                    &NSString::from_str(""),
+                )
+            };
+            // SAFETY: as above.
+            unsafe { item.setTarget(Some(&target)) };
+            if target_board == current {
+                item.setState(NSControlStateValueOn);
+            }
+            menu.addItem(&item);
+            targets.push(target);
+        }
+        Some((menu, targets))
+    }
+
+    /// Activates a row: a hidden one is shown first, and only a shown one is pasted.
+    fn activate_row(&self, id: i64, mode: Activate) {
+        if self.list.mark_of(id).hidden {
+            let extras = self.extras.borrow().clone();
+            if let Some(extras) = extras {
+                (extras.on_reveal)(self, id);
+            }
+            return;
+        }
+        (self.callbacks.on_activate)(self, id, mode);
     }
 
     /// Hides the window this surface lives in.
@@ -430,6 +934,16 @@ impl ClipView {
         if let Some(window) = self.root.window() {
             window.orderOut(None);
         }
+    }
+}
+
+/// A chip shows the start of a long name.
+fn chip_title(name: &str) -> String {
+    const SHOWN: usize = 14;
+    if name.chars().count() <= SHOWN {
+        name.to_owned()
+    } else {
+        format!("{}...", name.chars().take(SHOWN - 1).collect::<String>())
     }
 }
 
@@ -443,6 +957,8 @@ pub enum Activate {
 
 pub type QueryHandler = Box<dyn Fn(&ClipView, &str)>;
 pub type ItemHandler = Box<dyn Fn(&ClipView, i64)>;
+/// An item and the board it goes to, or `None` for out of its board.
+pub type BoardHandler = Box<dyn Fn(&ClipView, i64, Option<i64>)>;
 pub type ActivateCallback = Box<dyn Fn(&ClipView, i64, Activate)>;
 pub type CloseHandler = Box<dyn Fn(&ClipView)>;
 
@@ -477,7 +993,7 @@ pub fn handle_key(view: &ClipView, callbacks: &Callbacks, key: Key) -> bool {
                 Activate::Normal
             };
             if let Some(id) = view.list.selected_id() {
-                (callbacks.on_activate)(view, id, mode);
+                view.activate_row(id, mode);
             }
         }
         Key::Shortcut(letter) => {
@@ -485,11 +1001,19 @@ pub fn handle_key(view: &ClipView, callbacks: &Callbacks, key: Key) -> bool {
             let Some(id) = view.list.id_for_pin_key(letter) else {
                 return false;
             };
-            (callbacks.on_activate)(view, id, Activate::Normal);
+            view.activate_row(id, Activate::Normal);
         }
         Key::Pin => {
             if let Some(id) = view.list.selected_id() {
                 (callbacks.on_pin)(view, id);
+            }
+        }
+        Key::Board => {
+            let extras = view.extras.borrow().clone();
+            if let (Some(id), Some(extras)) = (view.list.selected_id(), extras)
+                && let Some(next) = view.next_board(view.list.mark_of(id).board)
+            {
+                (extras.on_board)(view, id, next);
             }
         }
         Key::Delete => {
@@ -524,6 +1048,17 @@ impl Drop for ClipUi {
 impl ClipUi {
     /// `top_inset` reserves room above the search field (the notch cutout).
     pub fn new(mtm: MainThreadMarker, size: NSSize, top_inset: f64, callbacks: Callbacks) -> Self {
+        Self::with_style(mtm, size, top_inset, callbacks, ListStyle::Plain)
+    }
+
+    /// The same surface with the look of the notch (`Cards`) or of the cursor popup (`Plain`).
+    pub fn with_style(
+        mtm: MainThreadMarker,
+        size: NSSize,
+        top_inset: f64,
+        callbacks: Callbacks,
+        list_style: ListStyle,
+    ) -> Self {
         let callbacks = Rc::new(callbacks);
         let frame = NSRect::new(NSPoint::ZERO, size);
         let root = PageRoot::new(mtm, frame, &labels::get().clipboard_hint);
@@ -536,41 +1071,92 @@ impl ClipUi {
                 NSSize::new(size.width - 2.0 * MARGIN, SEARCH_HEIGHT),
             ),
         );
-        search.setPlaceholderString(Some(&NSString::from_str(&labels::get().search_placeholder)));
+        let placeholder = if list_style == ListStyle::Cards {
+            &labels::get().search_placeholder_short
+        } else {
+            &labels::get().search_placeholder
+        };
+        search.setPlaceholderString(Some(&NSString::from_str(placeholder)));
         search.setFocusRingType(NSFocusRingType::None);
 
-        let list_height = search_top - SEARCH_HEIGHT - 8.0 - FOOTER_HEIGHT;
-        let scroll = NSScrollView::initWithFrame(
-            mtm.alloc(),
-            NSRect::new(
-                NSPoint::new(0.0, FOOTER_HEIGHT),
-                NSSize::new(size.width, list_height),
-            ),
-        );
+        let cards = list_style == ListStyle::Cards;
+        let chips: Vec<Chip> = if cards {
+            let t = labels::get();
+            [
+                (None, &t.chip_all),
+                (Some("@pin"), &t.chip_pinned),
+                (Some("@link"), &t.chip_links),
+                (Some("@code"), &t.chip_code),
+                (Some("@image"), &t.chip_images),
+                (Some("@file"), &t.chip_files),
+                (Some("@text"), &t.chip_text),
+            ]
+            .into_iter()
+            .map(|(filter, title)| {
+                let button = TouchButton::new(mtm, NSRect::ZERO, Look::Chip);
+                button.set_title(title);
+                root.addSubview(&button);
+                Chip {
+                    filter: filter.map(str::to_owned),
+                    button,
+                    board: false,
+                }
+            })
+            .collect()
+        } else {
+            Vec::new()
+        };
+
+        let scroll = NSScrollView::initWithFrame(mtm.alloc(), NSRect::ZERO);
         scroll.setHasVerticalScroller(true);
         scroll.setAutohidesScrollers(true);
         scroll.setScrollerStyle(NSScrollerStyle::Overlay);
         scroll.setDrawsBackground(false);
         scroll.setBorderType(NSBorderType::NoBorder);
-        let list = ListView::new(
-            mtm,
-            NSRect::new(NSPoint::ZERO, NSSize::new(size.width, list_height)),
-        );
-        list.set_min_height(list_height);
+        let list = ListView::new(mtm, NSRect::ZERO, list_style);
         scroll.setDocumentView(Some(&list));
         root.addSubview(&scroll);
         root.addSubview(&search);
 
-        let view = ClipView { root, search, list };
+        let view = ClipView {
+            root,
+            search,
+            list,
+            scroll,
+            mtm,
+            geometry: Rc::new(Geometry { size, search_top }),
+            chips: Rc::new(RefCell::new(chips)),
+            boards: Rc::default(),
+            extras: Rc::default(),
+            callbacks: Rc::clone(&callbacks),
+        };
+        view.relayout();
+        let list_frame = view.scroll.frame().size;
+        view.list.setFrameSize(list_frame);
+        view.sync_chips();
+        for chip in view.chips.borrow().iter().filter(|c| !c.board) {
+            let (view, filter) = (view.clone(), chip.filter.clone());
+            chip.button
+                .set_on_click(move || view.choose_filter(filter.as_deref()));
+        }
         {
-            let (view, callbacks) = (view.clone(), Rc::clone(&callbacks));
+            let view = view.clone();
             view.list
                 .clone()
-                .set_on_activate(move |id| (callbacks.on_activate)(&view, id, Activate::Normal));
+                .set_on_activate(move |id| view.activate_row(id, Activate::Normal));
+        }
+        {
+            let view = view.clone();
+            view.list.clone().set_on_menu(move |id, event| {
+                if let Some((menu, targets)) = view.board_menu(id) {
+                    view.list.pop_up(&menu, targets, event);
+                }
+            });
         }
 
         let (observed, callbacks_for_block) = (view.clone(), Rc::clone(&callbacks));
         let block = RcBlock::new(move |_: NonNull<NSNotification>| {
+            observed.sync_chips();
             (callbacks_for_block.on_query)(&observed, &observed.query());
         });
         let center = NSNotificationCenter::defaultCenter();
@@ -677,33 +1263,123 @@ impl Popup {
 
     /// Opens with the top-left corner near the pointer, kept inside the visible area of its screen.
     pub fn show_at_cursor(&self, mtm: MainThreadMarker) {
-        let mouse = NSEvent::mouseLocation();
-        let screens = NSScreen::screens(mtm);
-        let screen = screens
-            .iter()
-            .find(|s| {
-                let f = s.frame();
-                mouse.x >= f.origin.x
-                    && mouse.x < f.origin.x + f.size.width
-                    && mouse.y >= f.origin.y
-                    && mouse.y < f.origin.y + f.size.height
-            })
-            .or_else(|| screens.firstObject());
-        let size = POPUP_SIZE;
-        let mut origin = NSPoint::new(mouse.x - 24.0, mouse.y - size.height + 12.0);
-        if let Some(screen) = screen {
-            let area = screen.visibleFrame();
-            origin.x = origin.x.clamp(
-                area.origin.x,
-                (area.origin.x + area.size.width - size.width).max(area.origin.x),
-            );
-            origin.y = origin.y.clamp(
-                area.origin.y,
-                (area.origin.y + area.size.height - size.height).max(area.origin.y),
-            );
-        }
-        self.panel.setFrameOrigin(origin);
+        self.panel
+            .setFrameOrigin(origin_near_pointer(mtm, POPUP_SIZE));
         self.panel.makeKeyAndOrderFront(None);
         self.ui.focus_search();
+    }
+}
+
+/// The bottom-left corner for a window of `size` that opens with its top-left corner just beside the pointer,
+/// kept inside the visible area of the screen the pointer is on. With `FIGGHOST_NOTCH_OFFSCREEN` set (for
+/// tests that must not put anything on the person's screen) it is far outside every screen.
+pub(crate) fn origin_near_pointer(mtm: MainThreadMarker, size: NSSize) -> NSPoint {
+    if std::env::var_os("FIGGHOST_NOTCH_OFFSCREEN").is_some() {
+        return NSPoint::new(-30_000.0, 200.0);
+    }
+    let mouse = NSEvent::mouseLocation();
+    let screens = NSScreen::screens(mtm);
+    let screen = screens
+        .iter()
+        .find(|s| {
+            let f = s.frame();
+            mouse.x >= f.origin.x
+                && mouse.x < f.origin.x + f.size.width
+                && mouse.y >= f.origin.y
+                && mouse.y < f.origin.y + f.size.height
+        })
+        .or_else(|| screens.firstObject());
+    let mut origin = NSPoint::new(mouse.x - 24.0, mouse.y - size.height + 12.0);
+    if let Some(screen) = screen {
+        let area = screen.visibleFrame();
+        origin.x = origin.x.clamp(
+            area.origin.x,
+            (area.origin.x + area.size.width - size.width).max(area.origin.x),
+        );
+        origin.y = origin.y.clamp(
+            area.origin.y,
+            (area.origin.y + area.size.height - size.height).max(area.origin.y),
+        );
+    }
+    origin
+}
+
+#[cfg(test)]
+mod tests {
+    use super::*;
+
+    fn board(id: i64, name: &str) -> BoardChip {
+        BoardChip {
+            id,
+            name: name.into(),
+            filter: format!("@{}", name.to_lowercase()),
+        }
+    }
+
+    fn filter(query: &str) -> Option<String> {
+        filter_of(query, &[])
+    }
+
+    #[test]
+    fn the_filter_in_a_query_is_found_wherever_it_is() {
+        assert_eq!(filter("@link").as_deref(), Some("@link"));
+        assert_eq!(filter("hello @code world").as_deref(), Some("@code"));
+        assert_eq!(filter("@IMAGE logo").as_deref(), Some("@image"));
+        assert_eq!(filter("hello"), None);
+        assert_eq!(filter("@unknown thing"), None);
+        assert_eq!(filter(""), None);
+    }
+
+    #[test]
+    fn choosing_a_chip_replaces_the_filter_and_keeps_the_words() {
+        let with = |query, chosen| with_filter(query, chosen, &[]);
+        assert_eq!(with("", Some("@link")), "@link ");
+        assert_eq!(with("hello world", Some("@code")), "@code hello world");
+        assert_eq!(with("@link hello", Some("@code")), "@code hello");
+        assert_eq!(
+            with("hello @pin world", Some("@image")),
+            "@image hello world"
+        );
+        assert_eq!(with("@link hello", None), "hello");
+        assert_eq!(with("@link", None), "");
+        // Two filters collapse to the one that was chosen.
+        assert_eq!(with("@link @code x", Some("@file")), "@file x");
+    }
+
+    #[test]
+    fn a_board_is_a_filter_like_the_others() {
+        let boards = [board(1, "Work"), board(2, "Snippets")];
+        assert_eq!(filter_of("@work", &boards).as_deref(), Some("@work"));
+        assert_eq!(filter_of("notes @WORK", &boards).as_deref(), Some("@work"));
+        assert_eq!(filter_of("@work", &[]), None, "no chip, no filter");
+        assert_eq!(
+            filter_of("@snippets x", &boards).as_deref(),
+            Some("@snippets")
+        );
+        // Choosing a board replaces any filter, and choosing a filter replaces the board.
+        assert_eq!(
+            with_filter("@link hello", Some("@work"), &boards),
+            "@work hello"
+        );
+        assert_eq!(
+            with_filter("@work hello", Some("@code"), &boards),
+            "@code hello"
+        );
+        assert_eq!(with_filter("@work hello", None, &boards), "hello");
+        assert_eq!(
+            with_filter("@work", Some("@snippets"), &boards),
+            "@snippets "
+        );
+    }
+
+    #[test]
+    fn long_board_names_are_shortened_on_their_chip() {
+        assert_eq!(chip_title("Work"), "Work");
+        assert_eq!(chip_title("exactly fourteen"), "exactly fourt...");
+        assert_eq!(
+            chip_title("Công việc hằng ngày của tôi"),
+            "Công việc hằn..."
+        );
+        assert_eq!(chip_title("12345678901234"), "12345678901234");
     }
 }

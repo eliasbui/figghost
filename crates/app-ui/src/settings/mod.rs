@@ -4,9 +4,11 @@ pub mod model;
 mod page;
 
 use crate::{context::AppContext, i18n, trace};
+use core_agents::Agent;
 use macos_sys::{
     app,
     login_item::{self, LoginItem},
+    pasteboard::{Pasteboard, Write},
     permissions,
     webview::{WebWindow, WindowSpec},
     workspace,
@@ -160,6 +162,9 @@ impl SettingsFeature {
             version: env!("CARGO_PKG_VERSION"),
             bundled: login != LoginItem::Unavailable,
             config_dir: self.ctx.home.to_string_lossy().into_owned(),
+            exe: std::env::current_exe()
+                .map(|p| p.to_string_lossy().into_owned())
+                .unwrap_or_default(),
             accessibility: permissions::accessibility_trusted(false),
             login,
             language: i18n::current(),
@@ -167,6 +172,13 @@ impl SettingsFeature {
             shelf_count,
             names,
             display: workspace::display_options(),
+            agents: self
+                .ctx
+                .agents
+                .as_ref()
+                .map(|agents| agents.status())
+                .unwrap_or_default(),
+            runtime: self.ctx.features.runtime(),
         }
     }
 
@@ -214,6 +226,7 @@ impl SettingsFeature {
     fn edit(&self, message: &Message) {
         let before = self.ctx.config.borrow().clone();
         let effect = apply(&mut self.ctx.config.borrow_mut(), message);
+        let rollback = effect.clone().ok();
         let result = effect.and_then(|effect| self.perform(&effect).map(|()| effect));
         match result {
             Ok(_) => {
@@ -225,6 +238,9 @@ impl SettingsFeature {
                 // Put the previous shortcuts and settings back in force.
                 if let Message::Hotkey { target, .. } = message {
                     let _ = self.perform(&Effect::Hotkey(target.clone()));
+                }
+                if let Some(Effect::Feature(id)) = rollback {
+                    let _ = self.perform(&Effect::Feature(id));
                 }
                 self.fault(&fault);
             }
@@ -260,6 +276,12 @@ impl SettingsFeature {
                 }
                 Ok(())
             }
+            Effect::Agents => {
+                if let Some(agents) = &self.ctx.agents {
+                    agents.configure(&config.agents);
+                }
+                Ok(())
+            }
             Effect::Notch => {
                 if let Some(notch) = self.ctx.clipboard.as_ref().and_then(|c| c.notch.as_ref()) {
                     notch.set_enabled(config.notch.enabled);
@@ -272,6 +294,7 @@ impl SettingsFeature {
                 }
                 Ok(())
             }
+            Effect::Feature(id) => self.ctx.features.configure(id, &config),
             Effect::Hotkey(target) => self.register_hotkey(&config, target),
         }
     }
@@ -305,6 +328,7 @@ impl SettingsFeature {
                 clipboard.suspend_hotkey();
             }
             self.ctx.tiling.suspend();
+            self.ctx.features.suspend_hotkeys();
             return;
         }
         let config = self.ctx.config.borrow();
@@ -317,6 +341,7 @@ impl SettingsFeature {
         for failure in self.ctx.tiling.configure(&config.tiling) {
             eprintln!("tiling: {}", failure.note);
         }
+        self.ctx.features.resume_hotkeys(&config);
     }
 
     fn action(&self, name: &str) {
@@ -331,6 +356,12 @@ impl SettingsFeature {
                 let _ = std::fs::create_dir_all(&self.ctx.home);
                 workspace::open_path(&self.ctx.home);
             }
+            "copy_mcp_config" => {
+                let exe = std::env::current_exe().map(|p| p.to_string_lossy().into_owned());
+                if let Ok(exe) = exe {
+                    Pasteboard::general().write(Write::Text(&mcp_config(&exe)));
+                }
+            }
             "clear_history" => {
                 if let Some(clipboard) = &self.ctx.clipboard {
                     clipboard.history.clear_unpinned();
@@ -341,14 +372,69 @@ impl SettingsFeature {
                     shelf.clear();
                 }
             }
+            "agents_install_claude" => self.agent_hooks(Agent::Claude, true),
+            "agents_remove_claude" => self.agent_hooks(Agent::Claude, false),
+            "agents_install_codex" => self.agent_hooks(Agent::Codex, true),
+            "agents_remove_codex" => self.agent_hooks(Agent::Codex, false),
+            "agents_usage_on" => self.agent_usage(true),
+            "agents_usage_off" => self.agent_usage(false),
             "restart" => relaunch(mtm),
             "quit" => app::quit(mtm),
             other => {
-                self.fault(&Fault::new("unknown_action", other));
-                return;
+                let result = {
+                    let mut config = self.ctx.config.borrow_mut();
+                    self.ctx.features.action(other, &mut config)
+                };
+                match result {
+                    Some(Ok(())) => self.ctx.save_config(),
+                    Some(Err(fault)) => self.fault(&fault),
+                    None => {
+                        self.fault(&Fault::new("unknown_action", other));
+                        return;
+                    }
+                }
             }
         }
         self.push_state(true);
+    }
+
+    /// Adds our hooks to an agent's file, or takes them out. Installing also turns the listening on, since
+    /// hooks nobody listens to would do nothing.
+    fn agent_hooks(&self, agent: Agent, on: bool) {
+        let Some(agents) = self.ctx.agents.clone() else {
+            self.fault(&Fault::new("agents_failed", "the notch is off"));
+            return;
+        };
+        let result = if on {
+            agents.install(agent).map(|_| ())
+        } else {
+            agents.remove(agent).map(|_| ())
+        };
+        match result {
+            Ok(()) => {
+                if on && !self.ctx.config.borrow().agents.enabled {
+                    self.ctx.config.borrow_mut().agents.enabled = true;
+                    self.ctx.save_config();
+                    agents.configure(&self.ctx.config.borrow().agents);
+                }
+            }
+            Err(e) => self.fault(&Fault::new("agents_failed", e)),
+        }
+    }
+
+    fn agent_usage(&self, on: bool) {
+        let Some(agents) = self.ctx.agents.clone() else {
+            self.fault(&Fault::new("agents_failed", "the notch is off"));
+            return;
+        };
+        let result = if on {
+            agents.install_usage_tap()
+        } else {
+            agents.remove_usage_tap()
+        };
+        if let Err(e) = result {
+            self.fault(&Fault::new("agents_failed", e));
+        }
     }
 
     fn pick_app(&self, purpose: Purpose) {
@@ -429,6 +515,14 @@ fn relaunch(mtm: macos_sys::MainThreadMarker) {
     app::quit(mtm);
 }
 
+/// The JSON an assistant's configuration needs to start the clipboard server.
+pub fn mcp_config(exe: &str) -> String {
+    serde_json::to_string_pretty(&json!({
+        "mcpServers": { "figghost": { "command": exe, "args": ["--mcp"] } }
+    }))
+    .unwrap_or_default()
+}
+
 fn base64(bytes: &[u8]) -> String {
     const TABLE: &[u8; 64] = b"ABCDEFGHIJKLMNOPQRSTUVWXYZabcdefghijklmnopqrstuvwxyz0123456789+/";
     let mut out = String::with_capacity(bytes.len().div_ceil(3) * 4);
@@ -451,6 +545,20 @@ fn base64(bytes: &[u8]) -> String {
 #[cfg(test)]
 mod tests {
     use super::*;
+
+    #[test]
+    fn the_assistant_configuration_names_the_program_and_the_flag() {
+        let text = mcp_config("/Applications/Figghost.app/Contents/MacOS/Figghost");
+        let parsed: Value = serde_json::from_str(&text).unwrap();
+        let server = &parsed["mcpServers"]["figghost"];
+        assert_eq!(
+            server["command"],
+            "/Applications/Figghost.app/Contents/MacOS/Figghost"
+        );
+        assert_eq!(server["args"][0], "--mcp");
+        // Paths with quotes or backslashes stay valid JSON.
+        assert!(serde_json::from_str::<Value>(&mcp_config("/odd \"path\\x")).is_ok());
+    }
 
     #[test]
     fn base64_matches_the_standard_vectors() {

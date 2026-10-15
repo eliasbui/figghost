@@ -1,0 +1,18 @@
+{
+  "enabled": true,
+  "copy": true,
+  "save": true,
+  "edit": false,
+  "window_shadow": true,
+  "folder": "~/Pictures/Figghost",
+  "custom_folder": false,
+  "shortcuts": {
+    "region": "ctrl+opt+cmd+4",
+    "window": "ctrl+opt+cmd+5",
+    "screen": "ctrl+opt+cmd+3",
+    "repeat": "ctrl+opt+cmd+6",
+    "text": "ctrl+opt+cmd+7"
+  },
+  "permission": false,
+  "available": true
+}

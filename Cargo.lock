@@ -4,12 +4,20 @@ version = 4
 
 [[package]]
 name = "app-ui"
-version = "0.1.0"
+version = "0.2.0"
 dependencies = [
+ "core-agents",
+ "core-calendar",
+ "core-capture",
  "core-clipboard",
+ "core-lyrics",
  "core-mouse",
+ "core-smart",
  "core-window",
  "macos-sys",
+ "objc2",
+ "objc2-app-kit",
+ "objc2-foundation",
  "serde",
  "serde_json",
 ]
@@ -52,8 +60,28 @@ source = "registry+https://github.com/rust-lang/crates.io-index"
 checksum = "4e7648175b45a9a48536d676f68d918270699102aa8dab5496df06904c914600"
 
 [[package]]
+name = "core-agents"
+version = "0.2.0"
+dependencies = [
+ "serde",
+ "serde_json",
+]
+
+[[package]]
+name = "core-annotate"
+version = "0.2.0"
+
+[[package]]
+name = "core-calendar"
+version = "0.2.0"
+
+[[package]]
+name = "core-capture"
+version = "0.2.0"
+
+[[package]]
 name = "core-clipboard"
-version = "0.1.0"
+version = "0.2.0"
 dependencies = [
  "rusqlite",
 ]
@@ -75,8 +103,15 @@ source = "registry+https://github.com/rust-lang/crates.io-index"
 checksum = "773648b94d0e5d620f64f280777445740e61fe701025087ec8b57f45c791888b"
 
 [[package]]
+name = "core-lyrics"
+version = "0.2.0"
+dependencies = [
+ "serde_json",
+]
+
+[[package]]
 name = "core-mouse"
-version = "0.1.0"
+version = "0.2.0"
 dependencies = [
  "macos-sys",
  "serde",
@@ -84,8 +119,15 @@ dependencies = [
 ]
 
 [[package]]
+name = "core-smart"
+version = "0.2.0"
+dependencies = [
+ "serde_json",
+]
+
+[[package]]
 name = "core-window"
-version = "0.1.0"
+version = "0.2.0"
 
 [[package]]
 name = "dispatch2"
@@ -98,6 +140,12 @@ dependencies = [
  "libc",
  "objc2",
 ]
+
+[[package]]
+name = "equivalent"
+version = "1.0.3"
+source = "registry+https://github.com/rust-lang/crates.io-index"
+checksum = "00d174d5400e5e8fd687ad1049e2f578285fa914201b1af7e8b112a4546bd826"
 
 [[package]]
 name = "fallible-iterator"
@@ -151,6 +199,16 @@ dependencies = [
 ]
 
 [[package]]
+name = "indexmap"
+version = "2.14.2"
+source = "registry+https://github.com/rust-lang/crates.io-index"
+checksum = "cc4e190f5d26ca7051642629da2c52fc03bde85a03197c99408dcd291734c855"
+dependencies = [
+ "equivalent",
+ "hashbrown 0.17.1",
+]
+
+[[package]]
 name = "itoa"
 version = "1.0.18"
 source = "registry+https://github.com/rust-lang/crates.io-index"
@@ -184,18 +242,26 @@ dependencies = [
 
 [[package]]
 name = "macos-sys"
-version = "0.1.0"
+version = "0.2.0"
 dependencies = [
  "block2",
+ "core-annotate",
+ "core-calendar",
+ "core-capture",
  "core-foundation",
  "core-window",
  "dispatch2",
  "libc",
  "objc2",
  "objc2-app-kit",
+ "objc2-core-foundation",
  "objc2-core-graphics",
+ "objc2-core-video",
+ "objc2-event-kit",
  "objc2-foundation",
+ "objc2-screen-capture-kit",
  "objc2-service-management",
+ "objc2-vision",
  "objc2-web-kit",
 ]
 
@@ -264,7 +330,9 @@ source = "registry+https://github.com/rust-lang/crates.io-index"
 checksum = "2a180dd8642fa45cdb7dd721cd4c11b1cadd4929ce112ebd8b9f5803cc79d536"
 dependencies = [
  "bitflags",
+ "block2",
  "dispatch2",
+ "libc",
  "objc2",
 ]
 
@@ -289,6 +357,16 @@ name = "objc2-core-image"
 version = "0.3.2"
 source = "registry+https://github.com/rust-lang/crates.io-index"
 checksum = "e5d563b38d2b97209f8e861173de434bd0214cf020e3423a52624cd1d989f006"
+dependencies = [
+ "objc2",
+ "objc2-foundation",
+]
+
+[[package]]
+name = "objc2-core-location"
+version = "0.3.2"
+source = "registry+https://github.com/rust-lang/crates.io-index"
+checksum = "ca347214e24bc973fc025fd0d36ebb179ff30536ed1f80252706db19ee452009"
 dependencies = [
  "objc2",
  "objc2-foundation",
@@ -326,6 +404,22 @@ source = "registry+https://github.com/rust-lang/crates.io-index"
 checksum = "ef25abbcd74fb2609453eb695bd2f860d389e457f67dc17cafc8b8cbc89d0c33"
 
 [[package]]
+name = "objc2-event-kit"
+version = "0.3.2"
+source = "registry+https://github.com/rust-lang/crates.io-index"
+checksum = "51bc9ad7325642172110196bacd6af64027ec5549ded7fc6589ea03e0f792bf8"
+dependencies = [
+ "bitflags",
+ "block2",
+ "objc2",
+ "objc2-app-kit",
+ "objc2-core-graphics",
+ "objc2-core-location",
+ "objc2-foundation",
+ "objc2-map-kit",
+]
+
+[[package]]
 name = "objc2-foundation"
 version = "0.3.2"
 source = "registry+https://github.com/rust-lang/crates.io-index"
@@ -360,6 +454,16 @@ dependencies = [
 ]
 
 [[package]]
+name = "objc2-map-kit"
+version = "0.3.2"
+source = "registry+https://github.com/rust-lang/crates.io-index"
+checksum = "579edede1c244621cd8229b70ea6e20e6ec3bab5a74afdfd494b446b681e1e64"
+dependencies = [
+ "objc2",
+ "objc2-foundation",
+]
+
+[[package]]
 name = "objc2-metal"
 version = "0.3.2"
 source = "registry+https://github.com/rust-lang/crates.io-index"
@@ -378,6 +482,19 @@ checksum = "96c1358452b371bf9f104e21ec536d37a650eb10f7ee379fff67d2e08d537f1f"
 dependencies = [
  "bitflags",
  "objc2",
+ "objc2-foundation",
+]
+
+[[package]]
+name = "objc2-screen-capture-kit"
+version = "0.3.2"
+source = "registry+https://github.com/rust-lang/crates.io-index"
+checksum = "74b7c5390f477482f001bc354d6571a70db7e4f8d5288e860c45521fbce11394"
+dependencies = [
+ "block2",
+ "objc2",
+ "objc2-core-foundation",
+ "objc2-core-graphics",
  "objc2-foundation",
 ]
 
@@ -403,6 +520,18 @@ dependencies = [
  "objc2-core-foundation",
  "objc2-foundation",
  "objc2-security",
+]
+
+[[package]]
+name = "objc2-vision"
+version = "0.3.2"
+source = "registry+https://github.com/rust-lang/crates.io-index"
+checksum = "bfc194758a2d5d7540b1ad283bfb9ca318ec608991892326e95b428230b2689b"
+dependencies = [
+ "block2",
+ "objc2",
+ "objc2-core-video",
+ "objc2-foundation",
 ]
 
 [[package]]
@@ -518,6 +647,8 @@ version = "1.0.154"
 source = "registry+https://github.com/rust-lang/crates.io-index"
 checksum = "e7e9cc8b1b85264074fbcc02a88680c4096b1e47df8f739dceb03bf482f04bd6"
 dependencies = [
+ "foldhash",
+ "indexmap",
  "itoa",
  "memchr",
  "serde",

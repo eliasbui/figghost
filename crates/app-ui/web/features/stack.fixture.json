@@ -1,0 +1,12 @@
+{
+  "enabled": false,
+  "modifier": "option",
+  "sensitive": "off",
+  "expire_minutes": 10,
+  "boards": [],
+  "max_boards": 8,
+  "max_name": 24,
+  "accessibility": true,
+  "active": false,
+  "queued": 0
+}

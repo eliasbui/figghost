@@ -1,11 +1,15 @@
 //! The shelf: files dropped on the notch, kept as references to where they live (never copied), shown as
 //! a tab of the notch and remembered between runs.
 
-use crate::history::now_ms;
+use crate::{
+    history::now_ms,
+    i18n,
+    shelf_actions::{self, Action},
+};
 use macos_sys::{
-    MainThreadMarker,
+    MainThreadMarker, app,
     notch::Notch,
-    shelf_ui::{ShelfCallbacks, ShelfView},
+    shelf_ui::{ShelfAction, ShelfCallbacks, ShelfView},
     workspace,
 };
 use serde::{Deserialize, Serialize};
@@ -136,6 +140,7 @@ impl ShelfFeature {
         let callbacks = {
             let (on_drop_shelf, on_drop_refresh) = (Rc::clone(&shelf), Rc::clone(&refresh));
             let (on_remove_shelf, on_remove_refresh) = (Rc::clone(&shelf), Rc::clone(&refresh));
+            let (action_shelf, action_refresh) = (Rc::clone(&shelf), Rc::clone(&refresh));
             ShelfCallbacks {
                 on_drop: Box::new(move |paths| {
                     {
@@ -154,6 +159,20 @@ impl ShelfFeature {
                     on_remove_refresh();
                 }),
                 on_open: Box::new(|path| workspace::open_path(Path::new(&path))),
+                actions_for: Box::new(menu_for),
+                on_action: Box::new(move |path, id| match Action::from_id(id) {
+                    Some(Action::Remove) => {
+                        {
+                            let mut shelf = action_shelf.borrow_mut();
+                            shelf.remove(path);
+                            save(&shelf);
+                        }
+                        action_refresh();
+                    }
+                    Some(Action::Reveal) => workspace::reveal(Path::new(path)),
+                    Some(other) => start_job(other, path),
+                    None => {}
+                }),
             }
         };
 
@@ -161,6 +180,19 @@ impl ShelfFeature {
         *view_slot.borrow_mut() = Some(Rc::clone(&view));
         let on_show = Rc::clone(&refresh);
         notch.add_page(view.page(move || on_show()));
+        {
+            let (shelf, refresh) = (Rc::clone(&shelf), Rc::clone(&refresh));
+            ADD_FROM_JOB.with(|hook| {
+                *hook.borrow_mut() = Some(Rc::new(move |path| {
+                    {
+                        let mut shelf = shelf.borrow_mut();
+                        shelf.add(vec![path], now_ms());
+                        save(&shelf);
+                    }
+                    refresh();
+                }));
+            });
+        }
         refresh();
         Self {
             _view: view,
@@ -185,6 +217,55 @@ impl ShelfFeature {
         }
         (self.refresh)();
     }
+}
+
+type AddFile = Rc<dyn Fn(String)>;
+
+thread_local! {
+    /// Adds a file the shelf made (an archive, a converted image) once its job is done on another thread.
+    static ADD_FROM_JOB: RefCell<Option<AddFile>> = const { RefCell::new(None) };
+}
+
+/// The menu a file offers, with titles in the app's language.
+fn menu_for(path: &str) -> Vec<ShelfAction> {
+    let language = i18n::current();
+    let mut entries = Vec::new();
+    for action in shelf_actions::available(Path::new(path)) {
+        let title = match action {
+            Action::Zip => language.shelf_menu_zip().to_owned(),
+            Action::ToPng => language.shelf_menu_convert("PNG"),
+            Action::ToJpeg => language.shelf_menu_convert("JPEG"),
+            Action::ToHeic => language.shelf_menu_convert("HEIC"),
+            Action::RemoveBackground => language.vision_remove_background().to_owned(),
+            Action::Reveal => language.shelf_menu_reveal().to_owned(),
+            Action::Remove => language.shelf_menu_remove().to_owned(),
+        };
+        if action == Action::Reveal {
+            entries.push(ShelfAction::separator());
+        }
+        entries.push(ShelfAction::new(action.id(), &title));
+    }
+    entries
+}
+
+/// Runs a file job on a background thread; the new file joins the shelf when it is done.
+fn start_job(action: Action, path: &str) {
+    let source = PathBuf::from(path);
+    std::thread::spawn(move || match shelf_actions::make(action, &source) {
+        Ok(output) => {
+            let output = output.to_string_lossy().into_owned();
+            app::on_main(move || {
+                let add = ADD_FROM_JOB.with(|hook| hook.borrow().clone());
+                if let Some(add) = add {
+                    add(output);
+                }
+            });
+        }
+        Err(e) => {
+            eprintln!("shelf: {e}");
+            app::on_main(workspace::beep);
+        }
+    });
 }
 
 fn save(shelf: &Shelf) {

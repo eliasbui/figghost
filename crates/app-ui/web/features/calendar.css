@@ -1,0 +1,18 @@
+/* Calendar, reminders and meeting alerts on the notch. Styles for the page in web/features/calendar.js, using the variables at the top of app.css. */
+.cal-list { display: flex; flex-direction: column; }
+.cal-row { position: relative; display: flex; align-items: center; gap: 12px; padding: 10px 20px; }
+.cal-row + .cal-row::before { content: ""; position: absolute; left: 20px; right: 20px; top: 0; height: 1px; background: var(--stroke); }
+.cal-row.off { color: var(--text-2); }
+.cal-check {
+  position: relative; flex: none; width: 22px; height: 22px; padding: 0; border: 0; border-radius: 7px;
+  background: var(--track); box-shadow: inset 0 0 0 1.5px var(--boundary);
+  transition: background var(--dur-move) var(--ease-out), box-shadow var(--dur-move);
+}
+.cal-check[aria-checked="true"] { background: var(--accent-fill); box-shadow: inset 0 0 0 1.5px rgba(255,255,255,.22); }
+.cal-check[aria-checked="true"]::after {
+  content: ""; position: absolute; left: 7px; top: 3px; width: 5px; height: 10px;
+  border: solid #fff; border-width: 0 2px 2px 0; transform: rotate(45deg);
+}
+.cal-swatch { flex: none; width: 10px; height: 10px; border-radius: 50%; box-shadow: inset 0 0 0 1px rgba(0,0,0,.18); }
+.cal-name { flex: 1; min-width: 0; font-weight: 600; font-size: var(--fs-body); overflow: hidden; text-overflow: ellipsis; white-space: nowrap; }
+.cal-source { color: var(--text-3); font-size: var(--fs-small); overflow: hidden; text-overflow: ellipsis; white-space: nowrap; max-width: 40%; }

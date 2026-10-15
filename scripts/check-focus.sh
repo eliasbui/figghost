@@ -1,5 +1,7 @@
 #!/bin/sh
-# Regression check for the non-activating requirement: launching app-ui must not change the frontmost app.
+# Regression check for the non-activating requirement: starting app-ui in the background (--background, which
+# is what a login item uses) must not change the frontmost app. A normal start opens the settings window
+# and takes focus on purpose, so it is not what this script measures.
 # Run it from a terminal while that terminal is the frontmost app. macOS only lets a process take focus
 # at launch when the frontmost app is its ancestor, so with any other app in front a buggy build passes too.
 set -eu
@@ -40,7 +42,7 @@ is_ancestor "$before_pid" || {
 
 run=1
 while [ "$run" -le "$RUNS" ]; do
-  "$BIN" >/dev/null 2>&1 &
+  "$BIN" --background >/dev/null 2>&1 &
   pid=$!
   sleep 3
   now=$(probe)

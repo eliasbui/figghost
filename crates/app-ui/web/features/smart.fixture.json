@@ -1,0 +1,11 @@
+{
+  "enabled": true,
+  "shortcut": "ctrl+opt+s",
+  "internet": true,
+  "translate_to": "auto",
+  "currencies": ["USD", "EUR", "VND"],
+  "zones": ["UTC", "America/New_York", "Europe/London", "Asia/Tokyo"],
+  "languages": [{ "code": "en", "name": "English" }, { "code": "vi", "name": "Ti\u1ebfng Vi\u1ec7t" }],
+  "accessibility": true,
+  "rates_updated": 1792022551
+}

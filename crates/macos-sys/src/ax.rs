@@ -35,6 +35,13 @@ unsafe extern "C" {
         value: CFTypeRef,
     ) -> i32;
     fn AXUIElementGetPid(element: AXUIElementRef, pid: *mut i32) -> i32;
+    fn AXUIElementCopyElementAtPosition(
+        application: AXUIElementRef,
+        x: f32,
+        y: f32,
+        element: *mut AXUIElementRef,
+    ) -> i32;
+    fn AXUIElementSetMessagingTimeout(element: AXUIElementRef, seconds: f32) -> i32;
     fn AXValueCreate(kind: i32, value: *const c_void) -> AXValueRef;
     fn AXValueGetValue(value: AXValueRef, kind: i32, out: *mut c_void) -> bool;
 }
@@ -66,6 +73,12 @@ impl Element {
         (!raw.is_null()).then_some(Self(raw))
     }
 
+    /// Another owner of the same object.
+    pub fn duplicate(&self) -> Element {
+        // SAFETY: `self.0` is live; the +1 from the retain is owned by the new wrapper.
+        Element(unsafe { CFRetain(self.0) })
+    }
+
     pub fn system_wide() -> Option<Self> {
         // SAFETY: returns a new reference or null.
         Self::own(unsafe { AXUIElementCreateSystemWide() })
@@ -74,6 +87,31 @@ impl Element {
     pub fn application(pid: i32) -> Option<Self> {
         // SAFETY: returns a new reference or null.
         Self::own(unsafe { AXUIElementCreateApplication(pid) })
+    }
+
+    /// The deepest element at a point of the screen, in the same coordinates as `AXPosition`. `timeout` (seconds)
+    /// applies to every Accessibility request this process makes from now on, because the system-wide element
+    /// is where the system keeps it.
+    pub fn at_position(x: f64, y: f64, timeout: f32) -> Option<Element> {
+        let system = Element::system_wide()?;
+        system.set_timeout(timeout);
+        let mut found: AXUIElementRef = ptr::null();
+        // SAFETY: `system` is live and `found` is a valid out pointer; on success it holds a +1 reference.
+        let status =
+            unsafe { AXUIElementCopyElementAtPosition(system.0, x as f32, y as f32, &mut found) };
+        if status == 0 {
+            Element::own(found)
+        } else {
+            None
+        }
+    }
+
+    /// How long a request to the app that owns this element may take before it fails. The default is
+    /// seconds, which would freeze this app's main thread behind a hung one. On the system-wide element
+    /// it applies to every request this process makes.
+    pub fn set_timeout(&self, seconds: f32) {
+        // SAFETY: `self.0` is a live element.
+        unsafe { AXUIElementSetMessagingTimeout(self.0, seconds) };
     }
 
     fn copy(&self, attribute: &str) -> Option<CFTypeRef> {
@@ -118,6 +156,15 @@ impl Element {
         (unsafe { CFGetTypeID(value.0) } == CFBoolean::type_id())
             // SAFETY: the type was checked above; the get rule leaves ownership with `value`.
             .then(|| bool::from(unsafe { CFBoolean::wrap_under_get_rule(value.0.cast()) }))
+    }
+
+    /// A string attribute such as `AXSelectedText`.
+    pub fn string(&self, attribute: &str) -> Option<String> {
+        let value = Element::own(self.copy(attribute)?)?;
+        // SAFETY: only reading the type id of a live object.
+        (unsafe { CFGetTypeID(value.0) } == CFString::type_id())
+            // SAFETY: the type was checked above; the get rule leaves ownership with `value`.
+            .then(|| unsafe { CFString::wrap_under_get_rule(value.0.cast()) }.to_string())
     }
 
     fn pair(&self, attribute: &str, kind: i32) -> Option<(f64, f64)> {

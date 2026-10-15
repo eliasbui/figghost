@@ -6,17 +6,21 @@ use crate::{
     notch::Page,
     panel::Key,
     pasteboard::file_paths,
-    widgets::{Fit, PageRoot, draw_text, text_attributes},
+    style,
+    widgets::{ActionTarget, Fit, PageRoot, draw_text, text_attributes},
 };
 use objc2::{
     AnyThread, DefinedClass, MainThreadMarker, MainThreadOnly, define_class, msg_send,
-    rc::Retained, runtime::ProtocolObject,
+    rc::Retained,
+    runtime::{AnyObject, ProtocolObject},
+    sel,
 };
 use objc2_app_kit::{
     NSAutoresizingMaskOptions, NSBezierPath, NSBorderType, NSColor, NSCompositingOperation,
     NSDragOperation, NSDraggingContext, NSDraggingDestination, NSDraggingInfo, NSDraggingItem,
-    NSDraggingSession, NSDraggingSource, NSEvent, NSFont, NSImage, NSPasteboardTypeFileURL,
-    NSPasteboardWriting, NSScrollView, NSScrollerStyle, NSView, NSWorkspace,
+    NSDraggingSession, NSDraggingSource, NSEvent, NSEventModifierFlags, NSFont, NSImage, NSMenu,
+    NSMenuItem, NSPasteboardTypeFileURL, NSPasteboardWriting, NSScrollView, NSScrollerStyle,
+    NSView, NSWorkspace,
 };
 use objc2_foundation::{NSArray, NSObjectProtocol, NSPoint, NSRect, NSSize, NSString, NSURL};
 use std::{
@@ -36,6 +40,7 @@ const ICON_CACHE_LIMIT: usize = 120;
 
 type PathHandler = Rc<dyn Fn(Vec<String>)>;
 type OneHandler = Rc<dyn Fn(String)>;
+type MenuHandler = Rc<dyn Fn(String, &NSEvent)>;
 
 pub struct CanvasIvars {
     paths: RefCell<Vec<String>>,
@@ -48,6 +53,7 @@ pub struct CanvasIvars {
     min_height: Cell<f64>,
     on_drop: RefCell<Option<PathHandler>>,
     on_open: RefCell<Option<OneHandler>>,
+    on_menu: RefCell<Option<MenuHandler>>,
 }
 
 define_class!(
@@ -74,8 +80,18 @@ define_class!(
             self.paint(dirty);
         }
 
+        #[unsafe(method(rightMouseDown:))]
+        fn right_mouse_down(&self, event: &NSEvent) {
+            self.show_context_menu(event);
+        }
+
         #[unsafe(method(mouseDown:))]
         fn mouse_down(&self, event: &NSEvent) {
+            // Control-click is a right click.
+            if event.modifierFlags().contains(NSEventModifierFlags::Control) {
+                self.show_context_menu(event);
+                return;
+            }
             let point = self.convertPoint_fromView(event.locationInWindow(), None);
             let tile = self.tile_at(point);
             self.ivars().selected.set(tile);
@@ -167,6 +183,7 @@ impl ShelfCanvas {
             min_height: Cell::new(frame.size.height),
             on_drop: RefCell::new(None),
             on_open: RefCell::new(None),
+            on_menu: RefCell::new(None),
         };
         // SAFETY: designated initializer with valid arguments on the main thread.
         let this: Retained<Self> =
@@ -176,6 +193,21 @@ impl ShelfCanvas {
         let types = NSArray::from_slice(&[unsafe { NSPasteboardTypeFileURL }]);
         this.registerForDraggedTypes(&types);
         this
+    }
+
+    /// Selects the tile under the pointer and hands its path to the owner, which pops up the menu.
+    fn show_context_menu(&self, event: &NSEvent) {
+        let point = self.convertPoint_fromView(event.locationInWindow(), None);
+        let Some(tile) = self.tile_at(point) else {
+            return;
+        };
+        self.ivars().selected.set(Some(tile));
+        self.setNeedsDisplay(true);
+        let path = self.ivars().paths.borrow().get(tile).cloned();
+        let handler = self.ivars().on_menu.borrow().clone();
+        if let (Some(path), Some(handler)) = (path, handler) {
+            handler(path, event);
+        }
     }
 
     /// Files from another app only: a tile dragged out and back in would otherwise duplicate itself.
@@ -262,20 +294,37 @@ impl ShelfCanvas {
         let paths = self.ivars().paths.borrow();
         let bounds = self.bounds();
         if paths.is_empty() {
-            let attrs = text_attributes(
-                &NSFont::systemFontOfSize(13.0),
-                &NSColor::colorWithWhite_alpha(1.0, 0.5),
-                Fit::Clip,
-                true,
-            );
             let height = self.ivars().min_height.get();
+            // A dashed outline says "drop here" without a word.
+            let zone = NSRect::new(
+                NSPoint::new(16.0, 8.0),
+                NSSize::new(bounds.size.width - 32.0, height - 24.0),
+            );
+            let outline = NSBezierPath::bezierPathWithRoundedRect_xRadius_yRadius(
+                zone,
+                style::CARD_RADIUS,
+                style::CARD_RADIUS,
+            );
+            style::white(0.22).setStroke();
+            outline.setLineWidth(1.5);
+            let dash = [7.0_f64, 6.0];
+            // SAFETY: the pattern pointer is valid for the two entries named by the count.
+            unsafe { outline.setLineDash_count_phase(dash.as_ptr().cast_mut(), 2, 0.0) };
+            outline.stroke();
+            let centre = NSPoint::new(bounds.size.width / 2.0, height / 2.0 + 8.0);
+            style::draw_symbol("arrow.down.doc", centre, 30.0, &style::white(0.5));
             draw_text(
                 &labels::get().shelf_empty,
                 NSRect::new(
-                    NSPoint::new(0.0, height / 2.0 - 10.0),
-                    NSSize::new(bounds.size.width, 20.0),
+                    NSPoint::new(24.0, centre.y + 26.0),
+                    NSSize::new(bounds.size.width - 48.0, 20.0),
                 ),
-                &attrs,
+                &text_attributes(
+                    &style::font(13.0, style::Weight::Medium),
+                    &style::white(style::TEXT_SECONDARY),
+                    Fit::Clip,
+                    true,
+                ),
             );
         }
         let selected = self.ivars().selected.get();
@@ -294,17 +343,15 @@ impl ShelfCanvas {
             {
                 continue;
             }
+            let card = NSRect::new(
+                NSPoint::new(tile.origin.x + 3.0, tile.origin.y + 2.0),
+                NSSize::new(tile.size.width - 6.0, tile.size.height - 4.0),
+            );
             if selected == Some(index) {
-                NSColor::selectedContentBackgroundColor().setFill();
-                NSBezierPath::bezierPathWithRoundedRect_xRadius_yRadius(
-                    NSRect::new(
-                        NSPoint::new(tile.origin.x + 3.0, tile.origin.y + 2.0),
-                        NSSize::new(tile.size.width - 6.0, tile.size.height - 4.0),
-                    ),
-                    8.0,
-                    8.0,
-                )
-                .fill();
+                style::fill_rounded(card, 14.0, &style::white(0.17));
+                style::stroke_rounded(card, 14.0, &style::white(0.38), 1.5);
+            } else {
+                style::fill_rounded(card, 14.0, &style::white(0.07));
             }
             let icon = self.icon(path);
             // SAFETY: called from drawRect: with a valid graphics context; a zero source rect means the whole image.
@@ -332,17 +379,13 @@ impl ShelfCanvas {
             );
         }
         if self.ivars().hovering.get() {
-            NSColor::controlAccentColor().setStroke();
-            let outline = NSBezierPath::bezierPathWithRoundedRect_xRadius_yRadius(
-                NSRect::new(
-                    NSPoint::new(4.0, 4.0),
-                    NSSize::new(bounds.size.width - 8.0, bounds.size.height - 8.0),
-                ),
-                12.0,
-                12.0,
+            // Something is being dragged over the page: it will be taken in.
+            let zone = NSRect::new(
+                NSPoint::new(8.0, 6.0),
+                NSSize::new(bounds.size.width - 16.0, bounds.size.height - 12.0),
             );
-            outline.setLineWidth(2.0);
-            outline.stroke();
+            style::fill_rounded(zone, style::CARD_RADIUS, &style::white(0.06));
+            style::stroke_rounded(zone, style::CARD_RADIUS, &style::white(0.7), 2.0);
         }
     }
 
@@ -379,11 +422,73 @@ impl ShelfCanvas {
     }
 }
 
+/// One entry of the menu a tile offers; an empty `id` is a separator.
+#[derive(Debug, Clone, PartialEq, Eq)]
+pub struct ShelfAction {
+    pub id: String,
+    pub title: String,
+}
+
+impl ShelfAction {
+    pub fn new(id: &str, title: &str) -> Self {
+        Self {
+            id: id.into(),
+            title: title.into(),
+        }
+    }
+
+    pub fn separator() -> Self {
+        Self::new("", "")
+    }
+}
+
+/// The menu a file offers, and what happens when an entry is chosen.
+pub type MenuFor = Box<dyn Fn(&str) -> Vec<ShelfAction>>;
+pub type MenuChoice = Box<dyn Fn(&str, &str)>;
+
 /// What the app decides about the shelf contents.
 pub struct ShelfCallbacks {
     pub on_drop: Box<dyn Fn(Vec<String>)>,
     pub on_remove: Box<dyn Fn(String)>,
     pub on_open: Box<dyn Fn(String)>,
+    /// The menu for a file; the app knows what can be done with it.
+    pub actions_for: MenuFor,
+    /// Called with the file and the id of the entry the user chose.
+    pub on_action: MenuChoice,
+}
+
+/// A context menu for `actions`, with the targets that must stay alive while it is open.
+pub fn build_menu(
+    mtm: MainThreadMarker,
+    actions: &[ShelfAction],
+    on_pick: &Rc<dyn Fn(&str)>,
+) -> (Retained<NSMenu>, Vec<Retained<ActionTarget>>) {
+    let menu = NSMenu::new(mtm);
+    menu.setAutoenablesItems(false);
+    let mut targets = Vec::new();
+    for action in actions {
+        if action.id.is_empty() {
+            menu.addItem(&NSMenuItem::separatorItem(mtm));
+            continue;
+        }
+        let (pick, id) = (Rc::clone(on_pick), action.id.clone());
+        let target = ActionTarget::new(mtm, move || pick(&id));
+        // SAFETY: `fire:` is implemented by ActionTarget; the target is returned to the caller to outlive the menu.
+        let item = unsafe {
+            NSMenuItem::initWithTitle_action_keyEquivalent(
+                NSMenuItem::alloc(mtm),
+                &NSString::from_str(&action.title),
+                Some(sel!(fire:)),
+                &NSString::from_str(""),
+            )
+        };
+        let target_object: &AnyObject = &target;
+        // SAFETY: the target outlives the menu (see above).
+        unsafe { item.setTarget(Some(target_object)) };
+        menu.addItem(&item);
+        targets.push(target);
+    }
+    (menu, targets)
 }
 
 pub struct ShelfView {
@@ -419,7 +524,29 @@ impl ShelfView {
             Some(Rc::new(move |paths| (drop.callbacks.on_drop)(paths)));
         *this.canvas.ivars().on_open.borrow_mut() =
             Some(Rc::new(move |path| (open.callbacks.on_open)(path)));
+        let menu_owner = Rc::downgrade(&this);
+        *this.canvas.ivars().on_menu.borrow_mut() = Some(Rc::new(move |path, event| {
+            if let Some(view) = menu_owner.upgrade() {
+                view.pop_up_menu(mtm, &path, event);
+            }
+        }));
         this
+    }
+
+    /// Pops up the menu for one file. The chosen entry runs on the next turn of the run loop, when the menu
+    /// is certainly gone, so an action that changes the shelf never does it under the menu.
+    fn pop_up_menu(self: &Rc<Self>, mtm: MainThreadMarker, path: &str, event: &NSEvent) {
+        let actions = (self.callbacks.actions_for)(path);
+        if actions.is_empty() {
+            return;
+        }
+        let (view, file) = (Rc::clone(self), path.to_owned());
+        let on_pick: Rc<dyn Fn(&str)> = Rc::new(move |id| {
+            let (view, file, id) = (Rc::clone(&view), file.clone(), id.to_owned());
+            crate::app::after(0.0, move || (view.callbacks.on_action)(&file, &id));
+        });
+        let (menu, _targets) = build_menu(mtm, &actions, &on_pick);
+        NSMenu::popUpContextMenu_withEvent_forView(&menu, event, &self.canvas);
     }
 
     pub fn set_paths(&self, paths: Vec<String>) {
@@ -431,6 +558,7 @@ impl ShelfView {
         let keys = Rc::clone(self);
         Page {
             title: labels::get().shelf_tab.clone(),
+            symbol: "tray.full.fill",
             root: Retained::into_super(Retained::clone(&self.root)),
             on_show: Box::new(on_show),
             on_hide: Box::new(|| {}),

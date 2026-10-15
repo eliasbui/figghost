@@ -3,10 +3,11 @@
 //!   settings_preview selftest
 //!       runs the page's own checks against sample data; exits with status 1 on a failure
 //!   settings_preview snap <page> <out.png> [--dark] [--lang vi] [--size 1000x700] [--backdrop light|dark|color]
-//!                         [--eval "script"] [--patch '{"mouse":{"smooth":false}}']
+//!                         [--eval "script"] [--patch '{"mouse":{"smooth":false}}'] [--wait seconds]
 //!       renders one page to a PNG; pages: general scroll clipboard notch tiling about
 //!
-//! The sample data is `web/fixture.json`; a unit test keeps it in step with the real state.
+//! The sample data is `web/fixture.json` plus `web/features/*.fixture.json`; a unit test keeps it in step with
+//! the real state.
 
 use macos_sys::{MainThreadMarker, app, webview::HiddenStage};
 use serde_json::{Value, json};
@@ -14,8 +15,6 @@ use std::{cell::RefCell, env, fs, process, rc::Rc};
 
 #[path = "../src/settings/page.rs"]
 mod page;
-
-const FIXTURE: &str = include_str!("../web/fixture.json");
 
 fn merge(into: &mut Value, patch: &Value) {
     match (into, patch) {
@@ -59,7 +58,7 @@ fn main() {
         })
         .and_then(|(w, h)| Some((w?, h?)))
         .unwrap_or((1000.0, 700.0));
-    let mut state: Value = serde_json::from_str(FIXTURE).expect("fixture is JSON");
+    let mut state: Value = page::fixture();
     if let Some(patch) = option(&args, "--patch") {
         merge(
             &mut state,
@@ -169,7 +168,10 @@ fn main() {
                 }
             });
             let stage_shot = Rc::clone(&stage);
-            app::after(1.8, move || {
+            let wait: f64 = option(&args, "--wait")
+                .and_then(|w| w.parse().ok())
+                .unwrap_or(2.5);
+            app::after(0.8 + wait, move || {
                 stage_shot.host.snapshot_png(mtm, width, move |png| {
                     let Some(png) = png else {
                         println!("the snapshot failed");

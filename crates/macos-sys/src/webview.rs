@@ -13,9 +13,10 @@ use objc2::{
 use objc2_app_kit::{
     NSAppearance, NSAppearanceCustomization, NSAppearanceNameAqua, NSAppearanceNameDarkAqua,
     NSApplication, NSAutoresizingMaskOptions, NSBackingStoreType, NSBitmapImageFileType,
-    NSBitmapImageRep, NSColor, NSGlassEffectView, NSGlassEffectViewStyle, NSImage, NSView,
-    NSVisualEffectBlendingMode, NSVisualEffectMaterial, NSVisualEffectState, NSVisualEffectView,
-    NSWindow, NSWindowDelegate, NSWindowStyleMask, NSWindowTitleVisibility, NSWorkspace,
+    NSBitmapImageRep, NSColor, NSEventType, NSGlassEffectView, NSGlassEffectViewStyle, NSImage,
+    NSView, NSVisualEffectBlendingMode, NSVisualEffectMaterial, NSVisualEffectState,
+    NSVisualEffectView, NSWindow, NSWindowDelegate, NSWindowStyleMask, NSWindowTitleVisibility,
+    NSWorkspace,
 };
 use objc2_foundation::{
     NSDictionary, NSError, NSNotification, NSNumber, NSObject, NSObjectProtocol, NSPoint, NSRect,
@@ -465,7 +466,8 @@ impl WebWindow {
         window.setTitlebarAppearsTransparent(true);
         window.setOpaque(false);
         window.setBackgroundColor(Some(&NSColor::clearColor()));
-        window.setMinSize(NSSize::new(spec.min_width, spec.min_height));
+        // The content area keeps a usable size when the user resizes the window.
+        window.setContentMinSize(NSSize::new(spec.min_width, spec.min_height));
 
         // Weak, because the web view's controller keeps these callbacks alive and the window owns the web view.
         let (drag_target, zoom_target) =
@@ -479,7 +481,9 @@ impl WebWindow {
                 if let (Some(window), Some(event)) = (
                     drag_target.load(),
                     NSApplication::sharedApplication(mtm).currentEvent(),
-                ) {
+                ) && event.r#type() == NSEventType::LeftMouseDown
+                {
+                    // The message arrives a moment after the click; only the click itself can start a drag.
                     window.performWindowDragWithEvent(&event);
                 }
             },
@@ -500,6 +504,8 @@ impl WebWindow {
 
         let delegate = WindowDelegate::new(mtm, on_close);
         window.setDelegate(Some(ProtocolObject::from_ref(&*delegate)));
+        // The page takes the keyboard from the start, so Tab and shortcuts work without a click first.
+        window.makeFirstResponder(Some(&host.view));
         window.center();
         Rc::new(Self {
             host,
@@ -510,6 +516,9 @@ impl WebWindow {
 
     /// Brings the window to the front and makes this app active so it takes keyboard focus.
     pub fn show(&self, mtm: MainThreadMarker) {
+        if self.window.isMiniaturized() {
+            self.window.deminiaturize(None);
+        }
         self.window.makeKeyAndOrderFront(None);
         #[allow(deprecated)]
         NSApplication::sharedApplication(mtm).activateIgnoringOtherApps(true);

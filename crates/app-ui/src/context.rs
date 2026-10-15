@@ -1,8 +1,8 @@
 //! The services the menu and the settings window act on.
 
 use crate::{
-    clipboard::Clipboard, config::Config, shelf::ShelfFeature, tiling::Tiling,
-    volume_hud::VolumeHud,
+    agents::AgentsFeature, clipboard::Clipboard, config::Config, features::Features,
+    shelf::ShelfFeature, tiling::Tiling, volume_hud::VolumeHud,
 };
 use core_mouse::Control;
 use macos_sys::MainThreadMarker;
@@ -15,6 +15,8 @@ pub struct AppContext {
     pub control: Arc<Control>,
     pub clipboard: Option<Rc<Clipboard>>,
     pub shelf: Option<Rc<ShelfFeature>>,
+    pub agents: Option<Rc<AgentsFeature>>,
+    pub features: Features,
     pub volume_hud: Rc<VolumeHud>,
     pub tiling: Rc<Tiling>,
 }

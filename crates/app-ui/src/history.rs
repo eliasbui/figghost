@@ -5,21 +5,25 @@ use crate::{
     trace,
 };
 use core_clipboard::{
-    Capture, Item, Kind, Payload, Rich, Store, is_ignored_app, should_record, title_of,
+    Board, Capture, Item, Kind, Payload, Rich, Sensitivity, Store, is_ignored_app, should_record,
+    title_of,
 };
 use macos_sys::{
     app, ax,
     pasteboard::{Content, Pasteboard, Write},
     permissions, synth,
-    ui::{Activate, Row},
+    ui::{Activate, Mark, Row},
     workspace,
 };
 use std::{
     cell::{Cell, RefCell},
+    collections::HashMap,
     env,
     path::Path,
     time::{Instant, SystemTime, UNIX_EPOCH},
 };
+
+type RecordedHook = Box<dyn Fn(i64)>;
 
 const LIST_LIMIT: usize = 200;
 const FOCUS_POLL_SECONDS: f64 = 0.015;
@@ -108,6 +112,12 @@ pub struct History {
     auto_paste: Cell<bool>,
     /// Text goes in without its formatting unless asked the other way.
     paste_plain: Cell<bool>,
+    /// What to do with a copy that looks like a secret.
+    sensitivity: Cell<Sensitivity>,
+    /// Whether some masked item may be due to go, so the clock is only looked at when it can matter.
+    expiring: Cell<bool>,
+    /// Told the id of every copy that was recorded or moved to the top.
+    on_recorded: RefCell<Option<RecordedHook>>,
 }
 
 impl History {
@@ -118,13 +128,32 @@ impl History {
         auto_paste: bool,
         paste_plain: bool,
     ) -> core_clipboard::Result<Self> {
-        let mut store = Store::open(dir)?;
-        store.max_items = limit;
         // A named pasteboard keeps tests away from the user's real clipboard.
         let pasteboard = match env::var("FIGGHOST_PASTEBOARD") {
             Ok(name) => Pasteboard::named(&name),
             Err(_) => Pasteboard::general(),
         };
+        Self::with_pasteboard(
+            dir,
+            limit,
+            ignored_apps,
+            auto_paste,
+            paste_plain,
+            pasteboard,
+        )
+    }
+
+    fn with_pasteboard(
+        dir: &Path,
+        limit: usize,
+        ignored_apps: Vec<String>,
+        auto_paste: bool,
+        paste_plain: bool,
+        pasteboard: Pasteboard,
+    ) -> core_clipboard::Result<Self> {
+        let mut store = Store::open(dir)?;
+        store.max_items = limit;
+        let expiring = store.next_expiry()?.is_some();
         Ok(Self {
             store: RefCell::new(store),
             pasteboard,
@@ -133,7 +162,30 @@ impl History {
             ignored_apps: RefCell::new(ignored_apps),
             auto_paste: Cell::new(auto_paste),
             paste_plain: Cell::new(paste_plain),
+            sensitivity: Cell::new(Sensitivity::Keep),
+            expiring: Cell::new(expiring),
+            on_recorded: RefCell::new(None),
         })
+    }
+
+    pub fn set_sensitivity(&self, sensitivity: Sensitivity) {
+        self.sensitivity.set(sensitivity);
+    }
+
+    /// Registers who is told about each copy that is recorded, replacing the previous one.
+    pub fn set_on_recorded(&self, hook: Option<RecordedHook>) {
+        *self.on_recorded.borrow_mut() = hook;
+    }
+
+    /// The pasteboard the history watches: the real one, or the private one of a test.
+    pub fn pasteboard(&self) -> &Pasteboard {
+        &self.pasteboard
+    }
+
+    /// Ignores the change that left the pasteboard at this change count: a copy that was made and undone on
+    /// purpose (reading a selection) is not something the person copied.
+    pub fn skip_change(&self, change_count: isize) {
+        self.own_change.set(change_count);
     }
 
     /// Applies new settings to the running history: a lower limit trims it right away.
@@ -157,8 +209,28 @@ impl History {
         self.store.borrow().count().unwrap_or(0)
     }
 
-    /// Records a new pasteboard item if there is one; returns whether the history changed.
+    /// Records a new pasteboard item if there is one and removes masked items whose time has come; returns
+    /// whether the history changed.
     pub fn poll(&self) -> bool {
+        let purged = self.purge_expired(now_ms());
+        self.capture() || purged
+    }
+
+    fn purge_expired(&self, now: i64) -> bool {
+        if !self.expiring.get() {
+            return false;
+        }
+        let store = self.store.borrow();
+        let removed = store.purge_expired(now).unwrap_or_else(|e| {
+            eprintln!("history: cannot remove expired items: {e}");
+            0
+        });
+        self.expiring
+            .set(store.next_expiry().ok().flatten().is_some());
+        removed > 0
+    }
+
+    fn capture(&self) -> bool {
         let count = self.pasteboard.change_count();
         if count == self.last_seen.get() {
             return false;
@@ -204,8 +276,22 @@ impl History {
             app_name: source.map(|a| a.name).filter(|n| !n.is_empty()),
             rich,
         };
-        match self.store.borrow_mut().record(capture, now_ms()) {
-            Ok(recorded) => recorded.is_some(),
+        let sensitivity = self.sensitivity.get();
+        let recorded = self
+            .store
+            .borrow_mut()
+            .record_with(capture, now_ms(), sensitivity);
+        match recorded {
+            Ok(Some(id)) => {
+                if matches!(sensitivity, Sensitivity::Mask { .. }) {
+                    self.expiring.set(true);
+                }
+                if let Some(hook) = &*self.on_recorded.borrow() {
+                    hook(id);
+                }
+                true
+            }
+            Ok(None) => false,
             Err(e) => {
                 eprintln!("history: cannot record item: {e}");
                 false
@@ -213,31 +299,86 @@ impl History {
         }
     }
 
-    pub fn rows(&self, query: &str) -> Vec<Row> {
+    pub fn rows(&self, query: &str) -> (Vec<Row>, HashMap<i64, Mark>) {
         let store = self.store.borrow();
         let items = store.search(query, LIST_LIMIT).unwrap_or_else(|e| {
             eprintln!("history: search failed: {e}");
             Vec::new()
         });
+        let boards: HashMap<i64, String> = store
+            .boards()
+            .unwrap_or_default()
+            .into_iter()
+            .map(|b| (b.id, b.name))
+            .collect();
         let now = now_ms();
-        items.iter().map(|i| row_for(&store, i, now)).collect()
+        let rows = items
+            .iter()
+            .map(|i| row_for(&store, i, now, &boards))
+            .collect();
+        let marks = items
+            .iter()
+            .filter(|i| i.masked || i.board.is_some())
+            .map(|i| {
+                let mark = Mark {
+                    sensitive: i.masked,
+                    hidden: i.masked,
+                    board: i.board,
+                };
+                (i.id, mark)
+            })
+            .collect();
+        (rows, marks)
     }
 
-    /// Puts the item back on the pasteboard, moves it to the top and pastes it into the frontmost app.
-    /// Text keeps its formatting unless plain text is the default (`mode` flips which one applies).
-    pub fn activate(&self, id: i64, mode: Activate) {
+    pub fn boards(&self) -> Vec<Board> {
+        self.store.borrow().boards().unwrap_or_default()
+    }
+
+    pub fn add_board(&self, name: &str) -> core_clipboard::Result<i64> {
+        self.store.borrow().add_board(name)
+    }
+
+    pub fn rename_board(&self, id: i64, name: &str) -> core_clipboard::Result<()> {
+        self.store.borrow().rename_board(id, name)
+    }
+
+    pub fn delete_board(&self, id: i64) -> core_clipboard::Result<()> {
+        self.store.borrow().delete_board(id)
+    }
+
+    /// Files an item in a board, or takes it out (`None`).
+    pub fn set_board(&self, item: i64, board: Option<i64>) {
+        if let Err(e) = self.store.borrow().set_board(item, board) {
+            eprintln!("history: cannot move item {item}: {e}");
+        }
+    }
+
+    /// The first line of a masked item, to show it once the user asked to see it.
+    pub fn reveal_title(&self, id: i64) -> Option<String> {
+        match self.store.borrow().payload(id) {
+            Ok(Some(Payload::Text(text))) => Some(title_of(&text)),
+            _ => None,
+        }
+    }
+
+    /// Puts an item on the pasteboard exactly as `activate` would, without moving it in the history and
+    /// without pasting it. False when the item is gone.
+    pub fn stage(&self, id: i64) -> bool {
         let store = self.store.borrow();
+        self.put_on_pasteboard(&store, id, self.paste_plain.get())
+            .is_some()
+    }
+
+    /// Writes an item to the pasteboard; the change is remembered as ours so the poll skips it.
+    fn put_on_pasteboard(&self, store: &Store, id: i64, plain: bool) -> Option<()> {
         let payload = match store.payload(id) {
             Ok(Some(p)) => p,
-            Ok(None) => return,
+            Ok(None) => return None,
             Err(e) => {
                 eprintln!("history: cannot load item {id}: {e}");
-                return;
+                return None;
             }
-        };
-        let plain = match mode {
-            Activate::Normal => self.paste_plain.get(),
-            Activate::Alternate => !self.paste_plain.get(),
         };
         let count = match &payload {
             Payload::Text(t) => {
@@ -259,6 +400,20 @@ impl History {
             Payload::Files(files) => self.pasteboard.write(Write::Files(files)),
         };
         self.own_change.set(count);
+        Some(())
+    }
+
+    /// Puts the item back on the pasteboard, moves it to the top and pastes it into the frontmost app.
+    /// Text keeps its formatting unless plain text is the default (`mode` flips which one applies).
+    pub fn activate(&self, id: i64, mode: Activate) {
+        let store = self.store.borrow();
+        let plain = match mode {
+            Activate::Normal => self.paste_plain.get(),
+            Activate::Alternate => !self.paste_plain.get(),
+        };
+        if self.put_on_pasteboard(&store, id, plain).is_none() {
+            return;
+        }
         let _ = store.touch(id, now_ms());
         trace::log(&format!("activate id={id} plain={plain}"));
         // Without Accessibility access the keystroke would be dropped silently; the item is still on
@@ -295,7 +450,7 @@ impl History {
     }
 }
 
-fn row_for(store: &Store, item: &Item, now: i64) -> Row {
+fn row_for(store: &Store, item: &Item, now: i64, boards: &HashMap<i64, String>) -> Row {
     let language = i18n::current();
     let title = match item.kind {
         Kind::Image => language.image_title(item.width, item.height),
@@ -305,6 +460,12 @@ fn row_for(store: &Store, item: &Item, now: i64) -> Row {
     let mut parts = Vec::new();
     if item.pinned {
         parts.push(language.pinned().to_owned());
+    }
+    if let Some(board) = item.board.and_then(|id| boards.get(&id)) {
+        parts.push(board.clone());
+    }
+    if item.masked {
+        parts.push(language.sensitive_item().to_owned());
     }
     if let Some(app) = &item.app_name {
         parts.push(app.clone());
@@ -399,5 +560,246 @@ mod tests {
             empty_in(Language::Vietnamese, "abc"),
             "Không tìm thấy kết quả"
         );
+    }
+
+    mod secrets_boards_and_the_stack {
+        use super::*;
+        use std::{
+            rc::Rc,
+            sync::atomic::{AtomicUsize, Ordering},
+        };
+
+        fn history() -> (History, std::path::PathBuf) {
+            static N: AtomicUsize = AtomicUsize::new(0);
+            let n = N.fetch_add(1, Ordering::Relaxed);
+            let dir = env::temp_dir().join(format!(
+                "figghost-history-secret-{}-{n}",
+                std::process::id()
+            ));
+            std::fs::create_dir_all(&dir).unwrap();
+            let board =
+                Pasteboard::named(&format!("figghost-test-secret-{}-{n}", std::process::id()));
+            let history =
+                History::with_pasteboard(&dir, 100, Vec::new(), false, false, board).unwrap();
+            (history, dir)
+        }
+
+        fn copy(history: &History, text: &str) -> bool {
+            history.pasteboard.write(Write::Text(text));
+            history.poll()
+        }
+
+        fn finish(history: &History, dir: std::path::PathBuf) {
+            history.pasteboard.release();
+            let _ = std::fs::remove_dir_all(dir);
+        }
+
+        const SECRET: &str = "password: hunter2xyz";
+
+        #[test]
+        fn a_copied_secret_is_hidden_unsearchable_revealed_on_request_and_expires() {
+            let (history, dir) = history();
+            history.set_sensitivity(Sensitivity::Mask { minutes: 10 });
+            assert!(copy(&history, "ordinary note"));
+            assert!(copy(&history, SECRET));
+            let (rows, marks) = history.rows("");
+            assert_eq!(rows.len(), 2);
+            let secret = &rows[0];
+            assert_eq!(secret.title, "", "the list never receives the text");
+            assert!(!secret.subtitle.contains("hunter"));
+            assert!(secret.subtitle.contains("Sensitive"), "{}", secret.subtitle);
+            assert_eq!(
+                marks.get(&secret.id),
+                Some(&Mark {
+                    sensitive: true,
+                    hidden: true,
+                    board: None
+                })
+            );
+            assert!(!marks.contains_key(&rows[1].id));
+            // Search cannot find it, and the id gives the text only on request.
+            assert_eq!(history.rows("hunter2xyz").0.len(), 0);
+            assert_eq!(history.reveal_title(secret.id).as_deref(), Some(SECRET));
+            // It expires; the ordinary note stays.
+            assert!(!history.purge_expired(now_ms()), "not before its time");
+            assert!(history.purge_expired(now_ms() + 11 * 60_000));
+            assert_eq!(history.rows("").0.len(), 1);
+            assert!(
+                !history.purge_expired(now_ms() + 99 * 60_000),
+                "nothing left to expire"
+            );
+            finish(&history, dir);
+        }
+
+        #[test]
+        fn the_choice_decides_whether_a_secret_is_stored_masked_or_not_at_all() {
+            let (history, dir) = history();
+            assert!(copy(&history, SECRET), "off: stored like any copy");
+            assert!(history.rows("").1.is_empty());
+            history.clear_unpinned();
+            history.set_sensitivity(Sensitivity::Skip);
+            assert!(!copy(&history, SECRET), "never: not stored");
+            assert!(copy(&history, "a plain note"), "other copies are stored");
+            assert_eq!(history.rows("").0.len(), 1);
+            finish(&history, dir);
+        }
+
+        #[test]
+        fn staging_an_item_is_not_a_copy_and_does_not_reorder_the_history() {
+            let (history, dir) = history();
+            assert!(copy(&history, "first"));
+            assert!(copy(&history, "second"));
+            let before: Vec<i64> = history.rows("").0.iter().map(|r| r.id).collect();
+            let oldest = before[1];
+            assert!(history.stage(oldest));
+            assert_eq!(
+                history.pasteboard.read(),
+                Some(Content::Text("first".into()))
+            );
+            assert!(!history.poll(), "our own write is not recorded again");
+            let after: Vec<i64> = history.rows("").0.iter().map(|r| r.id).collect();
+            assert_eq!(before, after, "the order did not change");
+            assert!(!history.stage(9999), "a deleted item cannot be staged");
+            finish(&history, dir);
+        }
+
+        #[test]
+        fn the_hook_is_told_of_each_recorded_copy_in_order() {
+            let (history, dir) = history();
+            let heard = Rc::new(RefCell::new(Vec::new()));
+            let sink = Rc::clone(&heard);
+            history.set_on_recorded(Some(Box::new(move |id| sink.borrow_mut().push(id))));
+            copy(&history, "one");
+            copy(&history, "two");
+            copy(&history, "one");
+            let ids = heard.borrow().clone();
+            assert_eq!(ids.len(), 3);
+            assert_eq!(ids[0], ids[2], "the same text is the same item");
+            assert_ne!(ids[0], ids[1]);
+            history.set_on_recorded(None);
+            copy(&history, "three");
+            assert_eq!(heard.borrow().len(), 3, "a removed hook hears nothing");
+            finish(&history, dir);
+        }
+
+        #[test]
+        fn a_filed_item_shows_its_board_and_is_found_by_it() {
+            let (history, dir) = history();
+            copy(&history, "invoice 42");
+            copy(&history, "unrelated");
+            let id = history.rows("invoice").0[0].id;
+            let board = history.add_board("Work").unwrap();
+            history.set_board(id, Some(board));
+            let (rows, marks) = history.rows("@work");
+            assert_eq!(rows.len(), 1);
+            assert!(rows[0].pinned && rows[0].pin_key.is_some());
+            assert!(
+                rows[0].subtitle.starts_with("Pinned, Work"),
+                "{}",
+                rows[0].subtitle
+            );
+            assert_eq!(marks[&id].board, Some(board));
+            history.delete_board(board).unwrap();
+            let (rows, marks) = history.rows("@pin");
+            assert_eq!(rows.len(), 1, "deleting the board unpins nothing");
+            assert!(marks.is_empty());
+            finish(&history, dir);
+        }
+    }
+
+    mod pasting {
+        use super::*;
+        use macos_sys::pasteboard::Rich as BoardRich;
+        use std::sync::atomic::{AtomicUsize, Ordering};
+
+        /// A history on a private pasteboard and a throwaway directory.
+        fn history(paste_plain: bool) -> (History, std::path::PathBuf) {
+            static N: AtomicUsize = AtomicUsize::new(0);
+            let n = N.fetch_add(1, Ordering::Relaxed);
+            let dir =
+                env::temp_dir().join(format!("figghost-history-test-{}-{n}", std::process::id()));
+            std::fs::create_dir_all(&dir).unwrap();
+            let board =
+                Pasteboard::named(&format!("figghost-test-history-{}-{n}", std::process::id()));
+            let history =
+                History::with_pasteboard(&dir, 100, Vec::new(), false, paste_plain, board).unwrap();
+            (history, dir)
+        }
+
+        fn copy_formatted(history: &History) -> i64 {
+            history.pasteboard.write(Write::RichText {
+                text: "Hello world",
+                rtf: Some(b"{\\rtf1 Hello world}"),
+                html: Some(b"<b>Hello world</b>"),
+            });
+            assert!(history.poll(), "the copy is recorded");
+            history.store.borrow().search("", 10).unwrap()[0].id
+        }
+
+        fn has_formatting(history: &History) -> bool {
+            history
+                .pasteboard
+                .read_rich()
+                .is_some_and(|r: BoardRich| r.rtf.is_some() && r.html.is_some())
+        }
+
+        #[test]
+        fn formatted_text_is_pasted_with_its_formatting_and_the_other_key_removes_it() {
+            let (history, dir) = history(false);
+            let id = copy_formatted(&history);
+            history.pasteboard.write(Write::Text("something else"));
+            history.activate(id, Activate::Normal);
+            assert!(
+                has_formatting(&history),
+                "the usual paste keeps the formatting"
+            );
+            assert_eq!(
+                history.pasteboard.read(),
+                Some(Content::Text("Hello world".into()))
+            );
+            history.activate(id, Activate::Alternate);
+            assert!(!has_formatting(&history), "the other key pastes plain text");
+            assert_eq!(
+                history.pasteboard.read(),
+                Some(Content::Text("Hello world".into()))
+            );
+            history.pasteboard.release();
+            let _ = std::fs::remove_dir_all(dir);
+        }
+
+        #[test]
+        fn plain_by_default_flips_the_two_keys() {
+            let (history, dir) = history(true);
+            let id = copy_formatted(&history);
+            history.activate(id, Activate::Normal);
+            assert!(!has_formatting(&history));
+            history.activate(id, Activate::Alternate);
+            assert!(has_formatting(&history));
+            // The setting can change while the app runs.
+            history.configure(100, Vec::new(), false, false);
+            history.activate(id, Activate::Normal);
+            assert!(has_formatting(&history));
+            history.pasteboard.release();
+            let _ = std::fs::remove_dir_all(dir);
+        }
+
+        #[test]
+        fn our_own_paste_is_not_recorded_again_and_plain_copies_have_no_formatting() {
+            let (history, dir) = history(false);
+            let id = copy_formatted(&history);
+            history.activate(id, Activate::Normal);
+            assert!(!history.poll(), "the history does not record its own paste");
+            history.pasteboard.write(Write::Text("just text"));
+            assert!(history.poll());
+            let newest = history.store.borrow().search("just text", 10).unwrap()[0].id;
+            assert_eq!(history.store.borrow().rich(newest).unwrap(), None);
+            history.activate(newest, Activate::Normal);
+            assert!(
+                !has_formatting(&history),
+                "nothing to restore for a plain copy"
+            );
+            history.pasteboard.release();
+            let _ = std::fs::remove_dir_all(dir);
+        }
     }
 }

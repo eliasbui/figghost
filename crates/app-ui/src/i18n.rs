@@ -2,6 +2,7 @@
 //! method with an exhaustive `match`, so adding a language to `Language` makes the compiler list every
 //! string that still needs translating.
 
+use core_agents::tracker::State;
 use macos_sys::labels::Labels;
 use std::sync::OnceLock;
 
@@ -143,6 +144,183 @@ impl Language {
         }
     }
 
+    pub fn shelf_menu_zip(self) -> &'static str {
+        match self {
+            Language::English => "Compress to ZIP",
+            Language::Vietnamese => "Nén thành ZIP",
+        }
+    }
+
+    pub fn shelf_menu_convert(self, format: &str) -> String {
+        match self {
+            Language::English => format!("Convert to {format}"),
+            Language::Vietnamese => format!("Chuyển sang {format}"),
+        }
+    }
+
+    pub fn shelf_menu_reveal(self) -> &'static str {
+        match self {
+            Language::English => "Show in Finder",
+            Language::Vietnamese => "Hiện trong Finder",
+        }
+    }
+
+    pub fn shelf_menu_remove(self) -> &'static str {
+        match self {
+            Language::English => "Remove from shelf",
+            Language::Vietnamese => "Bỏ khỏi khay",
+        }
+    }
+
+    pub fn agents_wants(self, agent: &str, tool: &str) -> String {
+        match self {
+            Language::English => format!("{agent} wants to use {tool}"),
+            Language::Vietnamese => format!("{agent} muốn dùng {tool}"),
+        }
+    }
+
+    pub fn agents_asks(self, agent: &str) -> String {
+        match self {
+            Language::English => format!("{agent} is asking for permission"),
+            Language::Vietnamese => format!("{agent} đang xin quyền"),
+        }
+    }
+
+    pub fn agents_allow(self) -> &'static str {
+        match self {
+            Language::English => "Allow",
+            Language::Vietnamese => "Cho phép",
+        }
+    }
+
+    pub fn agents_deny(self) -> &'static str {
+        match self {
+            Language::English => "Deny",
+            Language::Vietnamese => "Từ chối",
+        }
+    }
+
+    /// What the agent is told when the user denies a command from the notch.
+    pub fn agents_denied_message(self) -> &'static str {
+        match self {
+            Language::English => "The user denied this from the notch.",
+            Language::Vietnamese => "Người dùng đã từ chối yêu cầu này từ notch.",
+        }
+    }
+
+    pub fn agents_more_waiting(self, n: usize) -> String {
+        match self {
+            Language::English => format!("{n} more waiting"),
+            Language::Vietnamese => format!("Còn {n} yêu cầu đang chờ"),
+        }
+    }
+
+    pub fn agents_sessions(self) -> &'static str {
+        match self {
+            Language::English => "Sessions",
+            Language::Vietnamese => "Phiên làm việc",
+        }
+    }
+
+    pub fn agents_usage(self) -> &'static str {
+        match self {
+            Language::English => "Usage limits",
+            Language::Vietnamese => "Hạn mức sử dụng",
+        }
+    }
+
+    pub fn agents_state(self, state: State) -> &'static str {
+        match (self, state) {
+            (Language::English, State::Waiting) => "Waiting for you",
+            (Language::English, State::Working) => "Working",
+            (Language::English, State::Failed) => "Failed",
+            (Language::English, State::Done) => "Done",
+            (Language::English, State::Idle) => "Idle",
+            (Language::Vietnamese, State::Waiting) => "Đang chờ bạn",
+            (Language::Vietnamese, State::Working) => "Đang làm",
+            (Language::Vietnamese, State::Failed) => "Lỗi",
+            (Language::Vietnamese, State::Done) => "Xong",
+            (Language::Vietnamese, State::Idle) => "Đang rảnh",
+        }
+    }
+
+    pub fn agents_empty_title(self) -> &'static str {
+        match self {
+            Language::English => "No agent is running",
+            Language::Vietnamese => "Chưa có tác tử nào đang chạy",
+        }
+    }
+
+    pub fn agents_empty_hint(self) -> &'static str {
+        match self {
+            Language::English => {
+                "Start Claude Code or Codex in a terminal. Turn on the hooks in Settings to see it here."
+            }
+            Language::Vietnamese => {
+                "Chạy Claude Code hoặc Codex trong terminal. Bật hook trong Cài đặt để thấy chúng ở đây."
+            }
+        }
+    }
+
+    /// The length of a usage window: "5 h", "7 d".
+    pub fn agents_window(self, minutes: u64) -> String {
+        if minutes <= 2880 {
+            let hours = (minutes as f64 / 60.0).round() as u64;
+            match self {
+                Language::English => format!("{hours} h"),
+                Language::Vietnamese => format!("{hours} giờ"),
+            }
+        } else {
+            let days = (minutes as f64 / 1440.0).round() as u64;
+            match self {
+                Language::English => format!("{days} d"),
+                Language::Vietnamese => format!("{days} ngày"),
+            }
+        }
+    }
+
+    /// A time left, in its two biggest units: "2 h 10 min", "4 d".
+    pub fn short_duration(self, secs: i64) -> String {
+        let secs = secs.max(0);
+        let (days, hours, minutes) = (secs / 86_400, (secs % 86_400) / 3600, (secs % 3600) / 60);
+        match self {
+            Language::English => match (days, hours) {
+                (d, _) if d >= 2 => format!("{d} d"),
+                (1, h) => format!("1 d {h} h"),
+                (_, h) if h > 0 => format!("{h} h {minutes} min"),
+                _ => format!("{} min", minutes.max(1)),
+            },
+            Language::Vietnamese => match (days, hours) {
+                (d, _) if d >= 2 => format!("{d} ngày"),
+                (1, h) => format!("1 ngày {h} giờ"),
+                (_, h) if h > 0 => format!("{h} giờ {minutes} phút"),
+                _ => format!("{} phút", minutes.max(1)),
+            },
+        }
+    }
+
+    pub fn agents_resets_in(self, secs: i64) -> String {
+        match self {
+            Language::English => format!("resets in {}", self.short_duration(secs)),
+            Language::Vietnamese => format!("đặt lại sau {}", self.short_duration(secs)),
+        }
+    }
+
+    pub fn agents_reset_already(self) -> &'static str {
+        match self {
+            Language::English => "has reset",
+            Language::Vietnamese => "đã đặt lại",
+        }
+    }
+
+    /// For numbers read a while ago: "as of 6 days ago".
+    pub fn agents_as_of(self, age: &str) -> String {
+        match self {
+            Language::English => format!("as of {age}"),
+            Language::Vietnamese => format!("số liệu {age}"),
+        }
+    }
+
     pub fn pick_app_prompt(self) -> &'static str {
         match self {
             Language::English => "Choose an app",
@@ -235,11 +413,22 @@ impl Language {
                 clipboard_tab: "Clipboard".into(),
                 shelf_tab: "Khay".into(),
                 search_placeholder: "Tìm kiếm  (@image @link @code @file @pin)".into(),
+                search_placeholder_short: "Tìm kiếm".into(),
                 clipboard_hint: "Enter: dán    Opt+P: ghim    Opt+Xoá: xoá    Esc: đóng".into(),
+                chip_all: "Tất cả".into(),
+                chip_pinned: "Đã ghim".into(),
+                chip_links: "Liên kết".into(),
+                chip_code: "Mã".into(),
+                chip_images: "Ảnh".into(),
+                chip_files: "Tệp".into(),
+                chip_text: "Văn bản".into(),
                 shelf_hint:
                     "Kéo tệp vào để giữ tạm    Nhấp đúp: mở    Kéo ra: dùng    Xoá: bỏ khỏi khay"
                         .into(),
                 shelf_empty: "Kéo tệp vào đây để giữ tạm".into(),
+                agents_tab: "Tác tử".into(),
+                agents_hint: "Return: cho phép    Opt+Xoá: từ chối    Không trả lời thì tác tử hỏi ngay trong terminal."
+                    .into(),
                 media_tab: "Media".into(),
                 media_idle: "Không có bài nào đang phát".into(),
                 media_previous: "Trước".into(),
@@ -249,6 +438,17 @@ impl Language {
                     .into(),
                 media_playing: "Đang phát".into(),
                 media_paused: "Đã tạm dừng".into(),
+                focus_tab: "Tập trung".into(),
+                focus_start: "Bắt đầu".into(),
+                focus_pause: "Tạm dừng".into(),
+                focus_resume: "Tiếp tục".into(),
+                focus_reset: "Đặt lại".into(),
+                focus_ready: "Chọn thời lượng rồi bắt đầu".into(),
+                focus_running: "Giữ nhịp nào".into(),
+                focus_paused: "Đã tạm dừng".into(),
+                focus_done: "Hết giờ".into(),
+                focus_hint: "Return: bắt đầu hoặc tạm dừng    Notch tự mở khi hết giờ.".into(),
+                focus_minutes: "phút".into(),
                 menu_about: "Giới thiệu".into(),
                 menu_settings: "Cài đặt...".into(),
                 menu_hide: "Ẩn".into(),
@@ -376,6 +576,31 @@ mod tests {
                 language.menu_volume_hud().to_owned(),
                 language.menu_settings().to_owned(),
                 language.pick_app_prompt().to_owned(),
+                language.agents_wants("Claude Code", "Bash"),
+                language.agents_asks("Codex"),
+                language.agents_allow().to_owned(),
+                language.agents_deny().to_owned(),
+                language.agents_denied_message().to_owned(),
+                language.agents_more_waiting(2),
+                language.agents_sessions().to_owned(),
+                language.agents_usage().to_owned(),
+                language.agents_state(State::Waiting).to_owned(),
+                language.agents_state(State::Working).to_owned(),
+                language.agents_state(State::Failed).to_owned(),
+                language.agents_state(State::Done).to_owned(),
+                language.agents_state(State::Idle).to_owned(),
+                language.agents_empty_title().to_owned(),
+                language.agents_empty_hint().to_owned(),
+                language.agents_window(300),
+                language.agents_window(10_080),
+                language.short_duration(7_800),
+                language.agents_resets_in(2_280),
+                language.agents_reset_already().to_owned(),
+                language.agents_as_of("2 days ago"),
+                language.shelf_menu_zip().to_owned(),
+                language.shelf_menu_convert("PNG"),
+                language.shelf_menu_reveal().to_owned(),
+                language.shelf_menu_remove().to_owned(),
                 language.menu_smooth_for("Safari"),
                 language.menu_smooth_current().to_owned(),
                 language.menu_open_history().to_owned(),
@@ -399,9 +624,19 @@ mod tests {
                 &labels.clipboard_tab,
                 &labels.shelf_tab,
                 &labels.search_placeholder,
+                &labels.search_placeholder_short,
                 &labels.clipboard_hint,
+                &labels.chip_all,
+                &labels.chip_pinned,
+                &labels.chip_links,
+                &labels.chip_code,
+                &labels.chip_images,
+                &labels.chip_files,
+                &labels.chip_text,
                 &labels.shelf_hint,
                 &labels.shelf_empty,
+                &labels.agents_tab,
+                &labels.agents_hint,
                 &labels.media_tab,
                 &labels.media_idle,
                 &labels.media_previous,
@@ -410,6 +645,17 @@ mod tests {
                 &labels.media_hint,
                 &labels.media_playing,
                 &labels.media_paused,
+                &labels.focus_tab,
+                &labels.focus_start,
+                &labels.focus_pause,
+                &labels.focus_resume,
+                &labels.focus_reset,
+                &labels.focus_ready,
+                &labels.focus_running,
+                &labels.focus_paused,
+                &labels.focus_done,
+                &labels.focus_hint,
+                &labels.focus_minutes,
                 &labels.menu_about,
                 &labels.menu_settings,
                 &labels.menu_hide,
@@ -442,5 +688,23 @@ mod tests {
         assert_ne!(en.labels().shelf_tab, vi.labels().shelf_tab);
         assert_ne!(en.labels().media_idle, vi.labels().media_idle);
         assert_ne!(en.labels().media_play_pause, vi.labels().media_play_pause);
+        assert_ne!(en.labels().chip_all, vi.labels().chip_all);
+        assert_ne!(en.labels().chip_pinned, vi.labels().chip_pinned);
+    }
+
+    #[test]
+    fn durations_use_their_two_biggest_units_in_both_languages() {
+        let (en, vi) = (Language::English, Language::Vietnamese);
+        assert_eq!(en.short_duration(7_800), "2 h 10 min");
+        assert_eq!(en.short_duration(2_280), "38 min");
+        assert_eq!(en.short_duration(30), "1 min");
+        assert_eq!(en.short_duration(4 * 86_400), "4 d");
+        assert_eq!(en.short_duration(86_400 + 2 * 3600), "1 d 2 h");
+        assert_eq!(vi.short_duration(7_800), "2 giờ 10 phút");
+        assert_eq!(vi.short_duration(4 * 86_400), "4 ngày");
+        assert_eq!(en.agents_window(299), "5 h");
+        assert_eq!(en.agents_window(10_079), "7 d");
+        assert_eq!(en.agents_window(43_200), "30 d");
+        assert_eq!(vi.agents_window(300), "5 giờ");
     }
 }

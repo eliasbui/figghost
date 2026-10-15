@@ -2,6 +2,8 @@
 //! Window tiling geometry: where each layout puts a window inside the usable area of a screen.
 //! Coordinates are whole pixels with the origin at the top-left corner, y growing downwards.
 
+pub mod snap;
+
 #[derive(Debug, Clone, Copy, PartialEq)]
 pub struct Rect {
     pub x: f64,

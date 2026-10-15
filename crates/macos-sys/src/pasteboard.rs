@@ -1,8 +1,8 @@
-use objc2::{rc::Retained, runtime::ProtocolObject};
+use objc2::{msg_send, rc::Retained, runtime::ProtocolObject};
 use objc2_app_kit::{
-    NSBitmapImageFileType, NSBitmapImageRep, NSPasteboard, NSPasteboardTypeFileURL,
-    NSPasteboardTypeHTML, NSPasteboardTypePNG, NSPasteboardTypeRTF, NSPasteboardTypeString,
-    NSPasteboardTypeTIFF, NSPasteboardWriting,
+    NSBitmapImageFileType, NSBitmapImageRep, NSPasteboard, NSPasteboardItem,
+    NSPasteboardTypeFileURL, NSPasteboardTypeHTML, NSPasteboardTypePNG, NSPasteboardTypeRTF,
+    NSPasteboardTypeString, NSPasteboardTypeTIFF, NSPasteboardWriting,
 };
 use objc2_foundation::{NSArray, NSData, NSDictionary, NSString, NSURL};
 
@@ -42,6 +42,9 @@ pub enum Write<'a> {
 
 pub struct Pasteboard(Retained<NSPasteboard>);
 
+/// Everything on a pasteboard, every item with every type it offers, so that it can be put back as it was.
+pub struct Snapshot(Vec<Vec<(String, Vec<u8>)>>);
+
 impl Pasteboard {
     pub fn general() -> Self {
         Self(NSPasteboard::generalPasteboard())
@@ -50,6 +53,59 @@ impl Pasteboard {
     /// A private named pasteboard, so tests never touch the user's clipboard.
     pub fn named(name: &str) -> Self {
         Self(NSPasteboard::pasteboardWithName(&NSString::from_str(name)))
+    }
+
+    /// Frees a named pasteboard, so a test leaves nothing behind in the pasteboard server.
+    pub fn release(&self) {
+        // SAFETY: a plain message with no arguments; the binding for it is deprecated and left out.
+        let _: () = unsafe { msg_send![&*self.0, releaseGlobally] };
+    }
+
+    /// The plain text on the pasteboard, if it has any.
+    pub fn string(&self) -> Option<String> {
+        // SAFETY: extern statics are process-lifetime constants.
+        self.0
+            .stringForType(unsafe { NSPasteboardTypeString })
+            .map(|s| s.to_string())
+    }
+
+    /// A copy of the whole content. `None` when a type cannot be read in full (a promise that fails to
+    /// deliver): putting back less than was there would lose the person's data, so nobody should touch it.
+    pub fn snapshot(&self) -> Option<Snapshot> {
+        let Some(items) = self.0.pasteboardItems() else {
+            return Some(Snapshot(Vec::new()));
+        };
+        let mut all = Vec::new();
+        for item in items.iter() {
+            let mut kinds = Vec::new();
+            for kind in item.types().iter() {
+                let data = item.dataForType(&kind)?;
+                kinds.push((kind.to_string(), data.to_vec()));
+            }
+            all.push(kinds);
+        }
+        Some(Snapshot(all))
+    }
+
+    /// Puts a snapshot back, replacing whatever is there, and returns the new change count so that the
+    /// history watcher can skip it.
+    pub fn restore(&self, snapshot: &Snapshot) -> isize {
+        self.0.clearContents();
+        let items: Vec<Retained<ProtocolObject<dyn NSPasteboardWriting>>> = snapshot
+            .0
+            .iter()
+            .map(|kinds| {
+                let item = NSPasteboardItem::new();
+                for (kind, bytes) in kinds {
+                    item.setData_forType(&NSData::with_bytes(bytes), &NSString::from_str(kind));
+                }
+                ProtocolObject::from_retained(item)
+            })
+            .collect();
+        if !items.is_empty() {
+            self.0.writeObjects(&NSArray::from_retained_slice(&items));
+        }
+        self.0.changeCount()
     }
 
     /// Cheap enough to poll; it does not read any content.

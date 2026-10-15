@@ -146,7 +146,7 @@ pub fn build(ctx: &AppContext, settings: &Rc<SettingsFeature>) -> StatusMenu {
         }))
     };
 
-    let entries = vec![
+    let mut entries = vec![
         open_settings,
         Entry::Separator,
         Entry::Item(
@@ -170,7 +170,15 @@ pub fn build(ctx: &AppContext, settings: &Rc<SettingsFeature>) -> StatusMenu {
         Entry::Separator,
         login,
         open_config,
-        Entry::Item(Item::new(text.menu_quit(), move || app::quit(mtm))),
     ];
+    // What the features add comes after the fixed entries and before the last one.
+    let extra = ctx.features.menu_entries();
+    if !extra.is_empty() {
+        entries.push(Entry::Separator);
+        entries.extend(extra);
+    }
+    entries.push(Entry::Item(Item::new(text.menu_quit(), move || {
+        app::quit(mtm)
+    })));
     StatusMenu::new(mtm, "Fig", entries)
 }

@@ -45,6 +45,7 @@ const ICONS = {
   refresh: '<path d="M20 11a8 8 0 1 0-2.3 5.7M20 4v7h-7"/>',
   trash: '<path d="M4 7h16M10 11v6M14 11v6M6 7l1 12a2 2 0 0 0 2 2h6a2 2 0 0 0 2-2l1-12M9 7V4h6v3"/>',
   power: '<path d="M12 3v9M6.3 6.8a8 8 0 1 0 11.4 0"/>',
+  agents: '<path d="M11 3l1.9 5.6L18.5 10.5l-5.6 1.9L11 18l-1.9-5.6L3.5 10.5l5.6-1.9z"/><path d="M19 15l.7 2 2 .7-2 .7-.7 2-.7-2-2-.7 2-.7z"/>',
 };
 
 const GHOST = '<svg viewBox="0 0 24 24" aria-hidden="true"><path d="M12 2.5c-4.2 0-7.5 3.2-7.5 7.3V20c0 .8.9 1.2 1.5.7l1.6-1.4 1.6 1.4c.5.4 1.2.4 1.7 0l1.1-1 1.1 1c.5.4 1.2.4 1.7 0l1.6-1.4 1.6 1.4c.6.5 1.5.1 1.5-.7V9.8c0-4.1-3.3-7.3-7.5-7.3z"/><circle cx="9.2" cy="10.2" r="1.5" fill="#5b4bdc"/><circle cx="14.8" cy="10.2" r="1.5" fill="#5b4bdc"/></svg>';
@@ -63,11 +64,26 @@ function throttleBy(key, ms, fn) {
 
 const I18N = {
   en: {
-    'nav.general': 'General', 'nav.scroll': 'Scrolling', 'nav.clipboard': 'Clipboard', 'nav.notch': 'Notch', 'nav.tiling': 'Window snapping', 'nav.about': 'About',
+    'nav.general': 'General', 'nav.scroll': 'Scrolling', 'nav.clipboard': 'Clipboard', 'nav.notch': 'Notch', 'nav.agents': 'AI agents', 'nav.tiling': 'Window snapping', 'nav.about': 'About',
     'page.general': 'General', 'page.general.sub': 'Startup, language and permissions.',
     'page.scroll': 'Scrolling', 'page.scroll.sub': 'Smooth, reversible mouse-wheel scrolling. Trackpads and the Magic Mouse are never touched.',
     'page.clipboard': 'Clipboard', 'page.clipboard.sub': 'A history of everything you copy, with instant search, pinning and keyboard shortcuts.',
-    'page.notch': 'Notch', 'page.notch.sub': 'A panel that grows out of the top edge of your screen: clipboard, file shelf and media.',
+    'page.notch': 'Notch', 'page.notch.sub': 'A panel that grows out of the top edge of your screen: clipboard, file shelf, media, a focus timer, your coding agents and your calendar.',
+    'page.agents': 'AI agents', 'page.agents.sub': 'Follow Claude Code and Codex from the notch: answer their permission requests, see what they are doing and how much of your limits is left.',
+    'sec.agents.follow': 'Following', 'agents.enable.title': 'Follow coding agents', 'agents.enable.desc': 'Listen for what Claude Code and Codex report and show it on the Agents tab of the notch.',
+    'sec.agents.connect': 'Connect', 'agents.claude.title': 'Claude Code', 'agents.claude.desc': 'Adds hooks to ~/.claude/settings.json. Your other hooks stay as they are.',
+    'agents.codex.title': 'Codex', 'agents.codex.desc': 'Adds hooks to ~/.codex/hooks.json. Codex asks you to review new hooks the first time it runs.',
+    'agents.install': 'Install', 'agents.remove': 'Remove', 'agents.repair': 'Repair',
+    'agents.status.on': 'Connected', 'agents.status.off': 'Not connected', 'agents.status.partial': 'Incomplete ({n} of {m})', 'agents.status.missing': 'Not found', 'agents.status.error': 'Cannot read its file',
+    'sec.agents.answer': 'Answering', 'agents.wait.title': 'Wait for an answer', 'agents.wait.desc': 'A command waits this long on the notch. Without an answer the agent asks in its own terminal, as usual.', 'agents.wait.n': '{n} seconds',
+    'agents.sound.title': 'Play a sound', 'agents.sound.desc': 'When a command needs an answer or an agent finishes.',
+    'agents.peek.title': 'Show the notch when an agent finishes', 'agents.peek.desc': 'The notch opens for a few seconds and closes by itself, unless the pointer is on it.',
+    'sec.agents.limits': 'Usage limits', 'agents.usage.title': 'Claude Code limits', 'agents.usage.desc': 'Claude Code reports how much of its five-hour and weekly limits is used to its status line. Turning this on runs Figghost there first and then your own status line, so it looks the same. Codex limits are read from its session logs and need nothing.',
+    'agents.usage.on': 'Turn on', 'agents.usage.off': 'Turn off', 'agents.usage.waiting': 'Waiting for the next message from Claude Code.', 'agents.usage.ok': 'On', 'agents.usage.none': 'Off',
+    'sec.agents.note': 'Good to know', 'agents.note.title': 'Other apps that answer permission requests', 'agents.note.body': 'If another app, such as OneNotch, also answers these requests, both ask and the first answer wins. Turn one of them off.',
+    'tab.agents': 'Agents', 'tab.agents.desc': 'Claude Code and Codex: the command waiting for you, the sessions that are running and what is left of their limits.',
+    'tab.calendar': 'Calendar', 'tab.calendar.desc': 'Today and tomorrow, the reminders that are due, and an alert with a Join button before a meeting. Off until you turn it on in the Calendar page.',
+    'fault.agents_failed': 'Could not change the agent files.',
     'page.tiling': 'Window snapping', 'page.tiling.sub': 'Place the focused window on a part of the screen with a shortcut.',
     'page.about': 'About', 'page.about.sub': 'Mos, Maccy and OneNotch ideas in one small app.',
 
@@ -91,12 +107,12 @@ const I18N = {
     'step.title': 'Step', 'step.desc': 'Distance of one wheel notch', 'speed.title': 'Speed', 'speed.desc': 'Multiplier for every scroll', 'duration.title': 'Glide', 'duration.desc': 'How long a glide takes to settle',
     'preset.precise': 'Precise', 'preset.balanced': 'Balanced', 'preset.fluid': 'Fluid',
     'graph.distance': 'Distance', 'graph.velocity': 'Speed', 'graph.per': 'One notch moves {px} px; 98% of it is done in {ms} ms.',
-    'pad.hint': 'Scroll here with your mouse wheel to feel the settings.', 'pad.speed': 'Speed', 'pad.peak': 'Peak', 'pad.frames': 'Frames', 'pad.jump': 'Largest jump', 'pad.line': 'line {n}',
+    'pad.hint': 'Scroll here with your mouse wheel to feel the settings.', 'pad.idle': 'Scroll to measure', 'pad.speed': 'Speed', 'pad.peak': 'Peak', 'pad.frames': 'Frames', 'pad.jump': 'Largest jump', 'pad.line': 'line {n}',
     'shift.title': 'Shift scrolls sideways', 'shift.desc': 'Hold Shift and turn the wheel to scroll horizontally, smoothly.',
     'option.title': 'Option scrolls faster', 'option.desc': 'Hold Option to scroll several times as far. Good for long documents.',
     'boost.title': 'Boost', 'cmd.title': 'Command zooms', 'cmd.desc': 'Hold Command and turn the wheel to zoom in or out. Sends Command + and Command - in browsers, editors and viewers.',
     'apps.desc': 'With Smooth scrolling on, set an app to Off to leave it alone (a block list). With it off, set an app to On and only those apps glide (an allow list).',
-    'apps.empty': 'No app rules yet.', 'apps.add': 'Add app', 'apps.smooth': 'Smooth', 'apps.reverse': 'Reverse', 'rule.default': 'Default', 'rule.on': 'On', 'rule.off': 'Off', 'apps.remove': 'Remove',
+    'apps.rules': 'Per-app rules', 'apps.empty': 'No app rules yet.', 'apps.add': 'Add app', 'apps.smooth': 'Smooth', 'apps.reverse': 'Reverse', 'rule.default': 'Default', 'rule.on': 'On', 'rule.off': 'Off', 'apps.remove': 'Remove',
     'menu.running': 'Running apps', 'menu.disk': 'Choose from disk...', 'menu.none': 'No other apps are open',
 
     'sec.shortcut': 'Shortcut', 'sec.pasting': 'Pasting', 'sec.history': 'History', 'sec.privacy': 'Privacy', 'sec.keys': 'Keyboard',
@@ -112,7 +128,8 @@ const I18N = {
 
     'notch.panel.title': 'Notch panel', 'notch.panel.desc': 'Move the pointer to the top edge of the screen to open it. Off removes it entirely.',
     'notch.preview': 'Hover the top edge', 'sec.tabs': 'Tabs', 'tab.clipboard': 'Clipboard', 'tab.clipboard.desc': 'The same list as the popup, with search.',
-    'tab.shelf': 'Shelf', 'tab.shelf.desc': 'Drop files to keep them handy, and drag them out again. Only references are stored.', 'tab.media': 'Media', 'tab.media.desc': 'Previous, play and next for whatever is playing; track details for Music and Spotify.',
+    'tab.shelf': 'Shelf', 'tab.shelf.desc': 'Drop files to keep them handy and drag them out again. Right-click a file to compress it or convert an image. Only references are stored.', 'tab.media': 'Media', 'tab.media.desc': 'Previous, play and next for whatever is playing; track details for Music and Spotify.',
+    'tab.focus': 'Focus', 'tab.focus.desc': 'A countdown for work sessions: 15, 25, 45 or 60 minutes. The notch opens and a sound plays when time is up.',
     'sec.volume': 'Volume', 'vol.title': 'Volume indicator in the notch', 'vol.desc': 'Replaces the system volume display. Needs Accessibility. Shift + Option moves in finer steps.',
     'shelf.count': 'Files on the shelf', 'shelf.clear': 'Clear shelf', 'shelf.clear.desc': 'Removes the references only. Your files are not touched.',
     'sec.shelf': 'Shelf',
@@ -131,13 +148,30 @@ const I18N = {
     'fault.invalid_shortcut': 'That key cannot be used.', 'fault.shortcut_required': 'This shortcut cannot be removed.', 'fault.conflict': 'Already used by {name}.', 'fault.taken': 'Another app already uses this shortcut.',
     'fault.accessibility_needed': 'Accessibility access is needed. Allow Figghost in System Settings.', 'fault.login_failed': 'Could not change the login item: {detail}', 'fault.unknown_action': 'Unknown action.', 'fault.unsupported_key': 'That key is not supported.',
     'target.clipboard': 'the clipboard shortcut',
+    'sec.ai': 'AI assistants', 'mcp.title': 'Let AI assistants search the history', 'mcp.desc': 'Starts a local server (MCP) that Claude and other assistants can use to find what you copied. Anything in the history can be read while this is on.',
+    'mcp.how': 'Add this to the assistant\'s MCP settings:', 'mcp.copy': 'Copy configuration', 'mcp.copied': 'Copied to the clipboard.',
   },
   vi: {
-    'nav.general': 'Chung', 'nav.scroll': 'Cuộn chuột', 'nav.clipboard': 'Clipboard', 'nav.notch': 'Notch', 'nav.tiling': 'Chia cửa sổ', 'nav.about': 'Giới thiệu',
+    'nav.general': 'Chung', 'nav.scroll': 'Cuộn chuột', 'nav.clipboard': 'Clipboard', 'nav.notch': 'Notch', 'nav.agents': 'Tác tử AI', 'nav.tiling': 'Chia cửa sổ', 'nav.about': 'Giới thiệu',
     'page.general': 'Chung', 'page.general.sub': 'Khởi động, ngôn ngữ và quyền truy cập.',
     'page.scroll': 'Cuộn chuột', 'page.scroll.sub': 'Cuộn mượt và đảo chiều cho con lăn chuột. Trackpad và Magic Mouse không bị can thiệp.',
     'page.clipboard': 'Clipboard', 'page.clipboard.sub': 'Lịch sử mọi thứ bạn sao chép, tìm kiếm tức thì, ghim và phím tắt.',
-    'page.notch': 'Notch', 'page.notch.sub': 'Bảng mọc ra từ mép trên màn hình: clipboard, khay tệp và media.',
+    'page.notch': 'Notch', 'page.notch.sub': 'Bảng mọc ra từ mép trên màn hình: clipboard, khay tệp, media, đồng hồ tập trung, các tác tử lập trình và lịch của bạn.',
+    'page.agents': 'Tác tử AI', 'page.agents.sub': 'Theo dõi Claude Code và Codex ngay trên notch: trả lời yêu cầu cấp quyền, xem chúng đang làm gì và còn bao nhiêu hạn mức.',
+    'sec.agents.follow': 'Theo dõi', 'agents.enable.title': 'Theo dõi các tác tử lập trình', 'agents.enable.desc': 'Lắng nghe những gì Claude Code và Codex báo về và hiện trên tab Tác tử của notch.',
+    'sec.agents.connect': 'Kết nối', 'agents.claude.title': 'Claude Code', 'agents.claude.desc': 'Thêm hook vào ~/.claude/settings.json. Các hook khác của bạn được giữ nguyên.',
+    'agents.codex.title': 'Codex', 'agents.codex.desc': 'Thêm hook vào ~/.codex/hooks.json. Codex sẽ hỏi bạn xem lại hook mới ở lần chạy đầu tiên.',
+    'agents.install': 'Cài', 'agents.remove': 'Gỡ', 'agents.repair': 'Sửa',
+    'agents.status.on': 'Đã kết nối', 'agents.status.off': 'Chưa kết nối', 'agents.status.partial': 'Chưa đủ ({n}/{m})', 'agents.status.missing': 'Không tìm thấy', 'agents.status.error': 'Không đọc được tệp của nó',
+    'sec.agents.answer': 'Trả lời', 'agents.wait.title': 'Thời gian chờ câu trả lời', 'agents.wait.desc': 'Một lệnh chờ chừng này trên notch. Không có câu trả lời thì tác tử hỏi trong terminal của nó như bình thường.', 'agents.wait.n': '{n} giây',
+    'agents.sound.title': 'Phát âm thanh', 'agents.sound.desc': 'Khi một lệnh cần câu trả lời hoặc tác tử làm xong.',
+    'agents.peek.title': 'Hiện notch khi tác tử làm xong', 'agents.peek.desc': 'Notch mở vài giây rồi tự đóng, trừ khi con trỏ đang ở trên nó.',
+    'sec.agents.limits': 'Hạn mức sử dụng', 'agents.usage.title': 'Hạn mức Claude Code', 'agents.usage.desc': 'Claude Code báo mức đã dùng của hạn mức năm giờ và hạn mức tuần vào dòng trạng thái của nó. Bật mục này thì Figghost chạy ở đó trước rồi mới đến dòng trạng thái của bạn, nên giao diện vẫn như cũ. Hạn mức Codex đọc từ nhật ký phiên của nó, không cần cài gì.',
+    'agents.usage.on': 'Bật', 'agents.usage.off': 'Tắt', 'agents.usage.waiting': 'Đang chờ tin nhắn tiếp theo từ Claude Code.', 'agents.usage.ok': 'Đang bật', 'agents.usage.none': 'Đang tắt',
+    'sec.agents.note': 'Cần biết', 'agents.note.title': 'Ứng dụng khác cũng trả lời yêu cầu cấp quyền', 'agents.note.body': 'Nếu một ứng dụng khác, như OneNotch, cũng trả lời các yêu cầu này thì cả hai cùng hỏi và câu trả lời đầu tiên được dùng. Hãy tắt một trong hai.',
+    'tab.agents': 'Tác tử', 'tab.agents.desc': 'Claude Code và Codex: lệnh đang chờ bạn, các phiên đang chạy và hạn mức còn lại.',
+    'tab.calendar': 'Lịch', 'tab.calendar.desc': 'Hôm nay và ngày mai, các lời nhắc đến hạn và cảnh báo có nút Tham gia trước cuộc họp. Tắt cho đến khi bạn bật ở trang Lịch.',
+    'fault.agents_failed': 'Không sửa được tệp của tác tử.',
     'page.tiling': 'Chia cửa sổ', 'page.tiling.sub': 'Đặt cửa sổ đang dùng vào một vùng của màn hình bằng phím tắt.',
     'page.about': 'Giới thiệu', 'page.about.sub': 'Ý tưởng của Mos, Maccy và OneNotch trong một ứng dụng nhỏ.',
 
@@ -161,12 +195,12 @@ const I18N = {
     'step.title': 'Bước cuộn', 'step.desc': 'Quãng đường của một nấc lăn', 'speed.title': 'Tốc độ', 'speed.desc': 'Hệ số nhân cho mọi lần cuộn', 'duration.title': 'Độ trượt', 'duration.desc': 'Thời gian để chuyển động dừng hẳn',
     'preset.precise': 'Chính xác', 'preset.balanced': 'Cân bằng', 'preset.fluid': 'Mượt',
     'graph.distance': 'Quãng đường', 'graph.velocity': 'Tốc độ', 'graph.per': 'Một nấc lăn đi {px} px; 98% hoàn thành sau {ms} ms.',
-    'pad.hint': 'Lăn chuột tại đây để cảm nhận các thiết lập.', 'pad.speed': 'Tốc độ', 'pad.peak': 'Cao nhất', 'pad.frames': 'Số khung', 'pad.jump': 'Bước nhảy lớn nhất', 'pad.line': 'dòng {n}',
+    'pad.hint': 'Lăn chuột tại đây để cảm nhận các thiết lập.', 'pad.idle': 'Cuộn để đo', 'pad.speed': 'Tốc độ', 'pad.peak': 'Cao nhất', 'pad.frames': 'Số khung', 'pad.jump': 'Bước nhảy lớn nhất', 'pad.line': 'dòng {n}',
     'shift.title': 'Shift để cuộn ngang', 'shift.desc': 'Giữ Shift và lăn chuột để cuộn ngang, vẫn mượt.',
     'option.title': 'Option để cuộn nhanh', 'option.desc': 'Giữ Option để cuộn xa gấp nhiều lần. Hợp với tài liệu dài.',
     'boost.title': 'Hệ số', 'cmd.title': 'Command để phóng to', 'cmd.desc': 'Giữ Command và lăn chuột để phóng to hoặc thu nhỏ. Gửi Command + và Command - trong trình duyệt, trình soạn thảo và trình xem ảnh.',
     'apps.desc': 'Khi Cuộn mượt đang bật, đặt một ứng dụng sang Tắt để bỏ qua nó (danh sách chặn). Khi đang tắt, đặt ứng dụng sang Bật thì chỉ các ứng dụng đó được làm mượt (danh sách cho phép).',
-    'apps.empty': 'Chưa có quy tắc nào.', 'apps.add': 'Thêm ứng dụng', 'apps.smooth': 'Cuộn mượt', 'apps.reverse': 'Đảo chiều', 'rule.default': 'Mặc định', 'rule.on': 'Bật', 'rule.off': 'Tắt', 'apps.remove': 'Xóa',
+    'apps.rules': 'Quy tắc theo ứng dụng', 'apps.empty': 'Chưa có quy tắc nào.', 'apps.add': 'Thêm ứng dụng', 'apps.smooth': 'Cuộn mượt', 'apps.reverse': 'Đảo chiều', 'rule.default': 'Mặc định', 'rule.on': 'Bật', 'rule.off': 'Tắt', 'apps.remove': 'Xóa',
     'menu.running': 'Ứng dụng đang chạy', 'menu.disk': 'Chọn từ ổ đĩa...', 'menu.none': 'Không có ứng dụng nào khác đang mở',
 
     'sec.shortcut': 'Phím tắt', 'sec.pasting': 'Dán', 'sec.history': 'Lịch sử', 'sec.privacy': 'Riêng tư', 'sec.keys': 'Bàn phím',
@@ -182,7 +216,8 @@ const I18N = {
 
     'notch.panel.title': 'Bảng notch', 'notch.panel.desc': 'Đưa con trỏ lên mép trên màn hình để mở. Tắt thì bảng biến mất hoàn toàn.',
     'notch.preview': 'Rê chuột lên mép trên', 'sec.tabs': 'Các tab', 'tab.clipboard': 'Clipboard', 'tab.clipboard.desc': 'Cùng danh sách như cửa sổ nhỏ, có tìm kiếm.',
-    'tab.shelf': 'Khay', 'tab.shelf.desc': 'Thả tệp vào để giữ tạm và kéo ra lại. Chỉ lưu đường dẫn tham chiếu.', 'tab.media': 'Media', 'tab.media.desc': 'Trước, phát và sau cho ứng dụng đang phát; thông tin bài hát cho Music và Spotify.',
+    'tab.shelf': 'Khay', 'tab.shelf.desc': 'Thả tệp vào để giữ tạm và kéo ra lại. Nhấp chuột phải vào tệp để nén hoặc đổi định dạng ảnh. Chỉ lưu đường dẫn tham chiếu.', 'tab.media': 'Media', 'tab.media.desc': 'Trước, phát và sau cho ứng dụng đang phát; thông tin bài hát cho Music và Spotify.',
+    'tab.focus': 'Tập trung', 'tab.focus.desc': 'Đồng hồ đếm ngược cho phiên làm việc: 15, 25, 45 hoặc 60 phút. Notch tự mở và có âm báo khi hết giờ.',
     'sec.volume': 'Âm lượng', 'vol.title': 'Chỉ báo âm lượng trong notch', 'vol.desc': 'Thay màn hình âm lượng của hệ thống. Cần quyền Trợ năng. Shift + Option để chỉnh từng bước nhỏ.',
     'shelf.count': 'Tệp trên khay', 'shelf.clear': 'Dọn khay', 'shelf.clear.desc': 'Chỉ xóa phần tham chiếu. Tệp của bạn không bị động tới.',
     'sec.shelf': 'Khay tệp',
@@ -201,6 +236,8 @@ const I18N = {
     'fault.invalid_shortcut': 'Không dùng được phím này.', 'fault.shortcut_required': 'Không thể xóa phím tắt này.', 'fault.conflict': 'Đã được dùng cho {name}.', 'fault.taken': 'Ứng dụng khác đang dùng phím tắt này.',
     'fault.accessibility_needed': 'Cần quyền Trợ năng. Hãy cho phép Figghost trong Cài đặt hệ thống.', 'fault.login_failed': 'Không đổi được mục đăng nhập: {detail}', 'fault.unknown_action': 'Hành động không tồn tại.', 'fault.unsupported_key': 'Phím này chưa được hỗ trợ.',
     'target.clipboard': 'phím tắt clipboard',
+    'sec.ai': 'Trợ lý AI', 'mcp.title': 'Cho trợ lý AI tìm trong lịch sử', 'mcp.desc': 'Chạy một máy chủ cục bộ (MCP) để Claude và các trợ lý khác tìm nội dung bạn đã sao chép. Mọi thứ trong lịch sử đều đọc được khi bật mục này.',
+    'mcp.how': 'Thêm đoạn này vào cài đặt MCP của trợ lý:', 'mcp.copy': 'Sao chép cấu hình', 'mcp.copied': 'Đã chép vào clipboard.',
   },
 };
 
@@ -310,6 +347,10 @@ function keycapsEl(shortcut) {
 
 function shortcutOf(target) {
   if (target === 'clipboard') return S.clipboard.hotkey;
+  // A feature's shortcut: target "<feature>" reads S.<feature>.shortcut, "<feature>:<what>" reads S.<feature>.shortcuts.<what>.
+  const [head, what] = target.split(':');
+  const own = S[head];
+  if (own && head !== 'tiling') return (what === undefined ? own.shortcut : (own.shortcuts || {})[what]) || '';
   const key = target.split(':')[1];
   return (S.tiling.layouts.find((l) => l.key === key) || {}).shortcut || '';
 }
@@ -378,6 +419,7 @@ function onFault(m) {
 }
 function targetName(target) {
   if (target === 'clipboard') return t('target.clipboard');
+  if (I18N.en['target.' + target]) return t('target.' + target);
   return t('layout.' + String(target).replace('tiling:', ''));
 }
 
@@ -412,7 +454,7 @@ function row(title, desc, control, opts = {}) {
   return el;
 }
 function toggleRow(path, title, desc, opts) { return row(title, desc, switchEl(path, title), opts); }
-function card(...rows) { return h('section', { class: 'card glass' }, rows); }
+function card(...rows) { return h('section', { class: 'card' }, rows); }
 function sectionTitle(text) { return h('div', { class: 'section-title', text }); }
 
 function segmented({ options, value, onPick, small, label }) {
@@ -529,25 +571,27 @@ function dynamicList(read, build, emptyText) {
 }
 
 function ruleRow(rule) {
-  const current = (field) => () => (S.mouse.apps.find((a) => a.id === rule.id) || {})[field] ?? null;
-  const tri = (field, label) => segmented({
-    small: true, label,
-    options: [{ value: null, label: t('rule.default') }, { value: true, label: t('rule.on') }, { value: false, label: t('rule.off') }],
-    value: current(field),
-    onPick: (value) => {
+  const current = (field) => (S.mouse.apps.find((a) => a.id === rule.id) || {})[field] ?? null;
+  const choice = (field, label) => {
+    const el = h('select', { class: 'pick small', 'aria-label': label + ': ' + rule.name },
+      h('option', { value: 'default', text: t('rule.default') }), h('option', { value: 'on', text: t('rule.on') }), h('option', { value: 'off', text: t('rule.off') }));
+    el.addEventListener('change', () => {
+      const value = el.value === 'on' ? true : el.value === 'off' ? false : null;
       const entry = S.mouse.apps.find((a) => a.id === rule.id);
       if (entry) entry[field] = value;
       runSyncs();
       send({ t: 'app_rule', id: rule.id, field, value });
-    },
-  });
+    });
+    reg(() => { const v = current(field); el.value = v === true ? 'on' : v === false ? 'off' : 'default'; });
+    return el;
+  };
   return appRow(rule, h('div', { class: 'app-opts' },
-    h('label', {}, t('apps.smooth'), tri('smooth', t('apps.smooth'))),
-    h('label', {}, t('apps.reverse'), tri('reverse', t('apps.reverse'))),
-    h('button', { class: 'btn icon', 'aria-label': t('apps.remove'), title: t('apps.remove'), onclick: () => send({ t: 'app_remove', id: rule.id }) }, icon('close'))));
+    h('label', {}, t('apps.smooth'), choice('smooth', t('apps.smooth'))),
+    h('label', {}, t('apps.reverse'), choice('reverse', t('apps.reverse'))),
+    h('button', { class: 'btn icon', 'aria-label': t('apps.remove') + ': ' + rule.name, title: t('apps.remove'), onclick: () => send({ t: 'app_remove', id: rule.id }) }, icon('close'))));
 }
 function ignoredRow(app) {
-  return appRow(app, h('button', { class: 'btn icon', 'aria-label': t('apps.remove'), title: t('apps.remove'), onclick: () => send({ t: 'ignored_remove', id: app.id }) }, icon('close')));
+  return appRow(app, h('button', { class: 'btn icon', 'aria-label': t('apps.remove') + ': ' + app.name, title: t('apps.remove'), onclick: () => send({ t: 'ignored_remove', id: app.id }) }, icon('close')));
 }
 
 // ---------------------------------------------------------------- pages
@@ -561,7 +605,7 @@ function pill(textFn, goodFn) {
 }
 
 function pageGeneral() {
-  const hero = h('section', { class: 'hero card glass' },
+  const hero = h('section', { class: 'hero card' },
     h('div', { class: 'hero-mark', html: GHOST }),
     h('div', {},
       h('h2', { text: 'Figghost' }),
@@ -689,8 +733,8 @@ function drawCurve(canvas) {
   if (done) {
     ctx.strokeStyle = text3; ctx.setLineDash([2, 4]);
     ctx.beginPath(); ctx.moveTo(x(done[0]), m.t); ctx.lineTo(x(done[0]), m.t + ph); ctx.stroke(); ctx.setLineDash([]);
-    ctx.fillStyle = text3; ctx.textAlign = 'center'; ctx.textBaseline = 'bottom';
-    ctx.fillText('98%', x(done[0]), m.t + 12);
+    ctx.fillStyle = cssVar('--text-2'); ctx.textAlign = 'left'; ctx.textBaseline = 'bottom';
+    ctx.fillText('98%', x(done[0]) + 6, m.t + ph - 6);
   }
 }
 
@@ -710,7 +754,7 @@ function curveCard() {
     summary.textContent = t('graph.per', { px: Math.round(S.mouse.step_px * S.mouse.speed), ms: done ? Math.round(done[0]) : Math.round(S.mouse.duration_ms * 1.0) });
     draw();
   });
-  return h('section', { class: 'card glass graph' }, canvas, legend);
+  return h('section', { class: 'card graph' }, canvas, legend);
 }
 
 const PRESETS = {
@@ -745,6 +789,15 @@ function scrollPad() {
     meter.width = Math.round(w * dpr); meter.height = Math.round(hgt * dpr);
     const ctx = meter.getContext('2d');
     ctx.setTransform(dpr, 0, 0, dpr, 0, 0);
+    ctx.clearRect(0, 0, w, hgt);
+    if (!deltas.length) {
+      // Waiting for a scroll: a dashed baseline and a short hint.
+      ctx.strokeStyle = cssVar('--text-3'); ctx.setLineDash([4, 4]); ctx.lineWidth = 1;
+      ctx.beginPath(); ctx.moveTo(10, hgt - 14); ctx.lineTo(w - 10, hgt - 14); ctx.stroke(); ctx.setLineDash([]);
+      ctx.fillStyle = cssVar('--text-2'); ctx.font = '12px ' + cssVar('--font'); ctx.textAlign = 'center'; ctx.textBaseline = 'middle';
+      ctx.fillText(t('pad.idle'), w / 2, hgt / 2 - 6);
+      return;
+    }
     const peak = Math.max(20, ...deltas);
     const bar = w / 60;
     deltas.forEach((d, i) => {
@@ -780,7 +833,7 @@ function scrollPad() {
     requestAnimationFrame(frame);
   });
   new ResizeObserver(paint).observe(meter);
-  return h('section', { class: 'card glass' },
+  return h('section', { class: 'card' },
     h('div', { class: 'pad-wrap' }, pad,
       h('div', { class: 'meter' }, meter, stat('speed', t('pad.speed')), stat('peak', t('pad.peak')), stat('frames', t('pad.frames')), stat('jump', t('pad.jump')),
         h('div', { class: 'row-desc', text: t('pad.hint') }))));
@@ -825,7 +878,7 @@ function pageScroll() {
       toggleRow('mouse.command_zoom', modTitle('⌘', t('cmd.title')), t('cmd.desc'))),
     sectionTitle(t('sec.apps')),
     card(
-      row(t('sec.apps'), t('apps.desc'), addAppButton('scroll', t('apps.add'))),
+      row(t('apps.rules'), t('apps.desc'), addAppButton('scroll', t('apps.add'))),
       dynamicList(() => S.mouse.apps, ruleRow, t('apps.empty'))),
   ];
 }
@@ -842,6 +895,17 @@ function limitSelect() {
     el.value = current;
   });
   return el;
+}
+
+function mcpSnippet() {
+  return JSON.stringify({ mcpServers: { figghost: { command: S.mcp.command, args: ['--mcp'] } } }, null, 2);
+}
+function mcpCard() {
+  const code = h('pre', { class: 'code', tabindex: '0', 'aria-label': t('mcp.how') });
+  const detail = h('div', { class: 'row block' }, h('div', { class: 'row-desc', text: t('mcp.how') }), code,
+    h('div', {}, button(t('mcp.copy'), () => { send({ t: 'action', name: 'copy_mcp_config' }); toast(t('mcp.copied')); }, { small: true })));
+  reg(() => { code.textContent = mcpSnippet(); detail.classList.toggle('dim', !S.mcp.enabled); });
+  return card(toggleRow('mcp.enabled', t('mcp.title'), t('mcp.desc')), detail);
 }
 
 function cheat(keys, text) {
@@ -867,14 +931,16 @@ function pageClipboard() {
     card(
       row(t('ignored.title'), t('ignored.desc'), addAppButton('ignore', t('ignored.add'))),
       dynamicList(() => S.clipboard.ignored, ignoredRow, t('ignored.empty'))),
+    sectionTitle(t('sec.ai')),
+    mcpCard(),
     sectionTitle(t('sec.keys')),
-    h('section', { class: 'card glass' }, h('div', { class: 'cheats' },
+    h('section', { class: 'card' }, h('div', { class: 'cheats' },
       cheat(['↩'], t('key.paste')),
       cheat(['⌥', '⇧', '↩'], t('key.pastealt')),
       cheat(['⌥', 'P'], t('key.pin')),
       cheat(['⌥', '⌫'], t('key.delete')),
       cheat(['⌘', 'B…'], t('key.pinkey')),
-      cheat(['⎋'], t('key.close')),
+      cheat(['Esc'], t('key.close')),
       h('div', { class: 'cheat' }, h('span', { text: t('key.filters') }), h('span', { class: 'row-title', style: 'font-family:var(--mono);font-size:12px', text: t('key.filters.val') })))),
   ];
 }
@@ -886,7 +952,7 @@ function notchStage() {
     h('div', { class: 'menubar' }),
     h('div', { class: 'notch' },
       h('div', { class: 'notch-body' },
-        h('div', { class: 'notch-tabs' }, h('span', { text: t('tab.clipboard') }), h('span', { text: t('tab.shelf') }), h('span', { text: t('tab.media') })),
+        h('div', { class: 'notch-tabs' }, h('span', { text: t('tab.clipboard') }), h('span', { text: t('tab.shelf') }), h('span', { text: t('tab.media') }), h('span', { text: t('tab.focus') }), h('span', { text: t('tab.agents') }), h('span', { text: t('tab.calendar') })),
         h('div', { class: 'notch-line' }), h('div', { class: 'notch-line' }), h('div', { class: 'notch-line' }))),
     h('div', { class: 'notch-note', text: t('notch.preview') }));
 }
@@ -900,7 +966,7 @@ function pageNotch() {
     notchStage(),
     card(toggleRow('notch.enabled', t('notch.panel.title'), t('notch.panel.desc'))),
     sectionTitle(t('sec.tabs')),
-    card(infoRow(t('tab.clipboard'), t('tab.clipboard.desc')), infoRow(t('tab.shelf'), t('tab.shelf.desc')), infoRow(t('tab.media'), t('tab.media.desc'))),
+    card(infoRow(t('tab.clipboard'), t('tab.clipboard.desc')), infoRow(t('tab.shelf'), t('tab.shelf.desc')), infoRow(t('tab.media'), t('tab.media.desc')), infoRow(t('tab.focus'), t('tab.focus.desc')), infoRow(t('tab.agents'), t('tab.agents.desc')), infoRow(t('tab.calendar'), t('tab.calendar.desc'))),
     sectionTitle(t('sec.shelf')),
     card(
       row(t('shelf.count'), null, shelfCount),
@@ -908,6 +974,78 @@ function pageNotch() {
     sectionTitle(t('sec.volume')),
     card(toggleRow('notch.volume_hud', t('vol.title'), t('vol.desc'))),
   ];
+}
+
+// -- agents ----------------------------------------------------------
+
+function agentLine(which) {
+  const a = () => S.agents[which];
+  const complete = () => a().installed > 0 && a().installed === a().wanted && !a().error;
+  const state = pill(() => {
+    if (a().error) return t('agents.status.error');
+    if (!a().found && a().installed === 0) return t('agents.status.missing');
+    if (a().installed === 0) return t('agents.status.off');
+    if (a().installed < a().wanted) return t('agents.status.partial', { n: a().installed, m: a().wanted });
+    return t('agents.status.on');
+  }, complete);
+  const btn = h('button', { class: 'btn small' });
+  reg(() => {
+    btn.textContent = complete() ? t('agents.remove') : (a().installed > 0 ? t('agents.repair') : t('agents.install'));
+    btn.classList.toggle('danger', complete());
+    btn.disabled = !a().found && a().installed === 0;
+    btn.setAttribute('aria-label', btn.textContent + ' ' + t('agents.' + which + '.title'));
+  });
+  btn.addEventListener('click', () => send({ t: 'action', name: 'agents_' + (complete() ? 'remove_' : 'install_') + which }));
+  return row(t('agents.' + which + '.title'), t('agents.' + which + '.desc'), [state, btn]);
+}
+
+function waitSelect() {
+  const values = [10, 20, 30, 60, 100];
+  const el = h('select', { class: 'pick', 'aria-label': t('agents.wait.title') }, values.map((v) => h('option', { value: String(v), text: t('agents.wait.n', { n: v }) })));
+  el.addEventListener('change', () => change('agents.wait', +el.value));
+  reg(() => {
+    const now = String(S.agents.wait);
+    if (![...el.options].some((o) => o.value === now)) el.append(h('option', { value: now, text: t('agents.wait.n', { n: now }) }));
+    el.value = now;
+  });
+  return el;
+}
+
+function usageRow() {
+  const state = pill(() => (S.agents.usage_tap ? t('agents.usage.ok') : t('agents.usage.none')), () => S.agents.usage_tap);
+  const btn = h('button', { class: 'btn small' });
+  reg(() => {
+    btn.textContent = S.agents.usage_tap ? t('agents.usage.off') : t('agents.usage.on');
+    btn.disabled = !S.agents.claude.found && !S.agents.usage_tap;
+    btn.setAttribute('aria-label', btn.textContent + ' ' + t('agents.usage.title'));
+  });
+  btn.addEventListener('click', () => send({ t: 'action', name: S.agents.usage_tap ? 'agents_usage_off' : 'agents_usage_on' }));
+  const waiting = h('div', { class: 'row-desc', role: 'status' });
+  reg(() => {
+    waiting.textContent = S.agents.usage_tap && !S.agents.usage_known ? t('agents.usage.waiting') : '';
+    waiting.style.display = waiting.textContent ? '' : 'none';
+  });
+  const line = row(t('agents.usage.title'), t('agents.usage.desc'), [state, btn]);
+  line.querySelector('.row-text').append(waiting);
+  return line;
+}
+
+function pageAgents() {
+  const body = [
+    card(toggleRow('agents.enabled', t('agents.enable.title'), t('agents.enable.desc'))),
+    sectionTitle(t('sec.agents.connect')),
+    card(agentLine('claude'), agentLine('codex')),
+    sectionTitle(t('sec.agents.answer')),
+    card(
+      row(t('agents.wait.title'), t('agents.wait.desc'), waitSelect(), { when: () => S.agents.enabled }),
+      toggleRow('agents.sound', t('agents.sound.title'), t('agents.sound.desc')),
+      toggleRow('agents.peek', t('agents.peek.title'), t('agents.peek.desc'))),
+    sectionTitle(t('sec.agents.limits')),
+    card(usageRow()),
+    sectionTitle(t('sec.agents.note')),
+    card(infoRow(t('agents.note.title'), t('agents.note.body'))),
+  ];
+  return body;
 }
 
 // -- window snapping ------------------------------------------------
@@ -930,7 +1068,7 @@ function layoutTile(layout) {
 }
 
 function pageTiling() {
-  const grid = h('section', { class: 'card glass' }, h('div', { class: 'tiles' }, S.tiling.layouts.map(layoutTile)));
+  const grid = h('section', { class: 'card' }, h('div', { class: 'tiles' }, S.tiling.layouts.map(layoutTile)));
   reg(() => grid.classList.toggle('dim', !S.tiling.enabled));
   return [
     card(toggleRow('tiling.enabled', t('tiling.enable.title'), t('tiling.enable.desc'))),
@@ -943,7 +1081,7 @@ function pageTiling() {
 
 function pageAbout() {
   return [
-    h('section', { class: 'hero card glass' },
+    h('section', { class: 'hero card' },
       h('div', { class: 'hero-mark', html: GHOST }),
       h('div', {}, h('h2', { text: 'Figghost' }), h('p', { text: t('about.line') }))),
     card(
@@ -959,9 +1097,25 @@ const PAGES = [
   { id: 'scroll', icon: 'scroll', build: pageScroll },
   { id: 'clipboard', icon: 'clipboard', build: pageClipboard },
   { id: 'notch', icon: 'notch', build: pageNotch },
+  { id: 'agents', icon: 'agents', build: pageAgents },
   { id: 'tiling', icon: 'tiling', build: pageTiling },
   { id: 'about', icon: 'about', build: pageAbout },
 ];
+
+// Pages, strings and cards that the features bring (web/features/*.js). A feature's page goes before
+// "Window snapping"; its cards for an existing page are appended to that page.
+const PLUGINS = window.__plugins || [];
+for (const p of PLUGINS) {
+  Object.assign(I18N.en, p.en || {});
+  Object.assign(I18N.vi, p.vi || {});
+  if (p.build) {
+    ICONS[p.id] = p.icon || ICONS.about;
+    PAGES.splice(PAGES.findIndex((x) => x.id === 'tiling'), 0, { id: p.id, icon: p.id, build: p.build });
+  }
+}
+function slotsFor(pageId) {
+  return PLUGINS.flatMap((p) => (p.slots && p.slots[pageId] ? [].concat(p.slots[pageId]()) : []));
+}
 
 // ---------------------------------------------------------------- shell
 
@@ -1011,7 +1165,7 @@ function go(id) {
   $('#title').textContent = t('page.' + page.id);
   $('#subtitle').textContent = t('page.' + page.id + '.sub');
   const scroller = $('#scroller');
-  pageSyncs = scoped(() => scroller.replaceChildren(h('div', { class: 'page' }, page.build())));
+  pageSyncs = scoped(() => scroller.replaceChildren(h('div', { class: 'page' }, [].concat(page.build(), slotsFor(page.id)))));
   scroller.scrollTop = 0;
   for (const item of document.querySelectorAll('.nav-item')) {
     if (item.dataset.page === current) item.setAttribute('aria-current', 'page'); else item.removeAttribute('aria-current');
@@ -1085,6 +1239,9 @@ document.addEventListener('pointermove', (e) => {
     glass.style.setProperty('--my', sheenEvent.clientY - r.top + 'px');
   });
 });
+
+// This is an app, not a web page: no browser context menu, except where the user may want to copy text.
+document.addEventListener('contextmenu', (e) => { if (!e.target.closest('.code')) e.preventDefault(); });
 
 // The title area moves and zooms the window, like a native title bar.
 document.addEventListener('mousedown', (e) => { if (e.button === 0 && e.target.closest('[data-drag]')) window.fig.drag(); });
@@ -1172,6 +1329,33 @@ window.__selftest = function () {
     expect(sent.some((m) => m.t === 'recording' && m.on === false), 'recording stops');
     go('tiling');
     expect(document.querySelectorAll('.tile').length === 13, 'thirteen layouts are shown');
+
+    // The agents page: switches write their setting, the button follows what is installed.
+    go('agents');
+    sent.length = 0;
+    const follow = [...document.querySelectorAll('.switch')][0];
+    const following = S.agents.enabled;
+    follow.click();
+    expect(sent.some((m) => m.t === 'set' && m.path === 'agents.enabled' && m.value === !following), 'the agents switch sends its setting: ' + JSON.stringify(sent));
+    follow.click();
+    const lines = [...document.querySelectorAll('.card .row')].filter((r) => /Claude Code|Codex/.test(r.querySelector('.row-title').textContent));
+    expect(lines.length >= 2, 'a line per agent');
+    sent.length = 0;
+    lines[0].querySelector('button').click();
+    expect(sent.some((m) => m.t === 'action' && m.name === 'agents_remove_claude'), 'a connected agent offers to remove: ' + JSON.stringify(sent));
+    sent.length = 0;
+    lines[1].querySelector('button').click();
+    expect(sent.some((m) => m.t === 'action' && m.name === 'agents_install_codex'), 'an agent that is not connected offers to install: ' + JSON.stringify(sent));
+    S.agents.codex.found = false; S.agents.codex.installed = 0; runSyncs();
+    expect(lines[1].querySelector('button').disabled, 'an agent that is not installed cannot be connected');
+    S.agents.codex.found = true; runSyncs();
+    const wait = $('select.pick');
+    wait.value = '60';
+    wait.dispatchEvent(new Event('change'));
+    expect(S.agents.wait === 60, 'the wait is a number of seconds');
+
+    // Each feature's own checks (web/features/*.js).
+    for (const p of PLUGINS) if (p.selftest) p.selftest({ expect, go, sent, S, h, $ });
   } catch (error) {
     failures.push('exception: ' + (error && error.stack ? error.stack : error));
   } finally {

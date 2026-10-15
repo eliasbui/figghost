@@ -1,23 +1,32 @@
 #![forbid(unsafe_code)]
 //! Composition root: starts each feature and keeps its handles alive.
 
+mod agents;
 mod clipboard;
 mod config;
 mod context;
+mod features;
+mod focus;
+mod focus_timer;
 mod history;
 mod i18n;
+mod mcp;
 mod media;
 mod menu;
 mod mouse;
 mod settings;
 mod shelf;
+mod shelf_actions;
 mod tiling;
 mod trace;
 mod volume_hud;
 
+use agents::AgentsFeature;
 use clipboard::Clipboard;
 use config::{Config, home_dir};
 use context::AppContext;
+use features::{AttachEnv, Features};
+use focus::FocusFeature;
 use macos_sys::{MainThreadMarker, app, status_item::StatusMenu};
 use media::MediaFeature;
 use mouse::Mouse;
@@ -28,8 +37,25 @@ use tiling::Tiling;
 use volume_hud::VolumeHud;
 
 fn main() {
-    let mtm = MainThreadMarker::new().expect("main() must run on the main thread");
     let home = home_dir();
+    // The coding agents start the app this way for each hook event and for the status line: no window, no
+    // AppKit, and nothing that can get in their way.
+    let args: Vec<String> = std::env::args().collect();
+    if let Some(at) = args.iter().position(|a| a == "--figghost-hook") {
+        std::process::exit(agents::run_hook_cli(
+            &home,
+            args.get(at + 1).map(String::as_str),
+        ));
+    }
+    if args.iter().any(|a| a == "--figghost-statusline") {
+        std::process::exit(agents::run_statusline_cli(&home));
+    }
+    // An AI assistant starts the app this way to talk to it over standard input and output: no window,
+    // no AppKit, and nothing on stdout but the protocol.
+    if std::env::args().any(|a| a == "--mcp") {
+        std::process::exit(mcp::run(&home));
+    }
+    let mtm = MainThreadMarker::new().expect("main() must run on the main thread");
     let (config, note) = Config::load(&home);
     if let Some(note) = note {
         eprintln!("config: {note}");
@@ -48,7 +74,9 @@ struct Shell {
     mouse: Mouse,
     clipboard: Option<Rc<Clipboard>>,
     shelf: Option<Rc<ShelfFeature>>,
-    media: Option<MediaFeature>,
+    media: Option<Rc<MediaFeature>>,
+    focus: Option<FocusFeature>,
+    agents: Option<Rc<AgentsFeature>>,
     tiling: Rc<Tiling>,
     volume_hud: Rc<VolumeHud>,
     settings: Rc<SettingsFeature>,
@@ -86,10 +114,23 @@ impl Shell {
             .as_ref()
             .map(|notch| Rc::new(ShelfFeature::attach(mtm, notch, &home)));
         let media = notch.as_ref().map(|notch| MediaFeature::attach(mtm, notch));
+        let focus = notch.as_ref().map(|notch| FocusFeature::attach(mtm, notch));
+        let agents = notch
+            .as_ref()
+            .map(|notch| AgentsFeature::attach(mtm, notch, &home, &config.agents));
         let volume_hud = Rc::new(VolumeHud::new(mtm));
         if config.volume_hud {
             volume_hud.enable_when_possible();
         }
+        let features = Features::attach(&AttachEnv {
+            mtm,
+            notch: notch.as_ref(),
+            home: &home,
+            config: &config,
+            clipboard: clipboard.as_ref(),
+            tiling: &tiling,
+            media: media.as_ref(),
+        });
 
         let ctx = Rc::new(AppContext {
             mtm,
@@ -98,6 +139,8 @@ impl Shell {
             control: Arc::clone(&mouse.control),
             clipboard: clipboard.clone(),
             shelf: shelf.clone(),
+            agents: agents.clone(),
+            features,
             volume_hud: Rc::clone(&volume_hud),
             tiling: Rc::clone(&tiling),
         });
@@ -115,6 +158,8 @@ impl Shell {
             clipboard,
             shelf,
             media,
+            focus,
+            agents,
             tiling,
             volume_hud,
             settings,

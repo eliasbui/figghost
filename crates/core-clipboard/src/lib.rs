@@ -2,10 +2,15 @@
 //! Maccy engine: capture policy, content classification and the SQLite history store.
 
 mod search;
+mod sensitive;
 mod store;
 
 pub use search::{Query, fold, fuzzy_score, parse_query};
-pub use store::{Capture, Error, Item, PIN_KEYS, Payload, Result, Rich, Store};
+pub use sensitive::{Secret, detect as detect_secret};
+pub use store::{
+    Board, BoardError, Capture, Error, Item, MAX_BOARD_NAME_CHARS, MAX_BOARDS, PIN_KEYS, Payload,
+    Result, Rich, Sensitivity, Store,
+};
 
 #[derive(Debug, Clone, Copy, PartialEq, Eq)]
 pub enum Kind {

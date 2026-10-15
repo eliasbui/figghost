@@ -1,15 +1,18 @@
 //! Checks that every page of the notch lands inside the window once it is open, including pages added
-//! while the notch was still collapsed, and that the tab bar is centred. Exits with status 1 on a failure.
+//! while the notch was still collapsed, and that the strip of page icons has one icon per page. Exits with
+//! status 1 on a failure.
 //! `cargo run -p macos-sys --example layout_check`
 
 use macos_sys::{
     MainThreadMarker, app,
+    focus_ui::{FocusCallbacks, FocusView},
     media_ui::{MediaCallbacks, MediaView},
     notch::{EXPANDED_SIZE, Notch, NotchGeometry},
     shelf_ui::{ShelfCallbacks, ShelfView},
     ui::AppCallbacks,
 };
 use objc2_app_kit::NSApplication;
+use objc2_foundation::{NSPoint, NSRect, NSSize};
 use std::{process, rc::Rc};
 
 /// Prints a line per problem and returns how many there were.
@@ -60,12 +63,19 @@ fn inspect(mtm: MainThreadMarker) -> usize {
         if !inside {
             fail(format!("subview {i} ({name}) lies outside the window"));
         }
-        if name.contains("Segmented") {
-            let middle = f.origin.x + f.size.width / 2.0;
-            if (middle - EXPANDED_SIZE.width / 2.0).abs() > 1.0 {
+        if name.contains("PageSwitcher") {
+            // One icon per page (clipboard, shelf, media, focus), at the left, below the top edge.
+            let expected = macos_sys::switcher::width_for(4);
+            if (f.size.width - expected).abs() > 0.5 {
                 fail(format!(
-                    "the tab bar is centred at {middle}, expected {}",
-                    EXPANDED_SIZE.width / 2.0
+                    "the page strip is {} wide, expected {expected}",
+                    f.size.width
+                ));
+            }
+            if f.origin.x > 40.0 {
+                fail(format!(
+                    "the page strip starts at {}, expected near the left edge",
+                    f.origin.x
                 ));
             }
         }
@@ -76,7 +86,12 @@ fn inspect(mtm: MainThreadMarker) -> usize {
 fn main() {
     let mtm = MainThreadMarker::new().expect("main thread");
     app::run_accessory(mtm, move || {
-        let geometry = NotchGeometry::detect(mtm).expect("a screen");
+        // Far outside every screen: the layout is the same there, and nothing flashes on the real one.
+        let geometry = NotchGeometry {
+            screen: NSRect::new(NSPoint::new(-30_000.0, 0.0), NSSize::new(1_920.0, 1_080.0)),
+            notch: NSSize::new(200.0, 32.0),
+            hardware: false,
+        };
         let noop = AppCallbacks {
             on_query: Box::new(|_, _| {}),
             on_activate: Box::new(|_, _, _| {}),
@@ -92,6 +107,8 @@ fn main() {
                 on_drop: Box::new(|_| {}),
                 on_remove: Box::new(|_| {}),
                 on_open: Box::new(|_| {}),
+                actions_for: Box::new(|_| Vec::new()),
+                on_action: Box::new(|_, _| {}),
             },
         );
         notch.add_page(shelf.page(|| {}));
@@ -105,6 +122,18 @@ fn main() {
             },
         );
         notch.add_page(media.page(|| {}, || {}));
+        let focus = FocusView::new(
+            mtm,
+            notch.page_frame(),
+            &[15, 25, 45, 60],
+            FocusCallbacks {
+                on_toggle: Box::new(|| {}),
+                on_reset: Box::new(|| {}),
+                on_preset: Box::new(|_| {}),
+                on_adjust: Box::new(|_| {}),
+            },
+        );
+        notch.add_page(focus.page(|| {}, || {}));
 
         let opener = Rc::clone(&notch);
         app::after(0.3, move || opener.open());
@@ -120,6 +149,6 @@ fn main() {
             );
             process::exit(i32::from(failures > 0));
         });
-        (notch, shelf, media)
+        (notch, shelf, media, focus)
     });
 }

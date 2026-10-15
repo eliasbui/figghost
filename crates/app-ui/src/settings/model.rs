@@ -101,6 +101,10 @@ pub enum Effect {
     History,
     Tiling,
     Notch,
+    /// Start or stop listening to the coding agents, or pass on their settings.
+    Agents,
+    /// A setting of a feature in `features/`; carries its id.
+    Feature(&'static str),
     /// `clipboard` or `tiling:<layout>`.
     Hotkey(String),
 }
@@ -132,6 +136,8 @@ pub struct Env {
     pub version: &'static str,
     pub bundled: bool,
     pub config_dir: String,
+    /// The program an AI assistant starts to reach the clipboard server.
+    pub exe: String,
     pub accessibility: bool,
     pub login: LoginItem,
     pub language: Language,
@@ -140,6 +146,9 @@ pub struct Env {
     /// Display names by bundle identifier, for the apps the lists mention.
     pub names: HashMap<String, String>,
     pub display: DisplayOptions,
+    pub agents: crate::agents::Status,
+    /// What the running features know that the page needs, by feature id.
+    pub runtime: HashMap<&'static str, Value>,
 }
 
 fn login_name(login: LoginItem) -> &'static str {
@@ -149,6 +158,15 @@ fn login_name(login: LoginItem) -> &'static str {
         LoginItem::NeedsApproval => "needs_approval",
         LoginItem::Unavailable => "unavailable",
     }
+}
+
+fn agent_entry(status: &crate::agents::AgentStatus) -> Value {
+    json!({
+        "found": status.found,
+        "installed": status.installed,
+        "wanted": status.wanted,
+        "error": status.error,
+    })
 }
 
 fn app_entry(id: &str, names: &HashMap<String, String>) -> Value {
@@ -187,7 +205,7 @@ pub fn state(config: &Config, env: &Env) -> Value {
         .collect();
 
     let m = &config.mouse;
-    json!({
+    let mut state = json!({
         "app": {
             "version": env.version,
             "bundled": env.bundled,
@@ -225,16 +243,34 @@ pub fn state(config: &Config, env: &Env) -> Value {
             "count": env.history_count,
             "ignored": ignored,
         },
+        "mcp": {
+            "enabled": config.mcp.enabled,
+            "command": env.exe,
+        },
         "notch": {
             "enabled": config.notch.enabled,
             "volume_hud": config.volume_hud,
             "shelf_count": env.shelf_count,
         },
+        "agents": {
+            "enabled": config.agents.enabled,
+            "wait": config.agents.approval_wait_seconds,
+            "sound": config.agents.sound,
+            "peek": config.agents.peek_when_done,
+            "claude": agent_entry(&env.agents.claude),
+            "codex": agent_entry(&env.agents.codex),
+            "usage_tap": env.agents.usage_tap,
+            "usage_known": env.agents.usage_known,
+        },
         "tiling": {
             "enabled": config.tiling.enabled,
             "layouts": layouts,
         },
-    })
+    });
+    if let Value::Object(root) = &mut state {
+        crate::features::state(config, &env.runtime, root);
+    }
+    state
 }
 
 fn flag(value: &Value) -> Result<bool, Fault> {
@@ -385,15 +421,42 @@ fn set(config: &mut Config, path: &str, value: &Value) -> Outcome {
             config.volume_hud = flag(value)?;
             Ok(Effect::VolumeHud(config.volume_hud))
         }
+        "mcp.enabled" => {
+            config.mcp.enabled = flag(value)?;
+            Ok(Effect::None)
+        }
         "notch.enabled" => {
             config.notch.enabled = flag(value)?;
             Ok(Effect::Notch)
+        }
+        "agents.enabled" => {
+            config.agents.enabled = flag(value)?;
+            Ok(Effect::Agents)
+        }
+        "agents.sound" => {
+            config.agents.sound = flag(value)?;
+            Ok(Effect::Agents)
+        }
+        "agents.peek" => {
+            config.agents.peek_when_done = flag(value)?;
+            Ok(Effect::Agents)
+        }
+        "agents.wait" => {
+            let (low, high) = (
+                f64::from(*crate::config::AGENT_WAIT_RANGE.start()),
+                f64::from(*crate::config::AGENT_WAIT_RANGE.end()),
+            );
+            config.agents.approval_wait_seconds = number(value, low, high)?.round() as u32;
+            Ok(Effect::Agents)
         }
         "tiling.enabled" => {
             config.tiling.enabled = flag(value)?;
             Ok(Effect::Tiling)
         }
-        other => Err(Fault::new("unknown_setting", other)),
+        other => match crate::features::set(config, other, value) {
+            Some(result) => result.map(Effect::Feature),
+            None => Err(Fault::new("unknown_setting", other)),
+        },
     }
 }
 
@@ -423,7 +486,39 @@ fn all_targets() -> Vec<String> {
     targets
 }
 
+/// Every shortcut in use as (target, shortcut): the clipboard's, the layouts' and the features'.
+fn all_shortcuts(config: &Config) -> Vec<(String, String)> {
+    let mut all: Vec<(String, String)> = all_targets()
+        .into_iter()
+        .filter_map(|t| shortcut_of(config, &t).map(|s| (t, s)))
+        .collect();
+    all.extend(crate::features::shortcuts(config));
+    all
+}
+
 fn set_hotkey(config: &mut Config, target: &str, value: &str) -> Outcome {
+    if crate::features::shortcut_owner(target).is_some() {
+        let value = value.trim();
+        if !value.is_empty() {
+            let spec = parse_hotkey(value).map_err(|e| {
+                let code = if e.contains("modifier") {
+                    "needs_modifier"
+                } else {
+                    "invalid_shortcut"
+                };
+                Fault::new(code, e)
+            })?;
+            for (other, shortcut) in all_shortcuts(config) {
+                if other != target && parse_hotkey(&shortcut).ok() == Some(spec) {
+                    return Err(Fault::new("conflict", other));
+                }
+            }
+        }
+        return match crate::features::set_shortcut(config, target, value) {
+            Some(result) => result.map(Effect::Feature),
+            None => Err(Fault::new("unknown_setting", target)),
+        };
+    }
     let tiling_layout = target
         .strip_prefix("tiling:")
         .and_then(|key| Layout::ALL.into_iter().find(|l| l.key() == key));
@@ -450,9 +545,8 @@ fn set_hotkey(config: &mut Config, target: &str, value: &str) -> Outcome {
         };
         Fault::new(code, e)
     })?;
-    for other in all_targets().into_iter().filter(|t| t != target) {
-        let taken = shortcut_of(config, &other).and_then(|s| parse_hotkey(&s).ok());
-        if taken == Some(spec) {
+    for (other, shortcut) in all_shortcuts(config) {
+        if other != target && parse_hotkey(&shortcut).ok() == Some(spec) {
             return Err(Fault::new("conflict", other));
         }
     }
@@ -501,6 +595,7 @@ mod tests {
             version: "0.2.0",
             bundled: true,
             config_dir: "/tmp/figghost".into(),
+            exe: "/Applications/Figghost.app/Contents/MacOS/Figghost".into(),
             accessibility: true,
             login: LoginItem::Disabled,
             language: Language::English,
@@ -508,6 +603,8 @@ mod tests {
             shelf_count: 3,
             names: HashMap::from([("com.apple.Safari".to_owned(), "Safari".to_owned())]),
             display: DisplayOptions::default(),
+            agents: crate::agents::Status::default(),
+            runtime: HashMap::new(),
         }
     }
 
@@ -619,7 +716,7 @@ mod tests {
 
     #[test]
     fn the_sample_state_used_for_previews_has_the_shape_of_the_real_one() {
-        let sample: Value = serde_json::from_str(include_str!("../../web/fixture.json")).unwrap();
+        let sample = super::super::page::fixture();
         let mut config = Config::default();
         config
             .mouse
@@ -944,5 +1041,83 @@ mod tests {
             assert_eq!(apply(&mut config, &m), Ok(Effect::None));
         }
         assert_eq!(serde_json::to_string(&config).unwrap(), before);
+    }
+
+    /// The seam between the model and the features: a feature's settings and shortcuts go through the same
+    /// validation and the same conflict check as the built-in ones.
+    #[test]
+    fn a_features_settings_and_shortcuts_take_part_in_the_shared_rules() {
+        let mut config = Config::default();
+        assert_eq!(
+            set_value(&mut config, "smart.enabled", json!(true)),
+            Ok(Effect::Feature("smart"))
+        );
+        assert!(config.smart.enabled);
+        let refused = set_value(&mut config, "smart.currencies", json!(["usd", "no"])).unwrap_err();
+        assert_eq!(refused.code, "invalid_value");
+        assert_eq!(
+            set_value(&mut config, "smart.nonsense", json!(1))
+                .unwrap_err()
+                .code,
+            "unknown_setting"
+        );
+        assert_eq!(
+            set_value(&mut config, "nonsense.enabled", json!(1))
+                .unwrap_err()
+                .code,
+            "unknown_setting"
+        );
+
+        // Its shortcut cannot take one that is in use, in either direction, and spelling does not matter.
+        assert_eq!(
+            hotkey(&mut config, "smart", "ctrl+opt+left")
+                .unwrap_err()
+                .code,
+            "conflict"
+        );
+        assert_eq!(
+            hotkey(&mut config, "smart", "opt+control+left")
+                .unwrap_err()
+                .detail,
+            "tiling:left"
+        );
+        assert_eq!(
+            hotkey(&mut config, "clipboard", "ctrl+opt+s")
+                .unwrap_err()
+                .detail,
+            "smart"
+        );
+        assert_eq!(
+            hotkey(&mut config, "smart", "s").unwrap_err().code,
+            "needs_modifier"
+        );
+        assert_eq!(
+            hotkey(&mut config, "smart", "ctrl+opt+t"),
+            Ok(Effect::Feature("smart"))
+        );
+        assert_eq!(config.smart.shortcut, "ctrl+opt+t");
+        // The feature's shortcut is free for another target once it has moved.
+        hotkey(&mut config, "tiling:right", "ctrl+opt+s").unwrap();
+        // A shortcut can be removed from a feature (the menu still reaches it).
+        hotkey(&mut config, "smart", "").unwrap();
+        assert!(config.smart.shortcut.is_empty());
+        // Nothing of a feature is in the way of the targets that do not belong to one.
+        assert_eq!(
+            hotkey(&mut config, "unknown", "ctrl+opt+x")
+                .unwrap_err()
+                .code,
+            "unknown_setting"
+        );
+    }
+
+    #[test]
+    fn every_feature_has_its_part_in_the_state_the_page_renders() {
+        let state = state(&Config::default(), &env());
+        for id in [
+            "smart", "capture", "vision", "lyrics", "calendar", "snap", "menubar", "stack",
+        ] {
+            assert!(state[id].is_object(), "{id} is missing from the state");
+            assert!(state[id]["enabled"].is_boolean(), "{id} has no switch");
+        }
     }
 }

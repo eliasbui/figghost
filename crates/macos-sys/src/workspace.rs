@@ -78,6 +78,25 @@ pub fn observe_frontmost(on_change: impl Fn(App) + 'static) -> Observer {
     Observer { center, token }
 }
 
+/// Shows the file in Finder, selected.
+pub fn reveal(path: &Path) {
+    let url = NSURL::fileURLWithPath(&NSString::from_str(&path.to_string_lossy()));
+    NSWorkspace::sharedWorkspace()
+        .activateFileViewerSelectingURLs(&NSArray::from_retained_slice(&[url]));
+}
+
+/// The system alert sound, for an action that did not work.
+pub fn beep() {
+    objc2_app_kit::NSBeep();
+}
+
+/// Plays one of the system sounds by name, such as "Glass" or "Ping".
+pub fn play_sound(name: &str) {
+    if let Some(sound) = objc2_app_kit::NSSound::soundNamed(&NSString::from_str(name)) {
+        sound.play();
+    }
+}
+
 /// Opens a URL with its default handler, such as a System Settings pane.
 pub fn open_url(url: &str) {
     if let Some(url) = NSURL::URLWithString(&NSString::from_str(url)) {

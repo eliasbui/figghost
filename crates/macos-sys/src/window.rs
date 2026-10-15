@@ -16,6 +16,22 @@ pub struct Frame {
 pub struct Window(Element);
 
 impl Window {
+    /// The window an element belongs to: the element itself when it is one.
+    pub fn containing(element: &Element) -> Option<Self> {
+        if element.string("AXRole").as_deref() == Some("AXWindow") {
+            return Some(Self(element.duplicate()));
+        }
+        element.attribute("AXWindow").map(Self)
+    }
+
+    pub fn set_timeout(&self, seconds: f32) {
+        self.0.set_timeout(seconds);
+    }
+
+    pub fn pid(&self) -> Option<i32> {
+        self.0.pid()
+    }
+
     /// The focused window of the frontmost app.
     pub fn focused() -> Option<Self> {
         let app = Element::system_wide()?.attribute("AXFocusedApplication")?;

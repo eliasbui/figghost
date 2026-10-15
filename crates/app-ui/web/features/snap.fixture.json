@@ -1,0 +1,1 @@
+{ "enabled": false, "zones": ["left", "right", "first_third", "center_third", "last_third", "maximize"], "accessibility": true }

@@ -283,6 +283,11 @@ pub fn wait_until(
     *slot.borrow_mut() = Some(timer);
 }
 
+/// Runs `f` on the main thread soon, from any thread.
+pub fn on_main(f: impl FnOnce() + Send + 'static) {
+    dispatch2::DispatchQueue::main().exec_async(f);
+}
+
 pub fn after(seconds: f64, f: impl FnOnce() + 'static) {
     let f = RefCell::new(Some(f));
     schedule(seconds, false, move || {

@@ -56,6 +56,42 @@ impl Default for NotchConfig {
     }
 }
 
+#[derive(Debug, Clone, Default, Serialize, Deserialize)]
+#[serde(default)]
+pub struct McpConfig {
+    /// Let an AI assistant search the clipboard history through `Figghost --mcp`. Off by default: what
+    /// was copied can include secrets.
+    pub enabled: bool,
+}
+
+/// The seconds a command may wait for an answer in the notch. Below the lower bound nobody could answer;
+/// above the upper one the agent would give up on the hook first.
+pub const AGENT_WAIT_RANGE: std::ops::RangeInclusive<u32> = 5..=100;
+
+#[derive(Debug, Clone, Serialize, Deserialize)]
+#[serde(default)]
+pub struct AgentsConfig {
+    /// Listen for the hooks of Claude Code and Codex and show them in the notch. Off by default.
+    pub enabled: bool,
+    /// How long a command waits for an answer in the notch before the agent asks in its own terminal.
+    pub approval_wait_seconds: u32,
+    /// A sound when a command needs an answer or an agent finishes.
+    pub sound: bool,
+    /// Open the notch for a moment when an agent finishes.
+    pub peek_when_done: bool,
+}
+
+impl Default for AgentsConfig {
+    fn default() -> Self {
+        Self {
+            enabled: false,
+            approval_wait_seconds: 30,
+            sound: true,
+            peek_when_done: true,
+        }
+    }
+}
+
 #[derive(Debug, Clone, Serialize, Deserialize)]
 #[serde(default)]
 pub struct Config {
@@ -71,7 +107,17 @@ pub struct Config {
     pub auto_paste: bool,
     /// Paste text without its formatting by default; Option+Shift+Enter then pastes it with formatting.
     pub paste_plain: bool,
+    pub mcp: McpConfig,
+    pub agents: AgentsConfig,
     pub notch: NotchConfig,
+    pub smart: crate::features::smart::Config,
+    pub capture: crate::features::capture::Config,
+    pub vision: crate::features::vision::Config,
+    pub lyrics: crate::features::lyrics::Config,
+    pub calendar: crate::features::calendar::Config,
+    pub snap: crate::features::snap::Config,
+    pub menubar: crate::features::menubar::Config,
+    pub stack: crate::features::stack::Config,
     /// Replace the system volume indicator with one in the notch. Needs Accessibility access.
     pub volume_hud: bool,
     /// Unpinned items kept in history.
@@ -90,7 +136,17 @@ impl Default for Config {
             hotkey: "cmd+shift+c".into(),
             auto_paste: true,
             paste_plain: false,
+            mcp: McpConfig::default(),
+            agents: AgentsConfig::default(),
             notch: NotchConfig::default(),
+            smart: crate::features::smart::Config::default(),
+            capture: crate::features::capture::Config::default(),
+            vision: crate::features::vision::Config::default(),
+            lyrics: crate::features::lyrics::Config::default(),
+            calendar: crate::features::calendar::Config::default(),
+            snap: crate::features::snap::Config::default(),
+            menubar: crate::features::menubar::Config::default(),
+            stack: crate::features::stack::Config::default(),
             volume_hud: false,
             history_limit: 500,
             ignored_apps: Vec::new(),
@@ -130,6 +186,10 @@ impl Config {
             Ok(mut cfg) => {
                 cfg.mouse = cfg.mouse.sanitized();
                 cfg.history_limit = cfg.history_limit.clamp(10, 100_000);
+                cfg.agents.approval_wait_seconds = cfg
+                    .agents
+                    .approval_wait_seconds
+                    .clamp(*AGENT_WAIT_RANGE.start(), *AGENT_WAIT_RANGE.end());
                 (cfg, None)
             }
             Err(e) => {
@@ -400,6 +460,29 @@ mod tests {
         assert!(!Config::load(&dir).0.volume_hud);
         fs::write(dir.join("config.json"), r#"{"volume_hud": true}"#).unwrap();
         assert!(Config::load(&dir).0.volume_hud);
+        fs::remove_dir_all(dir).unwrap();
+    }
+
+    #[test]
+    fn agents_are_off_by_default_and_their_wait_stays_in_range() {
+        let dir = temp_dir();
+        let (cfg, _) = Config::load(&dir);
+        assert!(!cfg.agents.enabled && cfg.agents.sound && cfg.agents.peek_when_done);
+        assert_eq!(cfg.agents.approval_wait_seconds, 30);
+        fs::write(
+            dir.join("config.json"),
+            r#"{"agents": {"enabled": true, "approval_wait_seconds": 100000}}"#,
+        )
+        .unwrap();
+        let (cfg, _) = Config::load(&dir);
+        assert!(cfg.agents.enabled);
+        assert_eq!(cfg.agents.approval_wait_seconds, 100);
+        fs::write(
+            dir.join("config.json"),
+            r#"{"agents": {"approval_wait_seconds": 0}}"#,
+        )
+        .unwrap();
+        assert_eq!(Config::load(&dir).0.agents.approval_wait_seconds, 5);
         fs::remove_dir_all(dir).unwrap();
     }
 

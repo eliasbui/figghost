@@ -25,6 +25,8 @@ fn main() {
                 on_drop: Box::new(|_| {}),
                 on_remove: Box::new(|_| {}),
                 on_open: Box::new(|_| {}),
+                actions_for: Box::new(|_| Vec::new()),
+                on_action: Box::new(|_, _| {}),
             },
         );
         view.set_paths(vec![file]);

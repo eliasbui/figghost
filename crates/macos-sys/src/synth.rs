@@ -10,6 +10,7 @@ const SESSION_EVENT_TAP: u32 = 1;
 const HID_EVENT_TAP: u32 = 0;
 const UNIT_PIXEL: u32 = 0;
 const KEY_V: u16 = 9;
+const KEY_C: u16 = 8;
 const KEY_EQUALS: u16 = 24;
 const KEY_MINUS: u16 = 27;
 const FLAG_COMMAND: u64 = 0x0010_0000;
@@ -92,6 +93,11 @@ fn post_key(key: u16, flags: u64) {
 /// Posts Command+V to whichever app currently has keyboard focus. Needs Accessibility access.
 pub fn post_paste() {
     post_key(KEY_V, FLAG_COMMAND);
+}
+
+/// Posts Command+C to whichever app currently has keyboard focus. Needs Accessibility access.
+pub fn post_copy() {
+    post_key(KEY_C, FLAG_COMMAND);
 }
 
 /// Posts Command+Plus or Command+Minus, the zoom shortcut of browsers, editors and image viewers.

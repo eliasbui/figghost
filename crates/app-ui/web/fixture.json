@@ -17,7 +17,14 @@
       { "id": "com.bitwarden.desktop", "name": "Bitwarden" }
     ]
   },
+  "mcp": { "enabled": false, "command": "/Applications/Figghost.app/Contents/MacOS/Figghost" },
   "notch": { "enabled": true, "volume_hud": false, "shelf_count": 4 },
+  "agents": {
+    "enabled": true, "wait": 30, "sound": true, "peek": true,
+    "claude": { "found": true, "installed": 8, "wanted": 8, "error": null },
+    "codex": { "found": true, "installed": 0, "wanted": 7, "error": null },
+    "usage_tap": false, "usage_known": false
+  },
   "tiling": {
     "enabled": true,
     "layouts": [

@@ -10,5 +10,15 @@ macos-sys.workspace = true
 core-mouse.workspace = true
 core-clipboard.workspace = true
 core-window.workspace = true
+core-agents.workspace = true
+core-capture.workspace = true
+core-calendar.workspace = true
+core-lyrics.workspace = true
+core-smart.workspace = true
 serde.workspace = true
 serde_json.workspace = true
+
+[dev-dependencies]
+objc2.workspace = true
+objc2-app-kit.workspace = true
+objc2-foundation.workspace = true

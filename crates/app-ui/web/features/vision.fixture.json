@@ -1,0 +1,8 @@
+{
+  "enabled": false,
+  "shortcut": "ctrl+opt+cmd+8",
+  "format": "hex",
+  "screen_access": false,
+  "text_recognition": true,
+  "background_removal": true
+}

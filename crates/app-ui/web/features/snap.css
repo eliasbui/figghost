@@ -1,0 +1,19 @@
+/* Dragging a window onto the notch to snap it to halves and thirds. Styles for the page in web/features/snap.js, using the variables at the top of app.css. */
+.snap-body { display: flex; flex-direction: column; gap: 16px; padding: 4px 20px 18px; }
+.snap-stage { display: grid; place-items: start center; height: 92px; border-radius: var(--r-md); background: var(--surface-2); box-shadow: inset 0 0 0 1px var(--stroke); overflow: hidden; }
+/* The shape as the notch draws it: black at the screen edge, slate at the bottom, rounded at the bottom only. */
+.snap-shape { display: inline-block; padding: 12px 12px 12px; border-radius: 0 0 22px 22px; background: linear-gradient(180deg, #000 0%, #2b2e33 100%); box-shadow: 0 14px 28px -14px rgba(0,0,0,.6); }
+.snap-row { display: flex; gap: 8px; }
+.snap-cell { display: grid; place-items: center; width: 64px; height: 44px; border-radius: 12px; background: rgba(255,255,255,.1); }
+.snap-cell .mini { width: 34px; height: 22px; background: transparent; box-shadow: inset 0 0 0 1.5px rgba(255,255,255,.6); }
+.snap-cell .mini i { background: rgba(255,255,255,.95); box-shadow: none; }
+.snap-picks { display: grid; grid-template-columns: repeat(auto-fill, minmax(150px, 1fr)); gap: 8px; }
+.snap-pick { display: flex; align-items: center; gap: 10px; min-height: 48px; padding: 7px 12px; border-radius: var(--r-md); border: 0; font: 600 var(--fs-body)/1.2 var(--font); color: var(--text); text-align: left; cursor: pointer;
+  background: var(--surface-2); box-shadow: inset 0 0 0 1px var(--boundary); transition: background var(--dur-move) var(--ease-out), box-shadow var(--dur-move) var(--ease-out); }
+.snap-pick:hover:not(:disabled) { background: var(--glass-strong); }
+.snap-pick[aria-pressed="true"] { background: var(--glass-strong); box-shadow: inset 0 0 0 2px var(--accent); }
+.snap-pick:disabled { opacity: 0.5; cursor: default; }
+.snap-name { min-width: 0; overflow-wrap: anywhere; }
+.snap-foot { display: flex; align-items: center; justify-content: space-between; gap: 12px; }
+.snap-foot .row-desc { margin: 0; }
+html.reduce-motion .snap-pick { transition: none; }

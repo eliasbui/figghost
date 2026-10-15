@@ -4,41 +4,51 @@ use crate::{
     app, labels,
     panel::{FigPanel, Key},
     pasteboard::file_paths,
-    ui::{AppCallbacks, Callbacks, ClipUi, ClipView, handle_key},
-    widgets::ActionTarget,
+    style::{self, PANEL_RADIUS},
+    switcher::{self, PageSwitcher},
+    ui::{AppCallbacks, Callbacks, ClipUi, ClipView, ListStyle, handle_key},
 };
 use block2::RcBlock;
 use objc2::{
     AnyThread, DefinedClass, MainThreadMarker, MainThreadOnly, define_class, msg_send,
     rc::Retained,
     runtime::{AnyObject, ProtocolObject},
-    sel,
 };
 use objc2_app_kit::{
-    NSApplicationDidChangeScreenParametersNotification, NSBezierPath, NSColor, NSDragOperation,
-    NSDraggingDestination, NSDraggingInfo, NSEvent, NSEventMask, NSPasteboardTypeFileURL, NSScreen,
-    NSSegmentSwitchTracking, NSSegmentedControl, NSStatusBar, NSTrackingArea,
+    NSApplicationDidChangeScreenParametersNotification, NSBezierPath, NSBitmapImageFileType,
+    NSColor, NSDragOperation, NSDraggingDestination, NSDraggingInfo, NSEvent, NSEventMask,
+    NSGradient, NSPasteboardTypeFileURL, NSScreen, NSStatusBar, NSTrackingArea,
     NSTrackingAreaOptions, NSView, NSWindowDidResignKeyNotification,
 };
 use objc2_foundation::{
-    NSArray, NSNotification, NSNotificationCenter, NSObjectProtocol, NSPoint, NSRect, NSSize,
-    NSString,
+    NSArray, NSDictionary, NSNotification, NSNotificationCenter, NSObjectProtocol, NSPoint, NSRect,
+    NSSize,
 };
 use std::{
     cell::{Cell, RefCell},
     ptr::NonNull,
-    rc::Rc,
+    rc::{Rc, Weak},
+    time::Instant,
 };
 
 pub const EXPANDED_SIZE: NSSize = NSSize::new(500.0, 440.0);
 /// Height reserved above the pages for the tab bar.
-pub const TAB_BAR_HEIGHT: f64 = 34.0;
-const TAB_WIDTH: f64 = 330.0;
-const PILL_WIDTH: f64 = 200.0;
+pub const TAB_BAR_HEIGHT: f64 = 40.0;
+/// Space between the left edge of the open notch and the page icons.
+const SWITCHER_INSET: f64 = 18.0;
+/// Width of the resting shape on a screen without a hardware notch.
+pub const PILL_WIDTH: f64 = 200.0;
 const HOT_ZONE_HEIGHT: f64 = 4.0;
 const TRIGGER_MIN_HEIGHT: f64 = 8.0;
 const TRIGGER_SIDE_SLACK: f64 = 10.0;
-const CORNER_RADIUS: f64 = 20.0;
+/// The bottom corners of the resting shape, close to the hardware notch's own.
+const COLLAPSED_RADIUS: f64 = 10.0;
+/// The notch opens on a spring and closes a little faster than it opened.
+const OPEN_SECONDS: f64 = 0.46;
+const CLOSE_SECONDS: f64 = 0.24;
+const PAGE_FADE_SECONDS: f64 = 0.20;
+/// How often a running animation moves the window.
+const FRAME_SECONDS: f64 = 1.0 / 120.0;
 const HOVER_OPEN_DELAY: f64 = 0.12;
 const HOVER_CLOSE_DELAY: f64 = 0.35;
 
@@ -54,6 +64,14 @@ pub struct NotchGeometry {
 impl NotchGeometry {
     /// Prefers the notched built-in display; falls back to the menu-bar screen with a pill-sized notch.
     pub fn detect(mtm: MainThreadMarker) -> Option<Self> {
+        // For tests: far outside every screen, so a notch that opens on its own does not flash on the real one.
+        if std::env::var_os("FIGGHOST_NOTCH_OFFSCREEN").is_some() {
+            return Some(Self {
+                screen: NSRect::new(NSPoint::new(-30_000.0, 0.0), NSSize::new(1_920.0, 1_080.0)),
+                notch: NSSize::new(PILL_WIDTH, 24.0),
+                hardware: false,
+            });
+        }
         let screens = NSScreen::screens(mtm);
         if let Some(s) = screens.iter().find(|s| s.safeAreaInsets().top > 0.0) {
             let (left, right) = (s.auxiliaryTopLeftArea(), s.auxiliaryTopRightArea());
@@ -148,16 +166,32 @@ define_class!(
             let ivars = self.ivars();
             // On screens without a notch the resting shape must stay invisible but still catch the pointer,
             // and fully transparent pixels would let it pass through.
-            let alpha = if ivars.expanded.get() || ivars.hardware.get() { 1.0 } else { 0.01 };
-            NSColor::colorWithWhite_alpha(0.0, alpha).setFill();
+            let expanded = ivars.expanded.get();
+            let alpha = if expanded || ivars.hardware.get() { 1.0 } else { 0.01 };
+            let radius = if expanded { PANEL_RADIUS } else { COLLAPSED_RADIUS };
             let bounds = self.bounds();
             // Overshoot the top edge so only the bottom corners are rounded, like the hardware notch.
             let shape = NSRect::new(
                 bounds.origin,
-                NSSize::new(bounds.size.width, bounds.size.height + CORNER_RADIUS),
+                NSSize::new(bounds.size.width, bounds.size.height + radius),
             );
-            NSBezierPath::bezierPathWithRoundedRect_xRadius_yRadius(shape, CORNER_RADIUS, CORNER_RADIUS)
-                .fill();
+            let path = NSBezierPath::bezierPathWithRoundedRect_xRadius_yRadius(shape, radius, radius);
+            if expanded {
+                // Black where it joins the screen's edge, a dark slate at the bottom: the surface reads as
+                // lit from below, and still merges with the hardware notch.
+                let slate = NSColor::colorWithSRGBRed_green_blue_alpha(0.17, 0.18, 0.20, 1.0);
+                let gradient = NSGradient::initWithStartingColor_endingColor(
+                    NSGradient::alloc(),
+                    &slate,
+                    &style::black(1.0),
+                );
+                if let Some(gradient) = gradient {
+                    gradient.drawInBezierPath_angle(&path, 90.0);
+                }
+            } else {
+                style::black(alpha).setFill();
+                path.fill();
+            }
         }
 
         // Everything inside lives in one container laid out for the expanded size and pinned to the top
@@ -271,6 +305,8 @@ impl ShapeView {
 /// One tab of the expanded notch.
 pub struct Page {
     pub title: String,
+    /// The SF Symbol shown for this page in the strip at the top.
+    pub symbol: &'static str,
     /// Fills `Notch::page_frame()`.
     pub root: Retained<NSView>,
     /// Runs whenever the page becomes visible, to refresh what it shows.
@@ -289,7 +325,7 @@ struct Inner {
     /// Holds the tab bar and every page at their expanded-size positions.
     content: Retained<NSView>,
     view: ClipView,
-    tabs: Retained<NSSegmentedControl>,
+    switcher: Retained<PageSwitcher>,
     pages: RefCell<Vec<Page>>,
     active: Cell<usize>,
     /// Set while files are being dragged over the notch, to open on the page that takes them.
@@ -299,6 +335,20 @@ struct Inner {
     expanded: Cell<bool>,
     /// Off removes the panel from the screen and ignores the pointer.
     enabled: Cell<bool>,
+    /// While something else is using the top edge (window snapping), the pointer does not open the notch.
+    suppressed: Cell<bool>,
+    me: Weak<Inner>,
+    /// The timer of the open or close animation, if one is running; replacing it cancels the old one.
+    anim: RefCell<Option<app::Timer>>,
+    page_anim: RefCell<Option<app::Timer>>,
+}
+
+fn reduced_motion() -> bool {
+    crate::workspace::display_options().reduce_motion
+}
+
+fn lerp(from: f64, to: f64, t: f64) -> f64 {
+    from + (to - from) * t
 }
 
 impl Inner {
@@ -322,10 +372,67 @@ impl Inner {
                 p.root.setHidden(i != index);
             }
             self.active.set(index);
-            self.tabs.setSelectedSegment(index as isize);
+            self.switcher.set_selected(index);
             (page.on_show)();
+            if previous != index {
+                self.fade_in(Retained::clone(&page.root));
+            }
         }
         self.settle_focus();
+    }
+
+    /// Shows a page by fading it in; instantly when the system asks for less motion.
+    fn fade_in(&self, root: Retained<NSView>) {
+        if reduced_motion() {
+            self.page_anim.borrow_mut().take();
+            root.setAlphaValue(1.0);
+            return;
+        }
+        root.setAlphaValue(0.0);
+        let (started, weak) = (Instant::now(), self.me.clone());
+        *self.page_anim.borrow_mut() = Some(app::every(FRAME_SECONDS, move || {
+            let t = (started.elapsed().as_secs_f64() / PAGE_FADE_SECONDS).min(1.0);
+            root.setAlphaValue(style::ease_out(t));
+            if t >= 1.0
+                && let Some(inner) = weak.upgrade()
+            {
+                inner.page_anim.borrow_mut().take();
+            }
+        }));
+    }
+
+    /// Moves the panel from its current size to `size` along `curve`, fading the content to `alpha`, then
+    /// runs `done`. Starting another animation cancels this one.
+    fn animate(
+        &self,
+        size: NSSize,
+        seconds: f64,
+        curve: fn(f64) -> f64,
+        alpha: f64,
+        done: impl Fn() + 'static,
+    ) {
+        let from = self.panel.frame().size;
+        let from_alpha = self.content.alphaValue();
+        let (started, weak) = (Instant::now(), self.me.clone());
+        *self.anim.borrow_mut() = Some(app::every(FRAME_SECONDS, move || {
+            let Some(inner) = weak.upgrade() else {
+                return;
+            };
+            let t = (started.elapsed().as_secs_f64() / seconds).min(1.0);
+            let p = curve(t);
+            let width = lerp(from.width, size.width, p);
+            let height = lerp(from.height, size.height, p);
+            inner
+                .panel
+                .setFrame_display(inner.geometry.get().frame(width, height), true);
+            inner
+                .content
+                .setAlphaValue(lerp(from_alpha, alpha, style::ease_out(t)));
+            if t >= 1.0 {
+                inner.anim.borrow_mut().take();
+                done();
+            }
+        }));
     }
 
     /// The search field only has focus on the clipboard page; other pages work from the keys the panel forwards.
@@ -345,11 +452,21 @@ impl Inner {
         }
         let first = !self.expanded.replace(true);
         if first {
+            let from_rest = self.content.isHidden();
             self.shape.set_expanded(true);
             self.content.setHidden(false);
-            self.tabs.setHidden(false);
-            self.panel
-                .setFrame_display_animate(self.geometry.get().expanded_frame(), true, true);
+            self.switcher.setHidden(false);
+            if reduced_motion() {
+                self.anim.borrow_mut().take();
+                self.content.setAlphaValue(1.0);
+                self.panel
+                    .setFrame_display(self.geometry.get().expanded_frame(), true);
+            } else {
+                if from_rest {
+                    self.content.setAlphaValue(0.0);
+                }
+                self.animate(EXPANDED_SIZE, OPEN_SECONDS, style::spring, 1.0, || {});
+            }
         }
         let page = match self.files_page() {
             Some(files) if self.files_hint.replace(false) => files,
@@ -365,6 +482,10 @@ impl Inner {
     }
 
     fn collapse(&self) {
+        self.collapse_with(true);
+    }
+
+    fn collapse_with(&self, animated: bool) {
         if !self.expanded.replace(false) {
             return;
         }
@@ -379,14 +500,33 @@ impl Inner {
             }
         }
         self.active.set(0);
-        self.tabs.setHidden(true);
+        if animated && !reduced_motion() {
+            let weak = self.me.clone();
+            let rest = self.geometry.get().collapsed_frame().size;
+            self.animate(rest, CLOSE_SECONDS, style::ease_out, 0.0, move || {
+                if let Some(inner) = weak.upgrade() {
+                    inner.finish_collapse();
+                }
+            });
+        } else {
+            self.anim.borrow_mut().take();
+            self.finish_collapse();
+        }
+    }
+
+    /// The resting state, reached once the closing animation has ended (or at once without one).
+    fn finish_collapse(&self) {
+        self.switcher.setHidden(true);
         self.content.setHidden(true);
+        self.content.setAlphaValue(1.0);
         self.shape.set_expanded(false);
         // A key window cannot be told to resign directly: take it off screen and bring it back unfocused.
         self.panel.orderOut(None);
         self.panel
             .setFrame_display(self.geometry.get().collapsed_frame(), true);
-        self.panel.orderFrontRegardless();
+        if self.enabled.get() {
+            self.panel.orderFrontRegardless();
+        }
     }
 
     fn relayout(&self, geometry: NotchGeometry) {
@@ -426,7 +566,7 @@ fn contains(rect: NSRect, p: NSPoint) -> bool {
 /// Hover logic: opens shortly after the pointer enters the trigger area, closes shortly after it leaves
 /// the open shape unless the search field has focus.
 fn pointer_moved(inner: &Rc<Inner>, p: NSPoint) {
-    if !inner.enabled.get() {
+    if !inner.enabled.get() || inner.suppressed.get() {
         return;
     }
     let geometry = inner.geometry.get();
@@ -462,7 +602,6 @@ type Observer = Retained<ProtocolObject<dyn NSObjectProtocol>>;
 pub struct Notch {
     inner: Rc<Inner>,
     ui: ClipUi,
-    _tab_target: Retained<ActionTarget>,
     observers: Vec<Observer>,
     /// Global pointer monitor; sees movement over other apps' windows, which tracking areas cannot.
     monitor: Option<Retained<AnyObject>>,
@@ -514,7 +653,7 @@ impl Notch {
         };
 
         let content_top = geometry.top_inset() + TAB_BAR_HEIGHT;
-        let ui = ClipUi::new(mtm, EXPANDED_SIZE, content_top, callbacks);
+        let ui = ClipUi::with_style(mtm, EXPANDED_SIZE, content_top, callbacks, ListStyle::Cards);
         let panel = FigPanel::new(mtm, geometry.expanded_frame());
         let shape = ShapeView::new(
             mtm,
@@ -529,29 +668,25 @@ impl Notch {
         shape.addSubview(&content);
         content.addSubview(&ui.view.root);
 
-        let tabs = NSSegmentedControl::initWithFrame(
-            mtm.alloc(),
-            NSRect::new(
-                NSPoint::new(
-                    (EXPANDED_SIZE.width - TAB_WIDTH) / 2.0,
-                    EXPANDED_SIZE.height - geometry.top_inset() - 6.0 - 24.0,
-                ),
-                NSSize::new(TAB_WIDTH, 24.0),
+        let switcher = PageSwitcher::new(
+            mtm,
+            NSPoint::new(
+                SWITCHER_INSET,
+                EXPANDED_SIZE.height - geometry.top_inset() - 6.0 - switcher::HEIGHT,
             ),
         );
-        tabs.setTrackingMode(NSSegmentSwitchTracking::SelectOne);
-        content.addSubview(&tabs);
+        content.addSubview(&switcher);
 
         panel.setFrame_display(geometry.collapsed_frame(), false);
         ui.view.root.setHidden(true);
-        tabs.setHidden(true);
+        switcher.setHidden(true);
 
-        let inner = Rc::new(Inner {
+        let inner = Rc::new_cyclic(|me| Inner {
             panel: Retained::clone(&panel),
             shape: Retained::clone(&shape),
             content,
             view: ui.view.clone(),
-            tabs: Retained::clone(&tabs),
+            switcher: Retained::clone(&switcher),
             pages: RefCell::new(Vec::new()),
             active: Cell::new(0),
             files_hint: Cell::new(false),
@@ -559,6 +694,10 @@ impl Notch {
             inside: Cell::new(false),
             expanded: Cell::new(false),
             enabled: Cell::new(true),
+            suppressed: Cell::new(false),
+            me: me.clone(),
+            anim: RefCell::new(None),
+            page_anim: RefCell::new(None),
         });
         *slot.borrow_mut() = Some(Rc::clone(&inner));
 
@@ -567,6 +706,7 @@ impl Notch {
             let key_view = view.clone();
             Page {
                 title: labels::get().clipboard_tab.clone(),
+                symbol: "doc.on.clipboard.fill",
                 root: Retained::into_super(Retained::clone(&ui.view.root)),
                 on_show: Box::new(move || on_expand(&view)),
                 on_hide: Box::new(|| {}),
@@ -576,24 +716,18 @@ impl Notch {
         };
         inner.pages.borrow_mut().push(clipboard_page);
 
-        let tab_target = {
+        {
             let slot = Rc::clone(&slot);
-            ActionTarget::new(mtm, move || {
+            switcher.set_on_select(move |index| {
                 let inner = slot.borrow().clone();
                 if let Some(inner) = inner {
-                    inner.select_page(inner.tabs.selectedSegment().max(0) as usize);
+                    inner.select_page(index);
                 }
-            })
-        };
-        // SAFETY: `fire:` takes the sender as its only argument; the target is kept alive by the Notch.
-        unsafe {
-            tabs.setTarget(Some(&tab_target));
-            tabs.setAction(Some(sel!(fire:)));
+            });
         }
         let mut this = Self {
             inner: Rc::clone(&inner),
             ui,
-            _tab_target: tab_target,
             observers: Vec::new(),
             monitor: None,
         };
@@ -682,6 +816,11 @@ impl Notch {
         )
     }
 
+    /// How many tabs there are, so a caller can learn the number of the one it is about to add.
+    pub fn page_count(&self) -> usize {
+        self.inner.pages.borrow().len()
+    }
+
     /// Adds a tab after the existing ones; Command+its number selects it.
     pub fn add_page(&self, page: Page) {
         page.root.setHidden(true);
@@ -692,13 +831,68 @@ impl Notch {
 
     fn refresh_tabs(&self) {
         let pages = self.inner.pages.borrow();
-        let tabs = &self.inner.tabs;
-        tabs.setSegmentCount(pages.len() as isize);
-        for (i, page) in pages.iter().enumerate() {
-            tabs.setLabel_forSegment(&NSString::from_str(&page.title), i as isize);
-            tabs.setWidth_forSegment(TAB_WIDTH / pages.len() as f64, i as isize);
+        self.inner.switcher.set_items(
+            pages
+                .iter()
+                .map(|page| (page.symbol.to_owned(), page.title.clone()))
+                .collect(),
+        );
+        self.inner.switcher.set_selected(self.inner.active.get());
+    }
+
+    /// Draws the open notch showing `page` into PNG bytes, without showing anything on screen: the shape is
+    /// laid out at its open size inside its own window and drawn from there. For checking the design.
+    pub fn snapshot_png(&self, page: usize) -> Option<Vec<u8>> {
+        let inner = &self.inner;
+        if page >= inner.pages.borrow().len() {
+            return None;
         }
-        tabs.setSelectedSegment(self.inner.active.get() as isize);
+        let before = inner.shape.frame().size;
+        let was_open = inner.expanded.get();
+        inner.shape.set_expanded(true);
+        inner.content.setHidden(false);
+        inner.switcher.setHidden(false);
+        inner.shape.setFrameSize(EXPANDED_SIZE);
+        inner.select_page(page);
+        // The fade-in has not run, and nothing is drawn while it is at zero.
+        inner.page_anim.borrow_mut().take();
+        inner.content.setAlphaValue(1.0);
+        if let Some(shown) = inner.pages.borrow().get(page) {
+            shown.root.setAlphaValue(1.0);
+        }
+        let bounds = inner.shape.bounds();
+        let png = inner
+            .shape
+            .bitmapImageRepForCachingDisplayInRect(bounds)
+            .and_then(|rep| {
+                inner
+                    .shape
+                    .cacheDisplayInRect_toBitmapImageRep(bounds, &rep);
+                // SAFETY: an empty properties dictionary is valid for PNG output.
+                unsafe {
+                    rep.representationUsingType_properties(
+                        NSBitmapImageFileType::PNG,
+                        &NSDictionary::new(),
+                    )
+                }
+            })
+            .map(|data| data.to_vec());
+        if !was_open {
+            let pages = inner.pages.borrow();
+            if let Some(shown) = pages.get(inner.active.get()) {
+                (shown.on_hide)();
+            }
+            for p in pages.iter() {
+                p.root.setHidden(true);
+            }
+            drop(pages);
+            inner.active.set(0);
+            inner.switcher.setHidden(true);
+            inner.content.setHidden(true);
+            inner.shape.set_expanded(false);
+        }
+        inner.shape.setFrameSize(before);
+        png
     }
 
     pub fn is_expanded(&self) -> bool {
@@ -713,9 +907,38 @@ impl Notch {
         if enabled {
             self.inner.panel.orderFrontRegardless();
         } else {
-            self.inner.collapse();
+            self.inner.collapse_with(false);
             self.inner.panel.orderOut(None);
         }
+    }
+
+    /// Keeps the notch closed and deaf to the pointer while the top edge belongs to something else, such as the
+    /// drop zones of a window being dragged. An open notch closes. Lifting it makes the next pointer move count as
+    /// a fresh arrival.
+    pub fn set_suppressed(&self, suppressed: bool) {
+        if self.inner.suppressed.replace(suppressed) == suppressed {
+            return;
+        }
+        self.inner.inside.set(false);
+        if suppressed {
+            self.inner.collapse();
+        }
+    }
+
+    /// Whether the pointer is over the notch right now; something that opened it by itself leaves it open
+    /// while the user is there.
+    pub fn pointer_inside(&self) -> bool {
+        self.inner.inside.get()
+    }
+
+    /// Marks a page's icon with a dot while it has something that needs the user.
+    pub fn set_page_badge(&self, index: usize, on: bool) {
+        self.inner.switcher.set_badge(index, on);
+    }
+
+    /// Closes the notch, as moving the pointer away does.
+    pub fn close(&self) {
+        self.inner.collapse();
     }
 
     /// Opens without taking keyboard focus, as hovering does.

@@ -26,6 +26,8 @@ pub enum Key {
     EnterAlt,
     Escape,
     Pin,
+    /// Option+B: file the selected item in the next board.
+    Board,
     Delete,
     /// Command plus a letter: pastes the pinned item that has that letter, if there is one.
     Shortcut(char),
@@ -64,6 +66,22 @@ pub fn letter_of_key_code(code: u16) -> Option<char> {
     })
 }
 
+/// The page a digit key selects with Command held: the number row, which is not in order on a keyboard.
+fn tab_of_key_code(code: u16) -> Option<u8> {
+    Some(match code {
+        18 => 1,
+        19 => 2,
+        20 => 3,
+        21 => 4,
+        23 => 5,
+        22 => 6,
+        26 => 7,
+        28 => 8,
+        25 => 9,
+        _ => return None,
+    })
+}
+
 fn decode(event: &NSEvent) -> Option<Key> {
     let flags = event.modifierFlags();
     let option = flags.contains(NSEventModifierFlags::Option);
@@ -82,16 +100,16 @@ fn decode(event: &NSEvent) -> Option<Key> {
         125 => Some(Key::Down),
         123 if plain => Some(Key::Left),
         124 if plain => Some(Key::Right),
-        18 if command => Some(Key::Tab(1)),
-        19 if command => Some(Key::Tab(2)),
-        20 if command => Some(Key::Tab(3)),
-        21 if command => Some(Key::Tab(4)),
+        code if command && !option && !shift && !control && tab_of_key_code(code).is_some() => {
+            tab_of_key_code(code).map(Key::Tab)
+        }
         116 => Some(Key::PageUp),
         121 => Some(Key::PageDown),
         36 | 76 if option && shift => Some(Key::EnterAlt),
         36 | 76 => Some(Key::Enter),
         53 => Some(Key::Escape),
         35 if option => Some(Key::Pin),
+        11 if option && !command => Some(Key::Board),
         51 | 117 if option || command => Some(Key::Delete),
         code if command && !option && !shift && !control => {
             letter_of_key_code(code).map(Key::Shortcut)
@@ -196,5 +214,21 @@ impl FigPanel {
         }
         // SAFETY: hasMarkedText is part of NSTextInputClient and takes no arguments.
         unsafe { msg_send![&*responder, hasMarkedText] }
+    }
+}
+
+#[cfg(test)]
+mod tests {
+    use super::*;
+
+    #[test]
+    fn the_number_row_selects_pages_one_to_nine() {
+        // Virtual key codes of 1 to 9 on an ANSI keyboard, which are not in order.
+        let codes = [18, 19, 20, 21, 23, 22, 26, 28, 25];
+        for (i, code) in codes.into_iter().enumerate() {
+            assert_eq!(tab_of_key_code(code), Some(i as u8 + 1));
+        }
+        assert_eq!(tab_of_key_code(29), None, "zero selects nothing");
+        assert_eq!(tab_of_key_code(0), None, "letters are not pages");
     }
 }
