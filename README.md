@@ -233,6 +233,7 @@ Rust is installed with rustup into `~/.cargo`. Keep the build directory outside 
     cargo test --workspace
     cargo clippy --workspace --all-targets -- -D warnings
     scripts/bundle.sh            # creates dist/Figghost.app
+    scripts/release.sh 0.2.1     # publishes a release and points the Homebrew cask at it (DRY_RUN=1 to check first)
 
 Accessibility access is tied to the code signature of the app. The default ad-hoc signature changes on every build, so access has to be granted again. To keep it, create a local code-signing certificate in Keychain and run `SIGN_IDENTITY="Certificate name" scripts/bundle.sh`.
 
