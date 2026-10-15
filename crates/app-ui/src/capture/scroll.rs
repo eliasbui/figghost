@@ -6,7 +6,7 @@ use crate::{i18n, trace};
 use core_capture::{FrameRef, Step, Stitcher};
 use macos_sys::{
     NSPoint, NSRect, app,
-    capture_ui::{self, ScrollSession, ScrollTexts},
+    capture_ui::{self, AreaSession, SessionTexts},
     screen_capture::{self, AreaCapture, Shot},
     synth::{self, ScrollPhase},
 };
@@ -33,7 +33,7 @@ pub(super) struct Scrolling {
     stitcher: RefCell<Option<Stitcher>>,
     /// The first frame, whose pixel format the stitched picture keeps.
     reference: RefCell<Option<Shot>>,
-    session: RefCell<Option<Rc<ScrollSession>>>,
+    session: RefCell<Option<Rc<AreaSession>>>,
     still: Cell<u32>,
     steps: Cell<usize>,
     /// Done was pressed: finish after the frame in flight.
@@ -75,15 +75,16 @@ impl Scrolling {
             place: area,
         });
         let text = i18n::current();
-        let texts = ScrollTexts {
+        let texts = SessionTexts {
             done: text.capture_scroll_done().into(),
             cancel: text.capture_scroll_cancel().into(),
         };
         let (on_done, on_cancel) = (scrolling.me.clone(), scrolling.me.clone());
-        let session = ScrollSession::show(
+        let session = AreaSession::show(
             feature.mtm,
             area,
             &texts,
+            true,
             move || {
                 if let Some(s) = on_done.upgrade() {
                     s.done.set(true);

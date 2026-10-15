@@ -1,7 +1,7 @@
 //! The "Fig" menu bar item. Dynamic entries are recomputed each time the menu opens.
 
 use crate::{
-    capture::{CaptureFeature, Kind},
+    capture::{CaptureFeature, Kind, RecordConfig},
     context::AppContext,
     i18n,
     settings::SettingsFeature,
@@ -163,6 +163,61 @@ pub fn build(
             app::after(0.25, move || capture.take(kind));
         }))
     };
+    let record = {
+        let (capture, recording) = (Rc::clone(capture), Rc::clone(capture));
+        Entry::Item(
+            Item::new(text.menu_record_screen(), move || {
+                let capture = Rc::clone(&capture);
+                app::after(0.25, move || capture.take(Kind::Record));
+            })
+            .titled(move || {
+                if recording.is_recording() {
+                    text.menu_record_stop().to_owned()
+                } else {
+                    text.menu_record_screen().to_owned()
+                }
+            }),
+        )
+    };
+    let record_gif = {
+        let (capture, recording) = (Rc::clone(capture), Rc::clone(capture));
+        Entry::Item(
+            Item::new(text.menu_record_gif(), move || {
+                let capture = Rc::clone(&capture);
+                app::after(0.25, move || capture.take(Kind::Gif));
+            })
+            .visible_when(move || !recording.is_recording()),
+        )
+    };
+    // Flips one recording option in the saved config; the next recording uses it.
+    let record_option = |name: &str, field: fn(&mut RecordConfig) -> &mut bool| {
+        let (config, check, home) = (Rc::clone(&config), Rc::clone(&config), home.clone());
+        let settings = Rc::clone(settings);
+        Entry::Item(
+            Item::new(name, move || {
+                {
+                    let mut config = config.borrow_mut();
+                    let value = field(&mut config.capture.record);
+                    *value = !*value;
+                }
+                if let Err(e) = config.borrow().save(&home) {
+                    eprintln!("config: cannot save: {e}");
+                }
+                settings.refresh();
+            })
+            .checked(move || *field(&mut check.borrow().capture.record.clone())),
+        )
+    };
+    let record_options = Entry::Submenu(
+        text.menu_record_options().to_owned(),
+        vec![
+            record_option(text.menu_record_system_audio(), |r| &mut r.system_audio),
+            record_option(text.menu_record_microphone(), |r| &mut r.microphone),
+            record_option(text.menu_record_camera(), |r| &mut r.camera),
+            record_option(text.menu_record_clicks(), |r| &mut r.clicks),
+            record_option(text.menu_record_keys(), |r| &mut r.keys),
+        ],
+    );
     let timer_seconds = config.borrow().capture.timer_seconds;
     let entries = vec![
         open_settings,
@@ -173,6 +228,9 @@ pub fn build(
         take(&text.menu_capture_timer(timer_seconds), Kind::Timer),
         take(text.menu_capture_text(), Kind::Text),
         take(text.menu_capture_scroll(), Kind::Scroll),
+        record,
+        record_gif,
+        record_options,
         {
             let capture = Rc::clone(capture);
             Entry::Item(Item::new(text.menu_capture_folder(), move || {

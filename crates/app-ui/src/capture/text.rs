@@ -165,6 +165,169 @@ impl Language {
         }
     }
 
+    pub fn capture_open(self) -> &'static str {
+        match self {
+            Language::English => "Open",
+            Language::Vietnamese => "Mở",
+        }
+    }
+
+    pub fn capture_file_copied(self) -> &'static str {
+        match self {
+            Language::English => "File copied",
+            Language::Vietnamese => "Đã sao chép tệp",
+        }
+    }
+
+    pub fn record_hint(self) -> &'static str {
+        match self {
+            Language::English => {
+                "Drag the area to record. Click a window to record it. Space: pick windows. Return: whole screen. Esc: cancel."
+            }
+            Language::Vietnamese => {
+                "Kéo chọn vùng cần quay. Bấm vào cửa sổ để quay cửa sổ đó. Space: chọn cửa sổ. Enter: cả màn hình. Esc: hủy."
+            }
+        }
+    }
+
+    pub fn record_stop(self) -> &'static str {
+        match self {
+            Language::English => "Stop",
+            Language::Vietnamese => "Dừng",
+        }
+    }
+
+    pub fn record_starting(self) -> &'static str {
+        match self {
+            Language::English => "Starting...",
+            Language::Vietnamese => "Đang bắt đầu...",
+        }
+    }
+
+    pub fn record_status(self, seconds: u64) -> String {
+        let time = format!("{}:{:02}", seconds / 60, seconds % 60);
+        match self {
+            Language::English => format!("Recording {time}"),
+            Language::Vietnamese => format!("Đang quay {time}"),
+        }
+    }
+
+    pub fn record_saving(self) -> &'static str {
+        match self {
+            Language::English => "Saving...",
+            Language::Vietnamese => "Đang lưu...",
+        }
+    }
+
+    pub fn record_making_gif(self) -> &'static str {
+        match self {
+            Language::English => "Making the GIF...",
+            Language::Vietnamese => "Đang tạo GIF...",
+        }
+    }
+
+    pub fn record_failed(self, detail: &str) -> String {
+        match self {
+            Language::English => format!("Recording failed: {detail}"),
+            Language::Vietnamese => format!("Không quay được: {detail}"),
+        }
+    }
+
+    pub fn record_needs_newer_macos(self) -> &'static str {
+        match self {
+            Language::English => "Screen recording needs macOS 15 or later",
+            Language::Vietnamese => "Quay màn hình cần macOS 15 trở lên",
+        }
+    }
+
+    pub fn record_no_camera(self) -> &'static str {
+        match self {
+            Language::English => "No camera found; recording without it",
+            Language::Vietnamese => "Không tìm thấy camera; quay không kèm camera",
+        }
+    }
+
+    pub fn record_camera_denied(self) -> &'static str {
+        match self {
+            Language::English => {
+                "Camera access is off: allow Figghost in System Settings, Privacy & Security, Camera"
+            }
+            Language::Vietnamese => {
+                "Chưa có quyền Camera: cho phép Figghost trong Cài đặt hệ thống, Quyền riêng tư và bảo mật, Camera"
+            }
+        }
+    }
+
+    pub fn record_keys_need_access(self) -> &'static str {
+        match self {
+            Language::English => "Showing keystrokes needs Accessibility access",
+            Language::Vietnamese => "Hiện phím bấm cần quyền Trợ năng",
+        }
+    }
+
+    pub fn menu_record_screen(self) -> &'static str {
+        match self {
+            Language::English => "Record Screen",
+            Language::Vietnamese => "Quay màn hình",
+        }
+    }
+
+    pub fn menu_record_gif(self) -> &'static str {
+        match self {
+            Language::English => "Record GIF",
+            Language::Vietnamese => "Quay GIF",
+        }
+    }
+
+    pub fn menu_record_stop(self) -> &'static str {
+        match self {
+            Language::English => "Stop Recording",
+            Language::Vietnamese => "Dừng quay",
+        }
+    }
+
+    pub fn menu_record_options(self) -> &'static str {
+        match self {
+            Language::English => "Recording Options",
+            Language::Vietnamese => "Tùy chọn quay",
+        }
+    }
+
+    pub fn menu_record_system_audio(self) -> &'static str {
+        match self {
+            Language::English => "Record Computer Audio",
+            Language::Vietnamese => "Thu âm thanh máy tính",
+        }
+    }
+
+    pub fn menu_record_microphone(self) -> &'static str {
+        match self {
+            Language::English => "Record Microphone",
+            Language::Vietnamese => "Thu micrô",
+        }
+    }
+
+    pub fn menu_record_camera(self) -> &'static str {
+        match self {
+            Language::English => "Show Camera",
+            Language::Vietnamese => "Hiện camera",
+        }
+    }
+
+    pub fn menu_record_clicks(self) -> &'static str {
+        match self {
+            Language::English => "Show Clicks",
+            Language::Vietnamese => "Hiện cú nhấp chuột",
+        }
+    }
+
+    pub fn menu_record_keys(self) -> &'static str {
+        match self {
+            Language::English => "Show Keystrokes",
+            Language::Vietnamese => "Hiện phím tắt đã bấm",
+        }
+    }
+
     pub fn editor_title(self) -> &'static str {
         match self {
             Language::English => "Edit Capture",

@@ -15,6 +15,11 @@ dispatch2.workspace = true
 objc2-web-kit.workspace = true
 objc2-screen-capture-kit.workspace = true
 objc2-vision.workspace = true
+objc2-core-media.workspace = true
+objc2-av-foundation.workspace = true
+objc2-image-io.workspace = true
+# Its default features give CALayer the geometry setters (corner radius) the camera bubble uses.
+objc2-quartz-core.workspace = true
 objc2-foundation.workspace = true
 objc2-app-kit.workspace = true
 core-foundation.workspace = true

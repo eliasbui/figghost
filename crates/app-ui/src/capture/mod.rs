@@ -1,7 +1,9 @@
-//! Screenshots, the way CleanShot X takes them: a shortcut or a menu item freezes every display, the
-//! overlay picks an area, a window or a display, and the picture is saved, copied and shown in a quick
-//! panel with copy, save, edit and pin. Text recognition copies the text of an area instead.
+//! Screenshots and recordings, the way CleanShot X takes them: a shortcut or a menu item freezes every
+//! display, the overlay picks an area, a window or a display, and the picture is saved, copied and
+//! shown in a quick panel with copy, save, edit and pin. Text recognition copies the text of an area
+//! instead; a recording records what was picked until it is stopped.
 
+mod record;
 mod scroll;
 mod text;
 
@@ -13,11 +15,12 @@ use core_capture::{Rect, Stamp, file_name, unique_path};
 use macos_sys::{
     MainThreadMarker, NSPoint, NSRect, app,
     capture_overlay::{self, Mode, Overlay, Picked},
-    capture_ui::{self, Pin, PinActions, PinTexts, QuickActions, QuickPanel, QuickTexts},
+    capture_ui::{self, Pin, PinActions, PinTexts, QuickPanel},
     editor_ui::{EditorActions, EditorTexts, EditorWindow},
     hotkey::Hotkey,
     ocr,
     pasteboard::{Pasteboard, Write},
+    recorder,
     screen_capture::{self, DisplayShot, Frozen, Shot},
     workspace,
 };
@@ -45,15 +48,22 @@ pub enum Kind {
     Text,
     /// An area whose content scrolls by itself, stitched into one tall picture.
     Scroll,
+    /// A video of an area, a window or a display; pressed again, it stops.
+    Record,
+    /// A recording made into an animated GIF.
+    Gif,
 }
 
 impl Kind {
-    pub const ALL: [Kind; 5] = [
+    pub const ALL: [Kind; 8] = [
         Kind::Area,
         Kind::Window,
         Kind::Screen,
         Kind::Timer,
         Kind::Text,
+        Kind::Scroll,
+        Kind::Record,
+        Kind::Gif,
     ];
 
     /// Name in the config file.
@@ -65,7 +75,13 @@ impl Kind {
             Kind::Timer => "timer",
             Kind::Text => "text",
             Kind::Scroll => "scroll",
+            Kind::Record => "record",
+            Kind::Gif => "gif",
         }
+    }
+
+    const fn records(self) -> bool {
+        matches!(self, Kind::Record | Kind::Gif)
     }
 
     /// Shortcuts that macOS does not use itself; the rest are in the menu only until given one.
@@ -73,7 +89,9 @@ impl Kind {
         match self {
             Kind::Area => "cmd+shift+2",
             Kind::Text => "cmd+shift+1",
-            Kind::Window | Kind::Screen | Kind::Timer | Kind::Scroll => "",
+            Kind::Window | Kind::Screen | Kind::Timer | Kind::Scroll | Kind::Record | Kind::Gif => {
+                ""
+            }
         }
     }
 }
@@ -89,9 +107,37 @@ pub struct CaptureConfig {
     /// How long the quick panel stays; 0 keeps it until closed.
     pub quick_seconds: f64,
     pub timer_seconds: u32,
-    /// Shortcut per capture kind (`area`, `window`, `screen`, `timer`, `text`, `scroll`); empty turns
-    /// it off.
+    /// Shortcut per capture kind (`area`, `window`, `screen`, `timer`, `text`, `scroll`, `record`,
+    /// `gif`); empty turns it off.
     pub shortcuts: BTreeMap<String, String>,
+    pub record: RecordConfig,
+}
+
+/// What a recording includes besides the picture.
+#[derive(Debug, Clone, PartialEq, Serialize, Deserialize)]
+#[serde(default)]
+pub struct RecordConfig {
+    /// What the computer plays.
+    pub system_audio: bool,
+    pub microphone: bool,
+    /// The camera in a round bubble.
+    pub camera: bool,
+    /// A ring where the mouse is clicked.
+    pub clicks: bool,
+    /// The shortcuts pressed, named at the bottom.
+    pub keys: bool,
+}
+
+impl Default for RecordConfig {
+    fn default() -> Self {
+        Self {
+            system_audio: false,
+            microphone: false,
+            camera: false,
+            clicks: true,
+            keys: false,
+        }
+    }
 }
 
 impl Default for CaptureConfig {
@@ -104,6 +150,7 @@ impl Default for CaptureConfig {
             quick_seconds: 8.0,
             timer_seconds: 5,
             shortcuts: BTreeMap::new(),
+            record: RecordConfig::default(),
         }
     }
 }
@@ -223,6 +270,7 @@ pub struct CaptureFeature {
     quick: RefCell<Vec<(u64, Rc<QuickPanel>)>>,
     pins: RefCell<Vec<(u64, Rc<Pin>)>>,
     scrolling: RefCell<Option<Rc<scroll::Scrolling>>>,
+    recording: RefCell<Option<Rc<record::Recorder>>>,
     editors: RefCell<Vec<(u64, Rc<EditorWindow>)>>,
     next_id: Cell<u64>,
 }
@@ -240,6 +288,7 @@ impl CaptureFeature {
             quick: RefCell::new(Vec::new()),
             pins: RefCell::new(Vec::new()),
             scrolling: RefCell::new(None),
+            recording: RefCell::new(None),
             editors: RefCell::new(Vec::new()),
             next_id: Cell::new(1),
         });
@@ -289,13 +338,28 @@ impl CaptureFeature {
         workspace::open_path(&folder);
     }
 
-    /// Starts a capture; ignored while another one is being picked.
+    pub fn is_recording(&self) -> bool {
+        self.recording.borrow().is_some()
+    }
+
+    /// Starts a capture; ignored while another one is being picked. A recording kind stops the
+    /// recording in progress instead.
     pub fn take(&self, kind: Kind) {
         trace::log(&format!("capture: {} requested", kind.key()));
+        let text = i18n::current();
+        if kind.records() {
+            let current = self.recording.borrow().clone();
+            if let Some(recorder) = current {
+                return recorder.stop();
+            }
+            if !recorder::recording_supported() {
+                capture_ui::toast(self.mtm, text.record_needs_newer_macos());
+                return;
+            }
+        }
         if self.busy.get() || self.scrolling.borrow().is_some() {
             return;
         }
-        let text = i18n::current();
         if !screen_capture::screen_access(false) {
             screen_capture::screen_access(true);
             capture_ui::toast(self.mtm, text.capture_needs_permission());
@@ -359,6 +423,7 @@ impl CaptureFeature {
             Kind::Window => (Mode::Window, text.capture_hint_window()),
             Kind::Text => (Mode::AreaOnly, text.capture_hint_text()),
             Kind::Scroll => (Mode::AreaOnly, text.capture_hint_scroll()),
+            Kind::Record | Kind::Gif => (Mode::Any, text.record_hint()),
         };
         let me = self.me.clone();
         let held = Rc::clone(&frozen);
@@ -373,6 +438,13 @@ impl CaptureFeature {
 
     fn picked(&self, kind: Kind, frozen: &Rc<Frozen>, picked: Picked) {
         trace::log(&format!("capture: picked {picked:?}"));
+        if kind.records() {
+            self.busy.set(false);
+            if let Some(feature) = self.me.upgrade() {
+                record::Recorder::start(&feature, kind, frozen, picked);
+            }
+            return;
+        }
         match picked {
             Picked::Cancelled => self.busy.set(false),
             Picked::Display(index) => match frozen.displays.get(index) {
@@ -491,6 +563,19 @@ impl CaptureFeature {
         });
     }
 
+    /// Where a new capture saved as `extension` goes: the capture folder, or a temporary one when
+    /// saving is off.
+    fn new_path(&self, extension: &str) -> PathBuf {
+        let config = &self.config.borrow().capture;
+        let folder = if config.save {
+            config.folder(&self.home)
+        } else {
+            env::temp_dir().join("figghost-captures")
+        };
+        let name = file_name(FILE_PREFIX, stamp(), extension);
+        unique_path(&folder, &name, |p| p.exists())
+    }
+
     /// Saves, copies and shows the quick panel, as the config asks.
     fn deliver(&self, taken: Taken) {
         let text = i18n::current();
@@ -498,14 +583,12 @@ impl CaptureFeature {
             return self.fail("cannot encode the picture");
         };
         let config = self.config.borrow().capture.clone();
-        let name = file_name(FILE_PREFIX, stamp(), "png");
-        let folder = if config.save {
-            config.folder(&self.home)
-        } else {
-            env::temp_dir().join("figghost-captures")
-        };
-        let path = unique_path(&folder, &name, |p| p.exists());
-        if let Err(e) = fs::create_dir_all(&folder).and_then(|()| fs::write(&path, &png)) {
+        let path = self.new_path("png");
+        let written = path
+            .parent()
+            .map_or(Ok(()), fs::create_dir_all)
+            .and_then(|()| fs::write(&path, &png));
+        if let Err(e) = written {
             capture_ui::toast(self.mtm, &text.capture_write_failed(&e.to_string()));
         }
         trace::log(&format!("capture: wrote {}", path.display()));
@@ -525,6 +608,10 @@ impl CaptureFeature {
         let (image, screen) = (taken.shot.ns_image(), taken.screen);
         let me = self.me.clone();
         let (held, file) = (Rc::clone(&taken), path.clone());
+        let edit = |f: &CaptureFeature, id, t: &Rc<Taken>, path: &Path| {
+            f.close_quick(id);
+            f.edit(t, path);
+        };
         let with = move |act: fn(&CaptureFeature, u64, &Rc<Taken>, &Path)| {
             let (me, taken, path) = (me.clone(), Rc::clone(&held), file.clone());
             Box::new(move || {
@@ -533,30 +620,122 @@ impl CaptureFeature {
                 }
             }) as Box<dyn Fn()>
         };
-        let actions = QuickActions {
-            on_copy: with(|f, _, t, _| f.copy(&t.shot)),
-            on_save: with(|f, _, t, _| f.save_as(&t.shot)),
-            on_edit: with(|f, id, t, path| {
-                f.close_quick(id);
-                f.edit(t, path);
-            }),
-            on_pin: with(|f, id, t, _| {
-                f.close_quick(id);
-                f.pin(t);
-            }),
-            on_close: with(|f, id, _, _| f.close_quick(id)),
-        };
-        let texts = QuickTexts {
-            copy: text.capture_copy().into(),
-            save: text.capture_save().into(),
-            edit: text.capture_edit().into(),
-            pin: text.capture_pin().into(),
-            close: text.capture_close().into(),
-        };
-        let panel = QuickPanel::show(self.mtm, image, &path, screen, slot, &texts, actions);
+        let buttons = vec![
+            (
+                text.capture_copy().to_owned(),
+                with(|f, _, t, _| f.copy(&t.shot)),
+            ),
+            (
+                text.capture_save().to_owned(),
+                with(|f, _, t, _| f.save_as(&t.shot)),
+            ),
+            (text.capture_edit().to_owned(), with(edit)),
+            (
+                text.capture_pin().to_owned(),
+                with(|f, id, t, _| {
+                    f.close_quick(id);
+                    f.pin(t);
+                }),
+            ),
+            (
+                text.capture_close().to_owned(),
+                with(|f, id, _, _| f.close_quick(id)),
+            ),
+        ];
+        let panel = QuickPanel::show(self.mtm, image, &path, screen, slot, buttons, with(edit));
         self.quick.borrow_mut().push((id, panel));
         if seconds > 0.0 {
             self.close_quick_later(id, seconds);
+        }
+    }
+
+    /// A finished recording, already where it belongs: copied and shown in the quick panel, as the
+    /// config asks.
+    fn deliver_file(&self, path: PathBuf, poster: Option<Shot>, screen: NSRect) {
+        trace::log(&format!("capture: wrote {}", path.display()));
+        let config = self.config.borrow().capture.clone();
+        if config.copy {
+            pasteboard().write(Write::Files(&[path.to_string_lossy().into_owned()]));
+        }
+        match poster {
+            Some(poster) if config.quick_panel => {
+                self.show_quick_file(poster, path, screen, config.quick_seconds);
+            }
+            _ => {
+                let name = path
+                    .file_name()
+                    .map(|n| n.to_string_lossy().into_owned())
+                    .unwrap_or_default();
+                capture_ui::toast(self.mtm, &i18n::current().capture_saved(&name));
+            }
+        }
+    }
+
+    /// The quick panel of a recording: its first frame, with copy, save and open.
+    fn show_quick_file(&self, poster: Shot, path: PathBuf, screen: NSRect, seconds: f64) {
+        let text = i18n::current();
+        let id = self.next_id.replace(self.next_id.get() + 1);
+        let slot = self.quick.borrow().len();
+        let (me, file) = (self.me.clone(), path.clone());
+        let with = move |act: fn(&CaptureFeature, u64, &Path)| {
+            let (me, path) = (me.clone(), file.clone());
+            Box::new(move || {
+                if let Some(feature) = me.upgrade() {
+                    act(&feature, id, &path);
+                }
+            }) as Box<dyn Fn()>
+        };
+        let open = |f: &CaptureFeature, id, path: &Path| {
+            f.close_quick(id);
+            workspace::open_path(path);
+        };
+        let buttons = vec![
+            (
+                text.capture_copy().to_owned(),
+                with(|f, _, p| f.copy_file(p)),
+            ),
+            (
+                text.capture_save().to_owned(),
+                with(|f, _, p| f.save_file_as(p)),
+            ),
+            (text.capture_open().to_owned(), with(open)),
+            (
+                text.capture_close().to_owned(),
+                with(|f, id, _| f.close_quick(id)),
+            ),
+        ];
+        let image = poster.ns_image();
+        let panel = QuickPanel::show(self.mtm, image, &path, screen, slot, buttons, with(open));
+        self.quick.borrow_mut().push((id, panel));
+        if seconds > 0.0 {
+            self.close_quick_later(id, seconds);
+        }
+    }
+
+    fn copy_file(&self, path: &Path) {
+        pasteboard().write(Write::Files(&[path.to_string_lossy().into_owned()]));
+        capture_ui::toast(self.mtm, i18n::current().capture_file_copied());
+    }
+
+    fn save_file_as(&self, path: &Path) {
+        let text = i18n::current();
+        let folder = self.config.borrow().capture.folder(&self.home);
+        let name = path
+            .file_name()
+            .map(|n| n.to_string_lossy().into_owned())
+            .unwrap_or_default();
+        let Some(target) = capture_ui::ask_save_path(self.mtm, &folder, &name) else {
+            return;
+        };
+        match fs::copy(path, &target) {
+            Ok(_) => {
+                let name = target
+                    .file_name()
+                    .map(|n| n.to_string_lossy().into_owned())
+                    .unwrap_or_default();
+                capture_ui::toast(self.mtm, &text.capture_saved(&name));
+            }
+            Err(e) => capture_ui::toast(self.mtm, &text.capture_write_failed(&e.to_string())),
         }
     }
 
@@ -748,8 +927,24 @@ mod tests {
         config
             .shortcuts
             .insert("window".into(), "cmd+shift+5".into());
+        config.shortcuts.insert("gif".into(), "cmd+shift+7".into());
         let keys: Vec<&str> = config.bindings().iter().map(|(k, _)| k.key()).collect();
-        assert_eq!(keys, ["window", "text"]);
+        assert_eq!(keys, ["window", "text", "gif"]);
+    }
+
+    #[test]
+    fn recordings_show_clicks_by_default_and_keep_hand_set_options() {
+        let config: CaptureConfig =
+            serde_json::from_str(r#"{"record": {"microphone": true}}"#).unwrap();
+        assert_eq!(
+            config.record,
+            RecordConfig {
+                microphone: true,
+                ..RecordConfig::default()
+            }
+        );
+        assert!(config.record.clicks);
+        assert!(!config.record.system_audio && !config.record.camera && !config.record.keys);
     }
 
     #[test]

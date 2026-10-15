@@ -33,7 +33,7 @@ const SCREEN_MARGIN: f64 = 18.0;
 const DRAG_THRESHOLD: f64 = 4.0;
 const TOAST_SECONDS: f64 = 1.8;
 
-fn panel(mtm: MainThreadMarker, frame: NSRect, level: isize) -> Retained<NSPanel> {
+pub(crate) fn panel(mtm: MainThreadMarker, frame: NSRect, level: isize) -> Retained<NSPanel> {
     // SAFETY: designated initializer with valid arguments on the main thread.
     let panel: Retained<NSPanel> = unsafe {
         msg_send![
@@ -220,24 +220,8 @@ impl Thumb {
     }
 }
 
-/// Labels of the quick panel's buttons.
-#[derive(Debug, Clone, Default)]
-pub struct QuickTexts {
-    pub copy: String,
-    pub save: String,
-    pub edit: String,
-    pub pin: String,
-    pub close: String,
-}
-
-/// What the quick panel's buttons do. A click on the thumbnail edits.
-pub struct QuickActions {
-    pub on_copy: Box<dyn Fn()>,
-    pub on_save: Box<dyn Fn()>,
-    pub on_edit: Box<dyn Fn()>,
-    pub on_pin: Box<dyn Fn()>,
-    pub on_close: Box<dyn Fn()>,
-}
+/// A button of the quick panel: its label and what it does.
+pub type QuickButton = (String, Box<dyn Fn()>);
 
 /// A capture's thumbnail and actions, in the bottom-left corner of the screen it was taken on.
 pub struct QuickPanel {
@@ -248,15 +232,16 @@ pub struct QuickPanel {
 
 impl QuickPanel {
     /// `file` is what dragging the thumbnail out delivers; `screen` is where the capture was taken
-    /// (AppKit coordinates); `slot` stacks panels upwards when several are open.
+    /// (AppKit coordinates); `slot` stacks panels upwards when several are open. `on_click` runs when
+    /// the thumbnail is clicked.
     pub fn show(
         mtm: MainThreadMarker,
         image: Retained<NSImage>,
         file: &Path,
         screen: NSRect,
         slot: usize,
-        texts: &QuickTexts,
-        actions: QuickActions,
+        buttons: Vec<QuickButton>,
+        on_click: Box<dyn Fn()>,
     ) -> Rc<Self> {
         let thumb_size = fit(
             image.size(),
@@ -300,7 +285,6 @@ impl QuickPanel {
         backdrop.addTrackingArea(&tracking);
         panel.setContentView(Some(&backdrop));
 
-        let actions = Rc::new(actions);
         let thumb_frame = NSRect::new(
             NSPoint::new(
                 (QUICK_WIDTH - thumb_size.width) / 2.0,
@@ -314,34 +298,21 @@ impl QuickPanel {
             image,
             file: file.to_owned(),
             press: Cell::new(None),
-            on_click: RefCell::new(None),
+            on_click: RefCell::new(Some(Rc::from(on_click))),
         };
         // SAFETY: designated initializer with valid arguments on the main thread.
         let thumb: Retained<Thumb> = unsafe {
             msg_send![super(mtm.alloc::<Thumb>().set_ivars(ivars)), initWithFrame: thumb_frame]
         };
-        {
-            let actions = Rc::clone(&actions);
-            *thumb.ivars().on_click.borrow_mut() = Some(Rc::new(move || (actions.on_edit)()));
-        }
         backdrop.addSubview(&thumb);
 
-        type Pick = fn(&QuickActions) -> &dyn Fn();
-        let entries: [(&str, Pick); 5] = [
-            (&texts.copy, |a| &a.on_copy),
-            (&texts.save, |a| &a.on_save),
-            (&texts.edit, |a| &a.on_edit),
-            (&texts.pin, |a| &a.on_pin),
-            (&texts.close, |a| &a.on_close),
-        ];
-        let width = (QUICK_WIDTH - 2.0 * QUICK_PAD) / entries.len() as f64;
+        let width = (QUICK_WIDTH - 2.0 * QUICK_PAD) / buttons.len().max(1) as f64;
         let mut targets = Vec::new();
-        for (i, (title, pick)) in entries.into_iter().enumerate() {
-            let actions = Rc::clone(&actions);
-            let target = ActionTarget::new(mtm, move || pick(&actions)());
+        for (i, (title, action)) in buttons.into_iter().enumerate() {
+            let target = ActionTarget::new(mtm, action);
             let made = button(
                 mtm,
-                title,
+                &title,
                 NSRect::new(
                     NSPoint::new(QUICK_PAD + i as f64 * width, QUICK_PAD),
                     NSSize::new(width - 2.0, BUTTON_HEIGHT),
@@ -677,7 +648,7 @@ define_class!(
     // SAFETY: NSView allows subclassing; it only draws a border.
     #[unsafe(super(NSView))]
     #[thread_kind = MainThreadOnly]
-    #[name = "FigScrollBorder"]
+    #[name = "FigAreaBorder"]
     struct BorderView;
 
     impl BorderView {
@@ -703,7 +674,7 @@ define_class!(
     // SAFETY: NSView allows subclassing; the ivars are only touched on the main thread and need no Drop.
     #[unsafe(super(NSView))]
     #[thread_kind = MainThreadOnly]
-    #[name = "FigScrollControls"]
+    #[name = "FigAreaControls"]
     #[ivars = KeysIvars]
     struct ControlsView;
 
@@ -734,7 +705,7 @@ define_class!(
     // SAFETY: NSPanel allows subclassing; this one only allows key status, for Escape and Return.
     #[unsafe(super(NSPanel))]
     #[thread_kind = MainThreadOnly]
-    #[name = "FigScrollPanel"]
+    #[name = "FigAreaPanel"]
     struct KeyPanel;
 
     impl KeyPanel {
@@ -746,26 +717,44 @@ define_class!(
 );
 
 #[derive(Debug, Clone, Default)]
-pub struct ScrollTexts {
+pub struct SessionTexts {
     pub done: String,
     pub cancel: String,
 }
 
-/// Shown while a scrolling capture runs: a border around the area (clicks and scrolling go through it)
-/// and a small bar with the progress, Done and Cancel. Return is Done, Escape is Cancel.
-pub struct ScrollSession {
+/// Where the session bar goes: under the area, else over it, else inside its bottom edge (a whole
+/// display has no room around it).
+fn bar_origin(area: NSRect, bar: NSSize, screen_bottom: f64, screen_top: f64) -> NSPoint {
+    let x = area.origin.x + (area.size.width - bar.width) / 2.0;
+    let below = area.origin.y - bar.height - 12.0;
+    let above = area.origin.y + area.size.height + 12.0;
+    let y = if below >= screen_bottom {
+        below
+    } else if above + bar.height <= screen_top {
+        above
+    } else {
+        area.origin.y.max(screen_bottom) + 24.0
+    };
+    NSPoint::new(x, y)
+}
+
+/// Shown while a scrolling capture or a recording runs: a border around the area (clicks and scrolling
+/// go through it) and a small bar with the progress, Done and Cancel. When the bar takes the keyboard,
+/// Return is Done and Escape is Cancel; a recording leaves the keyboard to the apps being recorded.
+pub struct AreaSession {
     border: Retained<NSPanel>,
     controls: Retained<KeyPanel>,
     status: Retained<objc2_app_kit::NSTextField>,
     _targets: Vec<Retained<ActionTarget>>,
 }
 
-impl ScrollSession {
+impl AreaSession {
     /// `area` is in AppKit screen coordinates.
     pub fn show(
         mtm: MainThreadMarker,
         area: NSRect,
-        texts: &ScrollTexts,
+        texts: &SessionTexts,
+        takes_keys: bool,
         on_done: impl Fn() + 'static,
         on_cancel: impl Fn() + 'static,
     ) -> Rc<Self> {
@@ -782,21 +771,20 @@ impl ScrollSession {
         };
         border.setContentView(Some(&view));
 
-        let (width, height) = (300.0, 40.0);
-        let below = area.origin.y - height - 12.0;
-        let screen_bottom = NSScreen::screens(mtm)
+        let size = NSSize::new(300.0, 40.0);
+        let visible: Vec<NSRect> = NSScreen::screens(mtm)
             .iter()
-            .map(|s| s.visibleFrame().origin.y)
+            .map(|s| s.visibleFrame())
+            .collect();
+        let screen_bottom = visible
+            .iter()
+            .map(|v| v.origin.y)
             .fold(f64::INFINITY, f64::min);
-        let y = if below > screen_bottom {
-            below
-        } else {
-            area.origin.y + area.size.height + 12.0
-        };
-        let frame = NSRect::new(
-            NSPoint::new(area.origin.x + (area.size.width - width) / 2.0, y),
-            NSSize::new(width, height),
-        );
+        let screen_top = visible
+            .iter()
+            .map(|v| v.origin.y + v.size.height)
+            .fold(f64::NEG_INFINITY, f64::max);
+        let frame = NSRect::new(bar_origin(area, size, screen_bottom, screen_top), size);
         // SAFETY: designated initializer with valid arguments on the main thread.
         let controls: Retained<KeyPanel> = unsafe {
             msg_send![
@@ -852,8 +840,12 @@ impl ScrollSession {
             &cancel_target,
         ));
         border.orderFrontRegardless();
-        controls.makeKeyAndOrderFront(None);
-        controls.makeFirstResponder(Some(&content));
+        if takes_keys {
+            controls.makeKeyAndOrderFront(None);
+            controls.makeFirstResponder(Some(&content));
+        } else {
+            controls.orderFrontRegardless();
+        }
         Rc::new(Self {
             border,
             controls,
@@ -889,6 +881,24 @@ pub fn ask_save_path(mtm: MainThreadMarker, directory: &Path, name: &str) -> Opt
 #[cfg(test)]
 mod tests {
     use super::*;
+
+    #[test]
+    fn the_session_bar_goes_under_then_over_then_inside_the_area() {
+        let bar = NSSize::new(300.0, 40.0);
+        let area = |y, h| NSRect::new(NSPoint::new(100.0, y), NSSize::new(600.0, h));
+        assert_eq!(
+            bar_origin(area(200.0, 300.0), bar, 0.0, 1050.0),
+            NSPoint::new(250.0, 148.0)
+        );
+        assert_eq!(
+            bar_origin(area(20.0, 300.0), bar, 0.0, 1050.0),
+            NSPoint::new(250.0, 332.0)
+        );
+        assert_eq!(
+            bar_origin(area(0.0, 1080.0), bar, 0.0, 1050.0),
+            NSPoint::new(250.0, 24.0)
+        );
+    }
 
     #[test]
     fn thumbnails_keep_their_aspect_and_never_grow() {

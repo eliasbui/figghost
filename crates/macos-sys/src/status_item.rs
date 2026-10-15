@@ -53,6 +53,8 @@ impl Item {
 pub enum Entry {
     Item(Item),
     Separator,
+    /// A titled submenu; its entries are refreshed with the rest when the menu opens.
+    Submenu(String, Vec<Entry>),
 }
 
 pub struct TargetIvars {
@@ -115,6 +117,50 @@ impl MenuDelegate {
     }
 }
 
+/// A menu with `entries`; the targets and the items to refresh are collected for the status menu.
+fn fill(
+    mtm: MainThreadMarker,
+    entries: Vec<Entry>,
+    targets: &mut Vec<Retained<MenuTarget>>,
+    pairs: &mut Vec<(Retained<NSMenuItem>, Rc<Item>)>,
+) -> Retained<NSMenu> {
+    let menu = NSMenu::new(mtm);
+    // The menu must not auto-enable items: our targets are not in the responder chain.
+    menu.setAutoenablesItems(false);
+    for entry in entries {
+        let spec = match entry {
+            Entry::Separator => {
+                menu.addItem(&NSMenuItem::separatorItem(mtm));
+                continue;
+            }
+            Entry::Submenu(title, entries) => {
+                let item = NSMenuItem::new(mtm);
+                item.setTitle(&NSString::from_str(&title));
+                item.setSubmenu(Some(&fill(mtm, entries, targets, pairs)));
+                menu.addItem(&item);
+                continue;
+            }
+            Entry::Item(spec) => Rc::new(spec),
+        };
+        let target = MenuTarget::new(mtm, Rc::clone(&spec));
+        // SAFETY: `fire:` is implemented by MenuTarget with the (id) signature AppKit expects.
+        let menu_item = unsafe {
+            NSMenuItem::initWithTitle_action_keyEquivalent(
+                NSMenuItem::alloc(mtm),
+                &NSString::from_str(""),
+                Some(sel!(fire:)),
+                &NSString::from_str(""),
+            )
+        };
+        // SAFETY: the target is kept alive in `targets` for as long as the menu.
+        unsafe { menu_item.setTarget(Some(&target)) };
+        menu.addItem(&menu_item);
+        targets.push(target);
+        pairs.push((menu_item, spec));
+    }
+    menu
+}
+
 /// Keeps the status item, its menu and the action targets alive.
 pub struct StatusMenu {
     _item: Retained<NSStatusItem>,
@@ -129,36 +175,9 @@ impl StatusMenu {
         if let Some(button) = item.button(mtm) {
             button.setTitle(&NSString::from_str(title));
         }
-        let menu = NSMenu::new(mtm);
-        // The menu must not auto-enable items: our targets are not in the responder chain.
-        menu.setAutoenablesItems(false);
-
         let mut targets = Vec::new();
         let mut pairs: Vec<(Retained<NSMenuItem>, Rc<Item>)> = Vec::new();
-        for entry in entries {
-            let spec = match entry {
-                Entry::Separator => {
-                    menu.addItem(&NSMenuItem::separatorItem(mtm));
-                    continue;
-                }
-                Entry::Item(spec) => Rc::new(spec),
-            };
-            let target = MenuTarget::new(mtm, Rc::clone(&spec));
-            // SAFETY: `fire:` is implemented by MenuTarget with the (id) signature AppKit expects.
-            let menu_item = unsafe {
-                NSMenuItem::initWithTitle_action_keyEquivalent(
-                    NSMenuItem::alloc(mtm),
-                    &NSString::from_str(""),
-                    Some(sel!(fire:)),
-                    &NSString::from_str(""),
-                )
-            };
-            // SAFETY: the target is kept alive in `targets` for as long as the menu.
-            unsafe { menu_item.setTarget(Some(&target)) };
-            menu.addItem(&menu_item);
-            targets.push(target);
-            pairs.push((menu_item, spec));
-        }
+        let menu = fill(mtm, entries, &mut targets, &mut pairs);
 
         let refresh = move || {
             for (menu_item, spec) in &pairs {

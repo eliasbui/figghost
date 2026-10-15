@@ -4,6 +4,7 @@
 
 mod annotate;
 mod geometry;
+mod keys;
 mod naming;
 mod stitch;
 
@@ -12,5 +13,6 @@ pub use annotate::{
     pixelate,
 };
 pub use geometry::{PixelRect, Point, Rect, pick_window};
+pub use keys::{Modifiers, key_name, label as key_label};
 pub use naming::{Stamp, file_name, unique_path};
 pub use stitch::{FrameRef, Step, Stitcher};
