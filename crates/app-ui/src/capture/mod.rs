@@ -552,8 +552,14 @@ impl CaptureFeature {
 
     fn recognize(&self, shot: &Shot) {
         let mtm = self.mtm;
+        let started = std::time::Instant::now();
         ocr::recognize(shot, move |result| {
             let text = i18n::current();
+            trace::log(&format!(
+                "capture: recognition took {:?}: {:?}",
+                started.elapsed(),
+                result.as_ref().map(|f| (f.lines.len(), f.codes.len()))
+            ));
             match result {
                 Ok(found) if !found.is_empty() => {
                     let mut parts = found.lines.clone();
