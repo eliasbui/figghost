@@ -2,6 +2,7 @@
 //! Composition root: starts each feature and keeps its handles alive.
 
 mod agents;
+mod audio;
 mod clipboard;
 mod config;
 mod context;
@@ -22,6 +23,7 @@ mod trace;
 mod volume_hud;
 
 use agents::AgentsFeature;
+use audio::AudioFeature;
 use clipboard::Clipboard;
 use config::{Config, home_dir};
 use context::AppContext;
@@ -77,6 +79,7 @@ struct Shell {
     media: Option<Rc<MediaFeature>>,
     focus: Option<FocusFeature>,
     agents: Option<Rc<AgentsFeature>>,
+    audio: AudioFeature,
     tiling: Rc<Tiling>,
     volume_hud: Rc<VolumeHud>,
     settings: Rc<SettingsFeature>,
@@ -118,10 +121,6 @@ impl Shell {
         let agents = notch
             .as_ref()
             .map(|notch| AgentsFeature::attach(mtm, notch, &home, &config.agents));
-        let volume_hud = Rc::new(VolumeHud::new(mtm));
-        if config.volume_hud {
-            volume_hud.enable_when_possible();
-        }
         let features = Features::attach(&AttachEnv {
             mtm,
             notch: notch.as_ref(),
@@ -131,11 +130,22 @@ impl Shell {
             tiling: &tiling,
             media: media.as_ref(),
         });
+        // The mixer saves what is changed on its notch page, so it shares the one config with the settings.
+        let config = Rc::new(RefCell::new(config));
+        let audio = AudioFeature::start(mtm, &config, home.clone(), notch.as_deref());
+        let volume_hud = Rc::new(VolumeHud::new(mtm, audio.engine.soft_volume()));
+        if config.borrow().volume_hud {
+            volume_hud.enable_when_possible();
+        }
+        {
+            let hud = Rc::clone(&volume_hud);
+            audio.engine.set_on_soft(move |on| hud.set_soft_keys(on));
+        }
 
         let ctx = Rc::new(AppContext {
             mtm,
             home,
-            config: Rc::new(RefCell::new(config)),
+            config: Rc::clone(&config),
             control: Arc::clone(&mouse.control),
             clipboard: clipboard.clone(),
             shelf: shelf.clone(),
@@ -160,6 +170,7 @@ impl Shell {
             media,
             focus,
             agents,
+            audio,
             tiling,
             volume_hud,
             settings,

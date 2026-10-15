@@ -53,6 +53,9 @@ impl Item {
 pub enum Entry {
     Item(Item),
     Separator,
+    /// A titled submenu; its entries are refreshed with the rest when the menu opens, and it is hidden
+    /// while all of them are.
+    Submenu(String, Vec<Entry>),
 }
 
 pub struct TargetIvars {
@@ -115,6 +118,56 @@ impl MenuDelegate {
     }
 }
 
+type Submenus = Vec<(Retained<NSMenuItem>, Retained<NSMenu>)>;
+
+/// A menu with `entries`; the targets, the items to refresh and the submenus are collected for the status
+/// menu. A submenu is collected after the submenus inside it.
+fn fill(
+    mtm: MainThreadMarker,
+    entries: Vec<Entry>,
+    targets: &mut Vec<Retained<MenuTarget>>,
+    pairs: &mut Vec<(Retained<NSMenuItem>, Rc<Item>)>,
+    submenus: &mut Submenus,
+) -> Retained<NSMenu> {
+    let menu = NSMenu::new(mtm);
+    // The menu must not auto-enable items: our targets are not in the responder chain.
+    menu.setAutoenablesItems(false);
+    for entry in entries {
+        let spec = match entry {
+            Entry::Separator => {
+                menu.addItem(&NSMenuItem::separatorItem(mtm));
+                continue;
+            }
+            Entry::Submenu(title, entries) => {
+                let item = NSMenuItem::new(mtm);
+                item.setTitle(&NSString::from_str(&title));
+                let submenu = fill(mtm, entries, targets, pairs, submenus);
+                item.setSubmenu(Some(&submenu));
+                menu.addItem(&item);
+                submenus.push((item, submenu));
+                continue;
+            }
+            Entry::Item(spec) => Rc::new(spec),
+        };
+        let target = MenuTarget::new(mtm, Rc::clone(&spec));
+        // SAFETY: `fire:` is implemented by MenuTarget with the (id) signature AppKit expects.
+        let menu_item = unsafe {
+            NSMenuItem::initWithTitle_action_keyEquivalent(
+                NSMenuItem::alloc(mtm),
+                &NSString::from_str(""),
+                Some(sel!(fire:)),
+                &NSString::from_str(""),
+            )
+        };
+        // SAFETY: the target is kept alive in `targets` for as long as the menu.
+        unsafe { menu_item.setTarget(Some(&target)) };
+        menu.addItem(&menu_item);
+        targets.push(target);
+        pairs.push((menu_item, spec));
+    }
+    menu
+}
+
 /// Keeps the status item, its menu and the action targets alive.
 pub struct StatusMenu {
     _item: Retained<NSStatusItem>,
@@ -129,36 +182,10 @@ impl StatusMenu {
         if let Some(button) = item.button(mtm) {
             button.setTitle(&NSString::from_str(title));
         }
-        let menu = NSMenu::new(mtm);
-        // The menu must not auto-enable items: our targets are not in the responder chain.
-        menu.setAutoenablesItems(false);
-
         let mut targets = Vec::new();
         let mut pairs: Vec<(Retained<NSMenuItem>, Rc<Item>)> = Vec::new();
-        for entry in entries {
-            let spec = match entry {
-                Entry::Separator => {
-                    menu.addItem(&NSMenuItem::separatorItem(mtm));
-                    continue;
-                }
-                Entry::Item(spec) => Rc::new(spec),
-            };
-            let target = MenuTarget::new(mtm, Rc::clone(&spec));
-            // SAFETY: `fire:` is implemented by MenuTarget with the (id) signature AppKit expects.
-            let menu_item = unsafe {
-                NSMenuItem::initWithTitle_action_keyEquivalent(
-                    NSMenuItem::alloc(mtm),
-                    &NSString::from_str(""),
-                    Some(sel!(fire:)),
-                    &NSString::from_str(""),
-                )
-            };
-            // SAFETY: the target is kept alive in `targets` for as long as the menu.
-            unsafe { menu_item.setTarget(Some(&target)) };
-            menu.addItem(&menu_item);
-            targets.push(target);
-            pairs.push((menu_item, spec));
-        }
+        let mut submenus = Submenus::new();
+        let menu = fill(mtm, entries, &mut targets, &mut pairs, &mut submenus);
 
         let refresh = move || {
             for (menu_item, spec) in &pairs {
@@ -173,6 +200,14 @@ impl StatusMenu {
                 if let Some(visible) = &spec.visible {
                     menu_item.setHidden(!visible());
                 }
+            }
+            // Inner submenus come first, so an outer one sees them already hidden or shown.
+            for (item, submenu) in &submenus {
+                let empty = submenu
+                    .itemArray()
+                    .iter()
+                    .all(|i| i.isHidden() || i.isSeparatorItem());
+                item.setHidden(empty);
             }
         };
         refresh();

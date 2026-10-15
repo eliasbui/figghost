@@ -1,46 +1,18 @@
 #![forbid(unsafe_code)]
-//! Screen capture with no screen: where a selection may go, how points become pixels across displays,
-//! the gestures of the selection overlay, and the names and folders of the files that are saved.
+//! Screen capture logic that needs no system: selection geometry, which window lies under the pointer,
+//! file names, stitching a scrolling capture, and the editor's annotation model.
 
-pub mod geometry;
-pub mod naming;
-pub mod select;
+mod annotate;
+mod geometry;
+mod keys;
+mod naming;
+mod stitch;
 
-pub use geometry::{
-    Display, PixelRect, Point, Rect, WindowBox, clamp_point, display_index_at, flip_y, pixel_rect,
-    primary_height, window_at,
+pub use annotate::{
+    Background, Color, Document, GRADIENTS, Mark, PALETTE, Shape, Tool, arrow_head, counter_radius,
+    pixelate,
 };
-
-/// What to take a picture of. Coordinates are AppKit's: points, the origin at the bottom left of the
-/// primary display.
-#[derive(Debug, Clone, PartialEq)]
-pub enum Grab {
-    Region {
-        display: Display,
-        rect: Rect,
-    },
-    Screen(Display),
-    /// One window alone, with or without its shadow.
-    Window {
-        id: u32,
-        shadow: bool,
-    },
-}
-
-/// A finished picture: PNG bytes at native pixel size.
-#[derive(Debug, Clone, PartialEq)]
-pub struct Shot {
-    pub png: Vec<u8>,
-    pub width: u32,
-    pub height: u32,
-    /// Pixels per point of the display it came from.
-    pub scale: f64,
-}
-
-/// What the person chose on the overlay.
-#[derive(Debug, Clone, PartialEq)]
-pub enum Pick {
-    Cancelled,
-    Region { display: Display, rect: Rect },
-    Window(WindowBox),
-}
+pub use geometry::{PixelRect, Point, Rect, pick_window};
+pub use keys::{Modifiers, key_name, label as key_label};
+pub use naming::{Stamp, file_name, unique_path};
+pub use stitch::{FrameRef, Step, Stitcher};

@@ -5,7 +5,8 @@ the capture shortcuts moved to function keys that hardly any keyboard has, so th
 capture or show anything. It checks what can be checked without the Screen Recording permission and without a
 screen: that the feature starts when it is switched on, registers its global shortcuts, reports a shortcut that is
 taken, survives a hand-edited config with hostile values, uses no CPU while idle,
-and leaves no process behind. The capture itself is not run here (see HANDOFF.md).
+and leaves no process behind. The capture itself is not run here: `capture_check`, `ocr_check`, `editor_check`
+and `record_check` in macos-sys check it with the permission.
 
     python3 -I scripts/check-capture.py target/debug/app-ui
 """
@@ -26,7 +27,10 @@ BASE = {
     "tiling": {"enabled": False},
     "mouse": {"smooth": False},
 }
-FUNCTION_KEYS = {"region": "f17", "window": "f18", "screen": "f19", "repeat": "f20", "text": ""}
+FUNCTION_KEYS = {
+    "area": "f17", "window": "f18", "screen": "f19", "timer": "f20",
+    "text": "", "scroll": "", "record": "", "gif": "",
+}
 root = tempfile.mkdtemp(prefix="figghost-capture.")
 failures = []
 children = []
@@ -95,7 +99,7 @@ try:
     second, _, second_log = launch("second", {"enabled": True, "shortcuts": clash})
     time.sleep(3)
     check(second.poll() is None, "the program still runs when two modes share a shortcut")
-    check("capture: taken" in text(second_log), "a shortcut that is taken is reported: " + text(second_log).strip()[:200])
+    check("capture: cannot register" in text(second_log), "a shortcut that is taken is reported: " + text(second_log).strip()[:200])
     stop(second)
 
     # 3. Off by default: with no capture section it registers nothing, so the same keys are free again.
@@ -109,13 +113,13 @@ try:
     hostile = {
         "enabled": True,
         "folder": "../../../../etc",
-        "shortcuts": {"region": "not a shortcut", "window": "cmd+cmd+cmd", "screen": "f16", "bogus": "f1"},
+        "shortcuts": {"area": "not a shortcut", "window": "cmd+cmd+cmd", "screen": "f16", "bogus": "f1"},
     }
     fourth, _, fourth_log = launch("fourth", hostile)
     time.sleep(3)
     check(fourth.poll() is None, "a hostile config does not stop the program")
     check("panicked" not in text(fourth_log), "no panic on hostile values")
-    check("shortcut for region" in text(fourth_log), "a shortcut that does not parse is skipped and logged")
+    check("shortcut 'not a shortcut' for area" in text(fourth_log), "a shortcut that does not parse is skipped and logged")
     stop(fourth)
 
     # 5. A section of the wrong type: the file is moved aside, never overwritten, and defaults are used.

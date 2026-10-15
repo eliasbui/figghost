@@ -1,3 +1,4 @@
+use crate::audio::model::AudioConfig;
 use core_mouse::Settings;
 use core_window::Layout;
 use macos_sys::hotkey::modifier;
@@ -124,6 +125,8 @@ pub struct Config {
     pub history_limit: usize,
     /// Bundle identifiers whose copies are never recorded, on top of the built-in password managers.
     pub ignored_apps: Vec<String>,
+    /// The per-app mixer: volumes, output devices and effects.
+    pub audio: AudioConfig,
 }
 
 impl Default for Config {
@@ -150,6 +153,7 @@ impl Default for Config {
             volume_hud: false,
             history_limit: 500,
             ignored_apps: Vec::new(),
+            audio: AudioConfig::default(),
         }
     }
 }
@@ -190,6 +194,8 @@ impl Config {
                     .agents
                     .approval_wait_seconds
                     .clamp(*AGENT_WAIT_RANGE.start(), *AGENT_WAIT_RANGE.end());
+                cfg.audio = cfg.audio.sanitized();
+                cfg.capture = cfg.capture.sanitized();
                 (cfg, None)
             }
             Err(e) => {

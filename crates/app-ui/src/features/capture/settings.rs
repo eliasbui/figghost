@@ -1,91 +1,99 @@
 //! This feature's part of the settings model: the JSON the page renders and the changes it may make.
 //! Pure data with no AppKit, so every rule is covered by plain unit tests.
 
-use super::{Config, Mode};
+use super::{Config, Kind};
 use crate::settings::model::Fault;
-use core_capture::naming::{tilde, validate_folder};
 use serde_json::{Map, Value, json};
 
 /// The state under the key "capture". `runtime` is `Feature::runtime()`, or null when the feature is not running.
 /// `web/features/capture.fixture.json` must have exactly the same keys; a unit test checks it.
 pub fn state(config: &Config, runtime: &Value) -> Value {
-    let flag = |key: &str| runtime.get(key).and_then(Value::as_bool);
-    let shortcuts: Map<String, Value> = Mode::ALL
+    let shortcuts: Map<String, Value> = Kind::ALL
         .into_iter()
-        .map(|mode| (mode.key().to_owned(), json!(config.shortcut(mode))))
+        .map(|kind| {
+            let shortcut = config
+                .shortcuts
+                .get(kind.key())
+                .map_or(kind.default_shortcut(), String::as_str);
+            (kind.key().to_owned(), Value::from(shortcut.trim()))
+        })
         .collect();
-    let home = std::env::var_os("HOME")
-        .map(std::path::PathBuf::from)
-        .unwrap_or_default();
     json!({
         "enabled": config.enabled,
-        "copy": config.copy,
+        "folder_path": runtime["folder_path"].as_str().unwrap_or(""),
         "save": config.save,
-        "edit": config.edit,
-        "window_shadow": config.window_shadow,
-        "folder": tilde(&config.save_dir(), &home),
-        "custom_folder": !config.folder.trim().is_empty(),
+        "copy": config.copy,
+        "quick_panel": config.quick_panel,
+        "quick_seconds": config.quick_seconds,
+        "timer_seconds": config.timer_seconds,
         "shortcuts": shortcuts,
-        "permission": flag("permission").unwrap_or(false),
-        "available": flag("available").unwrap_or(true),
+        "record": {
+            "system_audio": config.record.system_audio,
+            "microphone": config.record.microphone,
+            "camera": config.record.camera,
+            "clicks": config.record.clicks,
+            "keys": config.record.keys,
+        },
+        "screen_access": runtime["screen_access"].as_bool().unwrap_or(false),
+        "recording_supported": runtime["recording_supported"].as_bool().unwrap_or(false),
     })
+}
+
+fn whole_seconds(value: &Value, min: f64, max: f64) -> Result<f64, Fault> {
+    value
+        .as_f64()
+        .filter(|v| v.is_finite())
+        .map(|v| v.round().clamp(min, max))
+        .ok_or_else(|| Fault::new("invalid_value", "expected a number of seconds"))
 }
 
 /// A change from the page. `path` is relative to the feature: "enabled", not "capture.enabled". `None` when the
 /// path is not one of this feature's. Values must be validated here; the page is not trusted.
 pub fn set(config: &mut Config, path: &str, value: &Value) -> Option<Result<(), Fault>> {
-    let flag = |slot: &mut bool| {
+    let switch = match path {
+        "quick_seconds" => {
+            return Some(whole_seconds(value, 0.0, 600.0).map(|v| config.quick_seconds = v));
+        }
+        "timer_seconds" => {
+            return Some(whole_seconds(value, 1.0, 60.0).map(|v| config.timer_seconds = v as u32));
+        }
+        "enabled" => &mut config.enabled,
+        "save" => &mut config.save,
+        "copy" => &mut config.copy,
+        "quick_panel" => &mut config.quick_panel,
+        "record.system_audio" => &mut config.record.system_audio,
+        "record.microphone" => &mut config.record.microphone,
+        "record.camera" => &mut config.record.camera,
+        "record.clicks" => &mut config.record.clicks,
+        "record.keys" => &mut config.record.keys,
+        _ => return None,
+    };
+    Some(
         value
             .as_bool()
-            .map(|on| *slot = on)
-            .ok_or_else(|| Fault::new("invalid_value", "expected true or false"))
-    };
-    Some(match path {
-        "enabled" => flag(&mut config.enabled),
-        "copy" => flag(&mut config.copy),
-        "save" => flag(&mut config.save),
-        "edit" => flag(&mut config.edit),
-        "window_shadow" => flag(&mut config.window_shadow),
-        // An empty folder goes back to the default one.
-        "folder" => match value.as_str() {
-            Some(text) if text.trim().is_empty() => {
-                config.folder.clear();
-                Ok(())
-            }
-            Some(text) => validate_folder(text)
-                .map(|clean| config.folder = clean.to_string_lossy().into_owned())
-                .map_err(|reason| Fault::new("folder_invalid", reason)),
-            None => Err(Fault::new("invalid_value", "expected a folder path")),
-        },
-        _ => return None,
-    })
+            .map(|on| *switch = on)
+            .ok_or_else(|| Fault::new("invalid_value", "expected true or false")),
+    )
 }
 
 /// This feature's shortcuts as (target, shortcut). A target is "capture" or "capture:<what>", which is what the
 /// page's shortcut recorder sends. Shortcuts are checked against all the others before `set_shortcut` runs.
 pub fn shortcuts(config: &Config) -> Vec<(String, String)> {
-    Mode::ALL
+    config
+        .bindings()
         .into_iter()
-        .map(|mode| (format!("capture:{}", mode.key()), config.shortcut(mode)))
-        .filter(|(_, shortcut)| !shortcut.is_empty())
+        .map(|(kind, shortcut)| (format!("capture:{}", kind.key()), shortcut))
         .collect()
 }
 
-/// Stores a shortcut that was already parsed and checked for conflicts; an empty value removes it.
+/// Stores a shortcut that was already parsed and checked for conflicts; an empty value removes it, and the
+/// built-in one stays off.
 pub fn set_shortcut(config: &mut Config, target: &str, value: &str) -> Option<Result<(), Fault>> {
-    let mode = target.strip_prefix("capture:").and_then(Mode::from_key);
-    let Some(mode) = mode else {
-        return Some(Err(Fault::new("unknown_setting", target)));
-    };
-    let value = value.trim();
-    if value == mode.default_shortcut() {
-        // Back to the default: leave no override behind.
-        config.shortcuts.remove(mode.key());
-    } else {
-        config
-            .shortcuts
-            .insert(mode.key().to_owned(), value.to_owned());
-    }
+    let what = target.strip_prefix("capture:")?;
+    let kind = Kind::ALL.into_iter().find(|k| k.key() == what)?;
+    config
+        .shortcuts
+        .insert(kind.key().to_owned(), value.trim().to_owned());
     Some(Ok(()))
 }
 
@@ -93,155 +101,72 @@ pub fn set_shortcut(config: &mut Config, target: &str, value: &str) -> Option<Re
 mod tests {
     use super::*;
 
-    fn keys(value: &Value, prefix: &str, out: &mut Vec<String>) {
-        if let Value::Object(map) = value {
-            for (key, inner) in map {
-                let path = format!("{prefix}.{key}");
-                out.push(path.clone());
-                keys(inner, &path, out);
-            }
-        }
-    }
-
     #[test]
-    fn the_switches_are_validated() {
+    fn switches_and_numbers_are_validated() {
         let mut config = Config::default();
-        for path in ["enabled", "copy", "save", "edit", "window_shadow"] {
-            assert!(
-                set(&mut config, path, &json!("yes")).unwrap().is_err(),
-                "{path}"
-            );
-            assert!(
-                set(&mut config, path, &json!(1)).unwrap().is_err(),
-                "{path}"
-            );
-        }
-        assert!(set(&mut config, "enabled", &json!(true)).unwrap().is_ok() && config.enabled);
-        assert!(set(&mut config, "copy", &json!(false)).unwrap().is_ok() && !config.copy);
-        assert!(set(&mut config, "save", &json!(false)).unwrap().is_ok() && !config.save);
-        assert!(set(&mut config, "edit", &json!(true)).unwrap().is_ok() && config.edit);
         assert!(
-            set(&mut config, "window_shadow", &json!(false))
+            set(&mut config, "record.keys", &json!(true))
                 .unwrap()
                 .is_ok()
-                && !config.window_shadow
         );
+        assert!(config.record.keys);
+        assert!(set(&mut config, "save", &json!("yes")).unwrap().is_err());
+        assert!(
+            set(&mut config, "timer_seconds", &json!(999))
+                .unwrap()
+                .is_ok()
+        );
+        assert_eq!(config.timer_seconds, 60);
+        assert!(set(&mut config, "quick_seconds", &json!(f64::NAN)).is_some());
         assert!(set(&mut config, "nonsense", &json!(1)).is_none());
     }
 
     #[test]
-    fn a_folder_from_the_page_is_checked() {
+    fn shortcuts_show_the_built_in_ones_until_changed_or_removed() {
         let mut config = Config::default();
+        assert_eq!(
+            state(&config, &Value::Null)["shortcuts"]["area"],
+            "cmd+shift+2"
+        );
+        assert!(shortcuts(&config).contains(&("capture:area".into(), "cmd+shift+2".into())));
         assert!(
-            set(&mut config, "folder", &json!("/Users/me/Shots/"))
+            set_shortcut(&mut config, "capture:area", "")
                 .unwrap()
                 .is_ok()
         );
-        assert_eq!(config.folder, "/Users/me/Shots");
-        for bad in [
-            "relative",
-            "/Users/me/../../etc",
-            "/System/Library",
-            "",
-            "   ",
-        ] {
-            let before = config.folder.clone();
-            let result = set(&mut config, "folder", &json!(bad)).unwrap();
-            if bad.trim().is_empty() {
-                assert!(
-                    result.is_ok() && config.folder.is_empty(),
-                    "an empty folder resets it"
-                );
-                config.folder = before;
-            } else {
-                assert_eq!(result.unwrap_err().code, "folder_invalid", "{bad}");
-                assert_eq!(config.folder, before, "{bad} changed the folder");
+        assert!(shortcuts(&config).iter().all(|(t, _)| t != "capture:area"));
+        assert!(
+            set_shortcut(&mut config, "capture:record", "cmd+shift+8")
+                .unwrap()
+                .is_ok()
+        );
+        assert_eq!(
+            state(&config, &Value::Null)["shortcuts"]["record"],
+            "cmd+shift+8"
+        );
+        assert!(set_shortcut(&mut config, "capture:nothing", "cmd+k").is_none());
+        assert!(set_shortcut(&mut config, "tiling:left", "cmd+k").is_none());
+    }
+
+    #[test]
+    fn the_sample_data_has_the_same_keys_as_the_state() {
+        fn keys(value: &Value, prefix: &str, out: &mut Vec<String>) {
+            if let Value::Object(map) = value {
+                for (key, inner) in map {
+                    let path = format!("{prefix}.{key}");
+                    keys(inner, &path, out);
+                    out.push(path);
+                }
             }
         }
-        for bad in [json!(5), json!(null), json!(["/a"]), json!({"a": 1})] {
-            assert_eq!(
-                set(&mut config, "folder", &bad).unwrap().unwrap_err().code,
-                "invalid_value"
-            );
-        }
-        assert_eq!(config.folder, "/Users/me/Shots");
-    }
-
-    #[test]
-    fn the_state_has_every_switch_every_shortcut_and_the_permission() {
-        let config = Config::default();
-        let on = state(&config, &json!({"permission": true, "available": true}));
-        assert_eq!(on["permission"], true);
-        let off = state(&config, &Value::Null);
-        assert_eq!(off["permission"], false, "unknown means not granted");
-        assert_eq!(off["available"], true, "unknown means available");
-        for mode in Mode::ALL {
-            assert_eq!(on["shortcuts"][mode.key()], mode.default_shortcut());
-        }
-        assert_eq!(on["custom_folder"], false);
-        assert!(
-            on["folder"]
-                .as_str()
-                .unwrap()
-                .ends_with("Pictures/Figghost")
-        );
-    }
-
-    #[test]
-    fn the_fixture_has_exactly_the_keys_of_the_state() {
-        let fixture: Value =
+        let sample: Value =
             serde_json::from_str(include_str!("../../../web/features/capture.fixture.json"))
                 .unwrap();
         let (mut a, mut b) = (Vec::new(), Vec::new());
-        keys(&fixture, "", &mut a);
+        keys(&sample, "", &mut a);
         keys(&state(&Config::default(), &Value::Null), "", &mut b);
         a.sort();
         b.sort();
-        assert_eq!(
-            a, b,
-            "capture.fixture.json is out of date with settings::state"
-        );
-    }
-
-    #[test]
-    fn the_shortcuts_are_listed_under_their_targets_without_the_removed_ones() {
-        let mut config = Config::default();
-        let all = shortcuts(&config);
-        assert_eq!(all.len(), 5);
-        assert!(all.contains(&("capture:region".into(), "ctrl+opt+cmd+4".into())));
-        config.shortcuts.insert("text".into(), String::new());
-        assert_eq!(shortcuts(&config).len(), 4);
-    }
-
-    #[test]
-    fn a_shortcut_is_stored_as_an_override_and_the_default_leaves_none() {
-        let mut config = Config::default();
-        set_shortcut(&mut config, "capture:region", "f13")
-            .unwrap()
-            .unwrap();
-        assert_eq!(config.shortcut(Mode::Region), "f13");
-        set_shortcut(&mut config, "capture:region", "ctrl+opt+cmd+4")
-            .unwrap()
-            .unwrap();
-        assert!(config.shortcuts.is_empty());
-        set_shortcut(&mut config, "capture:window", "")
-            .unwrap()
-            .unwrap();
-        assert_eq!(config.shortcut(Mode::Window), "");
-        assert_eq!(config.shortcuts.get("window").map(String::as_str), Some(""));
-        assert_eq!(
-            set_shortcut(&mut config, "capture:nonsense", "f1")
-                .unwrap()
-                .unwrap_err()
-                .code,
-            "unknown_setting"
-        );
-        assert_eq!(
-            set_shortcut(&mut config, "capture", "f1")
-                .unwrap()
-                .unwrap_err()
-                .code,
-            "unknown_setting"
-        );
+        assert_eq!(a, b);
     }
 }

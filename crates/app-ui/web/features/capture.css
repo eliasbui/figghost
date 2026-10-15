@@ -1,5 +1,1 @@
-/* Screen capture: region, window and full screen, text from a region. Styles for the page in web/features/capture.js, using the variables at the top of app.css. */
-
-.capture-steps { margin: 6px 0 0; padding-left: 20px; color: var(--text-2); font-size: var(--fs-small); line-height: 1.55; }
-.capture-steps li + li { margin-top: 2px; }
-.capture-path { font-family: var(--mono); word-break: break-all; }
+/* Screenshots and recordings: the page in web/features/capture.js uses only the shared styles of app.css. */

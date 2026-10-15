@@ -211,3 +211,19 @@ pub fn display_options() -> DisplayOptions {
         increase_contrast: workspace.accessibilityDisplayShouldIncreaseContrast(),
     }
 }
+
+/// The app running as `pid`, when it is one the user can see: it has a Dock icon or a menu bar item.
+pub fn running_app(pid: i32) -> Option<App> {
+    let app = objc2_app_kit::NSRunningApplication::runningApplicationWithProcessIdentifier(pid)?;
+    if app.activationPolicy() == NSApplicationActivationPolicy::Prohibited {
+        return None;
+    }
+    Some(App {
+        bundle_id: app.bundleIdentifier()?.to_string(),
+        name: app
+            .localizedName()
+            .map(|n| n.to_string())
+            .unwrap_or_default(),
+        pid,
+    })
+}

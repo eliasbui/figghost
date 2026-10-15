@@ -40,6 +40,9 @@ cat > "$APP/Contents/Info.plist" <<'PLIST'
     <key>LSMinimumSystemVersion</key><string>13.0</string>
     <key>LSUIElement</key><true/>
     <key>NSHighResolutionCapable</key><true/>
+    <key>NSAudioCaptureUsageDescription</key><string>Figghost changes the volume, output and sound of each app, and records the computer's audio in screen recordings when asked to.</string>
+    <key>NSMicrophoneUsageDescription</key><string>Figghost records the microphone in screen recordings when you turn it on.</string>
+    <key>NSCameraUsageDescription</key><string>Figghost shows the camera in screen recordings when you turn it on.</string>
     <key>NSAppleEventsUsageDescription</key><string>Figghost reads the current track from Music and Spotify to show it in the notch.</string>
     <key>NSCalendarsUsageDescription</key><string>Figghost reads your calendar events to show today and tomorrow on the notch and to warn you before a meeting. Nothing leaves this Mac.</string>
     <key>NSCalendarsFullAccessUsageDescription</key><string>Figghost reads your calendar events to show today and tomorrow on the notch and to warn you before a meeting. Nothing leaves this Mac.</string>

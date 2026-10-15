@@ -2,15 +2,18 @@
 //! Every `unsafe` block in the workspace lives here; the other crates forbid it.
 
 pub mod agents_ui;
-pub mod annotate;
 pub mod app;
+pub mod audio_tap;
 pub mod ax;
 pub mod button;
 pub mod calendar_ui;
-pub mod capture;
+pub mod capture_overlay;
+pub mod capture_ui;
+pub mod editor_ui;
 pub mod event_tap;
 pub mod eventkit;
 pub mod focus_ui;
+pub mod gif;
 pub mod hotkey;
 pub mod hud;
 pub mod labels;
@@ -18,13 +21,19 @@ pub mod locale;
 pub mod login_item;
 pub mod media_ui;
 pub mod menubar;
+pub mod mixer_ui;
 pub mod notch;
 pub mod now_playing;
+pub mod ocr;
 pub mod panel;
 pub mod pasteboard;
 pub mod permissions;
 pub mod picker;
 pub mod qos;
+pub mod record_ui;
+pub mod recorder;
+pub mod reply;
+pub mod screen_capture;
 pub mod selection;
 pub mod shelf_ui;
 pub mod smart_ui;
@@ -45,3 +54,4 @@ pub mod window;
 pub mod workspace;
 
 pub use objc2::MainThreadMarker;
+pub use objc2_foundation::{NSPoint, NSRect, NSSize};

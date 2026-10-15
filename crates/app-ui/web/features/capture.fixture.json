@@ -1,18 +1,28 @@
 {
   "enabled": true,
-  "copy": true,
+  "folder_path": "/Users/someone/Desktop",
   "save": true,
-  "edit": false,
-  "window_shadow": true,
-  "folder": "~/Pictures/Figghost",
-  "custom_folder": false,
+  "copy": true,
+  "quick_panel": true,
+  "quick_seconds": 8,
+  "timer_seconds": 5,
   "shortcuts": {
-    "region": "ctrl+opt+cmd+4",
-    "window": "ctrl+opt+cmd+5",
-    "screen": "ctrl+opt+cmd+3",
-    "repeat": "ctrl+opt+cmd+6",
-    "text": "ctrl+opt+cmd+7"
+    "area": "cmd+shift+2",
+    "window": "",
+    "screen": "",
+    "timer": "",
+    "text": "cmd+shift+1",
+    "scroll": "",
+    "record": "",
+    "gif": ""
   },
-  "permission": false,
-  "available": true
+  "record": {
+    "system_audio": false,
+    "microphone": false,
+    "camera": false,
+    "clicks": true,
+    "keys": false
+  },
+  "screen_access": true,
+  "recording_supported": true
 }
