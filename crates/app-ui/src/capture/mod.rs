@@ -341,6 +341,7 @@ impl CaptureFeature {
     }
 
     fn frozen(&self, kind: Kind, frozen: Rc<Frozen>) {
+        trace::log(&format!("capture: froze {} display(s)", frozen.displays.len()));
         let text = i18n::current();
         let (mode, hint) = match kind {
             Kind::Screen | Kind::Timer => {
