@@ -5,9 +5,12 @@
 //!     post_input move <x> <y>
 //!     post_input click <x> <y>
 //!     post_input drag <x1> <y1> <x2> <y2>
+//!     post_input scroll <x> <y> <pixels>     (negative pixels scroll the content down; the pointer stays)
 
 use objc2_core_foundation::CGPoint;
-use objc2_core_graphics::{CGEvent, CGEventFlags, CGEventTapLocation, CGEventType, CGMouseButton};
+use objc2_core_graphics::{
+    CGEvent, CGEventFlags, CGEventTapLocation, CGEventType, CGMouseButton, CGScrollEventUnit,
+};
 use std::{env, thread, time::Duration};
 
 fn pause() {
@@ -73,6 +76,17 @@ fn main() {
             }
         }
         Some("move") => mouse(CGEventType::MouseMoved, num(1), num(2)),
+        Some("scroll") => {
+            // Four steps, as a wheel sends them; the point travels in the events.
+            let step = (num(3) / 4.0).round() as i32;
+            for _ in 0..4 {
+                let event =
+                    CGEvent::new_scroll_wheel_event2(None, CGScrollEventUnit::Pixel, 1, step, 0, 0);
+                CGEvent::set_location(event.as_deref(), CGPoint::new(num(1), num(2)));
+                CGEvent::post(CGEventTapLocation::HIDEventTap, event.as_deref());
+                pause();
+            }
+        }
         Some("click") => {
             mouse(CGEventType::MouseMoved, num(1), num(2));
             mouse(CGEventType::LeftMouseDown, num(1), num(2));

@@ -6,10 +6,10 @@
 
 use objc2::{MainThreadMarker, MainThreadOnly, rc::Retained};
 use objc2_app_kit::{
-    NSApplication, NSApplicationActivationPolicy, NSBackingStoreType, NSColor, NSFont, NSScreen,
-    NSTextView, NSWindow, NSWindowStyleMask,
+    NSApplication, NSApplicationActivationPolicy, NSBackingStoreType, NSColor, NSEventMask, NSFont,
+    NSScreen, NSTextView, NSWindow, NSWindowStyleMask,
 };
-use objc2_foundation::{NSDate, NSPoint, NSRect, NSRunLoop, NSSize, NSString};
+use objc2_foundation::{NSDate, NSDefaultRunLoopMode, NSPoint, NSRect, NSSize, NSString};
 use std::{env, fmt::Write, time::Instant};
 
 pub const LINES: usize = 300;
@@ -68,8 +68,23 @@ fn main() {
     }
     window.setContentView(Some(&scroll));
     window.orderFrontRegardless();
+    app.finishLaunching();
     let start = Instant::now();
+    // Events have to be taken from the queue and sent on, as NSApplication's own loop does, or the
+    // scroll view never sees the wheel.
     while start.elapsed().as_secs_f64() < seconds {
-        NSRunLoop::mainRunLoop().runUntilDate(&NSDate::dateWithTimeIntervalSinceNow(0.05));
+        let until = NSDate::dateWithTimeIntervalSinceNow(0.05);
+        // SAFETY: the default run loop mode is a framework constant.
+        let event = unsafe {
+            app.nextEventMatchingMask_untilDate_inMode_dequeue(
+                NSEventMask::Any,
+                Some(&until),
+                NSDefaultRunLoopMode,
+                true,
+            )
+        };
+        if let Some(event) = event {
+            app.sendEvent(&event);
+        }
     }
 }
