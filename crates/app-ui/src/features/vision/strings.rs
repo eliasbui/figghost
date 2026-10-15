@@ -19,6 +19,14 @@ impl Language {
         }
     }
 
+    /// Shown instead of the loupe on a system without the screenshots' frozen picture (before macOS 14).
+    pub fn vision_needs_newer_macos(self) -> &'static str {
+        match self {
+            Language::English => "The colour picker needs macOS 14 or later",
+            Language::Vietnamese => "Chọn màu cần macOS 14 trở lên",
+        }
+    }
+
     pub fn vision_menu_pick(self) -> &'static str {
         match self {
             Language::English => "Pick a colour",
@@ -45,6 +53,7 @@ mod tests {
             for text in [
                 language.vision_hint(),
                 language.vision_no_access(),
+                language.vision_needs_newer_macos(),
                 language.vision_menu_pick(),
                 language.vision_remove_background(),
             ] {
@@ -59,6 +68,7 @@ mod tests {
         for text in [
             l.vision_hint(),
             l.vision_no_access(),
+            l.vision_needs_newer_macos(),
             l.vision_menu_pick(),
             l.vision_remove_background(),
         ] {

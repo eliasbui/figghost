@@ -52,6 +52,7 @@ const HARDWARE_DEVICES: u32 = code(b"dev#");
 const HARDWARE_DEFAULT_OUTPUT: u32 = code(b"dOut");
 const HARDWARE_PROCESSES: u32 = code(b"prs#");
 const HARDWARE_PID_TO_PROCESS: u32 = code(b"id2p");
+const HARDWARE_TAPS: u32 = code(b"tps#");
 const OBJECT_NAME: u32 = code(b"lnam");
 const DEVICE_UID: u32 = code(b"uid ");
 const DEVICE_STREAMS: u32 = code(b"stm#");
@@ -470,6 +471,20 @@ fn describe_output(id: ObjectId) -> Option<OutputDevice> {
 /// Every device that can play audio, without the routes this app made.
 pub fn output_devices() -> Vec<OutputDevice> {
     devices().into_iter().filter_map(describe_output).collect()
+}
+
+/// How many aggregate devices this process made, and how many process taps it can see, exist now: a
+/// check that dropping routes and taps leaves nothing behind.
+pub fn routes_and_taps() -> (usize, usize) {
+    let routes = devices()
+        .into_iter()
+        .filter(|&id| {
+            get_string(id, address(DEVICE_UID, SCOPE_GLOBAL))
+                .is_some_and(|uid| uid.starts_with(AGGREGATE_UID_PREFIX))
+        })
+        .count();
+    let taps = get_ids(SYSTEM_OBJECT, address(HARDWARE_TAPS, SCOPE_GLOBAL)).len();
+    (routes, taps)
 }
 
 pub fn default_output() -> Option<OutputDevice> {

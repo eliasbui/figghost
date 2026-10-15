@@ -1,13 +1,14 @@
 //! The macOS side of dragging a window onto the notch: the pointer events of every app, the window under the
-//! pointer, the row of drop zones and the screens it hangs from. What a drag means lives in `core-window`; this
-//! file only looks and draws. All positions are in the coordinates of `window::Frame` (origin at the top-left of
-//! the primary screen, y down) unless a name says Cocoa.
+//! pointer, the drop zones and the screens they hang from, and the footprint that shows where the window will land.
+//! What a drag means lives in `core-window`; this file only looks and draws. All positions are in the coordinates
+//! of `window::Frame` (origin at the top-left of the primary screen, y down) unless a name says Cocoa.
 
 use crate::{
     app,
     ax::Element,
     notch::{NotchGeometry, PILL_WIDTH},
-    style::{self, BUTTON_RADIUS},
+    style::{self, BUTTON_RADIUS, Weight},
+    widgets::{self, Fit},
     window::{Frame, Window},
     workspace,
 };
@@ -18,9 +19,10 @@ use objc2::{
 };
 use objc2_app_kit::{
     NSAccessibility, NSAppearance, NSAppearanceCustomization, NSAppearanceNameDarkAqua,
-    NSBackingStoreType, NSBezierPath, NSBitmapImageFileType, NSColor, NSEvent, NSEventMask,
-    NSEventType, NSGradient, NSMainMenuWindowLevel, NSPanel, NSScreen, NSStatusBar, NSView,
-    NSWindowAnimationBehavior, NSWindowCollectionBehavior, NSWindowStyleMask,
+    NSBackingStoreType, NSBezierPath, NSBitmapImageFileType, NSBitmapImageRep, NSColor,
+    NSDeviceRGBColorSpace, NSEvent, NSEventMask, NSEventType, NSGradient, NSMainMenuWindowLevel,
+    NSPanel, NSScreen, NSStatusBar, NSView, NSWindowAnimationBehavior, NSWindowCollectionBehavior,
+    NSWindowStyleMask,
 };
 use objc2_foundation::{NSDictionary, NSPoint, NSRect, NSSize, NSString};
 use std::{
@@ -40,6 +42,15 @@ const FRAME_SECONDS: f64 = 1.0 / 120.0;
 const REST_HEIGHT: f64 = 6.0;
 /// The bottom corners of the shape; its top edge is cut off by the top of the screen.
 const SHAPE_RADIUS: f64 = 22.0;
+/// The small screen in a zone, 16 by 10 like most displays, and how far below the top of the zone it sits.
+const GLYPH: (f64, f64) = (50.0, 31.0);
+const GLYPH_TOP: f64 = 9.0;
+/// The footprint glides to another zone's frame quickly enough to keep up with the pointer.
+const GLIDE_SECONDS: f64 = 0.18;
+const FADE_IN_SECONDS: f64 = 0.12;
+const FADE_OUT_SECONDS: f64 = 0.2;
+/// Close to the corners of a window, so the footprint reads as one.
+const FOOTPRINT_RADIUS: f64 = 12.0;
 
 // ---------------------------------------------------------------- screens and coordinates
 
@@ -237,16 +248,18 @@ impl Held {
 
 // ---------------------------------------------------------------- the drop zones
 
-/// What the row shows. Cells are relative to the shape's own top-left corner.
+/// What the shape shows. Cells are relative to the shape's own top-left corner.
 #[derive(Debug, Clone, PartialEq)]
 pub struct ZonesSpec {
-    /// What the row is, for assistive technology: the names of the zones in order.
+    /// What the shape is, for assistive technology: the names of the zones in order.
     pub label: String,
     pub width: f64,
     pub height: f64,
     pub cells: Vec<Frame>,
     /// For each cell, the part of a small screen the layout fills, as fractions: x, y, width, height.
     pub glyphs: Vec<[f64; 4]>,
+    /// For each cell, the short name written under its small screen.
+    pub names: Vec<String>,
 }
 
 pub struct ViewIvars {
@@ -290,6 +303,7 @@ impl ZonesView {
                 height: 0.0,
                 cells: Vec::new(),
                 glyphs: Vec::new(),
+                names: Vec::new(),
             }),
             hover: Cell::new(None),
         };
@@ -329,36 +343,54 @@ impl ZonesView {
             gradient.drawInBezierPath_angle(&path, 270.0);
         }
         let hover = self.ivars().hover.get();
+        let font = style::font(11.0, Weight::Medium);
         for (i, cell) in spec.cells.iter().enumerate() {
             let rect = NSRect::new(NSPoint::new(cell.x, cell.y), NSSize::new(cell.w, cell.h));
             let active = hover == Some(i);
-            // The zone the window will land on is solid white with dark ink; the others rest as translucent
-            // controls.
+            // The zone the window will land on is solid white with dark ink, its part in the accent colour of the
+            // footprint on the screen; the others rest as translucent controls.
             let fill = style::white(if active { 1.0 } else { style::CONTROL });
             style::fill_rounded(rect, BUTTON_RADIUS, &fill);
-            let ink = if active {
-                style::black(0.85)
+            let (ink, part) = if active {
+                (style::black(0.85), NSColor::controlAccentColor())
             } else {
-                style::white(style::TEXT)
+                (style::white(style::TEXT), style::white(style::TEXT))
             };
             if let Some(glyph) = spec.glyphs.get(i) {
-                draw_glyph(rect, *glyph, &ink);
+                draw_glyph(rect, *glyph, &ink, &part);
+            }
+            if let Some(name) = spec.names.get(i) {
+                let color = if active {
+                    style::black(0.85)
+                } else {
+                    style::white(0.72)
+                };
+                let line = NSRect::new(
+                    NSPoint::new(
+                        rect.origin.x + 4.0,
+                        rect.origin.y + GLYPH_TOP + GLYPH.1 + 5.0,
+                    ),
+                    NSSize::new(rect.size.width - 8.0, 15.0),
+                );
+                let attrs = widgets::text_attributes(&font, &color, Fit::Tail, true);
+                widgets::draw_text(name, line, &attrs);
             }
         }
     }
 }
 
-/// A small screen with the part a layout fills.
-fn draw_glyph(cell: NSRect, part: [f64; 4], ink: &NSColor) {
-    let (w, h) = (34.0, 22.0);
+/// A small screen with the part a layout fills, at the top of a zone.
+fn draw_glyph(cell: NSRect, part: [f64; 4], ink: &NSColor, fill: &NSColor) {
+    let (w, h) = GLYPH;
     let screen = NSRect::new(
         NSPoint::new(
             cell.origin.x + (cell.size.width - w) / 2.0,
-            cell.origin.y + (cell.size.height - h) / 2.0,
+            cell.origin.y + GLYPH_TOP,
         ),
         NSSize::new(w, h),
     );
-    style::stroke_rounded(screen, 4.0, &ink.colorWithAlphaComponent(0.6), 1.5);
+    style::fill_rounded(screen, 5.0, &ink.colorWithAlphaComponent(0.08));
+    style::stroke_rounded(screen, 5.0, &ink.colorWithAlphaComponent(0.5), 1.25);
     let inner = NSRect::new(
         NSPoint::new(screen.origin.x + 3.0, screen.origin.y + 3.0),
         NSSize::new(w - 6.0, h - 6.0),
@@ -370,7 +402,7 @@ fn draw_glyph(cell: NSRect, part: [f64; 4], ink: &NSColor) {
         ),
         NSSize::new(part[2] * inner.size.width, part[3] * inner.size.height),
     );
-    style::fill_rounded(filled, 2.0, ink);
+    style::fill_rounded(filled, 2.5, fill);
 }
 
 define_class!(
@@ -596,15 +628,33 @@ impl ZonesPanel {
         self.inner.panel.frame()
     }
 
-    /// Draws the row with the zone `hover` lit into PNG bytes without showing anything: the view is laid out at its
-    /// full size and drawn from there. Transparent outside the shape. For checking the design.
+    /// Draws the zones with the zone `hover` lit into PNG bytes without showing anything: the view is laid out at
+    /// its full size and drawn from there, at two pixels per point as a Retina screen shows it. Transparent outside
+    /// the shape. For checking the design.
     pub fn snapshot_png(&self, spec: &ZonesSpec, hover: Option<usize>) -> Option<Vec<u8>> {
         let view = &self.inner.view;
         view.adopt(spec);
         view.ivars().hover.set(hover);
         view.setFrameSize(NSSize::new(spec.width, spec.height));
         let bounds = view.bounds();
-        let rep = view.bitmapImageRepForCachingDisplayInRect(bounds)?;
+        // SAFETY: a plain RGBA bitmap with valid dimensions.
+        let rep = unsafe {
+            NSBitmapImageRep::initWithBitmapDataPlanes_pixelsWide_pixelsHigh_bitsPerSample_samplesPerPixel_hasAlpha_isPlanar_colorSpaceName_bytesPerRow_bitsPerPixel(
+                NSBitmapImageRep::alloc(),
+                std::ptr::null_mut(),
+                (bounds.size.width * 2.0).round().max(1.0) as isize,
+                (bounds.size.height * 2.0).round().max(1.0) as isize,
+                8,
+                4,
+                true,
+                false,
+                NSDeviceRGBColorSpace,
+                0,
+                0,
+            )
+        }?;
+        // Drawing in points lands on two pixels each.
+        rep.setSize(bounds.size);
         view.cacheDisplayInRect_toBitmapImageRep(bounds, &rep);
         // SAFETY: an empty properties dictionary is valid for PNG output.
         let data = unsafe {
@@ -619,5 +669,161 @@ impl Drop for ZonesPanel {
         self.inner.anim.borrow_mut().take();
         self.inner.panel.orderOut(None);
         self.inner.panel.close();
+    }
+}
+
+// ---------------------------------------------------------------- where the window will land
+
+/// The footprint filling `rect`: a soft wash of the system accent colour inside a thin border of it. Shared by the
+/// panel and the design check, which draws it over a pretend desktop.
+pub fn paint_footprint(rect: NSRect) {
+    let accent = NSColor::controlAccentColor();
+    style::fill_rounded(rect, FOOTPRINT_RADIUS, &accent.colorWithAlphaComponent(0.2));
+    style::stroke_rounded(
+        rect,
+        FOOTPRINT_RADIUS,
+        &accent.colorWithAlphaComponent(0.9),
+        2.0,
+    );
+}
+
+define_class!(
+    // SAFETY: NSView allows subclassing; it only draws the footprint over its bounds.
+    #[unsafe(super(NSView))]
+    #[thread_kind = MainThreadOnly]
+    #[name = "FigSnapFootprint"]
+    struct FootprintView;
+
+    impl FootprintView {
+        #[unsafe(method(isOpaque))]
+        fn is_opaque(&self) -> bool {
+            false
+        }
+
+        #[unsafe(method(drawRect:))]
+        fn draw_rect(&self, _dirty: NSRect) {
+            paint_footprint(self.bounds());
+        }
+    }
+);
+
+struct Glide {
+    panel: Retained<SnapPanel>,
+    /// Where it is heading, in Cocoa coordinates; `None` while it fades away or is gone.
+    target: Cell<Option<NSRect>>,
+    anim: RefCell<Option<app::Timer>>,
+    me: Weak<Glide>,
+}
+
+impl Glide {
+    /// Moves the panel to `to` and its opacity to `alpha` on an ease-out curve, from wherever they are now.
+    fn animate(&self, to: NSRect, alpha: f64, seconds: f64, done: impl Fn() + 'static) {
+        let (from, from_alpha) = (self.panel.frame(), self.panel.alphaValue());
+        let (started, weak) = (Instant::now(), self.me.clone());
+        *self.anim.borrow_mut() = Some(app::every(FRAME_SECONDS, move || {
+            let Some(glide) = weak.upgrade() else {
+                return;
+            };
+            let t = (started.elapsed().as_secs_f64() / seconds).min(1.0);
+            let k = style::ease_out(t);
+            if from != to {
+                let frame = NSRect::new(
+                    NSPoint::new(
+                        lerp(from.origin.x, to.origin.x, k),
+                        lerp(from.origin.y, to.origin.y, k),
+                    ),
+                    NSSize::new(
+                        lerp(from.size.width, to.size.width, k),
+                        lerp(from.size.height, to.size.height, k),
+                    ),
+                );
+                glide.panel.setFrame_display(frame, true);
+            }
+            glide.panel.setAlphaValue(lerp(from_alpha, alpha, k));
+            if t >= 1.0 {
+                glide.anim.borrow_mut().take();
+                done();
+            }
+        }));
+    }
+}
+
+/// Where the dragged window will land: a translucent rounded rectangle on the screen, under the zones and over
+/// every ordinary window. It never takes focus, passes every click through and stays out of the window cycle.
+pub struct Footprint {
+    mtm: MainThreadMarker,
+    glide: Rc<Glide>,
+}
+
+impl Footprint {
+    pub fn new(mtm: MainThreadMarker) -> Self {
+        let panel = SnapPanel::new(mtm);
+        // Just under the zones, which are one level higher.
+        panel.setLevel(NSMainMenuWindowLevel + 1);
+        // SAFETY: designated initializer with valid arguments on the main thread.
+        let view: Retained<FootprintView> = unsafe {
+            msg_send![
+                super(mtm.alloc::<FootprintView>().set_ivars(())),
+                initWithFrame: NSRect::ZERO
+            ]
+        };
+        panel.setContentView(Some(&view));
+        let glide = Rc::new_cyclic(|me| Glide {
+            panel,
+            target: Cell::new(None),
+            anim: RefCell::new(None),
+            me: me.clone(),
+        });
+        Self { mtm, glide }
+    }
+
+    /// Shows the footprint over `frame`. Already showing, it glides there from where it is, or jumps with Reduce
+    /// Motion; it fades in and out either way.
+    pub fn show(&self, frame: Frame) {
+        let glide = &self.glide;
+        let to = NSRect::new(
+            NSPoint::new(frame.x, primary_height(self.mtm) - (frame.y + frame.h)),
+            NSSize::new(frame.w, frame.h),
+        );
+        if glide.target.replace(Some(to)) == Some(to) {
+            return;
+        }
+        let panel = &glide.panel;
+        let arriving = !panel.isVisible();
+        if arriving || workspace::display_options().reduce_motion {
+            panel.setFrame_display(to, true);
+        }
+        if arriving {
+            panel.setAlphaValue(0.0);
+            panel.orderFrontRegardless();
+        }
+        let seconds = if arriving {
+            FADE_IN_SECONDS
+        } else {
+            GLIDE_SECONDS
+        };
+        glide.animate(to, 1.0, seconds, || {});
+    }
+
+    /// Fades the footprint away where it is.
+    pub fn hide(&self) {
+        let glide = &self.glide;
+        if glide.target.take().is_none() {
+            return;
+        }
+        let weak = glide.me.clone();
+        glide.animate(glide.panel.frame(), 0.0, FADE_OUT_SECONDS, move || {
+            if let Some(glide) = weak.upgrade() {
+                glide.panel.orderOut(None);
+            }
+        });
+    }
+}
+
+impl Drop for Footprint {
+    fn drop(&mut self) {
+        self.glide.anim.borrow_mut().take();
+        self.glide.panel.orderOut(None);
+        self.glide.panel.close();
     }
 }

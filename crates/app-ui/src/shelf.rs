@@ -9,7 +9,8 @@ use crate::{
 use macos_sys::{
     MainThreadMarker, app,
     notch::Notch,
-    shelf_ui::{ShelfAction, ShelfCallbacks, ShelfView},
+    services::{self, Services},
+    shelf_ui::{Drag, ShelfAction, ShelfCallbacks, ShelfView},
     workspace,
 };
 use serde::{Deserialize, Serialize};
@@ -112,11 +113,17 @@ impl Shelf {
     }
 }
 
+type AddedHook = Box<dyn Fn(&[String])>;
+
 /// Keeps the shelf and its tab alive.
 pub struct ShelfFeature {
-    _view: Rc<ShelfView>,
+    view: Rc<ShelfView>,
     shelf: Rc<RefCell<Shelf>>,
     refresh: Rc<dyn Fn()>,
+    /// "Add to Figghost Shelf" in the Services menu and in Finder's right click menu.
+    _services: Services,
+    /// Told the files that came in through the Services menu, once they are on the shelf.
+    on_added: Rc<RefCell<Option<AddedHook>>>,
 }
 
 impl ShelfFeature {
@@ -194,11 +201,39 @@ impl ShelfFeature {
             });
         }
         refresh();
+        let on_added: Rc<RefCell<Option<AddedHook>>> = Rc::default();
+        let services = {
+            let (shelf, refresh, on_added) =
+                (Rc::clone(&shelf), Rc::clone(&refresh), Rc::clone(&on_added));
+            services::provide(mtm, move |paths| {
+                {
+                    let mut shelf = shelf.borrow_mut();
+                    shelf.add(paths.clone(), now_ms());
+                    save(&shelf);
+                }
+                refresh();
+                if let Some(hook) = &*on_added.borrow() {
+                    hook(&paths);
+                }
+            })
+        };
         Self {
-            _view: view,
+            view,
             shelf,
             refresh,
+            _services: services,
+            on_added,
         }
+    }
+
+    /// Told the files that came in through the Services menu, after they are on the shelf.
+    pub fn on_added(&self, hook: impl Fn(&[String]) + 'static) {
+        *self.on_added.borrow_mut() = Some(Box::new(hook));
+    }
+
+    /// Told where a file dragged out of the shelf is, from the start of the drag to its end.
+    pub fn on_drag(&self, hook: impl Fn(Drag) + 'static) {
+        self.view.set_on_drag(hook);
     }
 
     /// Files on the shelf.

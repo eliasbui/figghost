@@ -1,8 +1,9 @@
-//! Dragging a window onto the notch to snap it to halves and thirds.
+//! Dragging a window onto the notch to snap it to halves, thirds, quarters or the whole screen.
 //!
-//! While a window is dragged by its title bar and the pointer reaches the top edge of a screen, a row of drop
-//! zones hangs from the notch. Releasing the button on a zone puts the window in that layout on that screen;
-//! releasing anywhere else changes nothing.
+//! While a window is dragged by its title bar and the pointer reaches the top edge of a screen, the layouts hang
+//! from the notch in up to two rows, each a small screen with the part it takes. While the pointer is over one, a
+//! translucent rectangle shows on the screen where the window will land. Releasing the button there puts the window
+//! in that layout on that screen; releasing anywhere else changes nothing.
 //!
 //! How it works. A global monitor sees the left button of every app (mouse events need no permission). At the
 //! press, Accessibility finds the window under the pointer; the press counts only if it is on the title bar
@@ -17,7 +18,10 @@ use core_window::snap;
 use macos_sys::{MainThreadMarker, notch::Notch, snap_ui::MouseMonitor, status_item::Entry};
 use serde::{Deserialize, Serialize};
 use serde_json::{Value, json};
-use std::{cell::RefCell, rc::Rc};
+use std::{
+    cell::{Cell, RefCell},
+    rc::Rc,
+};
 
 pub mod controller;
 mod platform;
@@ -28,15 +32,14 @@ mod text;
 #[serde(default)]
 pub struct Config {
     pub enabled: bool,
-    /// Layout names, as in `tiling.shortcuts`. Unknown and repeated names are ignored and the row is capped; see
-    /// `snap::choose`.
+    /// Layout names, as in `tiling.shortcuts`. Unknown and repeated names are ignored; see `snap::choose`.
     pub zones: Vec<String>,
 }
 
 impl Default for Config {
     fn default() -> Self {
         Self {
-            enabled: false,
+            enabled: true,
             zones: snap::DEFAULT_ZONES
                 .iter()
                 .map(|l| l.key().to_owned())
@@ -59,6 +62,8 @@ pub struct Feature {
     controller: Rc<Live>,
     /// Present only while the feature is on: nothing watches the pointer otherwise.
     monitor: RefCell<Option<MouseMonitor>>,
+    /// macOS was asked for Accessibility once in this run; it is not asked again until the next.
+    asked: Cell<bool>,
 }
 
 /// Starts the feature. It does not need the notch, which it only holds shut while the zones show.
@@ -71,6 +76,7 @@ pub fn attach(env: &AttachEnv) -> Option<Rc<Feature>> {
             env.config.snap.layouts(),
         )),
         monitor: RefCell::new(None),
+        asked: Cell::new(false),
     });
     if let Err(fault) = feature.configure(&env.config.snap) {
         eprintln!("snap: {}", fault.detail);
@@ -86,6 +92,11 @@ impl Feature {
             self.monitor.borrow_mut().take();
             self.controller.cancel();
             return Ok(());
+        }
+        // Without Accessibility a drag finds no window and nothing shows: ask macOS, which shows its own dialog
+        // pointing to the setting. A build signed anew needs it granted again.
+        if !self.asked.replace(true) && !macos_sys::permissions::accessibility_trusted(false) {
+            macos_sys::permissions::accessibility_trusted(true);
         }
         if self.monitor.borrow().is_some() {
             return Ok(());
@@ -113,7 +124,7 @@ impl Feature {
         None
     }
 
-    /// Entries for the menu bar item. The feature has none: the "Fig" menu stays as it is.
+    /// Entries for the menu bar item. The feature has none: the menu stays as it is.
     pub fn menu_entries(_this: &Rc<Self>) -> Vec<Entry> {
         Vec::new()
     }
@@ -124,28 +135,34 @@ mod tests {
     use super::*;
 
     #[test]
-    fn it_is_off_by_default_with_the_six_zones_of_the_task() {
+    fn it_is_on_by_default_with_halves_full_thirds_and_quarters() {
         let config = Config::default();
-        assert!(!config.enabled);
+        assert!(config.enabled);
         assert_eq!(
             config.zones,
             [
                 "left",
                 "right",
+                "maximize",
                 "first_third",
                 "center_third",
                 "last_third",
-                "maximize"
+                "top_left",
+                "top_right",
+                "bottom_left",
+                "bottom_right"
             ]
         );
-        assert_eq!(config.layouts().len(), 6);
+        assert_eq!(config.layouts(), snap::DEFAULT_ZONES.to_vec());
     }
 
     #[test]
-    fn a_config_file_missing_the_zones_gets_the_default_row() {
-        let config: Config = serde_json::from_str(r#"{ "enabled": true }"#).unwrap();
-        assert!(config.enabled);
+    fn a_config_file_missing_a_setting_gets_its_default() {
+        let config: Config = serde_json::from_str(r#"{ "enabled": false }"#).unwrap();
+        assert!(!config.enabled, "a switch turned off stays off");
         assert_eq!(config.layouts(), snap::DEFAULT_ZONES.to_vec());
+        let config: Config = serde_json::from_str(r#"{ "zones": ["left"] }"#).unwrap();
+        assert!(config.enabled);
     }
 
     #[test]

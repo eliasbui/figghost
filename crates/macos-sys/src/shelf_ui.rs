@@ -41,6 +41,22 @@ const ICON_CACHE_LIMIT: usize = 120;
 type PathHandler = Rc<dyn Fn(Vec<String>)>;
 type OneHandler = Rc<dyn Fn(String)>;
 type MenuHandler = Rc<dyn Fn(String, &NSEvent)>;
+type DragHandler = Rc<dyn Fn(Drag)>;
+
+/// A tile on its way out of the shelf, in screen coordinates.
+#[derive(Debug, Clone, PartialEq)]
+pub enum Drag {
+    Began {
+        path: String,
+        at: NSPoint,
+    },
+    Moved(NSPoint),
+    /// `dropped` is false when the drag was given up and the file stays where it was.
+    Ended {
+        at: NSPoint,
+        dropped: bool,
+    },
+}
 
 pub struct CanvasIvars {
     paths: RefCell<Vec<String>>,
@@ -54,6 +70,9 @@ pub struct CanvasIvars {
     on_drop: RefCell<Option<PathHandler>>,
     on_open: RefCell<Option<OneHandler>>,
     on_menu: RefCell<Option<MenuHandler>>,
+    on_drag: RefCell<Option<DragHandler>>,
+    /// The file of the drag under way.
+    dragging: RefCell<Option<String>>,
 }
 
 define_class!(
@@ -136,6 +155,27 @@ define_class!(
             // Copy only: dragging a tile out must never move or delete the original file.
             NSDragOperation::Copy
         }
+
+        #[unsafe(method(draggingSession:willBeginAtPoint:))]
+        fn session_will_begin(&self, _session: &NSDraggingSession, point: NSPoint) {
+            if let Some(path) = self.ivars().dragging.borrow().clone() {
+                self.report_drag(Drag::Began { path, at: point });
+            }
+        }
+
+        #[unsafe(method(draggingSession:movedToPoint:))]
+        fn session_moved(&self, _session: &NSDraggingSession, point: NSPoint) {
+            self.report_drag(Drag::Moved(point));
+        }
+
+        #[unsafe(method(draggingSession:endedAtPoint:operation:))]
+        fn session_ended(&self, _session: &NSDraggingSession, point: NSPoint, operation: NSDragOperation) {
+            self.ivars().dragging.borrow_mut().take();
+            self.report_drag(Drag::Ended {
+                at: point,
+                dropped: operation != NSDragOperation::None,
+            });
+        }
     }
 
     unsafe impl NSDraggingDestination for ShelfCanvas {
@@ -184,6 +224,8 @@ impl ShelfCanvas {
             on_drop: RefCell::new(None),
             on_open: RefCell::new(None),
             on_menu: RefCell::new(None),
+            on_drag: RefCell::new(None),
+            dragging: RefCell::new(None),
         };
         // SAFETY: designated initializer with valid arguments on the main thread.
         let this: Retained<Self> =
@@ -207,6 +249,13 @@ impl ShelfCanvas {
         let handler = self.ivars().on_menu.borrow().clone();
         if let (Some(path), Some(handler)) = (path, handler) {
             handler(path, event);
+        }
+    }
+
+    fn report_drag(&self, drag: Drag) {
+        let handler = self.ivars().on_drag.borrow().clone();
+        if let Some(handler) = handler {
+            handler(drag);
         }
     }
 
@@ -283,6 +332,7 @@ impl ShelfCanvas {
         // SAFETY: the contents object is an NSImage, which NSDraggingItem accepts.
         unsafe { item.setDraggingFrame_contents(self.icon_rect(index), Some(&icon)) };
         let items = NSArray::from_slice(&[&*item]);
+        *self.ivars().dragging.borrow_mut() = Some(path);
         self.beginDraggingSessionWithItems_event_source(
             &items,
             event,
@@ -553,10 +603,16 @@ impl ShelfView {
         self.canvas.set_paths(paths);
     }
 
+    /// Told where a tile dragged out of the shelf is, from the start of the drag to its end.
+    pub fn set_on_drag(&self, on_drag: impl Fn(Drag) + 'static) {
+        *self.canvas.ivars().on_drag.borrow_mut() = Some(Rc::new(on_drag));
+    }
+
     /// The notch tab for this view; `on_show` refreshes the files each time the tab opens.
     pub fn page(self: &Rc<Self>, on_show: impl Fn() + 'static) -> Page {
         let keys = Rc::clone(self);
         Page {
+            id: "shelf",
             title: labels::get().shelf_tab.clone(),
             symbol: "tray.full.fill",
             root: Retained::into_super(Retained::clone(&self.root)),

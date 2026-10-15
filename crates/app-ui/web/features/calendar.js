@@ -1,7 +1,7 @@
 // Calendar, reminders and meeting alerts on the notch: the settings page.
 (window.__plugins = window.__plugins || []).push({
   id: 'calendar',
-  icon: '<rect x="4" y="5" width="16" height="15" rx="3"/><path d="M4 10h16M9 3v4M15 3v4"/>',
+  icon: 'calendar',
   en: {
     'nav.calendar': 'Calendar',
     'page.calendar': 'Calendar',

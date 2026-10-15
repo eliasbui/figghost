@@ -1,7 +1,7 @@
 {
   "app": { "version": "0.2.0", "bundled": true, "config_dir": "/Users/you/Library/Application Support/Figghost" },
   "env": { "accessibility": true, "login": "disabled", "language": "en", "reduce_transparency": false, "reduce_motion": false, "increase_contrast": false },
-  "general": { "language": "auto", "show_on_launch": true },
+  "general": { "language": "auto", "show_on_launch": true, "menu_icon": true, "theme": "auto" },
   "mouse": {
     "smooth": true, "reverse": false, "step_px": 36, "speed": 1, "duration_ms": 360,
     "shift_horizontal": true, "option_boost": true, "boost": 5, "command_zoom": false,
@@ -18,12 +18,30 @@
     ]
   },
   "mcp": { "enabled": false, "command": "/Applications/Figghost.app/Contents/MacOS/Figghost" },
-  "notch": { "enabled": true, "volume_hud": false, "shelf_count": 4 },
+  "notch": {
+    "enabled": true, "volume_hud": false, "shelf_count": 4,
+    "material": "glass", "shadow": true, "motion": "spring", "open_on_hover": true, "hover_delay_ms": 120,
+    "rest": "notch", "hide_in_capture": false, "haptics": true, "display": "auto", "open_page": "activity",
+    "pages": [
+      { "id": "clipboard", "title": "Clipboard", "on": true },
+      { "id": "shelf", "title": "Shelf", "on": true },
+      { "id": "media", "title": "Media", "on": true },
+      { "id": "focus", "title": "Focus", "on": true },
+      { "id": "agents", "title": "Agents", "on": true },
+      { "id": "calendar", "title": "Calendar", "on": true },
+      { "id": "sound", "title": "Sound", "on": false }
+    ],
+    "live_media": true, "live_agents": true, "waveform": "live", "shortcut": "", "hardware": false
+  },
   "agents": {
-    "enabled": true, "wait": 30, "sound": true, "peek": true,
+    "enabled": true, "wait": 30, "sound": true, "peek": true, "open_on_ask": false, "tokens": true,
     "claude": { "found": true, "installed": 8, "wanted": 8, "error": null },
     "codex": { "found": true, "installed": 0, "wanted": 7, "error": null },
-    "usage_tap": false, "usage_known": false
+    "usage_tap": false, "usage_known": false,
+    "spend": [
+      { "agent": "claude", "today": 1240000, "week": 9800000, "today_cost": 3.45, "week_cost": 21.3 },
+      { "agent": "codex", "today": 380000, "week": 2100000, "today_cost": null, "week_cost": null }
+    ]
   },
   "tiling": {
     "enabled": true,

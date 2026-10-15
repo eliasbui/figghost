@@ -29,6 +29,17 @@ def check(ok, message):
         failures.append(message)
 
 
+def cpu_seconds(pid):
+    """CPU time used so far, from `ps -o cputime` ([[h:]m:]s.cc). The `%cpu` column is an average over the whole
+    life of the process, which a busy start-up makes look like idle work."""
+    out = subprocess.run(["ps", "-o", "cputime=", "-p", str(pid)], capture_output=True, text=True).stdout.strip()
+    nums = [int(p) for p in out.replace(".", ":").split(":") if p.isdigit()]
+    if len(nums) < 2:
+        return 0.0
+    mins = nums[-3] if len(nums) >= 3 else 0
+    return mins * 60 + nums[-2] + nums[-1] / 100.0
+
+
 def run(name, calendar, seconds=5.0):
     """Runs the program for a while with the given calendar config; returns its trace, exit status and CPU."""
     data = os.path.join(root, name)
@@ -58,8 +69,13 @@ def run(name, calendar, seconds=5.0):
     alive = process.poll() is None
     cpu = None
     if alive:
-        out = subprocess.run(["ps", "-o", "%cpu=,rss=", "-p", str(process.pid)], capture_output=True).stdout.split()
-        cpu = (float(out[0]), int(out[1]) // 1024) if len(out) == 2 else None
+        # Idle is measured as CPU time used over a stretch after start-up: the `%cpu` column averages over the
+        # whole life of the process and a busy start makes it look like work that goes on.
+        before = cpu_seconds(process.pid)
+        time.sleep(6)
+        used = cpu_seconds(process.pid) - before
+        out = subprocess.run(["ps", "-o", "rss=", "-p", str(process.pid)], capture_output=True).stdout.split()
+        cpu = (used / 6.0 * 100.0, int(out[0]) // 1024) if out else None
         process.kill()
     process.wait()
     with open(trace_path) as f:

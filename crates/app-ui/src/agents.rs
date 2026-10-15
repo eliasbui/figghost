@@ -3,7 +3,7 @@
 //! the page, and carries the answer back.
 
 use crate::{
-    config::AgentsConfig,
+    config::{AgentsConfig, NotchConfig},
     history::{ago, now_ms},
     i18n::{self, Language},
     trace,
@@ -14,16 +14,18 @@ use core_agents::{
     install::{self, Report},
     server::{Handler, Server, Ticket},
     socket_path,
+    tokens::{ClaudeLedger, CodexLedger, Summary, Totals},
     tracker::{Approval, Effect, Session, State, Tracker},
     usage::{self, CLAUDE_USAGE_FILE, Limit, Limits},
 };
 use macos_sys::{
     MainThreadMarker,
     agents_ui::{
-        AgentsCallbacks, AgentsDisplay, AgentsView, ApprovalCardData, SessionData, UsageData,
+        AgentsCallbacks, AgentsDisplay, AgentsView, ApprovalCardData, SessionData, TokensData,
+        UsageData,
     },
     app,
-    notch::Notch,
+    notch::{Activity, Ear, Notch},
     style::Tone,
     workspace,
 };
@@ -35,15 +37,21 @@ use std::{
     os::unix::fs::OpenOptionsExt,
     path::{Path, PathBuf},
     rc::{Rc, Weak},
-    sync::Arc,
+    sync::{Arc, mpsc},
 };
 
 /// How often the page prunes answered questions and refreshes its ages, while there is anything to show.
 const REFRESH_SECONDS: f64 = 1.0;
 /// Reading the logs for the limits is cheap but not free: at most this often.
 const USAGE_REFRESH_MS: i64 = 20_000;
-/// How long the notch stays open after an agent finished, unless the pointer is on it.
+/// How long the closed notch says that an agent finished.
 const PEEK_SECONDS: f64 = 5.0;
+/// The slot of the agents' activity in the closed notch.
+const ACTIVITY: &str = "agents";
+/// The tokens are counted again at most this often while someone looks at them. Reading what the agents appended
+/// since the last count is cheap, but the first count of a week can read gigabytes.
+const TOKENS_REFRESH_MS: i64 = 30_000;
+const DAY_MS: i64 = 86_400_000;
 /// Numbers older than this are shown as "as of ...": the percentage is probably not true any more.
 const STALE_USAGE_MS: i64 = 30 * 60 * 1000;
 const ASK_SOUND: &str = "Ping";
@@ -150,6 +158,65 @@ pub fn usage_row(
     }
 }
 
+/// What one agent used today and in the last seven days, for the settings page.
+#[derive(Debug, Clone, PartialEq)]
+pub struct Spend {
+    pub agent: &'static str,
+    pub today: u64,
+    pub week: u64,
+    /// At API list prices; `None` when no price is known (Codex).
+    pub today_cost: Option<f64>,
+    pub week_cost: Option<f64>,
+}
+
+/// The latest counts from the transcripts, and when they were last asked for.
+#[derive(Default)]
+struct Counts {
+    claude: Option<Summary>,
+    codex: Option<Summary>,
+    asked_ms: i64,
+}
+
+/// Local midnight today and six days before it, in milliseconds since 1970: the windows of "today" and "week".
+fn day_and_week(now_ms: i64) -> (i64, i64) {
+    let offset =
+        i64::from(macos_sys::timezone::offset_minutes("local", now_ms / 1000).unwrap_or(0))
+            * 60_000;
+    let local = now_ms + offset;
+    let day = local - local.rem_euclid(DAY_MS) - offset;
+    (day, day - 6 * DAY_MS)
+}
+
+/// The counting thread: it owns both ledgers, so what they remember between counts never crosses threads. Only the
+/// newest request in the queue is answered.
+fn start_counter(user_home: PathBuf) -> Option<mpsc::Sender<(i64, i64)>> {
+    let (tx, rx) = mpsc::channel::<(i64, i64)>();
+    std::thread::Builder::new()
+        .name("fig-agent-tokens".into())
+        .spawn(move || {
+            macos_sys::qos::utility();
+            let mut claude = ClaudeLedger::new(user_home.join(".claude/projects"));
+            let mut codex = CodexLedger::new(user_home.join(".codex/sessions"));
+            while let Ok(mut window) = rx.recv() {
+                while let Ok(newer) = rx.try_recv() {
+                    window = newer;
+                }
+                let (day, week) = window;
+                claude.refresh(week);
+                codex.refresh(week);
+                let counts = (claude.summary(day, week), codex.summary(day, week));
+                app::on_main(move || {
+                    let feature = FEATURE.with(|slot| slot.borrow().upgrade());
+                    if let Some(feature) = feature {
+                        feature.took_counts(counts.0, counts.1);
+                    }
+                });
+            }
+        })
+        .ok()?;
+    Some(tx)
+}
+
 #[derive(Default)]
 struct UsageCache {
     claude: Option<Limits>,
@@ -167,7 +234,7 @@ pub struct AgentStatus {
     pub error: Option<String>,
 }
 
-#[derive(Debug, Clone, Default, PartialEq, Eq)]
+#[derive(Debug, Clone, Default, PartialEq)]
 pub struct Status {
     pub claude: AgentStatus,
     pub codex: AgentStatus,
@@ -175,6 +242,24 @@ pub struct Status {
     pub usage_tap: bool,
     /// Limits from Claude Code have been received at least once.
     pub usage_known: bool,
+    /// What each agent used, once counted.
+    pub spend: Vec<Spend>,
+}
+
+/// Where the agents' own files (`.claude`, `.codex`) are looked for. Each time it starts, the feature rewrites
+/// the paths of the hooks it installed, so a private instance (`FIGGHOST_HOME` set, which is how every test
+/// runs) must never reach the real files: it gets an empty folder inside its own data directory, unless a
+/// test points it somewhere on purpose with `FIGGHOST_AGENTS_HOME`.
+fn agents_home(
+    agents: Option<std::ffi::OsString>,
+    private_data: Option<&Path>,
+    real: Option<std::ffi::OsString>,
+) -> PathBuf {
+    match (agents, private_data) {
+        (Some(dir), _) => PathBuf::from(dir),
+        (None, Some(data)) => data.join("agents-home"),
+        (None, None) => real.map(PathBuf::from).unwrap_or_default(),
+    }
 }
 
 /// The files the agents read and the ones we keep, found from two directories. Nothing here needs the
@@ -228,6 +313,7 @@ impl Files {
                 .as_ref()
                 .is_some_and(install::statusline_installed),
             usage_known: self.home.join(CLAUDE_USAGE_FILE).exists(),
+            spend: Vec::new(),
         }
     }
 
@@ -283,6 +369,15 @@ pub struct AgentsFeature {
     visible: Cell<bool>,
     /// The notch was closed when something here opened it, so it may be closed again when that is over.
     opened_by_us: Cell<bool>,
+    /// Show what the agents do in the closed notch.
+    live: Cell<bool>,
+    /// An agent just finished (true) or failed (false); the closed notch says so until the time given.
+    peek: Cell<Option<(bool, i64)>>,
+    counts: RefCell<Counts>,
+    /// What the closed notch shows about the agents now, for the trace.
+    showing: Cell<&'static str>,
+    /// Where count requests go; started the first time the tokens are wanted.
+    counter: RefCell<Option<mpsc::Sender<(i64, i64)>>>,
     me: Weak<AgentsFeature>,
 }
 
@@ -293,10 +388,11 @@ impl AgentsFeature {
         home: &Path,
         config: &AgentsConfig,
     ) -> Rc<Self> {
-        let user_home = std::env::var_os("FIGGHOST_AGENTS_HOME")
-            .or_else(|| std::env::var_os("HOME"))
-            .map(PathBuf::from)
-            .unwrap_or_default();
+        let user_home = agents_home(
+            std::env::var_os("FIGGHOST_AGENTS_HOME"),
+            std::env::var_os("FIGGHOST_HOME").map(|_| home),
+            std::env::var_os("HOME"),
+        );
         let feature = Rc::new_cyclic(|me: &Weak<AgentsFeature>| {
             let decider = me.clone();
             let view = AgentsView::new(
@@ -327,6 +423,11 @@ impl AgentsFeature {
                 limits: RefCell::default(),
                 visible: Cell::new(false),
                 opened_by_us: Cell::new(false),
+                live: Cell::new(true),
+                peek: Cell::new(None),
+                counts: RefCell::default(),
+                showing: Cell::new("nothing"),
+                counter: RefCell::default(),
                 me: me.clone(),
             }
         });
@@ -368,6 +469,13 @@ impl AgentsFeature {
             self.update_badge();
             self.render();
         }
+        self.sync_activity();
+    }
+
+    /// Applies the notch settings that concern the agents: whether they show in the closed notch.
+    pub fn configure_notch(&self, notch: &NotchConfig) {
+        self.live.set(notch.live_agents);
+        self.sync_activity();
     }
 
     fn start_server(&self, wait_seconds: u32) {
@@ -427,24 +535,26 @@ impl AgentsFeature {
                 if settings.sound {
                     workspace::play_sound(ASK_SOUND);
                 }
-                self.open_page();
-            }
-            Effect::Finished { .. } => {
-                if settings.sound {
-                    workspace::play_sound(DONE_SOUND);
-                }
-                if settings.peek_when_done && self.tracker.borrow().approvals().is_empty() {
+                // By default the question waits in the closed notch, which opens on it under the pointer; the whole
+                // notch opening by itself while the user types elsewhere is what this avoids.
+                if settings.open_on_ask || !self.live.get() {
                     self.open_page();
-                    self.close_later(PEEK_SECONDS);
                 }
             }
-            Effect::Failed { .. } => {
+            Effect::Finished { .. } | Effect::Failed { .. } => {
+                let done = matches!(effect, Effect::Finished { .. });
                 if settings.sound {
-                    workspace::play_sound(FAILED_SOUND);
+                    workspace::play_sound(if done { DONE_SOUND } else { FAILED_SOUND });
                 }
-                if settings.peek_when_done && self.tracker.borrow().approvals().is_empty() {
-                    self.open_page();
-                    self.close_later(PEEK_SECONDS);
+                if settings.peek_when_done {
+                    self.peek
+                        .set(Some((done, now_ms() + (PEEK_SECONDS * 1000.0) as i64)));
+                    let weak = self.me.clone();
+                    app::after(PEEK_SECONDS + 0.05, move || {
+                        if let Some(feature) = weak.upgrade() {
+                            feature.sync_activity();
+                        }
+                    });
                 }
             }
             Effect::None => {}
@@ -461,6 +571,129 @@ impl AgentsFeature {
         self.sync_ticker();
         self.update_badge();
         self.render();
+        self.sync_activity();
+    }
+
+    /// What the closed notch shows about the agents: a question that waits (it breathes until answered), an agent
+    /// that just finished or failed, or agents at work with the share of the five-hour limit used so far.
+    fn sync_activity(&self) {
+        let Some(notch) = self.notch.upgrade() else {
+            return;
+        };
+        if !self.live.get() || !self.settings.borrow().enabled {
+            self.show_activity(&notch, "nothing", None);
+            return;
+        }
+        let now = now_ms();
+        let (waiting, working) = {
+            let tracker = self.tracker.borrow();
+            let sessions = tracker.sessions();
+            (
+                !tracker.approvals().is_empty()
+                    || sessions.iter().any(|s| s.state == State::Waiting),
+                sessions.iter().any(|s| s.state == State::Working),
+            )
+        };
+        let peek = self.peek.get().filter(|(_, until)| *until > now);
+        if peek.is_none() {
+            self.peek.set(None);
+        }
+        let language = i18n::current();
+        let page = Some(self.page);
+        let terminal = |tone| Ear::Symbol {
+            name: "terminal",
+            tone,
+            pulse: false,
+        };
+        let (what, activity) = if waiting {
+            (
+                "a waiting question",
+                Some(Activity {
+                    left: terminal(Tone::Orange),
+                    right: Ear::Symbol {
+                        name: "hand.raised.fill",
+                        tone: Tone::Orange,
+                        pulse: true,
+                    },
+                    page,
+                    priority: 30,
+                }),
+            )
+        } else if let Some((done, _)) = peek {
+            let (state, symbol, tone) = if done {
+                (State::Done, "checkmark.circle.fill", Tone::Green)
+            } else {
+                (State::Failed, "xmark.octagon.fill", Tone::Red)
+            };
+            let what = if done {
+                "a finished agent"
+            } else {
+                "a failed agent"
+            };
+            (
+                what,
+                Some(Activity {
+                    left: Ear::Symbol {
+                        name: symbol,
+                        tone,
+                        pulse: false,
+                    },
+                    right: Ear::Text {
+                        text: language.agents_state(state).to_owned(),
+                        tone,
+                    },
+                    page,
+                    priority: 25,
+                }),
+            )
+        } else if working {
+            let right = match self.five_hour_used(now) {
+                Some(used) => Ear::Text {
+                    text: format!("{used:.0}%"),
+                    tone: if used >= 90.0 {
+                        Tone::Red
+                    } else if used >= 70.0 {
+                        Tone::Orange
+                    } else {
+                        Tone::Gray
+                    },
+                },
+                None => Ear::Symbol {
+                    name: "ellipsis",
+                    tone: Tone::Gray,
+                    pulse: true,
+                },
+            };
+            (
+                "a working agent",
+                Some(Activity {
+                    left: terminal(Tone::Blue),
+                    right,
+                    page,
+                    priority: 10,
+                }),
+            )
+        } else {
+            ("nothing", None)
+        };
+        self.show_activity(&notch, what, activity);
+    }
+
+    fn show_activity(&self, notch: &Notch, what: &'static str, activity: Option<Activity>) {
+        if self.showing.replace(what) != what {
+            trace::log(&format!("agents: the closed notch shows {what}"));
+        }
+        notch.set_activity(ACTIVITY, activity);
+    }
+
+    /// The share of Claude Code's five-hour limit used, when it is known and still current.
+    fn five_hour_used(&self, now: i64) -> Option<f64> {
+        self.refresh_usage(now);
+        let cache = self.limits.borrow();
+        let limits = cache.claude.as_ref()?;
+        let five = limits.primary.as_ref()?;
+        let fresh = now - limits.observed_ms <= STALE_USAGE_MS && !five.has_reset(now / 1000);
+        fresh.then_some(five.used_percent)
     }
 
     /// Opens the notch on this page, remembering whether it was closed before.
@@ -522,6 +755,7 @@ impl AgentsFeature {
         self.tracker.borrow_mut().end_approval(id);
         self.update_badge();
         self.render();
+        self.sync_activity();
         if self.tracker.borrow().approvals().is_empty() {
             self.close_later(0.6);
         }
@@ -568,6 +802,7 @@ impl AgentsFeature {
         self.sync_ticker();
         self.update_badge();
         self.render();
+        self.sync_activity();
     }
 
     fn update_badge(&self) {
@@ -607,6 +842,7 @@ impl AgentsFeature {
             return;
         }
         let (language, now) = (i18n::current(), now_ms());
+        self.want_counts(now);
         let (approval, more_waiting, sessions) = {
             let tracker = self.tracker.borrow();
             let waiting = tracker.approvals();
@@ -633,6 +869,8 @@ impl AgentsFeature {
                 sessions,
                 usage_heading: language.agents_usage().to_owned(),
                 usage,
+                tokens_heading: language.agents_tokens().to_owned(),
+                tokens: self.token_rows(language),
                 empty_title: language.agents_empty_title().to_owned(),
                 empty_hint: language.agents_empty_hint().to_owned(),
             },
@@ -646,7 +884,81 @@ impl AgentsFeature {
     }
 
     pub fn status(&self) -> Status {
-        self.files.status()
+        self.want_counts(now_ms());
+        Status {
+            spend: self.spend(),
+            ..self.files.status()
+        }
+    }
+
+    /// Asks the counting thread for fresh numbers, at most every so often; they arrive later on the main thread.
+    fn want_counts(&self, now: i64) {
+        if !self.settings.borrow().tokens {
+            return;
+        }
+        {
+            let mut counts = self.counts.borrow_mut();
+            if now - counts.asked_ms < TOKENS_REFRESH_MS {
+                return;
+            }
+            counts.asked_ms = now;
+        }
+        let mut counter = self.counter.borrow_mut();
+        if counter.is_none() {
+            *counter = start_counter(self.files.user_home.clone());
+        }
+        if let Some(tx) = counter.as_ref()
+            && tx.send(day_and_week(now)).is_err()
+        {
+            counter.take();
+        }
+    }
+
+    fn took_counts(&self, claude: Summary, codex: Summary) {
+        {
+            let mut counts = self.counts.borrow_mut();
+            counts.claude = Some(claude);
+            counts.codex = Some(codex);
+        }
+        self.render();
+    }
+
+    /// Per agent: today and the week, with the cost when there is a price. Agents with nothing this week are left out.
+    fn spend(&self) -> Vec<Spend> {
+        if !self.settings.borrow().tokens {
+            return Vec::new();
+        }
+        let counts = self.counts.borrow();
+        let cost = |t: &Totals| (t.messages > t.unpriced).then_some(t.cost_usd);
+        [("claude", &counts.claude), ("codex", &counts.codex)]
+            .into_iter()
+            .filter_map(|(agent, summary)| {
+                let s = summary.as_ref()?;
+                (s.week.tokens() > 0).then(|| Spend {
+                    agent,
+                    today: s.today.tokens(),
+                    week: s.week.tokens(),
+                    today_cost: cost(&s.today),
+                    week_cost: cost(&s.week),
+                })
+            })
+            .collect()
+    }
+
+    fn token_rows(&self, language: Language) -> Vec<TokensData> {
+        self.spend()
+            .into_iter()
+            .map(|spend| TokensData {
+                label: if spend.agent == "claude" {
+                    "Claude"
+                } else {
+                    "Codex"
+                }
+                .to_owned(),
+                today: language.tokens_today(spend.today, spend.today_cost),
+                week: language.tokens_week(spend.week, spend.week_cost),
+            })
+            .collect()
     }
 
     pub fn install(&self, agent: Agent) -> Result<Report, String> {
@@ -866,6 +1178,24 @@ mod tests {
     }
 
     const EXE: &str = "/Applications/Figghost.app/Contents/MacOS/Figghost";
+
+    #[test]
+    fn a_private_instance_never_reaches_the_real_agent_files() {
+        let data = Path::new("/tmp/private/data");
+        let real = || Some(std::ffi::OsString::from("/Users/me"));
+        assert_eq!(agents_home(None, None, real()), PathBuf::from("/Users/me"));
+        assert_eq!(
+            agents_home(None, Some(data), real()),
+            PathBuf::from("/tmp/private/data/agents-home"),
+            "a private instance gets a folder of its own, whatever HOME is"
+        );
+        assert_eq!(
+            agents_home(Some("/tmp/pretend".into()), Some(data), real()),
+            PathBuf::from("/tmp/pretend"),
+            "unless a test points it somewhere on purpose"
+        );
+        assert_eq!(agents_home(None, None, None), PathBuf::new());
+    }
 
     #[test]
     fn without_the_agents_installed_nothing_is_found_and_nothing_is_created() {

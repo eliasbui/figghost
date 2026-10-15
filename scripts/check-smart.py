@@ -59,7 +59,7 @@ def check(ok, message):
 
 def rates_body():
     """A table shaped like the provider's, with a next update far away so that nothing is downloaded."""
-    table = {"USD": 1, "EUR": 0.894425, "VND": 25890.201508}
+    table = {"USD": 1, "EUR": 0.894425, "VND": 25890.201508, "JPY": 158.305497, "GBP": 0.756165}
     for i in range(30):
         table["X" + chr(65 + i // 26) + chr(65 + i % 26)] = i + 1
     return json.dumps(
@@ -73,8 +73,17 @@ def rates_body():
     )
 
 
-def answer_for(text, language="en", config_extra=None):
-    """Starts the program for one text and returns (label, value) of the answer window, or None."""
+def answer_for(text, language="en", config_extra=None, expect_window=True):
+    """Starts the program for one text and returns (label, value) of the answer window, or (None, None). A run
+    that finds no window is tried again, because another process on the machine can stop a test program."""
+    for attempt in range(3 if expect_window else 1):
+        result = answer_once(text, language, config_extra, 25 if expect_window else 8, expect_window)
+        if result != (None, None):
+            return result
+    return (None, None)
+
+
+def answer_once(text, language, config_extra, seconds, verbose):
     root = tempfile.mkdtemp(prefix="figghost-smart.")
     data = os.path.join(root, "data")
     os.makedirs(data)
@@ -99,21 +108,32 @@ def answer_for(text, language="en", config_extra=None):
         FIGGHOST_SMART_TEXT=text,
         FIGGHOST_SMART_OPEN="1",
     )
-    process = subprocess.Popen([BIN, "--background"], env=env, stdout=subprocess.DEVNULL, stderr=subprocess.DEVNULL)
+    errors = os.path.join(root, "stderr.log")
+    process = subprocess.Popen([BIN, "--background"], env=env, stdout=subprocess.DEVNULL, stderr=open(errors, "w"))
+    last = ""
     try:
-        deadline = time.time() + 20
+        deadline = time.time() + seconds
         while time.time() < deadline:
-            time.sleep(0.6)
+            time.sleep(0.4)
+            if process.poll() is not None:
+                last = f"the program exited with {process.returncode}"
+                break
             done = subprocess.run(
                 ["osascript", "-l", "JavaScript", "-e", READ, str(process.pid)], capture_output=True, timeout=60
             )
             # The program is not known to System Events for a moment after it starts: ask again.
             if done.returncode != 0:
+                last = done.stderr.decode().strip()
                 continue
+            last = "no answer window in the accessibility tree: " + done.stdout.decode()[:200]
             # The answer window opens at x = -30000; the notch is somewhere else outside the screen.
             found = [item for item in json.loads(done.stdout.decode() or "[]") if abs(item["x"] + 30000) < 5]
             if found:
                 return (found[0]["label"], found[0]["value"])
+        if verbose:
+            print("      no answer window: " + last)
+            with open(errors) as f:
+                print("      program output: " + f.read()[-300:].replace("\n", " | "))
         return (None, None)
     finally:
         process.kill()
@@ -161,7 +181,7 @@ try:
     label, value = answer_for("$100", config_extra={"currencies": ["JPY", "GBP"]})
     check("JPY" in value and "GBP" in value and "EUR" not in value, f"the currencies come from the settings ({value!r})")
 
-    result = answer_for("5 km", config_extra={"enabled": False})
+    result = answer_for("5 km", config_extra={"enabled": False}, expect_window=False)
     check(result == (None, None), "nothing opens while the feature is off")
 finally:
     pass

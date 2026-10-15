@@ -528,6 +528,20 @@ impl WebWindow {
         self.window.isVisible()
     }
 
+    /// Dark (`Some(true)`) or light (`Some(false)`) whatever the system uses, or the system's own (`None`). The
+    /// page follows, since WebKit reports the window's appearance to `prefers-color-scheme`.
+    pub fn set_dark(&self, dark: Option<bool>) {
+        // SAFETY: extern statics are process-lifetime constants.
+        let appearance = dark.and_then(|dark| unsafe {
+            NSAppearance::appearanceNamed(if dark {
+                NSAppearanceNameDarkAqua
+            } else {
+                NSAppearanceNameAqua
+            })
+        });
+        self.window.setAppearance(appearance.as_deref());
+    }
+
     pub fn is_key(&self) -> bool {
         self.window.isKeyWindow()
     }

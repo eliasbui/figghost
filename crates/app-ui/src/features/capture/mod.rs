@@ -359,14 +359,26 @@ impl Feature {
     /// The capture and recording entries of the menu bar item, in a submenu, and Stop Recording at the
     /// top level while a recording runs.
     pub fn menu_entries(this: &Rc<Self>) -> Vec<Entry> {
+        use crate::menu::symbols;
         let text = i18n::current();
         // Menu items run after the menu has closed, so the capture never shows the menu itself.
         let take = |title: &str, kind: Kind| {
             let feature = Rc::clone(this);
+            let symbol = match kind {
+                Kind::Area => symbols::CAPTURE_AREA,
+                Kind::Window => symbols::CAPTURE_WINDOW,
+                Kind::Screen => symbols::CAPTURE_SCREEN,
+                Kind::Timer => symbols::CAPTURE_TIMER,
+                Kind::Text => symbols::CAPTURE_TEXT,
+                Kind::Scroll => symbols::CAPTURE_SCROLL,
+                Kind::Record => symbols::RECORD_SCREEN,
+                Kind::Gif => symbols::RECORD_GIF,
+            };
             Item::new(title, move || {
                 let feature = Rc::clone(&feature);
                 app::after(0.25, move || feature.take(kind));
             })
+            .symbol(symbol)
         };
         let enabled = |item: Item| {
             let feature = Rc::clone(this);
@@ -378,10 +390,16 @@ impl Feature {
                 feature.config.borrow().enabled && feature.is_recording() == shown
             }))
         };
+        // Stop Recording runs the action of Record Screen, which a second press ends, so its icon is set by hand.
+        let stop = || {
+            let item = take(text.menu_record_stop(), Kind::Record).symbol(symbols::RECORD_STOP);
+            recording(item, true)
+        };
         let timer_seconds = this.config.borrow().timer_seconds;
         let open_folder = {
             let feature = Rc::clone(this);
             Item::new(text.menu_capture_folder(), move || feature.open_folder())
+                .symbol(symbols::CAPTURE_FOLDER)
         };
         let submenu = vec![
             enabled(take(text.menu_capture_area(), Kind::Area)),
@@ -393,13 +411,17 @@ impl Feature {
             Entry::Separator,
             recording(take(text.menu_record_screen(), Kind::Record), false),
             recording(take(text.menu_record_gif(), Kind::Gif), false),
-            recording(take(text.menu_record_stop(), Kind::Record), true),
+            stop(),
             Entry::Separator,
             enabled(open_folder),
         ];
         vec![
-            recording(take(text.menu_record_stop(), Kind::Record), true),
-            Entry::Submenu(text.menu_capture().to_owned(), submenu),
+            stop(),
+            Entry::Submenu {
+                title: text.menu_capture().to_owned(),
+                symbol: Some(symbols::CAPTURE),
+                entries: submenu,
+            },
         ]
     }
 

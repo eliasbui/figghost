@@ -87,18 +87,24 @@ mod tests {
     }
 
     #[test]
-    fn zones_are_stored_in_the_order_of_the_row() {
+    fn zones_are_stored_in_the_order_they_show() {
         let mut config = Config::default();
-        let result = set(&mut config, "zones", &json!(["maximize", "right", "left"]));
+        let result = set(
+            &mut config,
+            "zones",
+            &json!(["bottom_left", "maximize", "right", "left"]),
+        );
         assert!(result.unwrap().is_ok());
-        assert_eq!(keys(&config), ["left", "right", "maximize"]);
+        assert_eq!(keys(&config), ["left", "right", "maximize", "bottom_left"]);
+        let all: Vec<&str> = snap::OFFERED.iter().map(|l| l.key()).collect();
+        assert!(set(&mut config, "zones", &json!(all)).unwrap().is_ok());
+        assert_eq!(keys(&config), all, "every offered layout fits");
     }
 
     #[test]
     fn bad_zone_lists_are_refused_and_change_nothing() {
         let before = Config::default();
         let mut config = before.clone();
-        let too_many: Vec<&str> = snap::OFFERED.iter().map(|l| l.key()).collect();
         for bad in [
             json!([]),
             json!("left"),
@@ -108,7 +114,6 @@ mod tests {
             json!(["left", "bogus"]),
             json!(["center"]),
             json!(["../../etc/passwd"]),
-            json!(too_many),
         ] {
             let result = set(&mut config, "zones", &bad).unwrap();
             assert!(result.is_err(), "{bad}");
@@ -123,7 +128,7 @@ mod tests {
             ..Config::default()
         };
         let shown = state(&config, &json!({ "accessibility": true }));
-        assert_eq!(shown["zones"].as_array().unwrap().len(), 6);
+        assert_eq!(shown["zones"].as_array().unwrap().len(), 10);
         assert_eq!(shown["accessibility"], true);
         assert_eq!(state(&config, &Value::Null)["accessibility"], false);
     }

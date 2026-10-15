@@ -742,6 +742,7 @@ impl MixerView {
         on_hide: impl Fn() + 'static,
     ) -> Page {
         Page {
+            id: "sound",
             title: self.texts.tab.clone(),
             symbol: "speaker.wave.2",
             root: Retained::into_super(Retained::clone(&self.root)),

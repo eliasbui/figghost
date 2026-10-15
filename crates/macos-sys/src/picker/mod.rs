@@ -2,16 +2,17 @@
 //! it, with the colour under the centre in the chosen format. Tab changes the format, a click copies the
 //! value, Escape ends it.
 //!
-//! A transparent panel per display catches the pointer and the keys, because a click must not reach the app
-//! below. Both kinds of panel are left out of the pixels that are read: the read is of everything below the
-//! catching panel. Nothing runs while the picker is off: moves of the pointer, not a timer, trigger a read,
-//! and at most about thirty are made a second.
+//! The pixels come from the frozen picture of every display that the screenshots use, taken once when the
+//! picker starts (about a tenth of a second), before any panel of the picker is on screen. A move of the
+//! pointer is then only a lookup in that picture, and nothing runs while the picker is off. A transparent
+//! panel per display catches the pointer and the keys, because a click must not reach the app below.
 
 pub mod sample;
 
 use crate::{
     app,
     panel::FigPanel,
+    screen_capture::{self, DisplayShot},
     style::{self, Weight, fill_capsule, fill_circle, fill_rounded, stroke_rounded},
     widgets::{Fit, draw_text, text_attributes},
 };
@@ -28,8 +29,7 @@ use objc2_foundation::{NSMutableDictionary, NSPoint, NSRect, NSSize, NSString};
 use sample::Grid;
 use std::{
     cell::{Cell, RefCell},
-    rc::{Rc, Weak},
-    time::{Duration, Instant},
+    rc::Rc,
 };
 
 /// Pixels read around the pointer on each side of the middle one.
@@ -42,8 +42,9 @@ const CARD_HEIGHT: f64 = 78.0;
 const HEIGHT: f64 = CARD_TOP + CARD_HEIGHT + 6.0;
 /// Where the loupe sits relative to the pointer, clear of the pixels that are read.
 const GAP: f64 = 22.0;
-/// Between two reads, which keeps them to about thirty a second.
-const MIN_INTERVAL: Duration = Duration::from_millis(33);
+/// How long to wait for the picture. A system call that never answers must not leave the picker stuck
+/// waiting, with its shortcut dead until the app is started again.
+const FREEZE_TIMEOUT: f64 = 3.0;
 /// Almost invisible, but not clear: the window server lets clicks through a window that is fully clear.
 const CATCH_ALPHA: f64 = 0.01;
 
@@ -65,27 +66,45 @@ pub struct Callbacks {
     pub on_copy: Box<dyn Fn(String)>,
 }
 
+/// What a freeze calls back with: whether there is a picture to read from now.
+pub type Frozen = Box<dyn FnOnce(bool)>;
+
 /// Where the pixels, the permission and the display frames come from. `system` is the real thing; the
 /// checks swap in a synthetic one so nothing depends on the screen.
 pub struct Source {
     pub access: Box<dyn Fn() -> bool>,
-    /// The pixels around a point (global, bottom left origin) below the window with this number.
-    pub grab: Box<dyn Fn(NSPoint, usize, u32) -> Option<Grid>>,
+    /// Takes the picture that `grab` reads from, and calls back on the main thread when it is there.
+    pub freeze: Box<dyn Fn(Frozen)>,
+    /// The pixels around a point (global, bottom left origin) in that picture.
+    pub grab: Box<dyn Fn(NSPoint, usize) -> Option<Grid>>,
     /// The frames of the displays, in the same coordinates.
     pub screens: Box<dyn Fn() -> Vec<NSRect>>,
 }
 
 impl Source {
     pub fn system(mtm: MainThreadMarker) -> Self {
+        let pictures: Rc<RefCell<Vec<DisplayShot>>> = Rc::default();
+        let (store, read) = (Rc::clone(&pictures), pictures);
         Self {
-            access: Box::new(sample::screen_access),
-            grab: Box::new(move |point, cells, below| {
-                let scale = NSScreen::screens(mtm)
-                    .iter()
-                    .find(|s| contains(s.frame(), point))
-                    .map_or(1.0, |s| s.backingScaleFactor());
-                sample::grab(point, cells, below, scale)
+            access: Box::new(|| screen_capture::screen_access(false)),
+            freeze: Box::new(move |done| {
+                let store = Rc::clone(&store);
+                screen_capture::freeze(move |result| {
+                    let frozen = match result {
+                        Ok(frozen) => {
+                            *store.borrow_mut() = frozen.displays;
+                            true
+                        }
+                        Err(e) => {
+                            store.borrow_mut().clear();
+                            eprintln!("colour picker: cannot freeze the screens: {e}");
+                            false
+                        }
+                    };
+                    done(frozen);
+                });
             }),
+            grab: Box::new(move |point, cells| sample::grid_at(&read.borrow(), point, cells)),
             screens: Box::new(move || NSScreen::screens(mtm).iter().map(|s| s.frame()).collect()),
         }
     }
@@ -469,18 +488,19 @@ struct Session {
 
 struct Inner {
     mtm: MainThreadMarker,
-    me: Weak<Inner>,
     strings: Strings,
     callbacks: Callbacks,
     source: Source,
     loupe: Retained<Loupe>,
     session: RefCell<Option<Session>>,
     format: Cell<usize>,
-    pointer: Cell<NSPoint>,
     grid: RefCell<Option<Grid>>,
     blocked: Cell<bool>,
-    last_read: Cell<Option<Instant>>,
-    read_scheduled: Cell<bool>,
+    /// Counts the starts and the ends, so that a picture that arrives after the picker was ended, or started
+    /// again, is ignored.
+    generation: Cell<u64>,
+    /// The picture is being taken and nothing is on screen yet.
+    waiting: Cell<bool>,
 }
 
 pub struct Picker {
@@ -495,26 +515,25 @@ impl Picker {
         source: Source,
     ) -> Self {
         Self {
-            inner: Rc::new_cyclic(|me| Inner {
+            inner: Rc::new(Inner {
                 mtm,
-                me: me.clone(),
                 strings,
                 callbacks,
                 source,
                 loupe: Loupe::new(mtm),
                 session: RefCell::new(None),
                 format: Cell::new(0),
-                pointer: Cell::new(NSPoint::new(0.0, 0.0)),
                 grid: RefCell::new(None),
                 blocked: Cell::new(false),
-                last_read: Cell::new(None),
-                read_scheduled: Cell::new(false),
+                generation: Cell::new(0),
+                waiting: Cell::new(false),
             }),
         }
     }
 
+    /// Whether it is picking, or about to: the picture it reads from is still being taken.
     pub fn is_active(&self) -> bool {
-        self.inner.session.borrow().is_some()
+        self.inner.session.borrow().is_some() || self.inner.waiting.get()
     }
 
     /// The index of the format being shown.
@@ -525,12 +544,12 @@ impl Picker {
     /// Starts picking in the format with this index, with the loupe at `pointer`. Does nothing when it is
     /// already running.
     pub fn start(&self, format: usize, pointer: NSPoint) {
-        Inner::start(&self.inner, format, pointer);
+        Inner::start(&self.inner, format, Some(pointer));
     }
 
-    /// Starts picking where the pointer is now.
+    /// Starts picking where the pointer is when the loupe appears.
     pub fn start_at_pointer(&self, format: usize) {
-        self.start(format, NSEvent::mouseLocation());
+        Inner::start(&self.inner, format, None);
     }
 
     /// Ends it without copying anything.
@@ -571,21 +590,61 @@ impl Picker {
 }
 
 impl Inner {
-    fn start(this: &Rc<Self>, format: usize, pointer: NSPoint) {
-        if this.session.borrow().is_some() {
+    fn start(this: &Rc<Self>, format: usize, pointer: Option<NSPoint>) {
+        if this.session.borrow().is_some() || this.waiting.get() {
             return;
         }
-        let frames = (this.source.screens)();
-        if frames.is_empty() {
+        if (this.source.screens)().is_empty() {
             return;
         }
         this.format
             .set(format.min(this.strings.formats.len().saturating_sub(1)));
-        this.pointer.set(pointer);
         *this.grid.borrow_mut() = None;
-        this.last_read.set(None);
-        this.blocked.set(!(this.source.access)());
+        if !(this.source.access)() {
+            // Nothing can be read: the loupe says so, and a click only ends it.
+            this.blocked.set(true);
+            Self::show(this, pointer);
+            return;
+        }
+        // The picture is taken before any panel of the picker is on screen.
+        let mine = this.generation.get() + 1;
+        this.generation.set(mine);
+        this.waiting.set(true);
+        let weak = Rc::downgrade(this);
+        (this.source.freeze)(Box::new(move |frozen| {
+            let Some(this) = weak.upgrade() else {
+                return;
+            };
+            if this.generation.get() != mine {
+                return;
+            }
+            this.waiting.set(false);
+            this.blocked.set(!frozen);
+            Self::show(&this, pointer);
+        }));
+        let weak = Rc::downgrade(this);
+        app::after(FREEZE_TIMEOUT, move || {
+            let Some(this) = weak.upgrade() else {
+                return;
+            };
+            if this.generation.get() != mine || !this.waiting.get() {
+                return;
+            }
+            // Treated as a picture that could not be taken, and a late one is not wanted.
+            this.generation.set(mine + 1);
+            this.waiting.set(false);
+            this.blocked.set(true);
+            Self::show(&this, pointer);
+        });
+    }
 
+    /// Puts the panels on screen, with the loupe at `pointer` (where it is now when there is none).
+    fn show(this: &Rc<Self>, pointer: Option<NSPoint>) {
+        let pointer = pointer.unwrap_or_else(NSEvent::mouseLocation);
+        let frames = (this.source.screens)();
+        if frames.is_empty() {
+            return;
+        }
         let weak = Rc::downgrade(this);
         let on_input: OnInput = Rc::new(move |input| {
             if let Some(this) = weak.upgrade() {
@@ -645,43 +704,17 @@ impl Inner {
     }
 
     fn moved(&self, at: NSPoint) {
-        self.pointer.set(at);
         self.move_loupe(at);
         self.key_panel_at(at);
-        match self.last_read.get() {
-            Some(last) if last.elapsed() < MIN_INTERVAL => {
-                if !self.read_scheduled.replace(true) {
-                    let wait = (MIN_INTERVAL - last.elapsed()).as_secs_f64();
-                    let weak = self.me.clone();
-                    app::after(wait, move || {
-                        if let Some(this) = weak.upgrade() {
-                            this.read_scheduled.set(false);
-                            if this.session.borrow().is_some() {
-                                this.read_at(this.pointer.get());
-                            }
-                        }
-                    });
-                }
-            }
-            _ => self.read_at(at),
-        }
+        self.read_at(at);
     }
 
     fn read_at(&self, at: NSPoint) {
-        self.last_read.set(Some(Instant::now()));
-        let below = self
-            .session
-            .borrow()
-            .as_ref()
-            .and_then(|s| s.overlays.first())
-            .map_or(0, |p| u32::try_from(p.windowNumber()).unwrap_or(0));
-        if !(self.source.access)() {
-            self.blocked.set(true);
-            *self.grid.borrow_mut() = None;
+        *self.grid.borrow_mut() = if self.blocked.get() {
+            None
         } else {
-            self.blocked.set(false);
-            *self.grid.borrow_mut() = (self.source.grab)(at, CELLS, below);
-        }
+            (self.source.grab)(at, CELLS)
+        };
         self.refresh_look();
     }
 
@@ -747,6 +780,9 @@ impl Inner {
     }
 
     fn end(&self) {
+        // A picture that is still being taken is not wanted any more.
+        self.generation.set(self.generation.get() + 1);
+        self.waiting.set(false);
         let Some(session) = self.session.borrow_mut().take() else {
             return;
         };

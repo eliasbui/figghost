@@ -105,6 +105,10 @@ struct Plan {
     follow: bool,
 }
 
+/// The players lyrics are looked up for. Whatever else plays (a video in a browser, a podcast app) has a title that is
+/// not a song, which would only be sent to the lyrics service for nothing.
+const MUSIC_APPS: [&str; 2] = ["com.apple.Music", "com.spotify.client"];
+
 /// Decides what to show; `lookup` answers for a track, given whether the network may be used.
 fn plan(
     config: &Config,
@@ -123,6 +127,9 @@ fn plan(
         return still(Shown::Empty);
     };
     let track = &sample.track;
+    if !MUSIC_APPS.contains(&track.app.as_str()) {
+        return still(Shown::Hidden);
+    }
     let Some(query) = Query::new(&track.artist, &track.title, &track.album, track.duration_ms)
     else {
         return still(Shown::Notice(Notice::Missing));
@@ -250,19 +257,22 @@ impl Feature {
 mod tests {
     use super::*;
     use core_lyrics::{lrc, service::Ready};
-    use macos_sys::now_playing::{Player, Track};
+    use macos_sys::now_playing::Track;
     use std::{sync::Arc, time::Duration};
 
     fn sample(playing: bool, position_ms: u64, artist: &str) -> (Sample, Instant) {
         let at = Instant::now();
         let track = Track {
-            player: Player::Music,
+            app: "com.apple.Music".into(),
+            app_name: "Music".into(),
             title: "Song".into(),
             artist: artist.into(),
             album: "Album".into(),
             playing,
+            rate: if playing { 1.0 } else { 0.0 },
             position_ms,
             duration_ms: 200_000,
+            artwork: None,
         };
         (Sample { track, at }, at)
     }
@@ -306,6 +316,16 @@ mod tests {
             panic!("no artist, nothing to ask")
         });
         assert_eq!(p.shown, Shown::Notice(Notice::Missing));
+    }
+
+    #[test]
+    fn what_plays_in_a_browser_is_never_looked_up() {
+        let (mut s, at) = sample(true, 0, "Channel");
+        s.track.app = "com.microsoft.edgemac".into();
+        let p = plan(&on(), Some(&s), at, |_, _| {
+            panic!("a video title must not reach the lyrics service")
+        });
+        assert_eq!(p.shown, Shown::Hidden);
     }
 
     #[test]

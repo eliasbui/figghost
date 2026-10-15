@@ -2,6 +2,9 @@
 //! copy that leaves the clipboard exactly as it was where it does not.
 
 use crate::{ax::Element, pasteboard::Pasteboard, synth};
+use objc2::MainThreadMarker;
+use objc2_app_kit::NSScreen;
+use objc2_foundation::{NSPoint, NSRect, NSSize};
 use std::{
     thread,
     time::{Duration, Instant},
@@ -21,6 +24,25 @@ pub fn selected_text() -> Option<String> {
 /// The same for one app, whether or not it is the one in front.
 pub fn selected_text_of(pid: i32) -> Option<String> {
     selection_of(Element::application(pid)?.attribute("AXFocusedUIElement")?)
+}
+
+/// Where the selected text of the app that has the keyboard focus is on screen, in AppKit coordinates (origin
+/// bottom left). Needs Accessibility; `None` where the app does not say.
+pub fn selection_frame(mtm: MainThreadMarker) -> Option<NSRect> {
+    let focused = Element::system_wide()?.attribute("AXFocusedUIElement")?;
+    // A hung app must not hold the main thread for the default of several seconds.
+    focused.set_timeout(0.15);
+    let range = focused.attribute("AXSelectedTextRange")?;
+    let (x, y, w, h) = focused.rect_for("AXBoundsForRange", &range)?;
+    if w <= 0.0 && h <= 0.0 {
+        return None;
+    }
+    // Accessibility measures from the top left of the main display, y downwards.
+    let main = NSScreen::screens(mtm).firstObject()?.frame();
+    Some(NSRect::new(
+        NSPoint::new(x, main.origin.y + main.size.height - y - h),
+        NSSize::new(w, h),
+    ))
 }
 
 #[derive(Debug, Clone, PartialEq, Eq)]

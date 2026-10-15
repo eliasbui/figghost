@@ -24,6 +24,16 @@ use std::{
 };
 
 type RecordedHook = Box<dyn Fn(i64)>;
+type CopiedHook = Box<dyn Fn(Copied)>;
+
+/// What kind of thing a recorded copy was, for whoever shows that something was copied. Never its content,
+/// apart from the paths of copied files.
+#[derive(Debug, Clone, PartialEq, Eq)]
+pub enum Copied {
+    Text,
+    Image,
+    Files(Vec<String>),
+}
 
 const LIST_LIMIT: usize = 200;
 const FOCUS_POLL_SECONDS: f64 = 0.015;
@@ -118,6 +128,9 @@ pub struct History {
     expiring: Cell<bool>,
     /// Told the id of every copy that was recorded or moved to the top.
     on_recorded: RefCell<Option<RecordedHook>>,
+    /// Told the kind of every copy that was recorded or moved to the top; separate from `on_recorded`, which
+    /// the copy stack takes and gives back.
+    on_copied: RefCell<Option<CopiedHook>>,
 }
 
 impl History {
@@ -165,6 +178,7 @@ impl History {
             sensitivity: Cell::new(Sensitivity::Keep),
             expiring: Cell::new(expiring),
             on_recorded: RefCell::new(None),
+            on_copied: RefCell::new(None),
         })
     }
 
@@ -175,6 +189,11 @@ impl History {
     /// Registers who is told about each copy that is recorded, replacing the previous one.
     pub fn set_on_recorded(&self, hook: Option<RecordedHook>) {
         *self.on_recorded.borrow_mut() = hook;
+    }
+
+    /// Registers who is told what kind of thing each recorded copy was, replacing the previous one.
+    pub fn set_on_copied(&self, hook: Option<CopiedHook>) {
+        *self.on_copied.borrow_mut() = hook;
     }
 
     /// The pasteboard the history watches: the real one, or the private one of a test.
@@ -270,6 +289,11 @@ impl History {
                 height: i.height,
             },
         };
+        let copied = match &payload {
+            Payload::Text(_) => Copied::Text,
+            Payload::Image { .. } => Copied::Image,
+            Payload::Files(files) => Copied::Files(files.clone()),
+        };
         let capture = Capture {
             payload,
             app_id: source.as_ref().map(|a| a.bundle_id.clone()),
@@ -288,6 +312,9 @@ impl History {
                 }
                 if let Some(hook) = &*self.on_recorded.borrow() {
                     hook(id);
+                }
+                if let Some(hook) = &*self.on_copied.borrow() {
+                    hook(copied);
                 }
                 true
             }
@@ -679,6 +706,25 @@ mod tests {
             history.set_on_recorded(None);
             copy(&history, "three");
             assert_eq!(heard.borrow().len(), 3, "a removed hook hears nothing");
+            finish(&history, dir);
+        }
+
+        #[test]
+        fn the_copied_hook_hears_real_copies_beside_the_stack_hook() {
+            let (history, dir) = history();
+            let heard = Rc::new(RefCell::new(Vec::new()));
+            let sink = Rc::clone(&heard);
+            history.set_on_copied(Some(Box::new(move |c| sink.borrow_mut().push(c))));
+            // The copy stack takes the other hook and gives it back; this one stays.
+            history.set_on_recorded(Some(Box::new(|_| {})));
+            copy(&history, "one");
+            history.set_on_recorded(None);
+            copy(&history, "two");
+            assert_eq!(*heard.borrow(), vec![Copied::Text, Copied::Text]);
+            let first = history.rows("").0[1].id;
+            assert!(history.stage(first));
+            assert!(!history.poll());
+            assert_eq!(heard.borrow().len(), 2, "our own write is not a copy");
             finish(&history, dir);
         }
 

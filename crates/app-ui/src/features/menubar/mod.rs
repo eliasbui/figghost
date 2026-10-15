@@ -220,12 +220,13 @@ impl Feature {
         self.running.borrow().is_some()
     }
 
-    /// One entry in the "Fig" menu, only while the feature is on: a way to show the icons again even when the
-    /// arrow itself has been dragged to the hidden side.
+    /// One entry in the menu of the menu bar item, only while the feature is on: a way to show the icons again
+    /// even when the arrow itself has been dragged to the hidden side.
     pub fn menu_entries(this: &Rc<Self>) -> Vec<Entry> {
         let (toggle, title, visible) = (Rc::clone(this), Rc::clone(this), Rc::clone(this));
         vec![Entry::Item(
             Item::new("", move || toggle.toggle())
+                .symbol(crate::menu::symbols::MENU_BAR_ICONS)
                 .titled(move || {
                     let language = crate::i18n::current();
                     if title.collapsed() {

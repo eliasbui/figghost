@@ -28,6 +28,8 @@ pub struct Clipboard {
     popup: Rc<Popup>,
     mtm: MainThreadMarker,
     hotkey: RefCell<Option<Hotkey>>,
+    /// The shortcut that opens or closes the notch, when one is set.
+    notch_hotkey: RefCell<Option<Hotkey>>,
     /// Looks at the pasteboard now and then; replaced by a faster one while a copy stack runs.
     timer: RefCell<Option<app::Timer>>,
     poll: Rc<dyn Fn()>,
@@ -159,6 +161,7 @@ impl Clipboard {
             popup,
             mtm,
             hotkey: RefCell::new(None),
+            notch_hotkey: RefCell::new(None),
             timer: RefCell::new(None),
             poll,
             fast: Cell::new(false),
@@ -174,6 +177,17 @@ impl Clipboard {
                 }
             }
             Err(e) => eprintln!("hotkey: invalid shortcut in config: {e}"),
+        }
+        if !config.notch.shortcut.is_empty() {
+            let registered = parse_hotkey(&config.notch.shortcut)
+                .map_err(|e| format!("invalid ({e})"))
+                .and_then(|spec| {
+                    this.set_notch_hotkey(Some(spec))
+                        .map_err(|status| format!("taken (status {status})"))
+                });
+            if let Err(why) = registered {
+                eprintln!("hotkey: the notch shortcut is {why}");
+            }
         }
         Some(this)
     }
@@ -230,8 +244,22 @@ impl Clipboard {
         Ok(())
     }
 
-    /// Releases the shortcut, for while the settings page is capturing a new key combination.
+    /// Registers the shortcut that opens or closes the notch, or removes it with `None`.
+    pub fn set_notch_hotkey(&self, spec: Option<HotkeySpec>) -> Result<(), i32> {
+        self.notch_hotkey.borrow_mut().take();
+        let (Some(spec), Some(notch)) = (spec, self.notch.clone()) else {
+            return Ok(());
+        };
+        let hotkey = Hotkey::register(self.mtm, spec.key_code, spec.modifiers, move || {
+            notch.toggle();
+        })?;
+        *self.notch_hotkey.borrow_mut() = Some(hotkey);
+        Ok(())
+    }
+
+    /// Releases the shortcuts, for while the settings page is capturing a new key combination.
     pub fn suspend_hotkey(&self) {
         self.hotkey.borrow_mut().take();
+        self.notch_hotkey.borrow_mut().take();
     }
 }

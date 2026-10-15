@@ -4,18 +4,19 @@
 use macos_sys::{
     MainThreadMarker,
     agents_ui::{
-        AgentsCallbacks, AgentsDisplay, AgentsView, ApprovalCardData, SessionData, UsageData,
+        AgentsCallbacks, AgentsDisplay, AgentsView, ApprovalCardData, SessionData, TokensData,
+        UsageData,
     },
     app,
     focus_ui::{FocusCallbacks, FocusDisplay, FocusView},
     media_ui::{MediaCallbacks, MediaView},
     notch::{Notch, NotchGeometry},
-    now_playing::{Player, Track},
+    now_playing::{Sample, Track},
     shelf_ui::{ShelfCallbacks, ShelfView},
     style::Tone,
     ui::{AppCallbacks, Row},
 };
-use std::{env, fs, path::PathBuf, process, rc::Rc};
+use std::{env, fs, path::PathBuf, process, rc::Rc, time::Instant};
 
 const ROOT: &str = env!("CARGO_MANIFEST_DIR");
 
@@ -132,16 +133,23 @@ fn main() {
                 on_previous: Box::new(|| {}),
                 on_play_pause: Box::new(|| {}),
                 on_next: Box::new(|| {}),
+                on_seek: Box::new(|_| {}),
             },
         );
-        media.show(Some(&Track {
-            player: Player::Music,
-            title: "Blue in Green".into(),
-            artist: "Miles Davis".into(),
-            album: "Kind of Blue".into(),
-            playing: true,
-            position_ms: 0,
-            duration_ms: 0,
+        media.show(Some(&Sample {
+            track: Track {
+                app: "com.apple.Music".into(),
+                app_name: "Music".into(),
+                title: "Blue in Green".into(),
+                artist: "Miles Davis".into(),
+                album: "Kind of Blue".into(),
+                playing: true,
+                rate: 1.0,
+                position_ms: 0,
+                duration_ms: 0,
+                artwork: None,
+            },
+            at: Instant::now(),
         }));
         notch.add_page(media.page(|| {}, || {}));
 
@@ -239,6 +247,19 @@ fn main() {
                 sessions,
                 usage_heading: "Usage limits".into(),
                 usage,
+                tokens_heading: "Tokens and cost, at API prices".into(),
+                tokens: vec![
+                    TokensData {
+                        label: "Claude".into(),
+                        today: "1.24M tokens  $3.45".into(),
+                        week: "Week $21.30".into(),
+                    },
+                    TokensData {
+                        label: "Codex".into(),
+                        today: "380K tokens".into(),
+                        week: "Week 2.1M tokens".into(),
+                    },
+                ],
                 empty_title: "No agent is running".into(),
                 empty_hint: "Start Claude Code or Codex in a terminal. Turn on the hooks in Settings to see it here.".into(),
             }

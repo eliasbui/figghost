@@ -1,0 +1,10 @@
+/* The clipboard mascot. Styles for the card in web/features/mascot.js, using the variables at the top of app.css. */
+.mascot-pick { display: flex; align-items: center; gap: 14px; flex-wrap: wrap; }
+/* A sheet is twelve frames of 48 pixels in a row, drawn here at one and a half times with hard edges. */
+.mascot-sprite {
+  width: 72px; height: 72px; flex: none;
+  background-repeat: no-repeat; background-size: 864px 72px; background-position: 0 0;
+  image-rendering: pixelated;
+}
+/* The pleased frame, the eighth. */
+.mascot-sprite:hover { background-position: -504px 0; }

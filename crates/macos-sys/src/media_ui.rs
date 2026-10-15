@@ -1,14 +1,15 @@
-//! The media page: a cover card for the player, the current track, and previous / play-pause / next.
+//! The media page: the artwork (or a card in the app's colour), the current track, where it is in the track,
+//! and previous / play-pause / next.
 
 use crate::{
     app,
     button::{Look, TouchButton},
     labels,
     notch::Page,
-    now_playing::{Player, Track},
+    now_playing::{Artwork, Sample},
     panel::Key,
     style::{self, Tone, Weight, black, white},
-    widgets::PageRoot,
+    widgets::{PageRoot, ProgressBar},
 };
 use objc2::{
     AnyThread, DefinedClass, MainThreadMarker, MainThreadOnly, define_class, msg_send, rc::Retained,
@@ -16,16 +17,16 @@ use objc2::{
 use objc2_app_kit::{
     NSAppearance, NSAppearanceCustomization, NSAppearanceNameDarkAqua, NSAutoresizingMaskOptions,
     NSBezierPath, NSBitmapImageFileType, NSBorderType, NSBox, NSBoxType, NSColor, NSGradient,
-    NSLineBreakMode, NSScrollView, NSScrollerStyle, NSTextAlignment, NSTextField, NSTextView,
-    NSView,
+    NSGraphicsContext, NSImage, NSImageInterpolation, NSLineBreakMode, NSScrollView,
+    NSScrollerStyle, NSTextAlignment, NSTextField, NSTextView, NSView,
 };
-use objc2_foundation::{NSDictionary, NSObjectProtocol, NSPoint, NSRect, NSSize, NSString};
+use objc2_foundation::{NSData, NSDictionary, NSObjectProtocol, NSPoint, NSRect, NSSize, NSString};
 use std::{
     cell::{Cell, RefCell},
     collections::hash_map::DefaultHasher,
     hash::{Hash, Hasher},
     rc::Rc,
-    time::Instant,
+    time::{Duration, Instant},
 };
 
 const MARGIN: f64 = 24.0;
@@ -37,13 +38,24 @@ const BUTTON_GAP: f64 = 30.0;
 const ART_SMALL: f64 = 72.0;
 const CONTROLS_Y_WITH_LYRICS: f64 = 58.0;
 const LYRICS_BOTTOM: f64 = 100.0;
-const LYRICS_TOP_GAP: f64 = 108.0;
+/// Leaves room for the progress row under the track's text.
+const LYRICS_TOP_GAP: f64 = 116.0;
 const LINE_HEIGHT: f64 = 20.0;
 const CURRENT_HEIGHT: f64 = 56.0;
 const LINE_GAP: f64 = 14.0;
 /// How far the lines travel when the sung line changes, and for how long.
 const SLIDE: f64 = 22.0;
 const SLIDE_SECONDS: f64 = 0.32;
+/// The row with the time played, the bar and the time left.
+const TIME_WIDTH: f64 = 54.0;
+const TIME_HEIGHT: f64 = 14.0;
+/// The bar's view, which can be dragged: taller than the thin track it draws, so it is easy to hit.
+const BAR_HEIGHT: f64 = 20.0;
+const BAR_GAP: f64 = 8.0;
+/// After a seek the bar stays where it was sent until the player reports a position this close to it, or for at
+/// most this long.
+const SEEK_CAUGHT_UP_MS: u64 = 1_500;
+const SEEK_PATIENCE: Duration = Duration::from_secs(3);
 
 /// What the lyrics area of the page shows.
 #[derive(Debug, Clone, Copy, PartialEq, Eq, Hash)]
@@ -67,11 +79,15 @@ pub struct MediaCallbacks {
     pub on_previous: Box<dyn Fn()>,
     pub on_play_pause: Box<dyn Fn()>,
     pub on_next: Box<dyn Fn()>,
+    /// The bar was dragged or clicked: move to this position, in milliseconds from the start.
+    pub on_seek: Box<dyn Fn(u64)>,
 }
 
 pub struct ArtIvars {
     tone: Cell<Tone>,
     glyph: RefCell<String>,
+    /// The id of the artwork on the card and its decoded picture, `None` when it could not be decoded.
+    picture: RefCell<Option<(u64, Option<Retained<NSImage>>)>>,
 }
 
 define_class!(
@@ -91,6 +107,29 @@ define_class!(
                 style::CARD_RADIUS + 6.0,
                 style::CARD_RADIUS + 6.0,
             );
+            if let Some((_, Some(image))) = &*self.ivars().picture.borrow() {
+                let size = image.size();
+                if size.width > 0.0 && size.height > 0.0 {
+                    // Aspect fill: the picture covers the card, and the rounded corners clip what overflows.
+                    let scale = (bounds.size.width / size.width).max(bounds.size.height / size.height);
+                    let drawn = NSSize::new(size.width * scale, size.height * scale);
+                    let rect = NSRect::new(
+                        NSPoint::new(
+                            bounds.origin.x + (bounds.size.width - drawn.width) / 2.0,
+                            bounds.origin.y + (bounds.size.height - drawn.height) / 2.0,
+                        ),
+                        drawn,
+                    );
+                    NSGraphicsContext::saveGraphicsState_class();
+                    if let Some(context) = NSGraphicsContext::currentContext() {
+                        context.setImageInterpolation(NSImageInterpolation::High);
+                    }
+                    path.addClip();
+                    image.drawInRect(rect);
+                    NSGraphicsContext::restoreGraphicsState_class();
+                    return;
+                }
+            }
             let base = self.ivars().tone.get().color();
             let deep = base
                 .blendedColorWithFraction_ofColor(0.55, &black(1.0))
@@ -117,14 +156,29 @@ impl ArtCard {
         let this = mtm.alloc::<Self>().set_ivars(ArtIvars {
             tone: Cell::new(Tone::Gray),
             glyph: RefCell::new("music.note".to_owned()),
+            picture: RefCell::new(None),
         });
         // SAFETY: designated initializer with valid arguments on the main thread.
         unsafe { msg_send![super(this), initWithFrame: frame] }
     }
 
-    fn set(&self, tone: Tone, glyph: &str) {
-        self.ivars().tone.set(tone);
-        glyph.clone_into(&mut self.ivars().glyph.borrow_mut());
+    /// Shows the artwork when there is one, otherwise a gradient of `tone` with `glyph`. A picture is decoded once
+    /// per artwork id, and the card is only redrawn when something changed.
+    fn set(&self, tone: Tone, glyph: &str, artwork: Option<&Artwork>) {
+        let ivars = self.ivars();
+        let shown = ivars.picture.borrow().as_ref().map(|(id, _)| *id);
+        let new_picture = shown != artwork.map(|a| a.id);
+        if new_picture {
+            *ivars.picture.borrow_mut() = artwork.map(|a| {
+                let data = NSData::with_bytes(&a.bytes);
+                (a.id, NSImage::initWithData(NSImage::alloc(), &data))
+            });
+        }
+        if !new_picture && ivars.tone.get() == tone && ivars.glyph.borrow().as_str() == glyph {
+            return;
+        }
+        ivars.tone.set(tone);
+        glyph.clone_into(&mut ivars.glyph.borrow_mut());
         self.setNeedsDisplay(true);
     }
 }
@@ -142,6 +196,9 @@ pub struct MediaView {
     title: Retained<NSTextField>,
     artist: Retained<NSTextField>,
     status: Retained<NSTextField>,
+    elapsed: Retained<NSTextField>,
+    bar: Retained<ProgressBar>,
+    remaining: Retained<NSTextField>,
     previous: Retained<TouchButton>,
     play: Retained<TouchButton>,
     next: Retained<TouchButton>,
@@ -157,6 +214,70 @@ pub struct MediaView {
     drawn: Cell<Option<u64>>,
     /// The timer of the movement between two lines; empty when nothing moves, so an idle page runs no timer.
     slide: Rc<RefCell<Option<app::Timer>>>,
+    /// The length of what plays, in milliseconds; 0 when unknown, and then the bar is hidden.
+    length: Cell<u64>,
+    /// The position a seek asked for, and when, until the player reports it.
+    sought: Cell<Option<(u64, Instant)>>,
+}
+
+/// Where the bar stands just after a seek: where the seek sent it, moving on with the music, until the player
+/// reports a position close to that or it has been too long. `None` once the seek is behind.
+fn after_seek(reported: u64, sought: u64, since: Duration, playing: bool) -> Option<u64> {
+    let expected = sought + if playing { since.as_millis() as u64 } else { 0 };
+    (since < SEEK_PATIENCE && reported.abs_diff(expected) > SEEK_CAUGHT_UP_MS).then_some(expected)
+}
+
+/// A colour for the app's card when it gives no artwork, the same from one run to the next. Music and Spotify
+/// keep the colours they had before any other app was shown.
+fn app_tone(bundle: &str) -> Tone {
+    const TONES: [Tone; 5] = [
+        Tone::Blue,
+        Tone::Orange,
+        Tone::Green,
+        Tone::Red,
+        Tone::Purple,
+    ];
+    match bundle {
+        "com.apple.Music" => Tone::Red,
+        "com.spotify.client" => Tone::Green,
+        _ => {
+            let hash = bundle
+                .bytes()
+                .fold(0u32, |h, b| h.wrapping_mul(31).wrapping_add(u32::from(b)));
+            TONES[hash as usize % TONES.len()]
+        }
+    }
+}
+
+/// 4:05, or 1:02:05 from an hour on.
+fn clock(seconds: u64) -> String {
+    let (hours, minutes, seconds) = (seconds / 3600, seconds / 60 % 60, seconds % 60);
+    if hours > 0 {
+        format!("{hours}:{minutes:02}:{seconds:02}")
+    } else {
+        format!("{minutes}:{seconds:02}")
+    }
+}
+
+/// The frames of the time played, the bar and the time left: under the status line in the roomy layout, and in
+/// the text column beside the small cover when lyrics take the middle of the page.
+fn progress_frames(width: f64, top: f64, compact: bool) -> [NSRect; 3] {
+    let (left, right, middle) = if compact {
+        (MARGIN + ART_SMALL + 14.0, width - MARGIN, top - 100.0)
+    } else {
+        (MARGIN + 40.0, width - MARGIN - 40.0, top - 240.0)
+    };
+    let rect =
+        |x: f64, w: f64, h: f64| NSRect::new(NSPoint::new(x, middle - h / 2.0), NSSize::new(w, h));
+    [
+        rect(left, TIME_WIDTH, TIME_HEIGHT),
+        rect(
+            left + TIME_WIDTH + BAR_GAP,
+            right - left - 2.0 * (TIME_WIDTH + BAR_GAP),
+            BAR_HEIGHT,
+        ),
+        rect(right - TIME_WIDTH, TIME_WIDTH, TIME_HEIGHT),
+    ]
 }
 
 /// A label that may wrap onto a second line instead of being cut.
@@ -260,6 +381,23 @@ impl MediaView {
         root.addSubview(&artist);
         root.addSubview(&status);
 
+        let [elapsed_frame, bar_frame, remaining_frame] = progress_frames(width, top, false);
+        let time = |frame: NSRect, alignment: NSTextAlignment| {
+            let field = label(mtm, 10.5, Weight::Medium, style::TEXT_TERTIARY, frame);
+            field.setFont(Some(&style::digits(10.5, Weight::Medium)));
+            field.setAlignment(alignment);
+            field.setAutoresizingMask(NSAutoresizingMaskOptions::empty());
+            field.setHidden(true);
+            field
+        };
+        let elapsed = time(elapsed_frame, NSTextAlignment::Right);
+        let remaining = time(remaining_frame, NSTextAlignment::Left);
+        let bar = ProgressBar::new(mtm, bar_frame);
+        bar.setHidden(true);
+        root.addSubview(&elapsed);
+        root.addSubview(&bar);
+        root.addSubview(&remaining);
+
         let middle = NSPoint::new(width / 2.0, top - 292.0);
         let side = MAIN_BUTTON / 2.0 + BUTTON_GAP + SIDE_BUTTON / 2.0;
         let previous = round(
@@ -345,6 +483,9 @@ impl MediaView {
             title,
             artist,
             status,
+            elapsed,
+            bar,
+            remaining,
             previous,
             play,
             next,
@@ -358,9 +499,40 @@ impl MediaView {
             shown: RefCell::default(),
             drawn: Cell::new(None),
             slide: Rc::default(),
+            length: Cell::new(0),
+            sought: Cell::new(None),
         });
+        let weak = Rc::downgrade(&this);
+        this.bar
+            .set_on_seek(&texts.media_position, move |fraction, done| {
+                if let Some(view) = weak.upgrade() {
+                    view.scrubbed(fraction, done);
+                }
+            });
         this.show(None);
         this
+    }
+
+    /// The bar is being dragged: the times follow the pointer, and letting go moves what plays there.
+    fn scrubbed(&self, fraction: f64, done: bool) {
+        let length = self.length.get();
+        if length == 0 {
+            return;
+        }
+        let at = (fraction * length as f64).round() as u64;
+        self.show_times(at, length);
+        if done {
+            self.sought.set(Some((at, Instant::now())));
+            (self.callbacks.on_seek)(at);
+        }
+    }
+
+    fn show_times(&self, at: u64, length: u64) {
+        self.elapsed
+            .setStringValue(&NSString::from_str(&clock(at / 1000)));
+        let left = length.saturating_sub(at).div_ceil(1000);
+        self.remaining
+            .setStringValue(&NSString::from_str(&format!("-{}", clock(left))));
     }
 
     /// The area the lyrics use, between the track and the controls.
@@ -409,6 +581,21 @@ impl MediaView {
         for field in [&self.title, &self.artist, &self.status] {
             field.setAlignment(alignment);
         }
+        // Centred, the times hug the bar; beside the small cover they line up with the text above and the margin.
+        let [elapsed, bar, remaining] = progress_frames(width, top, compact);
+        self.elapsed.setFrame(elapsed);
+        self.bar.setFrame(bar);
+        self.remaining.setFrame(remaining);
+        self.elapsed.setAlignment(if compact {
+            NSTextAlignment::Left
+        } else {
+            NSTextAlignment::Right
+        });
+        self.remaining.setAlignment(if compact {
+            NSTextAlignment::Right
+        } else {
+            NSTextAlignment::Left
+        });
         let middle = if compact {
             CONTROLS_Y_WITH_LYRICS
         } else {
@@ -575,28 +762,30 @@ impl MediaView {
         *self.slide.borrow_mut() = Some(timer);
     }
 
-    /// Shows the track, or the idle message when nothing is playing.
-    pub fn show(&self, track: Option<&Track>) {
+    /// Shows what plays, with its position carried forward to now, or the idle message when nothing does.
+    pub fn show(&self, sample: Option<&Sample>) {
         let texts = labels::get();
+        let track = sample.map(|s| &s.track);
         let (title, artist, status, tone, symbol) = match track {
-            Some(t) => (
-                t.title.clone(),
-                t.artist.clone(),
-                format!(
-                    "{}  -  {}",
-                    t.player.name().to_uppercase(),
-                    if t.playing {
-                        texts.media_playing.to_uppercase()
+            Some(t) => {
+                let state = if t.playing {
+                    &texts.media_playing
+                } else {
+                    &texts.media_paused
+                }
+                .to_uppercase();
+                (
+                    t.title.clone(),
+                    t.artist.clone(),
+                    if t.app_name.is_empty() {
+                        state
                     } else {
-                        texts.media_paused.to_uppercase()
-                    }
-                ),
-                match t.player {
-                    Player::Music => Tone::Red,
-                    Player::Spotify => Tone::Green,
-                },
-                if t.playing { "pause.fill" } else { "play.fill" },
-            ),
+                        format!("{}  -  {state}", t.app_name.to_uppercase())
+                    },
+                    app_tone(&t.app),
+                    if t.playing { "pause.fill" } else { "play.fill" },
+                )
+            }
             None => (
                 texts.media_idle.clone(),
                 String::new(),
@@ -605,11 +794,40 @@ impl MediaView {
                 "play.fill",
             ),
         };
-        self.art.set(tone, "music.note");
+        self.art
+            .set(tone, "music.note", track.and_then(|t| t.artwork.as_ref()));
         self.title.setStringValue(&NSString::from_str(&title));
         self.artist.setStringValue(&NSString::from_str(&artist));
         self.status.setStringValue(&NSString::from_str(&status));
         self.play.set_symbol(symbol);
+        self.show_progress(sample);
+    }
+
+    /// The bar with the time played and the time left, while the length of the track is known.
+    fn show_progress(&self, sample: Option<&Sample>) {
+        let length = sample.map_or(0, |s| s.track.duration_ms);
+        let views: [&NSView; 3] = [&self.elapsed, &self.bar, &self.remaining];
+        for view in views {
+            view.setHidden(length == 0);
+        }
+        self.length.set(length);
+        let Some(sample) = sample.filter(|_| length > 0) else {
+            return;
+        };
+        // While the bar is held it follows the pointer, and so do the times.
+        if self.bar.held() {
+            return;
+        }
+        let now = Instant::now();
+        let mut at = sample.position_ms(now).min(length);
+        if let Some((sought, when)) = self.sought.get() {
+            match after_seek(at, sought, now - when, sample.track.playing) {
+                Some(expected) => at = expected.min(length),
+                None => self.sought.set(None),
+            }
+        }
+        self.bar.set(at as f64 / length as f64, Tone::Gray);
+        self.show_times(at, length);
     }
 
     /// A page at the size of the notch's pages whose buttons do nothing, for drawing it in a preview.
@@ -621,6 +839,7 @@ impl MediaView {
                 on_previous: Box::new(|| {}),
                 on_play_pause: Box::new(|| {}),
                 on_next: Box::new(|| {}),
+                on_seek: Box::new(|_| {}),
             },
         )
     }
@@ -668,6 +887,7 @@ impl MediaView {
     ) -> Page {
         let keys = Rc::clone(self);
         Page {
+            id: "media",
             title: labels::get().media_tab.clone(),
             symbol: "music.note",
             root: Retained::into_super(Retained::clone(&self.root)),
@@ -675,6 +895,54 @@ impl MediaView {
             on_hide: Box::new(on_hide),
             on_key: Box::new(move |key| keys.handle_key(key)),
             accepts_files: false,
+        }
+    }
+}
+
+#[cfg(test)]
+mod tests {
+    use super::*;
+
+    #[test]
+    fn clocks_show_minutes_or_hours() {
+        assert_eq!(clock(0), "0:00");
+        assert_eq!(clock(65), "1:05");
+        assert_eq!(clock(2304), "38:24");
+        assert_eq!(clock(3600), "1:00:00");
+        assert_eq!(clock(3725), "1:02:05");
+    }
+
+    #[test]
+    fn an_app_keeps_its_colour() {
+        assert_eq!(app_tone("com.apple.Music"), Tone::Red);
+        assert_eq!(app_tone("com.spotify.client"), Tone::Green);
+        assert_eq!(
+            app_tone("com.microsoft.edgemac"),
+            app_tone("com.microsoft.edgemac")
+        );
+        assert_ne!(app_tone(""), Tone::Gray, "gray is for nothing playing");
+    }
+
+    #[test]
+    fn after_a_seek_the_bar_waits_for_the_player_then_follows_it() {
+        let second = Duration::from_secs(1);
+        // The player still reports the old place: the bar shows the new one, moving on while it plays.
+        assert_eq!(after_seek(10_000, 90_000, second, true), Some(91_000));
+        assert_eq!(after_seek(10_000, 90_000, second, false), Some(90_000));
+        // It caught up, or it never will: the player is believed again.
+        assert_eq!(after_seek(90_800, 90_000, second, true), None);
+        assert_eq!(after_seek(10_000, 90_000, SEEK_PATIENCE, true), None);
+    }
+
+    #[test]
+    fn the_progress_row_stays_inside_the_page() {
+        for compact in [false, true] {
+            let [elapsed, bar, remaining] = progress_frames(500.0, 396.0, compact);
+            assert!(elapsed.origin.x >= MARGIN);
+            assert!(remaining.origin.x + remaining.size.width <= 500.0 - MARGIN);
+            assert!(elapsed.origin.x + elapsed.size.width < bar.origin.x);
+            assert!(bar.origin.x + bar.size.width < remaining.origin.x);
+            assert!(bar.size.width > 100.0);
         }
     }
 }

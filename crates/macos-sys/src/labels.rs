@@ -29,6 +29,8 @@ pub struct Labels {
     pub media_previous: String,
     pub media_play_pause: String,
     pub media_next: String,
+    /// The bar that shows, and moves, the position in the track.
+    pub media_position: String,
     pub media_hint: String,
     pub media_playing: String,
     pub media_paused: String,
@@ -90,8 +92,8 @@ impl Default for Labels {
             media_previous: "Previous".into(),
             media_play_pause: "Play / Pause".into(),
             media_next: "Next".into(),
-            media_hint: "Controls whichever app is playing. Track details: Music and Spotify."
-                .into(),
+            media_position: "Position".into(),
+            media_hint: "Controls whichever app is playing, browsers included.".into(),
             media_playing: "Playing".into(),
             media_paused: "Paused".into(),
             focus_tab: "Focus".into(),

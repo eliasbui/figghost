@@ -269,6 +269,7 @@ impl FocusView {
     ) -> Page {
         let keys = Rc::clone(self);
         Page {
+            id: "focus",
             title: labels::get().focus_tab.clone(),
             symbol: "timer",
             root: Retained::into_super(Retained::clone(&self.root)),

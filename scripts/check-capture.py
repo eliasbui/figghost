@@ -70,9 +70,15 @@ def stop(process):
         process.wait()
 
 
-def cpu(process):
-    out = subprocess.run(["ps", "-o", "%cpu=", "-p", str(process.pid)], capture_output=True, text=True).stdout
-    return float(out.strip() or 0)
+def cpu_seconds(process):
+    """CPU time used so far, from `ps -o cputime` ([[h:]m:]s.cc). The `%cpu` column averages over the whole life
+    of the process, so the cost of starting up shows as work that goes on."""
+    out = subprocess.run(["ps", "-o", "cputime=", "-p", str(process.pid)], capture_output=True, text=True).stdout.strip()
+    nums = [int(p) for p in out.replace(".", ":").split(":") if p.isdigit()]
+    if len(nums) < 2:
+        return 0.0
+    mins = nums[-3] if len(nums) >= 3 else 0
+    return mins * 60 + nums[-2] + nums[-1] / 100.0
 
 
 def text(path):
@@ -86,11 +92,10 @@ try:
     time.sleep(3)
     check(first.poll() is None, "the program runs with capture switched on")
     check("capture:" not in text(first_log) and "panicked" not in text(first_log), "no capture error at start: " + text(first_log).strip()[:200])
-    samples = []
-    for _ in range(5):
-        samples.append(cpu(first))
-        time.sleep(0.6)
-    check(max(samples) < 1.0, f"idle CPU stays under 1 percent ({samples})")
+    before = cpu_seconds(first)
+    time.sleep(6)
+    used = cpu_seconds(first) - before
+    check(used < 0.06, f"idle CPU stays under 1 percent (used {used:.2f} s of CPU in 6 s)")
 
     # 2. Two modes on one shortcut (a hand-edited file): the system refuses the second registration, and the
     # program reports it instead of crashing. (Two programs asking for the same keys do not refuse each other:

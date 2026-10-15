@@ -42,6 +42,35 @@ fn backdrop_css(kind: &str, dark: bool) -> &'static str {
     }
 }
 
+/// Runs the page's own checks. A page that has not finished loading has no checks to run yet (on a busy
+/// machine that takes longer than a second), so a missing answer is asked for again for a while before it counts.
+fn run_selftest(stage: Rc<HiddenStage>, attempt: u32) {
+    let again = Rc::clone(&stage);
+    stage
+        .host
+        .eval_string("JSON.stringify(window.__selftest())", move |result| {
+            if result.is_none() && attempt < 30 {
+                app::after(0.5, move || run_selftest(again, attempt + 1));
+                return;
+            }
+            let failures: Vec<String> = result
+                .and_then(|r| serde_json::from_str(&r).ok())
+                .unwrap_or_else(|| vec!["the self-test did not return".into()]);
+            for failure in &failures {
+                println!("FAIL: {failure}");
+            }
+            println!(
+                "{}",
+                if failures.is_empty() {
+                    "settings page ok"
+                } else {
+                    "settings page broken"
+                }
+            );
+            process::exit(i32::from(!failures.is_empty()));
+        });
+}
+
 fn main() {
     let mtm = MainThreadMarker::new().expect("main thread");
     let args: Vec<String> = env::args().skip(1).collect();
@@ -125,27 +154,7 @@ fn main() {
 
         if mode == "selftest" {
             let stage = Rc::clone(&stage);
-            app::after(1.0, move || {
-                stage
-                    .host
-                    .eval_string("JSON.stringify(window.__selftest())", |result| {
-                        let failures: Vec<String> = result
-                            .and_then(|r| serde_json::from_str(&r).ok())
-                            .unwrap_or_else(|| vec!["the self-test did not return".into()]);
-                        for failure in &failures {
-                            println!("FAIL: {failure}");
-                        }
-                        println!(
-                            "{}",
-                            if failures.is_empty() {
-                                "settings page ok"
-                            } else {
-                                "settings page broken"
-                            }
-                        );
-                        process::exit(i32::from(!failures.is_empty()));
-                    });
-            });
+            app::after(1.0, move || run_selftest(stage, 0));
         } else {
             let page_id = args.get(1).cloned().unwrap_or_else(|| "general".into());
             let out = args

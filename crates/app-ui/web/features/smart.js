@@ -1,7 +1,7 @@
 // Smart Select: a page of its own. Units, money and times in the selected text, and translation.
 (window.__plugins = window.__plugins || []).push({
   id: 'smart',
-  icon: '<path d="M4 8V6a2 2 0 0 1 2-2h2M16 4h2a2 2 0 0 1 2 2v2M20 16v2a2 2 0 0 1-2 2h-2M8 20H6a2 2 0 0 1-2-2v-2"/><path d="M9 12h6M12 9v6"/>',
+  icon: 'text.magnifyingglass',
   en: {
     'nav.smart': 'Smart Select', 'page.smart': 'Smart Select',
     'page.smart.sub': 'Select text anywhere and press the shortcut to see it converted: units, money and times, and a translation of other text.',

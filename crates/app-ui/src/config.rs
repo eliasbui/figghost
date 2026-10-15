@@ -44,16 +44,170 @@ impl TilingConfig {
     }
 }
 
-#[derive(Debug, Clone, Serialize, Deserialize)]
-#[serde(default)]
+/// The tabs of the notch, in their default order.
+pub const NOTCH_PAGES: [&str; 7] = [
+    "clipboard",
+    "shelf",
+    "media",
+    "focus",
+    "agents",
+    "calendar",
+    "sound",
+];
+
+/// The notch and how it looks and behaves. Read leniently: a hand-edited value of the wrong type or an unknown
+/// word falls back to its default instead of making the whole file unreadable.
+#[derive(Debug, Clone, PartialEq, Serialize, Deserialize)]
+#[serde(from = "serde_json::Value")]
 pub struct NotchConfig {
     /// The notch panel, with its hover trigger. Off removes it from the screen entirely.
     pub enabled: bool,
+    /// What the open notch is made of: `glass`, `clear` (glass with less tint) or `black`.
+    pub material: String,
+    pub shadow: bool,
+    /// How it moves: `spring`, `smooth` or `none`.
+    pub motion: String,
+    pub open_on_hover: bool,
+    /// How long the pointer rests on the notch before it opens, 0 to 1000.
+    pub hover_delay_ms: u32,
+    /// On a screen without a notch: `notch` shows a black tab, `hidden` only a strip at the top edge.
+    pub rest: String,
+    /// Keeps the notch out of screenshots and screen recordings.
+    pub hide_in_capture: bool,
+    pub haptics: bool,
+    /// Which screen: `auto` (the built-in one with a notch, else the main one), `main` or `pointer`.
+    pub display: String,
+    /// The tab it opens on: `last`, `activity` (what is playing or working), or a tab id.
+    pub open_page: String,
+    /// The tabs to show, in order; empty shows them all.
+    pub pages: Vec<String>,
+    /// Playing music in the closed notch: the cover and moving bars.
+    pub live_media: bool,
+    /// Working coding agents in the closed notch.
+    pub live_agents: bool,
+    /// What moves the bars: `live` (the sound the Mac plays; needs System Audio Recording) or `animated`.
+    pub waveform: String,
+    /// A global shortcut that opens or closes the notch; empty for none.
+    pub shortcut: String,
 }
 
 impl Default for NotchConfig {
     fn default() -> Self {
-        Self { enabled: true }
+        Self {
+            enabled: true,
+            material: "glass".into(),
+            shadow: true,
+            motion: "spring".into(),
+            open_on_hover: true,
+            hover_delay_ms: 120,
+            rest: "notch".into(),
+            hide_in_capture: false,
+            haptics: true,
+            display: "auto".into(),
+            open_page: "activity".into(),
+            pages: Vec::new(),
+            live_media: true,
+            live_agents: true,
+            waveform: "live".into(),
+            shortcut: String::new(),
+        }
+    }
+}
+
+/// `value` when it is one of `words`, else the default.
+fn word(value: &serde_json::Value, words: &[&str], default: &str) -> String {
+    value
+        .as_str()
+        .filter(|w| words.contains(w))
+        .unwrap_or(default)
+        .to_owned()
+}
+
+/// The tab ids in `value` that exist, each once, in the given order.
+pub fn notch_pages(value: &serde_json::Value) -> Vec<String> {
+    let mut pages: Vec<String> = Vec::new();
+    for id in value
+        .as_array()
+        .into_iter()
+        .flatten()
+        .filter_map(|v| v.as_str())
+    {
+        if NOTCH_PAGES.contains(&id) && !pages.iter().any(|p| p == id) {
+            pages.push(id.to_owned());
+        }
+    }
+    pages
+}
+
+impl From<serde_json::Value> for NotchConfig {
+    fn from(v: serde_json::Value) -> Self {
+        let d = Self::default();
+        let flag = |key: &str, default: bool| v[key].as_bool().unwrap_or(default);
+        let open_page = v["open_page"]
+            .as_str()
+            .filter(|w| ["last", "activity"].contains(w) || NOTCH_PAGES.contains(w))
+            .unwrap_or(&d.open_page)
+            .to_owned();
+        Self {
+            enabled: flag("enabled", d.enabled),
+            material: word(&v["material"], &["glass", "clear", "black"], &d.material),
+            shadow: flag("shadow", d.shadow),
+            motion: word(&v["motion"], &["spring", "smooth", "none"], &d.motion),
+            open_on_hover: flag("open_on_hover", d.open_on_hover),
+            hover_delay_ms: v["hover_delay_ms"]
+                .as_u64()
+                .map_or(d.hover_delay_ms, |ms| ms.min(1000) as u32),
+            rest: word(&v["rest"], &["notch", "hidden"], &d.rest),
+            hide_in_capture: flag("hide_in_capture", d.hide_in_capture),
+            haptics: flag("haptics", d.haptics),
+            display: word(&v["display"], &["auto", "main", "pointer"], &d.display),
+            open_page,
+            pages: notch_pages(&v["pages"]),
+            live_media: flag("live_media", d.live_media),
+            live_agents: flag("live_agents", d.live_agents),
+            waveform: word(&v["waveform"], &["live", "animated"], &d.waveform),
+            shortcut: v["shortcut"].as_str().unwrap_or("").trim().to_owned(),
+        }
+    }
+}
+
+impl NotchConfig {
+    /// What the notch itself needs to know.
+    pub fn style(&self) -> macos_sys::notch::Style {
+        use macos_sys::notch::{Display, Material, Motion, OpenPage, Rest, Style};
+        Style {
+            material: match self.material.as_str() {
+                "clear" => Material::ClearGlass,
+                "black" => Material::Black,
+                _ => Material::Glass,
+            },
+            shadow: self.shadow,
+            motion: match self.motion.as_str() {
+                "smooth" => Motion::Smooth,
+                "none" => Motion::Instant,
+                _ => Motion::Spring,
+            },
+            open_on_hover: self.open_on_hover,
+            hover_delay: f64::from(self.hover_delay_ms.min(1000)) / 1000.0,
+            rest: if self.rest == "hidden" {
+                Rest::Hidden
+            } else {
+                Rest::Notch
+            },
+            hide_in_capture: self.hide_in_capture,
+            haptics: self.haptics,
+            display: match self.display.as_str() {
+                "main" => Display::Main,
+                "pointer" => Display::Pointer,
+                _ => Display::Auto,
+            },
+            open_page: match self.open_page.as_str() {
+                "last" => OpenPage::Last,
+                "activity" => OpenPage::Activity,
+                page => OpenPage::Page(page.to_owned()),
+            },
+            pages: self.pages.clone(),
+        }
     }
 }
 
@@ -78,8 +232,12 @@ pub struct AgentsConfig {
     pub approval_wait_seconds: u32,
     /// A sound when a command needs an answer or an agent finishes.
     pub sound: bool,
-    /// Open the notch for a moment when an agent finishes.
+    /// Show for a moment in the closed notch that an agent finished.
     pub peek_when_done: bool,
+    /// Open the notch when a command needs an answer; off shows it in the closed notch instead.
+    pub open_on_ask: bool,
+    /// Count the tokens and estimate the cost from the agents' own transcripts on this Mac.
+    pub tokens: bool,
 }
 
 impl Default for AgentsConfig {
@@ -89,17 +247,29 @@ impl Default for AgentsConfig {
             approval_wait_seconds: 30,
             sound: true,
             peek_when_done: true,
+            open_on_ask: false,
+            tokens: true,
         }
     }
 }
 
+/// The version of the file's layout this build writes; older files are brought up to it once, when they load.
+pub const CONFIG_VERSION: u32 = 2;
+
 #[derive(Debug, Clone, Serialize, Deserialize)]
 #[serde(default)]
 pub struct Config {
+    /// The layout of this file; 0 for files written before it was recorded (hence its own default).
+    #[serde(default)]
+    pub version: u32,
     /// `auto` follows the system language; or a language code such as `en` or `vi`.
     pub language: String,
     /// Open the settings window every time the app is started by hand (never when started at login).
     pub show_settings_on_launch: bool,
+    /// The icon in the menu bar. Without it, opening the app again (Finder, Spotlight) shows the settings.
+    pub menu_icon: bool,
+    /// The settings window's appearance: `auto` follows the system, or `light` or `dark`.
+    pub theme: String,
     pub mouse: Settings,
     pub tiling: TilingConfig,
     /// Global shortcut that opens the clipboard popup, e.g. "cmd+shift+c".
@@ -119,6 +289,7 @@ pub struct Config {
     pub snap: crate::features::snap::Config,
     pub menubar: crate::features::menubar::Config,
     pub stack: crate::features::stack::Config,
+    pub mascot: crate::features::mascot::Config,
     /// Replace the system volume indicator with one in the notch. Needs Accessibility access.
     pub volume_hud: bool,
     /// Unpinned items kept in history.
@@ -132,8 +303,11 @@ pub struct Config {
 impl Default for Config {
     fn default() -> Self {
         Self {
+            version: CONFIG_VERSION,
             language: "auto".into(),
             show_settings_on_launch: true,
+            menu_icon: true,
+            theme: "auto".into(),
             mouse: Settings::default(),
             tiling: TilingConfig::default(),
             hotkey: "cmd+shift+c".into(),
@@ -150,6 +324,7 @@ impl Default for Config {
             snap: crate::features::snap::Config::default(),
             menubar: crate::features::menubar::Config::default(),
             stack: crate::features::stack::Config::default(),
+            mascot: crate::features::mascot::Config::default(),
             volume_hud: false,
             history_limit: 500,
             ignored_apps: Vec::new(),
@@ -196,6 +371,10 @@ impl Config {
                     .clamp(*AGENT_WAIT_RANGE.start(), *AGENT_WAIT_RANGE.end());
                 cfg.audio = cfg.audio.sanitized();
                 cfg.capture = cfg.capture.sanitized();
+                if !["auto", "light", "dark"].contains(&cfg.theme.as_str()) {
+                    cfg.theme = "auto".into();
+                }
+                cfg.upgrade();
                 (cfg, None)
             }
             Err(e) => {
@@ -213,6 +392,18 @@ impl Config {
                 (Self::default(), Some(note))
             }
         }
+    }
+
+    /// Brings a file written by an older version up to date, once: what it changes is saved with the next save,
+    /// and from then on the user's own choices stand.
+    fn upgrade(&mut self) {
+        if self.version < 2 {
+            // Dragging a window onto the notch used to be off by default, and the settings window wrote that default
+            // into every file, so a file cannot tell a choice from a default: it is turned on once, as it now is
+            // for everyone.
+            self.snap.enabled = true;
+        }
+        self.version = CONFIG_VERSION;
     }
 
     pub fn save(&self, dir: &Path) -> io::Result<()> {
@@ -489,6 +680,59 @@ mod tests {
         )
         .unwrap();
         assert_eq!(Config::load(&dir).0.agents.approval_wait_seconds, 5);
+        fs::remove_dir_all(dir).unwrap();
+    }
+
+    #[test]
+    fn an_older_file_turns_window_snapping_on_once_and_then_keeps_the_choice() {
+        let dir = temp_dir();
+        fs::write(
+            dir.join("config.json"),
+            r#"{"snap": {"enabled": false, "zones": ["left"]}}"#,
+        )
+        .unwrap();
+        let (cfg, _) = Config::load(&dir);
+        assert!(cfg.snap.enabled);
+        assert_eq!(cfg.version, CONFIG_VERSION);
+        let mut off = cfg;
+        off.snap.enabled = false;
+        off.save(&dir).unwrap();
+        assert!(
+            !Config::load(&dir).0.snap.enabled,
+            "a choice made since stands"
+        );
+        fs::remove_dir_all(dir).unwrap();
+    }
+
+    #[test]
+    fn notch_settings_survive_hand_edits_of_the_wrong_kind() {
+        let dir = temp_dir();
+        fs::write(
+            dir.join("config.json"),
+            r#"{"hotkey": "cmd+shift+v", "notch": {"enabled": "yes", "material": 7, "motion": "bouncy",
+                "hover_delay_ms": 99999, "pages": ["media", "nope", "media", 3, "clipboard"],
+                "open_page": "agents", "shortcut": "  ctrl+opt+n "}}"#,
+        )
+        .unwrap();
+        let (cfg, note) = Config::load(&dir);
+        assert!(note.is_none(), "the file stays readable");
+        assert_eq!(cfg.hotkey, "cmd+shift+v");
+        let notch = cfg.notch;
+        assert!(notch.enabled && notch.material == "glass" && notch.motion == "spring");
+        assert_eq!(notch.hover_delay_ms, 1000);
+        assert_eq!(notch.pages, ["media", "clipboard"]);
+        assert_eq!(notch.open_page, "agents");
+        assert_eq!(notch.shortcut, "ctrl+opt+n");
+        let style = notch.style();
+        assert_eq!(style.hover_delay, 1.0);
+        assert_eq!(
+            style.open_page,
+            macos_sys::notch::OpenPage::Page("agents".into())
+        );
+        // What is saved reads back the same.
+        let again: NotchConfig =
+            serde_json::from_value(serde_json::to_value(&notch).unwrap()).unwrap();
+        assert_eq!(again, notch);
         fs::remove_dir_all(dir).unwrap();
     }
 

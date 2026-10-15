@@ -518,6 +518,7 @@ impl Feature {
                 }
             });
         })
+        .symbol(crate::menu::symbols::SMART_SELECT)
         .visible_when(move || visible.upgrade().is_some_and(|f| f.config.borrow().enabled));
         vec![Entry::Item(item)]
     }

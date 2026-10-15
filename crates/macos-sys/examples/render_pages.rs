@@ -1,19 +1,21 @@
 //! Draws the focus and media pages of the notch into PNGs without showing any window.
 //! `cargo run -p macos-sys --example render_pages -- /tmp/pages`
 
+use block2::RcBlock;
 use macos_sys::{
     MainThreadMarker,
     focus_ui::{FocusCallbacks, FocusDisplay, FocusView},
     media_ui::{Lyrics, MediaCallbacks, MediaView},
-    now_playing::{Player, Track},
+    now_playing::{Artwork, Sample, Track},
 };
-use objc2::rc::Retained;
+use objc2::{rc::Retained, runtime::Bool};
 use objc2_app_kit::{
     NSAppearance, NSAppearanceCustomization, NSAppearanceNameDarkAqua, NSApplication,
-    NSApplicationActivationPolicy, NSBitmapImageFileType, NSBox, NSBoxType, NSColor, NSView,
+    NSApplicationActivationPolicy, NSBitmapImageFileType, NSBitmapImageRep, NSBox, NSBoxType,
+    NSColor, NSImage, NSRectFill, NSView,
 };
 use objc2_foundation::{NSDate, NSDictionary, NSPoint, NSRect, NSRunLoop, NSSize};
-use std::{env, fs, path::Path};
+use std::{env, fs, path::Path, sync::Arc, time::Instant};
 
 const PAGE: NSSize = NSSize::new(500.0, 396.0);
 
@@ -40,6 +42,35 @@ fn render(content: &NSView, out: &Path) {
     .expect("png data");
     fs::write(out, png.to_vec()).expect("write png");
     println!("wrote {}", out.display());
+}
+
+/// A wide picture in three bands, as PNG bytes: on the square card the middle band shows whole and the outer two
+/// are cut, which is what filling the card looks like.
+fn wide_artwork() -> Vec<u8> {
+    let draw = RcBlock::new(|rect: NSRect| {
+        let third = rect.size.width / 3.0;
+        for (i, (r, g, b)) in [(0.92, 0.33, 0.30), (0.97, 0.78, 0.30), (0.28, 0.52, 0.95)]
+            .into_iter()
+            .enumerate()
+        {
+            NSColor::colorWithSRGBRed_green_blue_alpha(r, g, b, 1.0).setFill();
+            NSRectFill(NSRect::new(
+                NSPoint::new(third * i as f64, 0.0),
+                NSSize::new(third, rect.size.height),
+            ));
+        }
+        Bool::YES
+    });
+    let image =
+        NSImage::imageWithSize_flipped_drawingHandler(NSSize::new(320.0, 180.0), false, &draw);
+    let tiff = image.TIFFRepresentation().expect("tiff");
+    let rep = NSBitmapImageRep::imageRepWithData(&tiff).expect("bitmap");
+    // SAFETY: an empty properties dictionary is valid for PNG output.
+    unsafe {
+        rep.representationUsingType_properties(NSBitmapImageFileType::PNG, &NSDictionary::new())
+    }
+    .expect("png")
+    .to_vec()
 }
 
 fn main() {
@@ -107,19 +138,42 @@ fn main() {
             on_previous: Box::new(|| {}),
             on_play_pause: Box::new(|| {}),
             on_next: Box::new(|| {}),
+            on_seek: Box::new(|_| {}),
         },
     );
-    let track = |playing| Track {
-        player: Player::Music,
-        title: "Blue in Green".into(),
-        artist: "Miles Davis".into(),
-        album: "Kind of Blue".into(),
-        playing,
-        position_ms: 0,
-        duration_ms: 337_000,
+    let sample = |playing, artwork: Option<Artwork>| Sample {
+        track: Track {
+            app: "com.apple.Music".into(),
+            app_name: "Music".into(),
+            title: "Blue in Green".into(),
+            artist: "Miles Davis".into(),
+            album: "Kind of Blue".into(),
+            playing,
+            rate: 1.0,
+            position_ms: 128_000,
+            duration_ms: 337_000,
+            artwork,
+        },
+        at: Instant::now(),
     };
-    media.show(Some(&track(true)));
+    media.show(Some(&sample(true, None)));
     render(&media.root, &Path::new(&dir).join("media.png"));
+    let artwork = Artwork {
+        id: 1,
+        bytes: Arc::new(wide_artwork()),
+    };
+    let mut browser = sample(false, Some(artwork));
+    browser.track.app = "com.microsoft.edgemac".into();
+    browser.track.app_name = "Microsoft Edge".into();
+    browser.track.title = "A long video title from a browser tab that does not fit".into();
+    browser.track.artist = "Channel".into();
+    browser.track.duration_ms = 5_400_000;
+    browser.track.position_ms = 939_020;
+    media.show(Some(&browser));
+    render(&media.root, &Path::new(&dir).join("media_artwork.png"));
+    media.show(None);
+    render(&media.root, &Path::new(&dir).join("media_idle.png"));
+    media.show(Some(&browser));
 
     let pages = [
         (

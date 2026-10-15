@@ -1,4 +1,4 @@
-//! The "Fig" menu bar item. Dynamic entries are recomputed each time the menu opens.
+//! The menu bar item, a ghost with a menu. Dynamic entries are recomputed each time the menu opens.
 
 use crate::{context::AppContext, i18n, settings::SettingsFeature};
 use core_mouse::Settings;
@@ -13,6 +13,49 @@ use std::{cell::RefCell, fs, rc::Rc, sync::Arc};
 
 type ChangeSettings = Rc<dyn Fn(&dyn Fn(&mut Settings))>;
 
+/// The SF Symbol of each entry of the menu, named in one place so that a test can ask the system for every
+/// one of them: a name it does not know is not an error, the entry only shows without an icon. All of them
+/// are in the symbol set of macOS 13 or earlier.
+pub mod symbols {
+    // The list the test walks is made from the same lines as the constants, so it cannot miss one.
+    macro_rules! symbols {
+        ($($name:ident = $symbol:literal,)*) => {
+            $(pub const $name: &str = $symbol;)*
+            #[cfg(test)]
+            pub const ALL: &[&str] = &[$($name),*];
+        };
+    }
+
+    symbols! {
+        SETTINGS = "gearshape",
+        ACCESSIBILITY = "hand.raised",
+        SMOOTH = "computermouse",
+        REVERSE = "arrow.up.arrow.down",
+        SMOOTH_APP = "macwindow",
+        VOLUME_HUD = "speaker.wave.2",
+        OPEN_HISTORY = "doc.on.clipboard",
+        CLEAR_HISTORY = "trash",
+        LOGIN = "power",
+        OPEN_CONFIG = "folder",
+        QUIT = "xmark.rectangle",
+        CAPTURE = "camera.viewfinder",
+        CAPTURE_AREA = "rectangle.dashed",
+        CAPTURE_WINDOW = "macwindow",
+        CAPTURE_SCREEN = "display",
+        CAPTURE_TIMER = "timer",
+        CAPTURE_TEXT = "text.viewfinder",
+        CAPTURE_SCROLL = "arrow.up.and.down.text.horizontal",
+        RECORD_SCREEN = "record.circle",
+        RECORD_GIF = "photo.stack",
+        RECORD_STOP = "stop.circle",
+        CAPTURE_FOLDER = "folder",
+        SMART_SELECT = "text.magnifyingglass",
+        COLOR_PICKER = "eyedropper",
+        MENU_BAR_ICONS = "menubar.rectangle",
+        COPY_STACK = "square.stack.3d.up",
+    }
+}
+
 pub fn build(ctx: &AppContext, settings: &Rc<SettingsFeature>) -> StatusMenu {
     let mtm = ctx.mtm;
     let home = ctx.home.clone();
@@ -21,7 +64,9 @@ pub fn build(ctx: &AppContext, settings: &Rc<SettingsFeature>) -> StatusMenu {
     let text = i18n::current();
     let open_settings = {
         let settings = Rc::clone(settings);
-        Entry::Item(Item::new(text.menu_settings(), move || settings.show()))
+        Entry::Item(
+            Item::new(text.menu_settings(), move || settings.show()).symbol(symbols::SETTINGS),
+        )
     };
 
     // Applies one change to the live engine settings and to the saved config.
@@ -38,12 +83,15 @@ pub fn build(ctx: &AppContext, settings: &Rc<SettingsFeature>) -> StatusMenu {
         })
     };
 
-    let toggle_global = |name: &str, read: fn(&Settings) -> bool, flip: fn(&mut Settings)| {
-        let (control, change) = (Arc::clone(&control), Rc::clone(&change));
-        Entry::Item(
-            Item::new(name, move || change(&flip)).checked(move || read(&control.snapshot())),
-        )
-    };
+    let toggle_global =
+        |name: &str, symbol: &'static str, read: fn(&Settings) -> bool, flip: fn(&mut Settings)| {
+            let (control, change) = (Arc::clone(&control), Rc::clone(&change));
+            Entry::Item(
+                Item::new(name, move || change(&flip))
+                    .symbol(symbol)
+                    .checked(move || read(&control.snapshot())),
+            )
+        };
 
     let app_smooth = {
         let (control_check, change) = (Arc::clone(&control), Rc::clone(&change));
@@ -53,6 +101,7 @@ pub fn build(ctx: &AppContext, settings: &Rc<SettingsFeature>) -> StatusMenu {
                     change(&|s| s.toggle_smooth_for(&front.bundle_id));
                 }
             })
+            .symbol(symbols::SMOOTH_APP)
             .titled(move || match workspace::frontmost_app() {
                 Some(front) => text.menu_smooth_for(&front.name),
                 None => text.menu_smooth_current().to_owned(),
@@ -88,25 +137,32 @@ pub fn build(ctx: &AppContext, settings: &Rc<SettingsFeature>) -> StatusMenu {
                     }
                 }
             })
+            .symbol(symbols::VOLUME_HUD)
             .checked(move || check.is_enabled()),
         )
     };
 
     let open_history = {
         let clipboard = clipboard.clone();
-        Entry::Item(Item::new(text.menu_open_history(), move || {
-            if let Some(clipboard) = &clipboard {
-                (clipboard.open_popup)();
-            }
-        }))
+        Entry::Item(
+            Item::new(text.menu_open_history(), move || {
+                if let Some(clipboard) = &clipboard {
+                    (clipboard.open_popup)();
+                }
+            })
+            .symbol(symbols::OPEN_HISTORY),
+        )
     };
     let clear_history = {
         let clipboard = clipboard.clone();
-        Entry::Item(Item::new(text.menu_clear_history(), move || {
-            if let Some(clipboard) = &clipboard {
-                clipboard.history.clear_unpinned();
-            }
-        }))
+        Entry::Item(
+            Item::new(text.menu_clear_history(), move || {
+                if let Some(clipboard) = &clipboard {
+                    clipboard.history.clear_unpinned();
+                }
+            })
+            .symbol(symbols::CLEAR_HISTORY),
+        )
     };
 
     // The last failure is shown in the item's own title: an accessory app has no better place for it.
@@ -126,6 +182,7 @@ pub fn build(ctx: &AppContext, settings: &Rc<SettingsFeature>) -> StatusMenu {
                 };
                 *on_click_error.borrow_mut() = result.err();
             })
+            .symbol(symbols::LOGIN)
             .titled(
                 move || match (&*title_error.borrow(), login_item::status()) {
                     (Some(e), _) => text.menu_login_error(e),
@@ -140,10 +197,13 @@ pub fn build(ctx: &AppContext, settings: &Rc<SettingsFeature>) -> StatusMenu {
 
     let open_config = {
         let home = home.clone();
-        Entry::Item(Item::new(text.menu_open_config(), move || {
-            let _ = fs::create_dir_all(&home);
-            workspace::open_path(&home);
-        }))
+        Entry::Item(
+            Item::new(text.menu_open_config(), move || {
+                let _ = fs::create_dir_all(&home);
+                workspace::open_path(&home);
+            })
+            .symbol(symbols::OPEN_CONFIG),
+        )
     };
 
     let mut entries = vec![
@@ -153,11 +213,18 @@ pub fn build(ctx: &AppContext, settings: &Rc<SettingsFeature>) -> StatusMenu {
             Item::new(text.menu_accessibility(), || {
                 permissions::accessibility_trusted(true);
             })
+            .symbol(symbols::ACCESSIBILITY)
             .visible_when(|| !permissions::accessibility_trusted(false)),
         ),
-        toggle_global(text.menu_smooth(), |s| s.smooth, |s| s.smooth = !s.smooth),
+        toggle_global(
+            text.menu_smooth(),
+            symbols::SMOOTH,
+            |s| s.smooth,
+            |s| s.smooth = !s.smooth,
+        ),
         toggle_global(
             text.menu_reverse(),
+            symbols::REVERSE,
             |s| s.reverse,
             |s| s.reverse = !s.reverse,
         ),
@@ -177,8 +244,23 @@ pub fn build(ctx: &AppContext, settings: &Rc<SettingsFeature>) -> StatusMenu {
         entries.push(Entry::Separator);
         entries.extend(extra);
     }
-    entries.push(Entry::Item(Item::new(text.menu_quit(), move || {
-        app::quit(mtm)
-    })));
-    StatusMenu::new(mtm, "Fig", entries)
+    entries.push(Entry::Item(
+        Item::new(text.menu_quit(), move || app::quit(mtm)).symbol(symbols::QUIT),
+    ));
+    StatusMenu::new(mtm, "Figghost", entries)
+}
+
+#[cfg(test)]
+mod tests {
+    use super::*;
+
+    #[test]
+    fn the_system_knows_every_symbol_of_the_menu() {
+        for name in symbols::ALL {
+            assert!(
+                macos_sys::status_item::menu_symbol(name).is_some(),
+                "no SF Symbol is named {name}"
+            );
+        }
+    }
 }

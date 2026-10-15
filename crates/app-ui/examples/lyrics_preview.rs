@@ -2,12 +2,12 @@
 //! app itself uses.
 //!   `cargo run -p app-ui --example lyrics_preview -- /tmp/lyrics [en|vi]`
 
-use std::{env, fs, path::Path};
+use std::{env, fs, path::Path, time::Instant};
 
 use macos_sys::{
     MainThreadMarker,
     media_ui::{Lyrics, MediaView},
-    now_playing::{Player, Track},
+    now_playing::{Sample, Track},
 };
 
 // The example uses a few of the language tables; the rest of the file is for the app.
@@ -29,14 +29,20 @@ fn main() {
     fs::create_dir_all(&dir).expect("output directory");
 
     let media = MediaView::preview(mtm);
-    media.show(Some(&Track {
-        player: Player::Spotify,
-        title: "Nối vòng tay lớn".into(),
-        artist: "Trịnh Công Sơn".into(),
-        album: "Album".into(),
-        playing: true,
-        position_ms: 0,
-        duration_ms: 0,
+    media.show(Some(&Sample {
+        track: Track {
+            app: "com.spotify.client".into(),
+            app_name: "Spotify".into(),
+            title: "Nối vòng tay lớn".into(),
+            artist: "Trịnh Công Sơn".into(),
+            album: "Album".into(),
+            playing: true,
+            rate: 1.0,
+            position_ms: 0,
+            duration_ms: 0,
+            artwork: None,
+        },
+        at: Instant::now(),
     }));
 
     let vi = language == Language::Vietnamese;

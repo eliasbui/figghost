@@ -16,6 +16,7 @@ pub struct AppContext {
     pub clipboard: Option<Rc<Clipboard>>,
     pub shelf: Option<Rc<ShelfFeature>>,
     pub agents: Option<Rc<AgentsFeature>>,
+    pub live_media: Option<Rc<crate::live_media::LiveMedia>>,
     pub features: Features,
     pub volume_hud: Rc<VolumeHud>,
     pub tiling: Rc<Tiling>,

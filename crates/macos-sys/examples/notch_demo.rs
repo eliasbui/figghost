@@ -7,11 +7,11 @@ use macos_sys::{
     MainThreadMarker, app,
     media_ui::{MediaCallbacks, MediaView},
     notch::{Notch, NotchGeometry},
-    now_playing::{Player, Track},
+    now_playing::{Sample, Track},
     shelf_ui::{ShelfCallbacks, ShelfView},
     ui::{AppCallbacks, Row},
 };
-use std::{env, fs, path::PathBuf, rc::Rc};
+use std::{env, fs, path::PathBuf, rc::Rc, time::Instant};
 
 fn rows(thumb: Option<PathBuf>) -> Vec<Row> {
     let row = |id, title: &str, subtitle: &str, pinned, thumb| Row {
@@ -105,16 +105,23 @@ fn main() {
                 on_previous: Box::new(|| {}),
                 on_play_pause: Box::new(|| {}),
                 on_next: Box::new(|| {}),
+                on_seek: Box::new(|_| {}),
             },
         );
-        media.show(Some(&Track {
-            player: Player::Music,
-            title: "Blue in Green".into(),
-            artist: "Miles Davis".into(),
-            album: "Kind of Blue".into(),
-            playing: true,
-            position_ms: 0,
-            duration_ms: 0,
+        media.show(Some(&Sample {
+            track: Track {
+                app: "com.apple.Music".into(),
+                app_name: "Music".into(),
+                title: "Blue in Green".into(),
+                artist: "Miles Davis".into(),
+                album: "Kind of Blue".into(),
+                playing: true,
+                rate: 1.0,
+                position_ms: 0,
+                duration_ms: 0,
+                artwork: None,
+            },
+            at: Instant::now(),
         }));
         notch.add_page(media.page(|| {}, || {}));
 

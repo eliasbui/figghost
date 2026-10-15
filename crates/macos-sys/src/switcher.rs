@@ -12,10 +12,10 @@ use std::{
     rc::Rc,
 };
 
-pub const HEIGHT: f64 = 28.0;
-const PAD: f64 = 3.0;
-const ITEM_WIDTH: f64 = 34.0;
-const GLYPH: f64 = 14.0;
+pub const HEIGHT: f64 = 24.0;
+const PAD: f64 = 2.0;
+const ITEM_WIDTH: f64 = 28.0;
+const GLYPH: f64 = 12.0;
 
 /// The width that fits this many pages.
 pub fn width_for(count: usize) -> f64 {
@@ -184,10 +184,10 @@ impl PageSwitcher {
             if self.ivars().badges.borrow().contains(&i) {
                 let dot = NSRect::new(
                     NSPoint::new(
-                        cell.origin.x + cell.size.width - 11.0,
-                        cell.origin.y + cell.size.height - 9.0,
+                        cell.origin.x + cell.size.width - 9.0,
+                        cell.origin.y + cell.size.height - 7.5,
                     ),
-                    NSSize::new(7.0, 7.0),
+                    NSSize::new(6.0, 6.0),
                 );
                 style::fill_circle(dot, &style::Tone::Orange.color());
             }

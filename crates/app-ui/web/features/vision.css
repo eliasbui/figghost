@@ -1,3 +1,3 @@
 /* Colour picker, and background removal for images. Styles for the page in web/features/vision.js, using the variables at the top of app.css. */
+.nav-item[data-page="vision"] { --tile: #ff2d55; }
 .vision-controls { display: flex; align-items: center; gap: 6px; }
-.vision-controls .hotkey { min-width: 150px; }

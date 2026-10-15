@@ -11,6 +11,7 @@ mod focus;
 mod focus_timer;
 mod history;
 mod i18n;
+mod live_media;
 mod mcp;
 mod media;
 mod menu;
@@ -29,6 +30,7 @@ use config::{Config, home_dir};
 use context::AppContext;
 use features::{AttachEnv, Features};
 use focus::FocusFeature;
+use live_media::LiveMedia;
 use macos_sys::{MainThreadMarker, app, status_item::StatusMenu};
 use media::MediaFeature;
 use mouse::Mouse;
@@ -77,13 +79,14 @@ struct Shell {
     clipboard: Option<Rc<Clipboard>>,
     shelf: Option<Rc<ShelfFeature>>,
     media: Option<Rc<MediaFeature>>,
+    live_media: Option<Rc<LiveMedia>>,
     focus: Option<FocusFeature>,
     agents: Option<Rc<AgentsFeature>>,
     audio: AudioFeature,
     tiling: Rc<Tiling>,
     volume_hud: Rc<VolumeHud>,
     settings: Rc<SettingsFeature>,
-    status: StatusMenu,
+    status: Rc<StatusMenu>,
     reopen: app::ReopenHandler,
 }
 
@@ -111,16 +114,24 @@ impl Shell {
         }
         let notch = clipboard.as_ref().and_then(|c| c.notch.clone());
         if let Some(notch) = &notch {
+            notch.configure(&config.notch.style());
             notch.set_enabled(config.notch.enabled);
         }
         let shelf = notch
             .as_ref()
             .map(|notch| Rc::new(ShelfFeature::attach(mtm, notch, &home)));
         let media = notch.as_ref().map(|notch| MediaFeature::attach(mtm, notch));
+        let live_media = notch
+            .as_ref()
+            .zip(media.as_ref())
+            .map(|(notch, media)| LiveMedia::attach(notch, media, &config.notch));
         let focus = notch.as_ref().map(|notch| FocusFeature::attach(mtm, notch));
         let agents = notch
             .as_ref()
             .map(|notch| AgentsFeature::attach(mtm, notch, &home, &config.agents));
+        if let Some(agents) = &agents {
+            agents.configure_notch(&config.notch);
+        }
         let features = Features::attach(&AttachEnv {
             mtm,
             notch: notch.as_ref(),
@@ -129,6 +140,7 @@ impl Shell {
             clipboard: clipboard.as_ref(),
             tiling: &tiling,
             media: media.as_ref(),
+            shelf: shelf.as_ref(),
         });
         // The mixer saves what is changed on its notch page, so it shares the one config with the settings.
         let config = Rc::new(RefCell::new(config));
@@ -150,6 +162,7 @@ impl Shell {
             clipboard: clipboard.clone(),
             shelf: shelf.clone(),
             agents: agents.clone(),
+            live_media: live_media.clone(),
             features,
             volume_hud: Rc::clone(&volume_hud),
             tiling: Rc::clone(&tiling),
@@ -159,7 +172,12 @@ impl Shell {
         app::set_settings_handler(move || on_settings.show());
         let on_reopen = Rc::clone(&settings);
         let reopen = app::on_reopen(mtm, move || on_reopen.show());
-        let status = menu::build(&ctx, &settings);
+        let status = Rc::new(menu::build(&ctx, &settings));
+        status.set_visible(ctx.config.borrow().menu_icon);
+        {
+            let status = Rc::clone(&status);
+            settings.on_menu_icon(move |show| status.set_visible(show));
+        }
         if show_settings {
             settings.show();
         }
@@ -168,6 +186,7 @@ impl Shell {
             clipboard,
             shelf,
             media,
+            live_media,
             focus,
             agents,
             audio,

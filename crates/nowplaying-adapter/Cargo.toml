@@ -1,0 +1,19 @@
+[package]
+name = "nowplaying-adapter"
+version.workspace = true
+edition.workspace = true
+rust-version.workspace = true
+publish.workspace = true
+
+# Never linked into the app: /usr/bin/perl loads the library and calls into it (see src/lib.rs), and the app reads
+# what it prints.
+[lib]
+name = "figghost_nowplaying"
+crate-type = ["cdylib"]
+
+[dependencies]
+objc2.workspace = true
+objc2-foundation.workspace = true
+block2.workspace = true
+dispatch2.workspace = true
+libc.workspace = true

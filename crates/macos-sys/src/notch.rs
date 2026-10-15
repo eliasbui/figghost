@@ -1,41 +1,59 @@
-//! The notch surface: a black shape that grows out of the notch cutout on hover and hosts the clipboard list.
+//! The notch surface: a shape that grows out of the top edge of the screen. At rest it covers the hardware cutout
+//! (on a screen without one it is a notch-shaped tab, or only an invisible strip); while something is live, such as
+//! music or a working coding agent, it widens into two ears beside the cutout; open, it hosts the tabs.
+//!
+//! The window is resized only when a movement starts or ends. The movement is laid out frame by frame on the
+//! display's own clock, a spring computed here: Liquid Glass is drawn by SwiftUI inside its view and cannot be moved by
+//! a Core Animation animation from outside, so everything in the shape, glass included, gets the shape's size on every
+//! frame instead. Only the fades are Core Animation's.
 
 use crate::{
     app, labels,
     panel::{FigPanel, Key},
     pasteboard::file_paths,
-    style::{self, PANEL_RADIUS},
+    style::{self, PANEL_RADIUS, Tone, Weight, white},
     switcher::{self, PageSwitcher},
     ui::{AppCallbacks, Callbacks, ClipUi, ClipView, ListStyle, handle_key},
+    widgets::{Fit, draw_text, text_attributes},
 };
 use block2::RcBlock;
 use objc2::{
-    AnyThread, DefinedClass, MainThreadMarker, MainThreadOnly, define_class, msg_send,
+    AnyThread, DefinedClass, MainThreadMarker, MainThreadOnly, Message, define_class, msg_send,
     rc::Retained,
-    runtime::{AnyObject, ProtocolObject},
+    runtime::{AnyClass, AnyObject, ProtocolObject},
+    sel,
 };
 use objc2_app_kit::{
+    NSAnimatablePropertyContainer, NSAnimationContext,
     NSApplicationDidChangeScreenParametersNotification, NSBezierPath, NSBitmapImageFileType,
-    NSColor, NSDragOperation, NSDraggingDestination, NSDraggingInfo, NSEvent, NSEventMask,
-    NSGradient, NSPasteboardTypeFileURL, NSScreen, NSStatusBar, NSTrackingArea,
-    NSTrackingAreaOptions, NSView, NSWindowDidResignKeyNotification,
+    NSColor, NSCompositingOperation, NSDragOperation, NSDraggingDestination, NSDraggingInfo,
+    NSEvent, NSEventMask, NSGlassEffectView, NSGlassEffectViewStyle, NSGradient,
+    NSHapticFeedbackManager, NSHapticFeedbackPattern, NSHapticFeedbackPerformanceTime,
+    NSHapticFeedbackPerformer, NSImage, NSPasteboardTypeFileURL, NSScreen, NSStatusBar,
+    NSStringDrawing, NSTrackingArea, NSTrackingAreaOptions, NSView, NSVisualEffectBlendingMode,
+    NSVisualEffectMaterial, NSVisualEffectState, NSVisualEffectView,
+    NSWindowDidResignKeyNotification, NSWindowSharingType,
 };
 use objc2_foundation::{
-    NSArray, NSDictionary, NSNotification, NSNotificationCenter, NSObjectProtocol, NSPoint, NSRect,
-    NSSize,
+    NSArray, NSData, NSDictionary, NSNotification, NSNotificationCenter, NSNumber, NSObject,
+    NSObjectProtocol, NSPoint, NSRect, NSRunLoop, NSRunLoopCommonModes, NSSize, NSString,
+};
+use objc2_quartz_core::{
+    CABasicAnimation, CACornerMask, CACurrentMediaTime, CADisplayLink, CALayer, CAMediaTiming,
+    CAMediaTimingFunction, CATransaction, kCACornerCurveContinuous,
 };
 use std::{
     cell::{Cell, RefCell},
     ptr::NonNull,
     rc::{Rc, Weak},
-    time::Instant,
+    sync::Arc,
 };
 
 pub const EXPANDED_SIZE: NSSize = NSSize::new(500.0, 440.0);
 /// Height reserved above the pages for the tab bar.
-pub const TAB_BAR_HEIGHT: f64 = 40.0;
+pub const TAB_BAR_HEIGHT: f64 = 32.0;
 /// Space between the left edge of the open notch and the page icons.
-const SWITCHER_INSET: f64 = 18.0;
+const SWITCHER_INSET: f64 = 16.0;
 /// Width of the resting shape on a screen without a hardware notch.
 pub const PILL_WIDTH: f64 = 200.0;
 const HOT_ZONE_HEIGHT: f64 = 4.0;
@@ -43,14 +61,108 @@ const TRIGGER_MIN_HEIGHT: f64 = 8.0;
 const TRIGGER_SIDE_SLACK: f64 = 10.0;
 /// The bottom corners of the resting shape, close to the hardware notch's own.
 const COLLAPSED_RADIUS: f64 = 10.0;
-/// The notch opens on a spring and closes a little faster than it opened.
-const OPEN_SECONDS: f64 = 0.46;
-const CLOSE_SECONDS: f64 = 0.24;
-const PAGE_FADE_SECONDS: f64 = 0.20;
-/// How often a running animation moves the window.
-const FRAME_SECONDS: f64 = 1.0 / 120.0;
-const HOVER_OPEN_DELAY: f64 = 0.12;
 const HOVER_CLOSE_DELAY: f64 = 0.35;
+/// The narrowest an ear beside the cutout gets, as a share of its height; wide enough for a square picture.
+const EAR_MIN_SHARE: f64 = 1.2;
+const EAR_MAX: f64 = 96.0;
+const EAR_PAD: f64 = 9.0;
+/// How often moving bars are drawn while they are on screen.
+const BARS_FRAME_SECONDS: f64 = 1.0 / 30.0;
+const BAR_COUNT: usize = 4;
+const PAGE_FADE_SECONDS: f64 = 0.18;
+/// How long a shape takes to fade in or out when nothing may move.
+const DISSOLVE_SECONDS: f64 = 0.18;
+
+/// What the open notch is made of.
+#[derive(Debug, Clone, Copy, PartialEq, Eq)]
+pub enum Material {
+    /// Liquid Glass with a dark tint: the desktop shows through, bent at the edges.
+    Glass,
+    /// Liquid Glass with a light tint, more of the desktop shows through.
+    ClearGlass,
+    /// Black, slightly lighter at the bottom, like the hardware notch grown larger.
+    Black,
+}
+
+/// How the shape moves between its states.
+#[derive(Debug, Clone, Copy, PartialEq, Eq)]
+pub enum Motion {
+    /// One small overshoot, which is what makes a surface feel like it has weight.
+    Spring,
+    /// Fast at first and slowing down, without overshoot.
+    Smooth,
+    /// No movement at all; Reduce Motion has the same effect.
+    Instant,
+}
+
+/// What a screen without a hardware notch shows while nothing is happening.
+#[derive(Debug, Clone, Copy, PartialEq, Eq)]
+pub enum Rest {
+    /// A black tab the size of a notch, centred under the top edge.
+    Notch,
+    /// Nothing visible; the pointer at the top edge still opens it.
+    Hidden,
+}
+
+/// Which screen the notch lives on.
+#[derive(Debug, Clone, Copy, PartialEq, Eq)]
+pub enum Display {
+    /// The built-in screen with a notch, else the main screen.
+    Auto,
+    /// The screen with the menu bar.
+    Main,
+    /// Whichever screen the pointer reaches the top of.
+    Pointer,
+}
+
+/// The tab the notch shows when it opens.
+#[derive(Debug, Clone, PartialEq, Eq)]
+pub enum OpenPage {
+    /// The one that was showing when it closed.
+    Last,
+    /// The tab of what is live (playing music, a working agent), else the last one.
+    Activity,
+    /// Always this tab (a page id).
+    Page(String),
+}
+
+/// How the notch looks and behaves; the settings window edits it.
+#[derive(Debug, Clone, PartialEq)]
+pub struct Style {
+    pub material: Material,
+    pub shadow: bool,
+    pub motion: Motion,
+    pub open_on_hover: bool,
+    /// Seconds the pointer rests on the notch before it opens.
+    pub hover_delay: f64,
+    pub rest: Rest,
+    /// Leaves the notch out of screenshots and screen recordings, this app's own included.
+    pub hide_in_capture: bool,
+    /// A tap on a Force Touch trackpad when the notch opens under the pointer.
+    pub haptics: bool,
+    pub display: Display,
+    pub open_page: OpenPage,
+    /// The ids of the tabs to show, in order. Empty shows every tab, in the order they were added.
+    pub pages: Vec<String>,
+}
+
+impl Default for Style {
+    fn default() -> Self {
+        Self {
+            material: Material::Glass,
+            shadow: true,
+            motion: Motion::Spring,
+            open_on_hover: true,
+            hover_delay: 0.12,
+            rest: Rest::Notch,
+            hide_in_capture: false,
+            haptics: true,
+            display: Display::Auto,
+            open_page: OpenPage::Activity,
+            pages: Vec::new(),
+        }
+    }
+}
 
 /// Notch position in AppKit screen coordinates (origin bottom-left).
 #[derive(Debug, Clone, Copy)]
@@ -64,6 +176,11 @@ pub struct NotchGeometry {
 impl NotchGeometry {
     /// Prefers the notched built-in display; falls back to the menu-bar screen with a pill-sized notch.
     pub fn detect(mtm: MainThreadMarker) -> Option<Self> {
+        Self::detect_on(mtm, Display::Auto)
+    }
+
+    /// The geometry on the screen that `display` picks.
+    pub fn detect_on(mtm: MainThreadMarker, display: Display) -> Option<Self> {
         // For tests: far outside every screen, so a notch that opens on its own does not flash on the real one.
         if std::env::var_os("FIGGHOST_NOTCH_OFFSCREEN").is_some() {
             return Some(Self {
@@ -73,23 +190,39 @@ impl NotchGeometry {
             });
         }
         let screens = NSScreen::screens(mtm);
-        if let Some(s) = screens.iter().find(|s| s.safeAreaInsets().top > 0.0) {
+        let chosen = match display {
+            Display::Auto => screens
+                .iter()
+                .find(|s| s.safeAreaInsets().top > 0.0)
+                .or_else(|| screens.firstObject()),
+            Display::Main => screens.firstObject(),
+            Display::Pointer => {
+                let p = NSEvent::mouseLocation();
+                screens
+                    .iter()
+                    .find(|s| contains(s.frame(), p))
+                    .or_else(|| screens.firstObject())
+            }
+        }?;
+        Some(Self::of_screen(&chosen))
+    }
+
+    /// The notch of one screen: its cutout, or a pill as tall as the menu bar.
+    pub fn of_screen(s: &NSScreen) -> Self {
+        if s.safeAreaInsets().top > 0.0 {
             let (left, right) = (s.auxiliaryTopLeftArea(), s.auxiliaryTopRightArea());
             let width = right.origin.x - (left.origin.x + left.size.width);
-            let notch = NSSize::new(width, s.safeAreaInsets().top);
-            return Some(Self {
+            return Self {
                 screen: s.frame(),
-                notch,
+                notch: NSSize::new(width, s.safeAreaInsets().top),
                 hardware: true,
-            });
+            };
         }
-        let s = screens.firstObject()?;
-        let notch = NSSize::new(PILL_WIDTH, NSStatusBar::systemStatusBar().thickness());
-        Some(Self {
+        Self {
             screen: s.frame(),
-            notch,
+            notch: NSSize::new(PILL_WIDTH, NSStatusBar::systemStatusBar().thickness()),
             hardware: false,
-        })
+        }
     }
 
     /// A rect of the given size hugging the top edge, horizontally centered on the screen.
@@ -102,22 +235,30 @@ impl NotchGeometry {
         NSRect::new(origin, size)
     }
 
-    /// The resting shape: exactly the notch cutout, or a thin hot zone on screens without one.
+    /// The resting shape with nothing visible on a screen without a notch: exactly the cutout, or a thin hot zone.
     pub fn collapsed_frame(&self) -> NSRect {
-        if self.hardware {
-            self.frame(self.notch.width, self.notch.height)
-        } else {
-            self.frame(PILL_WIDTH, HOT_ZONE_HEIGHT)
+        let size = self.rest_size(Rest::Hidden);
+        self.frame(size.width, size.height)
+    }
+
+    /// The size of the resting shape.
+    pub fn rest_size(&self, rest: Rest) -> NSSize {
+        match (self.hardware, rest) {
+            (true, _) | (false, Rest::Notch) => self.notch,
+            (false, Rest::Hidden) => NSSize::new(PILL_WIDTH, HOT_ZONE_HEIGHT),
         }
     }
 
-    /// Where the pointer must be to open the notch. Taller than the resting shape on screens without a
-    /// notch, and checked against raw pointer positions: the topmost rows of the screen never deliver
-    /// events to a window, so a tracking area alone would miss a pointer pushed against the edge.
+    /// Where the pointer must be to open a shape of this size. Taller than the shape when it is a thin strip, and
+    /// checked against raw pointer positions: the topmost rows of the screen never deliver events to a window, so a
+    /// tracking area alone would miss a pointer pushed against the edge.
+    pub fn trigger_for(&self, size: NSSize) -> NSRect {
+        let height = size.height.max(TRIGGER_MIN_HEIGHT);
+        self.frame(size.width + 2.0 * TRIGGER_SIDE_SLACK, height)
+    }
+
     pub fn trigger_rect(&self) -> NSRect {
-        let rest = self.collapsed_frame();
-        let height = rest.size.height.max(TRIGGER_MIN_HEIGHT);
-        self.frame(rest.size.width + 2.0 * TRIGGER_SIDE_SLACK, height)
+        self.trigger_for(self.collapsed_frame().size)
     }
 
     pub fn expanded_frame(&self) -> NSRect {
@@ -134,104 +275,122 @@ impl NotchGeometry {
     }
 }
 
+/// Fills its slice with levels from 0 to 1, one per bar.
+pub type Levels = Rc<dyn Fn(&mut [f32])>;
+
+/// What one side of the closed notch shows while something is live.
+#[derive(Clone)]
+pub enum Ear {
+    Empty,
+    /// An SF Symbol in a colour; `pulse` makes it breathe, for something that waits for the user.
+    Symbol {
+        name: &'static str,
+        tone: Tone,
+        pulse: bool,
+    },
+    /// A short text, such as a percentage or a count.
+    Text {
+        text: String,
+        tone: Tone,
+    },
+    /// Encoded image bytes (album art), drawn with rounded corners. `id` tells a new picture from the same one.
+    Artwork {
+        id: u64,
+        bytes: Arc<Vec<u8>>,
+    },
+    /// Bars that move with `levels` (0 to 1 each), asked about 30 times a second while they are on screen.
+    Bars {
+        levels: Levels,
+        /// sRGB, 0 to 1.
+        color: [f64; 3],
+    },
+}
+
+impl Ear {
+    /// How wide this side needs to be at the given height.
+    fn width(&self, height: f64) -> f64 {
+        let least = height * EAR_MIN_SHARE;
+        match self {
+            Ear::Text { text, .. } => {
+                let font = style::font(text_size(height), Weight::Semibold);
+                let attrs = text_attributes(&font, &white(1.0), Fit::Clip, false);
+                // SAFETY: the attributes dictionary holds valid attribute objects.
+                let width =
+                    unsafe { NSString::from_str(text).sizeWithAttributes(Some(&attrs)) }.width;
+                (width.ceil() + 2.0 * EAR_PAD).clamp(least, EAR_MAX)
+            }
+            Ear::Bars { .. } => least.max(BAR_COUNT as f64 * 5.5 + 2.0 * EAR_PAD),
+            _ => least,
+        }
+    }
+}
+
+fn text_size(height: f64) -> f64 {
+    (height * 0.45).clamp(11.0, 13.5)
+}
+
+/// Something live, shown in the closed notch.
+#[derive(Clone)]
+pub struct Activity {
+    pub left: Ear,
+    pub right: Ear,
+    /// The tab that opens from it: on a click, and on a hover with the "activity" opening rule.
+    pub page: Option<usize>,
+    /// The highest priority is shown; among equals, the one that started last.
+    pub priority: u8,
+}
+
 type Signal = Rc<dyn Fn()>;
 type DragSignal = Rc<dyn Fn(bool)>;
+type Resize = Rc<dyn Fn(NSSize)>;
 
-pub struct ShapeIvars {
-    expanded: Cell<bool>,
-    hardware: Cell<bool>,
+pub struct RootIvars {
     /// Called when the pointer enters or leaves the window.
     on_pointer: RefCell<Option<Signal>>,
     on_click: RefCell<Option<Signal>>,
-    /// Called with true when a drag carrying files enters the shape and false when it leaves.
+    /// Called with true when a drag carrying files enters the window and false when it leaves.
     on_drag: RefCell<Option<DragSignal>>,
+    /// While the notch is open, a click is the pages' business.
+    open: Cell<bool>,
 }
 
 define_class!(
     // SAFETY: NSView allows subclassing; the ivars are only touched on the main thread and need no Drop.
     #[unsafe(super(NSView))]
     #[thread_kind = MainThreadOnly]
-    #[name = "FigNotchShape"]
-    #[ivars = ShapeIvars]
-    struct ShapeView;
+    #[name = "FigNotchRoot"]
+    #[ivars = RootIvars]
+    struct RootView;
 
-    impl ShapeView {
+    impl RootView {
         #[unsafe(method(acceptsFirstMouse:))]
         fn accepts_first_mouse(&self, _event: Option<&NSEvent>) -> bool {
             true
         }
 
-        #[unsafe(method(drawRect:))]
-        fn draw_rect(&self, _dirty: NSRect) {
-            let ivars = self.ivars();
-            // On screens without a notch the resting shape must stay invisible but still catch the pointer,
-            // and fully transparent pixels would let it pass through.
-            let expanded = ivars.expanded.get();
-            let alpha = if expanded || ivars.hardware.get() { 1.0 } else { 0.01 };
-            let radius = if expanded { PANEL_RADIUS } else { COLLAPSED_RADIUS };
-            let bounds = self.bounds();
-            // Overshoot the top edge so only the bottom corners are rounded, like the hardware notch.
-            let shape = NSRect::new(
-                bounds.origin,
-                NSSize::new(bounds.size.width, bounds.size.height + radius),
-            );
-            let path = NSBezierPath::bezierPathWithRoundedRect_xRadius_yRadius(shape, radius, radius);
-            if expanded {
-                // Black where it joins the screen's edge, a dark slate at the bottom: the surface reads as
-                // lit from below, and still merges with the hardware notch.
-                let slate = NSColor::colorWithSRGBRed_green_blue_alpha(0.17, 0.18, 0.20, 1.0);
-                let gradient = NSGradient::initWithStartingColor_endingColor(
-                    NSGradient::alloc(),
-                    &slate,
-                    &style::black(1.0),
-                );
-                if let Some(gradient) = gradient {
-                    gradient.drawInBezierPath_angle(&path, 90.0);
-                }
-            } else {
-                style::black(alpha).setFill();
-                path.fill();
-            }
-        }
-
-        // Everything inside lives in one container laid out for the expanded size and pinned to the top
-        // centre here. Autoresizing masks misplace views wider than a shrunken parent, and views that are
-        // added while the shape is collapsed.
-        #[unsafe(method(setFrameSize:))]
-        fn set_frame_size(&self, size: NSSize) {
-            // SAFETY: forwards the same selector and argument to the superclass.
-            let _: () = unsafe { msg_send![super(self), setFrameSize: size] };
-            if let Some(content) = self.subviews().firstObject() {
-                content.setFrameOrigin(NSPoint::new(
-                    (size.width - EXPANDED_SIZE.width) / 2.0,
-                    size.height - EXPANDED_SIZE.height,
-                ));
-            }
-        }
-
         #[unsafe(method(mouseEntered:))]
         fn mouse_entered(&self, _event: &NSEvent) {
-            self.fire(&self.ivars().on_pointer);
+            fire(&self.ivars().on_pointer);
         }
 
         #[unsafe(method(mouseExited:))]
         fn mouse_exited(&self, _event: &NSEvent) {
-            self.fire(&self.ivars().on_pointer);
+            fire(&self.ivars().on_pointer);
         }
 
         #[unsafe(method(mouseDown:))]
         fn mouse_down(&self, _event: &NSEvent) {
-            if !self.ivars().expanded.get() {
-                self.fire(&self.ivars().on_click);
+            if !self.ivars().open.get() {
+                fire(&self.ivars().on_click);
             }
         }
     }
 
-    unsafe impl NSObjectProtocol for ShapeView {}
+    unsafe impl NSObjectProtocol for RootView {}
 
-    // The shape is a drag destination only to notice files arriving: it opens the notch on the shelf. The
-    // shelf page itself accepts the drop, so this never claims the operation.
-    unsafe impl NSDraggingDestination for ShapeView {
+    // The window is a drag destination only to notice files arriving: it opens the notch on the shelf. The shelf
+    // page itself accepts the drop, so this never claims the operation.
+    unsafe impl NSDraggingDestination for RootView {
         #[unsafe(method(draggingEntered:))]
         fn dragging_entered(&self, sender: &ProtocolObject<dyn NSDraggingInfo>) -> NSDragOperation {
             if !file_paths(&sender.draggingPasteboard()).is_empty() {
@@ -247,18 +406,25 @@ define_class!(
     }
 );
 
-impl ShapeView {
-    fn new(mtm: MainThreadMarker, frame: NSRect, hardware: bool) -> Retained<Self> {
-        let ivars = ShapeIvars {
-            expanded: Cell::new(false),
-            hardware: Cell::new(hardware),
+fn fire(which: &RefCell<Option<Signal>>) {
+    let signal = which.borrow().clone();
+    if let Some(signal) = signal {
+        signal();
+    }
+}
+
+impl RootView {
+    fn new(mtm: MainThreadMarker, frame: NSRect) -> Retained<Self> {
+        let ivars = RootIvars {
             on_pointer: RefCell::new(None),
             on_click: RefCell::new(None),
             on_drag: RefCell::new(None),
+            open: Cell::new(false),
         };
         // SAFETY: designated initializer with valid arguments on the main thread.
         let this: Retained<Self> =
             unsafe { msg_send![super(mtm.alloc::<Self>().set_ivars(ivars)), initWithFrame: frame] };
+        this.setWantsLayer(true);
         // SAFETY: extern statics are process-lifetime constants.
         this.registerForDraggedTypes(&NSArray::from_slice(&[unsafe { NSPasteboardTypeFileURL }]));
         // SAFETY: valid options and owner; InVisibleRect ignores the (empty) rect.
@@ -283,27 +449,365 @@ impl ShapeView {
             signal(entered);
         }
     }
+}
 
-    fn fire(&self, which: &RefCell<Option<Signal>>) {
-        let signal = which.borrow().clone();
-        if let Some(signal) = signal {
-            signal();
+pub struct SurfaceIvars {
+    on_resize: RefCell<Option<Resize>>,
+}
+
+define_class!(
+    // SAFETY: NSView allows subclassing; the ivars are only touched on the main thread and need no Drop.
+    #[unsafe(super(NSView))]
+    #[thread_kind = MainThreadOnly]
+    #[name = "FigNotchSurface"]
+    #[ivars = SurfaceIvars]
+    struct SurfaceView;
+
+    impl SurfaceView {
+        // Everything inside is placed here, from the top centre, whenever the shape changes size: on every frame of a
+        // movement.
+        #[unsafe(method(setFrameSize:))]
+        fn set_frame_size(&self, size: NSSize) {
+            // SAFETY: forwards the same selector and argument to the superclass.
+            let _: () = unsafe { msg_send![super(self), setFrameSize: size] };
+            let layout = self.ivars().on_resize.borrow().clone();
+            if let Some(layout) = layout {
+                layout(size);
+            }
         }
     }
+);
 
-    fn set_expanded(&self, expanded: bool) {
-        self.ivars().expanded.set(expanded);
+impl SurfaceView {
+    fn new(mtm: MainThreadMarker) -> Retained<Self> {
+        let ivars = SurfaceIvars {
+            on_resize: RefCell::new(None),
+        };
+        // SAFETY: designated initializer with valid arguments on the main thread.
+        let this: Retained<Self> = unsafe {
+            msg_send![super(mtm.alloc::<Self>().set_ivars(ivars)), initWithFrame: NSRect::ZERO]
+        };
+        // The surface clips nothing: Liquid Glass inside a clipping layer cannot see what is behind the window and
+        // turns flat grey. The pieces that need the rounded shape round themselves (`round_bottom`).
+        this.setWantsLayer(true);
+        this
+    }
+}
+
+/// How a plain view paints itself: a colour, a gradient, or nothing.
+#[derive(Debug, Clone, Copy, PartialEq)]
+enum Paint {
+    Ink,
+    /// Black where it joins the screen's edge, a dark slate at the bottom: the surface reads as lit from below.
+    Slate,
+    /// Black at the top fading to nothing, so glass merges with a hardware notch.
+    Band,
+}
+
+pub struct FillIvars {
+    paint: Cell<Paint>,
+}
+
+define_class!(
+    // SAFETY: NSView allows subclassing; the ivars are only touched on the main thread and need no Drop.
+    #[unsafe(super(NSView))]
+    #[thread_kind = MainThreadOnly]
+    #[name = "FigNotchFill"]
+    #[ivars = FillIvars]
+    struct FillView;
+
+    impl FillView {
+        #[unsafe(method(drawRect:))]
+        fn draw_rect(&self, _dirty: NSRect) {
+            let bounds = self.bounds();
+            let gradient = |top: &NSColor, bottom: &NSColor| {
+                if let Some(g) = NSGradient::initWithStartingColor_endingColor(NSGradient::alloc(), bottom, top) {
+                    g.drawInRect_angle(bounds, 90.0);
+                }
+            };
+            match self.ivars().paint.get() {
+                Paint::Ink => {
+                    style::black(1.0).setFill();
+                    NSBezierPath::fillRect(bounds);
+                }
+                Paint::Slate => gradient(
+                    &style::black(1.0),
+                    &NSColor::colorWithSRGBRed_green_blue_alpha(0.17, 0.18, 0.20, 1.0),
+                ),
+                Paint::Band => gradient(&style::black(1.0), &style::black(0.0)),
+            }
+        }
+    }
+);
+
+impl FillView {
+    fn new(mtm: MainThreadMarker, paint: Paint) -> Retained<Self> {
+        let this = mtm.alloc::<Self>().set_ivars(FillIvars {
+            paint: Cell::new(paint),
+        });
+        // SAFETY: designated initializer with valid arguments on the main thread.
+        let this: Retained<Self> = unsafe { msg_send![super(this), initWithFrame: NSRect::ZERO] };
+        this.setWantsLayer(true);
+        if paint != Paint::Band
+            && let Some(layer) = this.layer()
+        {
+            round_bottom(&layer);
+        }
+        this
+    }
+}
+
+/// Rounds the bottom corners of a layer and clips what it draws to them. A layer-backed view's layer is not flipped,
+/// so the minimum y corners are the bottom ones; the top edge joins the edge of the screen and stays square.
+fn round_bottom(layer: &CALayer) {
+    layer.setMasksToBounds(true);
+    layer.setMaskedCorners(CACornerMask::LayerMinXMinYCorner | CACornerMask::LayerMaxXMinYCorner);
+    // SAFETY: an extern static constant.
+    layer.setCornerCurve(unsafe { kCACornerCurveContinuous });
+    layer.setCornerRadius(COLLAPSED_RADIUS);
+}
+
+/// One side of the closed notch.
+struct EarState {
+    ear: Ear,
+    image: Option<Retained<NSImage>>,
+    image_id: u64,
+    levels: [f32; BAR_COUNT],
+}
+
+pub struct EarIvars {
+    state: RefCell<EarState>,
+}
+
+define_class!(
+    // SAFETY: NSView allows subclassing; the ivars are only touched on the main thread and need no Drop.
+    #[unsafe(super(NSView))]
+    #[thread_kind = MainThreadOnly]
+    #[name = "FigNotchEar"]
+    #[ivars = EarIvars]
+    struct EarView;
+
+    impl EarView {
+        #[unsafe(method(drawRect:))]
+        fn draw_rect(&self, _dirty: NSRect) {
+            self.paint();
+        }
+    }
+);
+
+impl EarView {
+    fn new(mtm: MainThreadMarker) -> Retained<Self> {
+        let this = mtm.alloc::<Self>().set_ivars(EarIvars {
+            state: RefCell::new(EarState {
+                ear: Ear::Empty,
+                image: None,
+                image_id: 0,
+                levels: [0.0; BAR_COUNT],
+            }),
+        });
+        // SAFETY: designated initializer with valid arguments on the main thread.
+        let this: Retained<Self> = unsafe { msg_send![super(this), initWithFrame: NSRect::ZERO] };
+        this.setWantsLayer(true);
+        this
+    }
+
+    fn set(&self, ear: &Ear) {
+        {
+            let mut state = self.ivars().state.borrow_mut();
+            if let Ear::Artwork { id, bytes } = ear
+                && (state.image_id != *id || state.image.is_none())
+            {
+                let data = NSData::with_bytes(bytes);
+                state.image = NSImage::initWithData(NSImage::alloc(), &data);
+                state.image_id = *id;
+            }
+            if !matches!(ear, Ear::Artwork { .. }) {
+                state.image = None;
+                state.image_id = 0;
+            }
+            state.ear = ear.clone();
+        }
+        let pulse = matches!(ear, Ear::Symbol { pulse: true, .. });
+        if let Some(layer) = self.layer() {
+            let key = NSString::from_str("pulse");
+            if pulse {
+                // SAFETY: only reads whether an animation is attached under this key.
+                if unsafe { layer.animationForKey(&key) }.is_none() {
+                    let anim = CABasicAnimation::animationWithKeyPath(Some(&NSString::from_str(
+                        "opacity",
+                    )));
+                    // SAFETY: NSNumber is a valid value for an opacity animation.
+                    unsafe {
+                        anim.setFromValue(Some(&NSNumber::new_f64(1.0)));
+                        anim.setToValue(Some(&NSNumber::new_f64(0.35)));
+                    }
+                    anim.setDuration(0.9);
+                    anim.setAutoreverses(true);
+                    anim.setRepeatCount(f32::INFINITY);
+                    anim.setTimingFunction(Some(
+                        &CAMediaTimingFunction::functionWithControlPoints(0.45, 0.0, 0.55, 1.0),
+                    ));
+                    layer.addAnimation_forKey(&anim, Some(&key));
+                }
+            } else {
+                layer.removeAnimationForKey(&key);
+            }
+        }
         self.setNeedsDisplay(true);
     }
 
-    fn set_hardware(&self, hardware: bool) {
-        self.ivars().hardware.set(hardware);
+    /// Asks the bars for their levels and redraws them. Returns false when this side has no bars.
+    fn tick(&self) -> bool {
+        let levels = match &self.ivars().state.borrow().ear {
+            Ear::Bars { levels, .. } => Rc::clone(levels),
+            _ => return false,
+        };
+        let mut next = [0.0; BAR_COUNT];
+        levels(&mut next);
+        self.ivars().state.borrow_mut().levels = next;
         self.setNeedsDisplay(true);
+        true
     }
+
+    fn paint(&self) {
+        let state = self.ivars().state.borrow();
+        let bounds = self.bounds();
+        let centre = NSPoint::new(bounds.size.width / 2.0, bounds.size.height / 2.0);
+        let height = bounds.size.height;
+        match &state.ear {
+            Ear::Empty => {}
+            Ear::Symbol { name, tone, .. } => {
+                style::draw_symbol(name, centre, (height * 0.62).min(18.0), &tone.color());
+            }
+            Ear::Text { text, tone } => {
+                let font = style::font(text_size(height), Weight::Semibold);
+                let line = font.ascender() - font.descender();
+                draw_text(
+                    text,
+                    NSRect::new(
+                        NSPoint::new(0.0, centre.y - line / 2.0 - 0.5),
+                        NSSize::new(bounds.size.width, line + 1.0),
+                    ),
+                    &text_attributes(&font, &tone.color(), Fit::Clip, true),
+                );
+            }
+            Ear::Artwork { .. } => {
+                let side = (height - 8.0).max(8.0);
+                let rect = NSRect::new(
+                    NSPoint::new(centre.x - side / 2.0, centre.y - side / 2.0),
+                    NSSize::new(side, side),
+                );
+                let path = NSBezierPath::bezierPathWithRoundedRect_xRadius_yRadius(rect, 5.0, 5.0);
+                match &state.image {
+                    Some(image) => {
+                        objc2_app_kit::NSGraphicsContext::saveGraphicsState_class();
+                        path.addClip();
+                        draw_filled(image, rect);
+                        objc2_app_kit::NSGraphicsContext::restoreGraphicsState_class();
+                    }
+                    None => {
+                        white(0.16).setFill();
+                        path.fill();
+                    }
+                }
+            }
+            Ear::Bars { color, .. } => {
+                let ink =
+                    NSColor::colorWithSRGBRed_green_blue_alpha(color[0], color[1], color[2], 1.0);
+                let (bar, gap) = (3.0, 2.5);
+                let span = BAR_COUNT as f64 * bar + (BAR_COUNT - 1) as f64 * gap;
+                let tallest = (height * 0.62).max(6.0);
+                for (i, level) in state.levels.iter().enumerate() {
+                    let h = (f64::from(*level).clamp(0.0, 1.0) * tallest).max(bar);
+                    let rect = NSRect::new(
+                        NSPoint::new(
+                            centre.x - span / 2.0 + i as f64 * (bar + gap),
+                            centre.y - h / 2.0,
+                        ),
+                        NSSize::new(bar, h),
+                    );
+                    style::fill_capsule(rect, &ink);
+                }
+            }
+        }
+    }
+}
+
+/// A colour for bars next to a cover: its average colour, brightened enough to read on black. `None` for bytes
+/// that are not a picture.
+pub fn artwork_tint(bytes: &[u8]) -> Option<[f64; 3]> {
+    let image = NSImage::initWithData(NSImage::alloc(), &NSData::with_bytes(bytes))?;
+    // SAFETY: a one-pixel 8-bit RGBA bitmap with no planes passed in; AppKit allocates its own buffer.
+    let rep = unsafe {
+        objc2_app_kit::NSBitmapImageRep::initWithBitmapDataPlanes_pixelsWide_pixelsHigh_bitsPerSample_samplesPerPixel_hasAlpha_isPlanar_colorSpaceName_bytesPerRow_bitsPerPixel(
+            objc2_app_kit::NSBitmapImageRep::alloc(),
+            std::ptr::null_mut(),
+            1,
+            1,
+            8,
+            4,
+            true,
+            false,
+            objc2_app_kit::NSCalibratedRGBColorSpace,
+            4,
+            32,
+        )
+    }?;
+    let context = objc2_app_kit::NSGraphicsContext::graphicsContextWithBitmapImageRep(&rep)?;
+    objc2_app_kit::NSGraphicsContext::saveGraphicsState_class();
+    objc2_app_kit::NSGraphicsContext::setCurrentContext(Some(&context));
+    // Drawn into one pixel, the picture is averaged by the scaling.
+    image.drawInRect(NSRect::new(NSPoint::ZERO, NSSize::new(1.0, 1.0)));
+    context.flushGraphics();
+    objc2_app_kit::NSGraphicsContext::restoreGraphicsState_class();
+    let color = rep.colorAtX_y(0, 0)?;
+    let srgb = color.colorUsingColorSpace(&objc2_app_kit::NSColorSpace::sRGBColorSpace())?;
+    let rgb = [
+        srgb.redComponent(),
+        srgb.greenComponent(),
+        srgb.blueComponent(),
+    ];
+    Some(brighten(rgb))
+}
+
+/// Lifts a colour until its brightest part reads on black, keeping its hue; a cover that is nearly black has no hue
+/// worth keeping and gives plain light bars.
+fn brighten(rgb: [f64; 3]) -> [f64; 3] {
+    let top = rgb.iter().copied().fold(0.0, f64::max);
+    if top < 0.04 {
+        return [0.92, 0.92, 0.95];
+    }
+    let scale = 0.95 / top;
+    rgb.map(|c| (c * scale * 0.8 + 0.2).clamp(0.0, 1.0))
+}
+
+/// Draws an image so it fills `rect`, cropping what overflows, like a cover.
+fn draw_filled(image: &NSImage, rect: NSRect) {
+    let size = image.size();
+    if size.width <= 0.0 || size.height <= 0.0 {
+        return;
+    }
+    let scale = (rect.size.width / size.width).max(rect.size.height / size.height);
+    let drawn = NSSize::new(size.width * scale, size.height * scale);
+    let target = NSRect::new(
+        NSPoint::new(
+            rect.origin.x + (rect.size.width - drawn.width) / 2.0,
+            rect.origin.y + (rect.size.height - drawn.height) / 2.0,
+        ),
+        drawn,
+    );
+    image.drawInRect_fromRect_operation_fraction(
+        target,
+        NSRect::ZERO,
+        NSCompositingOperation::SourceOver,
+        1.0,
+    );
 }
 
 /// One tab of the expanded notch.
 pub struct Page {
+    /// Stable name of the tab, for the settings that order and hide tabs: clipboard, shelf, media, ...
+    pub id: &'static str,
     pub title: String,
     /// The SF Symbol shown for this page in the strip at the top.
     pub symbol: &'static str,
@@ -319,36 +823,266 @@ pub struct Page {
     pub accepts_files: bool,
 }
 
+/// Where the shape is, or is going.
+#[derive(Debug, Clone, Copy, PartialEq)]
+enum Shape {
+    Rest,
+    /// Widened by this much on each side of the cutout, for something live.
+    Compact(f64),
+    Open,
+}
+
 struct Inner {
+    mtm: MainThreadMarker,
     panel: Retained<FigPanel>,
-    shape: Retained<ShapeView>,
+    root: Retained<RootView>,
+    surface: Retained<SurfaceView>,
+    /// Glass, or the slate gradient; replaced when the material changes.
+    background: RefCell<Retained<NSView>>,
+    /// The background when it is Liquid Glass, whose corners follow the shape's.
+    glass: RefCell<Option<Retained<NSGlassEffectView>>>,
+    /// Solid black over the background while the notch is closed, so the closed shape is a notch.
+    ink: Retained<FillView>,
+    /// Black at the top of open glass on a screen with a hardware notch.
+    band: Retained<FillView>,
+    left: Retained<EarView>,
+    right: Retained<EarView>,
+    /// The shape's own size, rounded and clipping like it, so the pages show only inside the shape as it grows. Glass
+    /// cannot be inside a clipping view (see `SurfaceView::new`), the pages can.
+    clip: Retained<NSView>,
     /// Holds the tab bar and every page at their expanded-size positions.
     content: Retained<NSView>,
     view: ClipView,
     switcher: Retained<PageSwitcher>,
     pages: RefCell<Vec<Page>>,
+    /// The visible pages, in tab order (indices into `pages`).
+    order: RefCell<Vec<usize>>,
+    badges: RefCell<Vec<usize>>,
     active: Cell<usize>,
+    /// The page whose `on_show` ran last and whose `on_hide` has not run yet.
+    shown: Cell<Option<usize>>,
     /// Set while files are being dragged over the notch, to open on the page that takes them.
     files_hint: Cell<bool>,
     geometry: Cell<NotchGeometry>,
+    style: RefCell<Style>,
+    shape: Cell<Shape>,
     inside: Cell<bool>,
-    expanded: Cell<bool>,
     /// Off removes the panel from the screen and ignores the pointer.
     enabled: Cell<bool>,
     /// While something else is using the top edge (window snapping), the pointer does not open the notch.
     suppressed: Cell<bool>,
+    activities: RefCell<Vec<(&'static str, Activity, u64)>>,
+    serial: Cell<u64>,
+    /// The ears' bars are redrawn by this while they are on screen; nothing runs otherwise.
+    bars: RefCell<Option<app::Timer>>,
+    /// Bumped by every movement; a movement that finishes late does nothing when another has started since.
+    generation: Cell<u64>,
+    /// The shape as it is on screen now.
+    pose: Cell<Pose>,
+    /// The movement under way.
+    flight: Cell<Option<Flight>>,
+    /// Present only while a movement is under way.
+    driver: RefCell<Option<Driver>>,
     me: Weak<Inner>,
-    /// The timer of the open or close animation, if one is running; replacing it cancels the old one.
-    anim: RefCell<Option<app::Timer>>,
-    page_anim: RefCell<Option<app::Timer>>,
 }
 
 fn reduced_motion() -> bool {
     crate::workspace::display_options().reduce_motion
 }
 
-fn lerp(from: f64, to: f64, t: f64) -> f64 {
-    from + (to - from) * t
+/// `FIGGHOST_SLOW_MOTION=25` plays every movement 25 times slower, so it can be looked at frame by frame (see the
+/// notch_shots example). 1 otherwise.
+fn slow_motion() -> f64 {
+    std::env::var("FIGGHOST_SLOW_MOTION")
+        .ok()
+        .and_then(|v| v.parse::<f64>().ok())
+        .filter(|f| *f >= 1.0)
+        .unwrap_or(1.0)
+}
+
+fn timing(c1x: f32, c1y: f32, c2x: f32, c2y: f32) -> Retained<CAMediaTimingFunction> {
+    CAMediaTimingFunction::functionWithControlPoints(c1x, c1y, c2x, c2y)
+}
+
+/// Runs `changes` as one Core Animation group of `seconds` along `curve`.
+fn animate(seconds: f64, curve: &CAMediaTimingFunction, changes: impl Fn() + 'static) {
+    let curve = curve.retain();
+    let block = RcBlock::new(move |context: NonNull<NSAnimationContext>| {
+        // SAFETY: AppKit passes the live current context for the duration of the call.
+        let context = unsafe { context.as_ref() };
+        context.setDuration(seconds);
+        context.setTimingFunction(Some(&curve));
+        context.setAllowsImplicitAnimation(true);
+        changes();
+    });
+    NSAnimationContext::runAnimationGroup(&block);
+}
+
+/// Changes made at once, with every implicit animation turned off.
+fn instantly(changes: impl FnOnce()) {
+    CATransaction::begin();
+    CATransaction::setDisableActions(true);
+    changes();
+    CATransaction::commit();
+}
+
+fn union_size(a: NSSize, b: NSSize) -> NSSize {
+    NSSize::new(a.width.max(b.width), a.height.max(b.height))
+}
+
+/// A damped spring from 0 to 1, as Core Animation and SwiftUI describe one: how long it takes to look done, and how
+/// much it overshoots (0 for none). It can start already moving, so a movement that turns another around keeps its
+/// pace.
+#[derive(Debug, Clone, Copy, PartialEq)]
+struct Spring {
+    omega: f64,
+    zeta: f64,
+    /// Progress per second at the start.
+    velocity: f64,
+}
+
+impl Spring {
+    fn new(duration: f64, bounce: f64, velocity: f64) -> Self {
+        Self {
+            omega: std::f64::consts::TAU / duration,
+            zeta: (1.0 - bounce).clamp(0.05, 1.0),
+            velocity,
+        }
+    }
+
+    /// Progress and its speed (per second) `t` seconds in.
+    fn at(&self, t: f64) -> (f64, f64) {
+        let (w, z) = (self.omega, self.zeta);
+        // The distance left, y = progress - 1, starts at -1 with the given speed.
+        if z < 1.0 {
+            let wd = w * (1.0 - z * z).sqrt();
+            let (a, b) = (-1.0, (self.velocity - z * w) / wd);
+            let decay = (-z * w * t).exp();
+            let (sin, cos) = (wd * t).sin_cos();
+            let y = decay * (a * cos + b * sin);
+            let dy = decay * ((-z * w * a + wd * b) * cos + (-z * w * b - wd * a) * sin);
+            (1.0 + y, dy)
+        } else {
+            let (a, b) = (-1.0, self.velocity - w);
+            let decay = (-w * t).exp();
+            ((1.0 + (a + b * t) * decay), (b - w * (a + b * t)) * decay)
+        }
+    }
+
+    /// Whether a movement over `distance` points is over: under half a point from the end, and nearly still.
+    fn settled(&self, t: f64, distance: f64) -> bool {
+        let (x, v) = self.at(t);
+        ((1.0 - x) * distance).abs() < 0.5 && (v * distance).abs() < 30.0
+    }
+
+    /// When a movement over `distance` points is over, to the nearest frame.
+    fn settling_time(&self, distance: f64) -> f64 {
+        (0..=360)
+            .map(|frame| f64::from(frame) / 120.0)
+            .find(|&t| self.settled(t, distance))
+            .unwrap_or(3.0)
+    }
+}
+
+/// The shape at one moment: its size and the radius of its bottom corners.
+#[derive(Debug, Clone, Copy, PartialEq)]
+struct Pose {
+    size: NSSize,
+    radius: f64,
+}
+
+impl Pose {
+    /// The pose `progress` of the way to `to`; past 1 it overshoots.
+    fn toward(self, to: Pose, progress: f64) -> Pose {
+        let mix = |a: f64, b: f64| (a + (b - a) * progress).max(0.0);
+        Pose {
+            size: NSSize::new(
+                mix(self.size.width, to.size.width),
+                mix(self.size.height, to.size.height),
+            ),
+            radius: mix(self.radius, to.radius),
+        }
+    }
+
+    /// How far apart two poses are, in points: the larger change of the two sides.
+    fn distance(self, to: Pose) -> f64 {
+        (to.size.width - self.size.width)
+            .abs()
+            .max((to.size.height - self.size.height).abs())
+    }
+}
+
+/// One movement of the shape.
+#[derive(Debug, Clone, Copy)]
+struct Flight {
+    from: Pose,
+    to: Pose,
+    spring: Spring,
+    /// The display time of its first frame; unknown until that frame, so work done just before (a page filling
+    /// itself) delays the movement instead of eating its start.
+    start: Option<f64>,
+    generation: u64,
+}
+
+impl Flight {
+    fn pose_at(&self, t: f64) -> Pose {
+        self.from.toward(self.to, self.spring.at(t).0)
+    }
+
+    fn distance(&self) -> f64 {
+        self.from.distance(self.to)
+    }
+}
+
+pub struct TickerIvars {
+    inner: Weak<Inner>,
+}
+
+define_class!(
+    // SAFETY: NSObject allows subclassing; the ivar is only touched on the main thread.
+    #[unsafe(super(NSObject))]
+    #[thread_kind = MainThreadOnly]
+    #[name = "FigNotchTicker"]
+    #[ivars = TickerIvars]
+    struct Ticker;
+
+    impl Ticker {
+        #[unsafe(method(tick:))]
+        fn tick(&self, link: &CADisplayLink) {
+            // The last frame of a movement lets go of the display link, which lets go of this object: kept alive
+            // until the call returns.
+            let _alive = self.retain();
+            if let Some(inner) = self.ivars().inner.upgrade() {
+                inner.tick(link.timestamp(), link.targetTimestamp());
+            }
+        }
+    }
+
+    unsafe impl NSObjectProtocol for Ticker {}
+);
+
+impl Ticker {
+    fn new(mtm: MainThreadMarker, inner: Weak<Inner>) -> Retained<Self> {
+        let this = mtm.alloc::<Self>().set_ivars(TickerIvars { inner });
+        // SAFETY: NSObject's designated initializer.
+        unsafe { msg_send![super(this), init] }
+    }
+}
+
+/// What calls a movement back on every frame: the display link of the notch's view, or on macOS 13, which has none,
+/// a timer at a common display rate.
+enum Driver {
+    Link(Retained<CADisplayLink>),
+    Timer(#[allow(dead_code)] app::Timer),
+}
+
+impl Drop for Driver {
+    fn drop(&mut self) {
+        // A run loop keeps a display link until it is invalidated.
+        if let Driver::Link(link) = self {
+            link.invalidate();
+        }
+    }
 }
 
 impl Inner {
@@ -356,15 +1090,501 @@ impl Inner {
         self.pages.borrow().iter().position(|p| p.accepts_files)
     }
 
+    fn is_open(&self) -> bool {
+        self.shape.get() == Shape::Open
+    }
+
+    fn page_visible(&self, index: usize) -> bool {
+        self.order.borrow().contains(&index)
+    }
+
+    /// The size of a shape on this screen.
+    fn size_of(&self, shape: Shape) -> NSSize {
+        let geometry = self.geometry.get();
+        match shape {
+            Shape::Rest => geometry.rest_size(self.style.borrow().rest),
+            Shape::Compact(ear) => {
+                NSSize::new(geometry.notch.width + 2.0 * ear, geometry.notch.height)
+            }
+            Shape::Open => EXPANDED_SIZE,
+        }
+    }
+
+    fn radius_of(&self, shape: Shape) -> f64 {
+        match shape {
+            Shape::Rest => COLLAPSED_RADIUS,
+            Shape::Compact(_) => (self.geometry.get().notch.height / 2.0).min(13.0),
+            Shape::Open => PANEL_RADIUS,
+        }
+    }
+
+    /// The window that holds a shape. Its shadow is the window's own, drawn by the window server outside it.
+    fn window_size(&self, shape: Shape) -> NSSize {
+        self.size_of(shape)
+    }
+
+    /// The surface's frame for a shape size inside the window as it is now: centred, against the top edge.
+    fn surface_frame(&self, size: NSSize) -> NSRect {
+        let bounds = self.root.bounds();
+        NSRect::new(
+            NSPoint::new(
+                (bounds.size.width - size.width) / 2.0,
+                bounds.size.height - size.height,
+            ),
+            size,
+        )
+    }
+
+    /// Resizes the window around the top centre and puts the surface back where it was on screen.
+    fn set_window(&self, size: NSSize) {
+        let geometry = self.geometry.get();
+        let frame = geometry.frame(size.width, size.height);
+        if self.panel.frame() == frame {
+            return;
+        }
+        let shown = self.surface.frame().size;
+        instantly(|| {
+            self.panel.setFrame_display(frame, false);
+            self.surface.setFrame(self.surface_frame(shown));
+        });
+    }
+
+    /// Lays out what is inside the surface for a size: called from the surface's own `setFrameSize:`.
+    fn layout_inside(&self, size: NSSize) {
+        let geometry = self.geometry.get();
+        // The glass is taller than the surface by its radius: its rounded top corners are cut off above, so only the
+        // bottom ones show, the same ones the surface clips to.
+        let overhang = PANEL_RADIUS;
+        self.background.borrow().setFrame(NSRect::new(
+            NSPoint::ZERO,
+            NSSize::new(size.width, size.height + overhang),
+        ));
+        self.ink.setFrame(NSRect::new(NSPoint::ZERO, size));
+        let band = geometry.notch.height + 14.0;
+        self.band.setFrame(NSRect::new(
+            NSPoint::new(0.0, size.height - band),
+            NSSize::new(size.width, band),
+        ));
+        self.clip.setFrame(NSRect::new(NSPoint::ZERO, size));
+        self.content.setFrameOrigin(NSPoint::new(
+            (size.width - EXPANDED_SIZE.width) / 2.0,
+            size.height - EXPANDED_SIZE.height,
+        ));
+        let ear_height = geometry.notch.height;
+        let ear = match self.shape.get() {
+            Shape::Compact(ear) => ear,
+            _ => self.left.frame().size.width,
+        };
+        let top = size.height - ear_height;
+        // The ears stay against the outer edges, so they ride out with the shape as it widens.
+        self.left.setFrame(NSRect::new(
+            NSPoint::new(0.0, top),
+            NSSize::new(ear, ear_height),
+        ));
+        self.right.setFrame(NSRect::new(
+            NSPoint::new(size.width - ear, top),
+            NSSize::new(ear, ear_height),
+        ));
+    }
+
+    /// Moves the shape to `target`. The window grows to the largest shape at once, the shape moves inside it frame by
+    /// frame, and the window shrinks back when the movement has ended (unless another has started since).
+    fn move_to(&self, target: Shape) {
+        let previous = self.shape.replace(target);
+        let generation = self.generation.get() + 1;
+        self.generation.set(generation);
+        let open = target == Shape::Open;
+        self.root.ivars().open.set(open);
+        if open {
+            self.content.setHidden(false);
+        }
+        let style = self.style.borrow().clone();
+        let largest = union_size(self.window_size(Shape::Open), self.window_size(previous));
+        self.set_window(union_size(largest, self.window_size(target)));
+        let hidden_rest =
+            target == Shape::Rest && !self.geometry.get().hardware && style.rest == Rest::Hidden;
+        let alphas = Alphas {
+            // The closed shape is black, like a notch; the material shows only when it opens.
+            ink: if open { 0.0 } else { 1.0 },
+            band: if open && self.geometry.get().hardware && style.material != Material::Black {
+                1.0
+            } else {
+                0.0
+            },
+            ears: if matches!(target, Shape::Compact(_)) {
+                1.0
+            } else {
+                0.0
+            },
+            content: if open { 1.0 } else { 0.0 },
+            // Fully transparent pixels would let the pointer through; this keeps the invisible strip catchable.
+            surface: if hidden_rest { 0.01 } else { 1.0 },
+        };
+        // The open notch casts the window's own shadow, redrawn on every frame of a movement so it follows the shape.
+        if open && style.shadow {
+            self.panel.setHasShadow(true);
+        }
+        let from = self.pose.get();
+        let to = Pose {
+            size: self.size_of(target),
+            radius: self.radius_of(target),
+        };
+        let grows = open || (matches!(target, Shape::Compact(_)) && previous == Shape::Rest);
+        if style.motion == Motion::Instant || reduced_motion() {
+            self.flight.set(None);
+            self.driver.borrow_mut().take();
+            self.dissolve(to, alphas, grows, generation);
+            return;
+        }
+        // Growing springs, with one small overshoot unless the motion is the smooth one; shrinking only slows down.
+        let (duration, bounce) = match (grows, style.motion) {
+            (true, Motion::Spring) => (if open { 0.42 } else { 0.34 }, 0.22),
+            (true, _) => (0.36, 0.0),
+            (false, _) => (0.26, 0.0),
+        };
+        let flight = Flight {
+            from,
+            to,
+            spring: Spring::new(duration, bounce, self.carried_velocity(from, to)),
+            start: None,
+            generation,
+        };
+        self.flight.set(Some(flight));
+        self.fade(alphas, open, previous == Shape::Open);
+        if flight.distance() < 0.5 {
+            self.land(generation);
+            return;
+        }
+        // Without frames (a screen asleep, a window off screen) the movement still ends.
+        let limit = flight.spring.settling_time(flight.distance()) + 0.25;
+        let weak = self.me.clone();
+        app::after(limit * slow_motion(), move || {
+            if let Some(inner) = weak.upgrade() {
+                inner.land(generation);
+            }
+        });
+        self.start_ticking();
+    }
+
+    /// The speed the shape has now, as progress per second of a movement from `from` to `to`, so a movement that
+    /// turns another around carries on from its pace instead of from a standstill.
+    fn carried_velocity(&self, from: Pose, to: Pose) -> f64 {
+        let Some(flight) = self.flight.get() else {
+            return 0.0;
+        };
+        let Some(start) = flight.start else {
+            return 0.0;
+        };
+        let speed = flight
+            .spring
+            .at((CACurrentMediaTime() - start) / slow_motion())
+            .1;
+        // Along the side that changes most in the new movement.
+        let side = |p: Pose| {
+            if (to.size.height - from.size.height).abs() >= (to.size.width - from.size.width).abs()
+            {
+                p.size.height
+            } else {
+                p.size.width
+            }
+        };
+        let (before, now) = (side(flight.to) - side(flight.from), side(to) - side(from));
+        if now.abs() < 1.0 {
+            return 0.0;
+        }
+        (speed * before / now).clamp(-20.0, 20.0)
+    }
+
+    /// One frame of the movement under way, for the frame shown at `target` (display time).
+    fn tick(&self, now: f64, target: f64) {
+        let Some(mut flight) = self.flight.get() else {
+            self.driver.borrow_mut().take();
+            return;
+        };
+        let start = *flight.start.get_or_insert(now);
+        self.flight.set(Some(flight));
+        let t = (target - start).max(0.0) / slow_motion();
+        if flight.spring.settled(t, flight.distance()) {
+            self.land(flight.generation);
+        } else {
+            self.show_pose(flight.pose_at(t));
+        }
+    }
+
+    /// Ends the movement `generation` where it was going, unless another has started since.
+    fn land(&self, generation: u64) {
+        let Some(flight) = self.flight.get().filter(|f| f.generation == generation) else {
+            return;
+        };
+        self.flight.set(None);
+        self.driver.borrow_mut().take();
+        self.show_pose(flight.to);
+        self.settle(generation);
+    }
+
+    /// Lays the shape out at `pose`, all of it in this frame.
+    fn show_pose(&self, pose: Pose) {
+        instantly(|| {
+            self.surface.setFrame(self.surface_frame(pose.size));
+            self.set_radius(pose.radius);
+            // SwiftUI lays the glass out inside its view: now, so it has this frame's size in this frame.
+            self.background.borrow().layoutSubtreeIfNeeded();
+        });
+        self.pose.set(pose);
+        if self.panel.hasShadow() {
+            self.panel.invalidateShadow();
+        }
+    }
+
+    fn start_ticking(&self) {
+        if self.driver.borrow().is_some() {
+            return;
+        }
+        // The clock of the screen the notch is on; a window off every screen (the checks) still gets one.
+        let screen = self
+            .panel
+            .screen()
+            .or_else(|| NSScreen::mainScreen(self.mtm));
+        let driver = if let Some(screen) =
+            screen.filter(|s| s.respondsToSelector(sel!(displayLinkWithTarget:selector:)))
+        {
+            let ticker = Ticker::new(self.mtm, self.me.clone());
+            // SAFETY: the ticker answers `tick:`, taking the display link, which is what the selector names.
+            let link = unsafe { screen.displayLinkWithTarget_selector(&ticker, sel!(tick:)) };
+            // SAFETY: the main run loop, in the common modes so frames also come while the pointer is held down.
+            unsafe { link.addToRunLoop_forMode(&NSRunLoop::mainRunLoop(), NSRunLoopCommonModes) };
+            Driver::Link(link)
+        } else {
+            let weak = self.me.clone();
+            Driver::Timer(app::every(1.0 / 120.0, move || {
+                if let Some(inner) = weak.upgrade() {
+                    let now = CACurrentMediaTime();
+                    inner.tick(now, now);
+                }
+            }))
+        };
+        *self.driver.borrow_mut() = Some(driver);
+    }
+
+    /// The pieces fade on their own clocks while the shape moves: the black of the closed notch gives way to the
+    /// material as the shape opens and comes back as it closes, the pages appear inside the growing shape and leave
+    /// first, and the ears come in once there is room for them.
+    fn fade(&self, alphas: Alphas, opening: bool, closing: bool) {
+        let group =
+            |seconds: f64, curve: Retained<CAMediaTimingFunction>, apply: fn(&Inner, &Alphas)| {
+                let weak = self.me.clone();
+                animate(seconds, &curve, move || {
+                    if let Some(inner) = weak.upgrade() {
+                        apply(&inner, &alphas);
+                    }
+                });
+            };
+        let quick = || timing(0.3, 0.0, 0.6, 1.0);
+        let (seconds, curve) = if opening {
+            (0.3, timing(0.3, 0.0, 0.2, 1.0))
+        } else {
+            (0.12, quick())
+        };
+        group(seconds, curve, |inner, a| {
+            inner.content.animator().setAlphaValue(a.content);
+        });
+        let (seconds, curve) = if opening {
+            (0.32, timing(0.45, 0.0, 0.55, 1.0))
+        } else if closing {
+            (0.22, timing(0.4, 0.0, 0.6, 1.0))
+        } else {
+            (0.2, quick())
+        };
+        group(seconds, curve, |inner, a| {
+            inner.ink.animator().setAlphaValue(a.ink);
+            inner.band.animator().setAlphaValue(a.band);
+        });
+        let (seconds, curve) = if alphas.ears > 0.0 {
+            (0.3, timing(0.6, 0.0, 0.4, 1.0))
+        } else {
+            (0.12, quick())
+        };
+        group(seconds, curve, |inner, a| {
+            inner.left.animator().setAlphaValue(a.ears);
+            inner.right.animator().setAlphaValue(a.ears);
+        });
+        group(0.2, quick(), |inner, a| {
+            inner.surface.animator().setAlphaValue(a.surface);
+        });
+    }
+
+    /// Without movement (the setting, or Reduce Motion): the new shape fades in where it is, and a shape that gets
+    /// smaller first fades away, as macOS itself replaces movement with a fade.
+    fn dissolve(&self, to: Pose, alphas: Alphas, grows: bool, generation: u64) {
+        let curve = timing(0.3, 0.0, 0.3, 1.0);
+        let weak = self.me.clone();
+        let fade_in = curve.clone();
+        let appear = move || {
+            let Some(inner) = weak.upgrade() else {
+                return;
+            };
+            if inner.generation.get() != generation {
+                return;
+            }
+            instantly(|| {
+                alphas.apply(&inner);
+                inner.surface.setAlphaValue(0.0);
+            });
+            inner.show_pose(to);
+            let again = inner.me.clone();
+            animate(DISSOLVE_SECONDS, &fade_in, move || {
+                if let Some(inner) = again.upgrade() {
+                    inner.surface.animator().setAlphaValue(alphas.surface);
+                }
+            });
+            inner.settle(generation);
+        };
+        if grows {
+            appear();
+            return;
+        }
+        let weak = self.me.clone();
+        animate(DISSOLVE_SECONDS, &curve, move || {
+            if let Some(inner) = weak.upgrade() {
+                inner.surface.animator().setAlphaValue(0.0);
+            }
+        });
+        app::after(DISSOLVE_SECONDS * slow_motion(), appear);
+    }
+
+    /// The layers with the shape's rounded corners: the black of the closed notch, the pages' clip and the slate
+    /// background. Glass has a radius of its own.
+    fn rounded_layers(&self) -> Vec<Retained<CALayer>> {
+        let background = self.background.borrow().clone();
+        let mut layers: Vec<Retained<CALayer>> = [self.ink.layer(), self.clip.layer()]
+            .into_iter()
+            .flatten()
+            .collect();
+        if self.glass.borrow().is_none()
+            && let Some(layer) = background.layer()
+        {
+            layers.push(layer);
+        }
+        layers
+    }
+
+    /// Sets the corner radius of every rounded piece of the shape.
+    fn set_radius(&self, radius: f64) {
+        for layer in self.rounded_layers() {
+            layer.setCornerRadius(radius);
+        }
+        if let Some(glass) = self.glass.borrow().as_ref() {
+            glass.setCornerRadius(radius.max(COLLAPSED_RADIUS));
+        }
+    }
+
+    /// The end of a movement: the window shrinks to what the shape needs, and a closed notch hides its pages so a
+    /// click on it reaches the shape.
+    fn settle(&self, generation: u64) {
+        if self.generation.get() != generation {
+            return;
+        }
+        let shape = self.shape.get();
+        // The open notch casts the window's own shadow, taken from what it draws; nothing behind the glass may darken
+        // it, so the shadow cannot be a layer under the shape. It is off while the shape moves.
+        let shadow = shape == Shape::Open && self.style.borrow().shadow;
+        self.panel.setHasShadow(shadow);
+        if shadow {
+            self.panel.invalidateShadow();
+        }
+        if shape != Shape::Open {
+            self.content.setHidden(true);
+            if !self.enabled.get() {
+                return;
+            }
+            self.set_window(self.window_size(shape));
+            // A key window cannot be told to resign directly: take it off screen and bring it back unfocused.
+            if self.panel.isKeyWindow() {
+                self.panel.orderOut(None);
+                self.panel.orderFrontRegardless();
+            }
+        }
+        self.sync_bars();
+    }
+
+    /// The activity on show: the highest priority, the newest among equals.
+    fn current_activity(&self) -> Option<Activity> {
+        self.activities
+            .borrow()
+            .iter()
+            .max_by_key(|(_, activity, serial)| (activity.priority, *serial))
+            .map(|(_, activity, _)| activity.clone())
+    }
+
+    /// The closed shape: widened for an activity, else at rest.
+    fn closed_shape(&self) -> Shape {
+        match self.current_activity() {
+            Some(activity) => {
+                let height = self.geometry.get().notch.height;
+                let ear = activity
+                    .left
+                    .width(height)
+                    .max(activity.right.width(height));
+                Shape::Compact(ear.round())
+            }
+            None => Shape::Rest,
+        }
+    }
+
+    /// Shows the activity on show in the ears, and moves a closed notch to the shape it needs.
+    fn refresh_activity(&self) {
+        let activity = self.current_activity();
+        let (left, right) = activity.as_ref().map_or((Ear::Empty, Ear::Empty), |a| {
+            (a.left.clone(), a.right.clone())
+        });
+        self.left.set(&left);
+        self.right.set(&right);
+        if !self.is_open() && self.enabled.get() {
+            let target = self.closed_shape();
+            if target != self.shape.get() {
+                self.move_to(target);
+            }
+        }
+        self.sync_bars();
+    }
+
+    /// Runs the bars' clock only while bars are on screen.
+    fn sync_bars(&self) {
+        let wanted = matches!(self.shape.get(), Shape::Compact(_))
+            && self.enabled.get()
+            && self.current_activity().is_some_and(|a| {
+                matches!(a.left, Ear::Bars { .. }) || matches!(a.right, Ear::Bars { .. })
+            });
+        let mut bars = self.bars.borrow_mut();
+        match (wanted, bars.is_some()) {
+            (true, false) => {
+                let weak = self.me.clone();
+                *bars = Some(app::every(BARS_FRAME_SECONDS, move || {
+                    if let Some(inner) = weak.upgrade() {
+                        inner.left.tick();
+                        inner.right.tick();
+                    }
+                }));
+            }
+            (false, true) => {
+                bars.take();
+            }
+            _ => {}
+        }
+    }
+
     fn select_page(&self, index: usize) {
+        if !self.page_visible(index) {
+            return;
+        }
         {
             let pages = self.pages.borrow();
             let Some(page) = pages.get(index) else {
                 return;
             };
             let previous = self.active.get();
-            if previous != index
-                && let Some(old) = pages.get(previous)
+            if let Some(old) = self.shown.get().filter(|&shown| shown != index)
+                && let Some(old) = pages.get(old)
             {
                 (old.on_hide)();
             }
@@ -372,67 +1592,27 @@ impl Inner {
                 p.root.setHidden(i != index);
             }
             self.active.set(index);
-            self.switcher.set_selected(index);
+            self.shown.set(Some(index));
+            self.sync_switcher();
             (page.on_show)();
             if previous != index {
-                self.fade_in(Retained::clone(&page.root));
+                self.fade_in(&page.root);
             }
         }
         self.settle_focus();
     }
 
     /// Shows a page by fading it in; instantly when the system asks for less motion.
-    fn fade_in(&self, root: Retained<NSView>) {
-        if reduced_motion() {
-            self.page_anim.borrow_mut().take();
+    fn fade_in(&self, root: &NSView) {
+        if reduced_motion() || self.style.borrow().motion == Motion::Instant {
             root.setAlphaValue(1.0);
             return;
         }
         root.setAlphaValue(0.0);
-        let (started, weak) = (Instant::now(), self.me.clone());
-        *self.page_anim.borrow_mut() = Some(app::every(FRAME_SECONDS, move || {
-            let t = (started.elapsed().as_secs_f64() / PAGE_FADE_SECONDS).min(1.0);
-            root.setAlphaValue(style::ease_out(t));
-            if t >= 1.0
-                && let Some(inner) = weak.upgrade()
-            {
-                inner.page_anim.borrow_mut().take();
-            }
-        }));
-    }
-
-    /// Moves the panel from its current size to `size` along `curve`, fading the content to `alpha`, then
-    /// runs `done`. Starting another animation cancels this one.
-    fn animate(
-        &self,
-        size: NSSize,
-        seconds: f64,
-        curve: fn(f64) -> f64,
-        alpha: f64,
-        done: impl Fn() + 'static,
-    ) {
-        let from = self.panel.frame().size;
-        let from_alpha = self.content.alphaValue();
-        let (started, weak) = (Instant::now(), self.me.clone());
-        *self.anim.borrow_mut() = Some(app::every(FRAME_SECONDS, move || {
-            let Some(inner) = weak.upgrade() else {
-                return;
-            };
-            let t = (started.elapsed().as_secs_f64() / seconds).min(1.0);
-            let p = curve(t);
-            let width = lerp(from.width, size.width, p);
-            let height = lerp(from.height, size.height, p);
-            inner
-                .panel
-                .setFrame_display(inner.geometry.get().frame(width, height), true);
-            inner
-                .content
-                .setAlphaValue(lerp(from_alpha, alpha, style::ease_out(t)));
-            if t >= 1.0 {
-                inner.anim.borrow_mut().take();
-                done();
-            }
-        }));
+        let root = root.retain();
+        animate(PAGE_FADE_SECONDS, &timing(0.25, 0.9, 0.3, 1.0), move || {
+            root.animator().setAlphaValue(1.0)
+        });
     }
 
     /// The search field only has focus on the clipboard page; other pages work from the keys the panel forwards.
@@ -446,32 +1626,50 @@ impl Inner {
         }
     }
 
-    fn expand(&self, focus: bool) {
+    /// The tab to show when the notch opens.
+    fn page_to_open(&self) -> usize {
+        let last = self.active.get();
+        let fallback = |index: usize| {
+            if self.page_visible(index) {
+                index
+            } else {
+                self.order.borrow().first().copied().unwrap_or(0)
+            }
+        };
+        if let Some(files) = self.files_page()
+            && self.files_hint.replace(false)
+            && self.page_visible(files)
+        {
+            return files;
+        }
+        let rule = self.style.borrow().open_page.clone();
+        match rule {
+            OpenPage::Last => fallback(last),
+            OpenPage::Activity => {
+                let live = self.current_activity().and_then(|a| a.page);
+                fallback(live.filter(|p| self.page_visible(*p)).unwrap_or(last))
+            }
+            OpenPage::Page(id) => {
+                let index = self.pages.borrow().iter().position(|p| p.id == id);
+                fallback(index.unwrap_or(last))
+            }
+        }
+    }
+
+    fn expand(&self, focus: bool, page: Option<usize>) {
         if !self.enabled.get() {
             return;
         }
-        let first = !self.expanded.replace(true);
+        let first = !self.is_open();
+        let page = page.unwrap_or_else(|| self.page_to_open());
         if first {
-            let from_rest = self.content.isHidden();
-            self.shape.set_expanded(true);
-            self.content.setHidden(false);
             self.switcher.setHidden(false);
-            if reduced_motion() {
-                self.anim.borrow_mut().take();
-                self.content.setAlphaValue(1.0);
-                self.panel
-                    .setFrame_display(self.geometry.get().expanded_frame(), true);
-            } else {
-                if from_rest {
-                    self.content.setAlphaValue(0.0);
-                }
-                self.animate(EXPANDED_SIZE, OPEN_SECONDS, style::spring, 1.0, || {});
+            for (i, p) in self.pages.borrow().iter().enumerate() {
+                p.root.setHidden(i != page);
+                p.root.setAlphaValue(1.0);
             }
+            self.move_to(Shape::Open);
         }
-        let page = match self.files_page() {
-            Some(files) if self.files_hint.replace(false) => files,
-            _ => self.active.get(),
-        };
         if first || page != self.active.get() {
             self.select_page(page);
         }
@@ -482,68 +1680,43 @@ impl Inner {
     }
 
     fn collapse(&self) {
-        self.collapse_with(true);
-    }
-
-    fn collapse_with(&self, animated: bool) {
-        if !self.expanded.replace(false) {
+        if !self.is_open() {
             return;
         }
         self.view.clear_query();
+        if let Some(shown) = self.shown.take()
+            && let Some(page) = self.pages.borrow().get(shown)
         {
-            let pages = self.pages.borrow();
-            if let Some(shown) = pages.get(self.active.get()) {
-                (shown.on_hide)();
-            }
-            for page in pages.iter() {
-                page.root.setHidden(true);
-            }
+            (page.on_hide)();
         }
-        self.active.set(0);
-        if animated && !reduced_motion() {
-            let weak = self.me.clone();
-            let rest = self.geometry.get().collapsed_frame().size;
-            self.animate(rest, CLOSE_SECONDS, style::ease_out, 0.0, move || {
-                if let Some(inner) = weak.upgrade() {
-                    inner.finish_collapse();
-                }
-            });
-        } else {
-            self.anim.borrow_mut().take();
-            self.finish_collapse();
-        }
-    }
-
-    /// The resting state, reached once the closing animation has ended (or at once without one).
-    fn finish_collapse(&self) {
-        self.switcher.setHidden(true);
-        self.content.setHidden(true);
-        self.content.setAlphaValue(1.0);
-        self.shape.set_expanded(false);
-        // A key window cannot be told to resign directly: take it off screen and bring it back unfocused.
-        self.panel.orderOut(None);
-        self.panel
-            .setFrame_display(self.geometry.get().collapsed_frame(), true);
-        if self.enabled.get() {
-            self.panel.orderFrontRegardless();
-        }
+        self.move_to(self.closed_shape());
     }
 
     fn relayout(&self, geometry: NotchGeometry) {
         self.geometry.set(geometry);
-        self.shape.set_hardware(geometry.hardware);
-        let frame = if self.expanded.get() {
-            geometry.expanded_frame()
-        } else {
-            geometry.collapsed_frame()
-        };
-        self.panel.setFrame_display(frame, true);
+        let shape = self.shape.get();
+        let window = self.window_size(shape);
+        instantly(|| {
+            self.panel
+                .setFrame_display(geometry.frame(window.width, window.height), true);
+        });
+        // A movement under way lays the shape out on its next frame.
+        if self.flight.get().is_none() {
+            self.show_pose(Pose {
+                size: self.size_of(shape),
+                radius: self.radius_of(shape),
+            });
+        }
     }
 
     fn handle_key(&self, key: Key) -> bool {
         if let Key::Tab(n) = key {
-            let index = usize::from(n).saturating_sub(1);
-            if index < self.pages.borrow().len() {
+            let target = self
+                .order
+                .borrow()
+                .get(usize::from(n).saturating_sub(1))
+                .copied();
+            if let Some(index) = target {
                 self.select_page(index);
             }
             return true;
@@ -552,6 +1725,146 @@ impl Inner {
         pages
             .get(self.active.get())
             .is_some_and(|page| (page.on_key)(key))
+    }
+
+    /// The tab strip shows the visible pages in their order, with the badges of those pages.
+    fn sync_switcher(&self) {
+        let order = self.order.borrow();
+        let pages = self.pages.borrow();
+        let active = self.active.get();
+        self.switcher.set_items(
+            order
+                .iter()
+                .filter_map(|&i| pages.get(i))
+                .map(|page| (page.symbol.to_owned(), page.title.clone()))
+                .collect(),
+        );
+        self.switcher.set_selected(
+            order
+                .iter()
+                .position(|&i| i == active)
+                .unwrap_or(usize::MAX),
+        );
+        let badges = self.badges.borrow();
+        for (slot, index) in order.iter().enumerate() {
+            self.switcher.set_badge(slot, badges.contains(index));
+        }
+    }
+
+    /// Recomputes the visible pages from the style.
+    fn sync_order(&self) {
+        let wanted = self.style.borrow().pages.clone();
+        let pages = self.pages.borrow();
+        let order: Vec<usize> = if wanted.is_empty() {
+            (0..pages.len()).collect()
+        } else {
+            let mut order: Vec<usize> = wanted
+                .iter()
+                .filter_map(|id| pages.iter().position(|p| p.id == id))
+                .collect();
+            order.dedup();
+            // A tab nobody can reach is worse than one the user did not ask for.
+            if order.is_empty() {
+                order.push(0);
+            }
+            order
+        };
+        drop(pages);
+        *self.order.borrow_mut() = order;
+        self.sync_switcher();
+    }
+
+    /// Replaces the background for the material in use.
+    fn set_material(&self, material: Material) {
+        let mtm = self.mtm;
+        self.glass.borrow_mut().take();
+        let view: Retained<NSView> = match material {
+            Material::Black => Retained::into_super(FillView::new(mtm, Paint::Slate)),
+            Material::Glass | Material::ClearGlass
+                if AnyClass::get(c"NSGlassEffectView").is_some() =>
+            {
+                let glass = NSGlassEffectView::initWithFrame(mtm.alloc(), NSRect::ZERO);
+                let (look, tint) = if material == Material::Glass {
+                    (NSGlassEffectViewStyle::Regular, 0.42)
+                } else {
+                    (NSGlassEffectViewStyle::Clear, 0.18)
+                };
+                glass.setStyle(look);
+                glass.setTintColor(Some(&style::black(tint)));
+                glass.setCornerRadius(self.radius_of(self.shape.get()).max(COLLAPSED_RADIUS));
+                *self.glass.borrow_mut() = Some(Retained::clone(&glass));
+                Retained::into_super(glass)
+            }
+            // Before macOS 26 there is no Liquid Glass: a dark vibrancy material stands in.
+            Material::Glass | Material::ClearGlass => {
+                let effect = NSVisualEffectView::initWithFrame(mtm.alloc(), NSRect::ZERO);
+                effect.setMaterial(NSVisualEffectMaterial::HUDWindow);
+                effect.setBlendingMode(NSVisualEffectBlendingMode::BehindWindow);
+                effect.setState(NSVisualEffectState::Active);
+                Retained::into_super(effect)
+            }
+        };
+        let old = self.background.replace(view.clone());
+        self.surface.addSubview_positioned_relativeTo(
+            &view,
+            objc2_app_kit::NSWindowOrderingMode::Below,
+            Some(&old),
+        );
+        old.removeFromSuperview();
+        self.layout_inside(self.surface.frame().size);
+    }
+
+    fn apply_style(&self, style: Style) {
+        let before = self.style.replace(style.clone());
+        self.panel.setSharingType(if style.hide_in_capture {
+            NSWindowSharingType::None
+        } else {
+            NSWindowSharingType::ReadOnly
+        });
+        if before.material != style.material {
+            self.set_material(style.material);
+        }
+        if before.display != style.display
+            && let Some(geometry) = NotchGeometry::detect_on(self.mtm, style.display)
+        {
+            self.geometry.set(geometry);
+        }
+        if before.pages != style.pages {
+            self.sync_order();
+            if !self.page_visible(self.active.get()) {
+                let first = self.order.borrow().first().copied().unwrap_or(0);
+                self.active.set(first);
+            }
+        }
+        // The shapes may have changed size (rest style, shadow): put the closed shape where it belongs now.
+        if !self.is_open() {
+            let target = self.closed_shape();
+            self.shape.set(target);
+        }
+        let shape = self.shape.get();
+        self.relayout(self.geometry.get());
+        self.move_to(shape);
+    }
+}
+
+/// The opacities of the pieces of the surface for one shape.
+#[derive(Debug, Clone, Copy)]
+struct Alphas {
+    ink: f64,
+    band: f64,
+    ears: f64,
+    content: f64,
+    surface: f64,
+}
+
+impl Alphas {
+    fn apply(&self, inner: &Inner) {
+        inner.ink.setAlphaValue(self.ink);
+        inner.band.setAlphaValue(self.band);
+        inner.left.setAlphaValue(self.ears);
+        inner.right.setAlphaValue(self.ears);
+        inner.content.setAlphaValue(self.content);
+        inner.surface.setAlphaValue(self.surface);
     }
 }
 
@@ -563,34 +1876,61 @@ fn contains(rect: NSRect, p: NSPoint) -> bool {
         && p.y <= rect.origin.y + rect.size.height
 }
 
-/// Hover logic: opens shortly after the pointer enters the trigger area, closes shortly after it leaves
-/// the open shape unless the search field has focus.
+/// A tap under the fingers on a Force Touch trackpad.
+fn tap() {
+    let performer = NSHapticFeedbackManager::defaultPerformer();
+    performer.performFeedbackPattern_performanceTime(
+        NSHapticFeedbackPattern::Alignment,
+        NSHapticFeedbackPerformanceTime::Now,
+    );
+}
+
+/// Hover logic: opens shortly after the pointer enters the trigger area, closes shortly after it leaves the open
+/// shape unless the search field has focus.
 fn pointer_moved(inner: &Rc<Inner>, p: NSPoint) {
     if !inner.enabled.get() || inner.suppressed.get() {
         return;
     }
-    let geometry = inner.geometry.get();
-    let area = if inner.expanded.get() {
+    let mut geometry = inner.geometry.get();
+    // Following the pointer: a pointer at the top of another screen brings the closed notch there.
+    if inner.style.borrow().display == Display::Pointer
+        && !inner.is_open()
+        && !contains(geometry.screen, p)
+        && let Some(found) = NotchGeometry::detect_on(inner.mtm, Display::Pointer)
+        && p.y >= found.screen.origin.y + found.screen.size.height - TRIGGER_MIN_HEIGHT
+    {
+        inner.relayout(found);
+        geometry = found;
+    }
+    let area = if inner.is_open() {
         geometry.expanded_frame()
     } else {
-        geometry.trigger_rect()
+        geometry.trigger_for(inner.size_of(inner.shape.get()))
     };
     let inside = contains(area, p);
     if inner.inside.replace(inside) == inside {
         return;
     }
+    let style = inner.style.borrow().clone();
     let inner = Rc::clone(inner);
     if inside {
-        app::after(HOVER_OPEN_DELAY, move || {
-            if inner.inside.get() && !inner.expanded.get() {
-                inner.expand(false);
+        if !style.open_on_hover {
+            return;
+        }
+        app::after(style.hover_delay, move || {
+            // Window snapping may have taken the top edge since the pointer arrived.
+            if inner.inside.get() && !inner.is_open() && !inner.suppressed.get() {
+                if style.haptics {
+                    tap();
+                }
+                inner.expand(false, None);
             }
         });
     } else {
         inner.files_hint.set(false);
         app::after(HOVER_CLOSE_DELAY, move || {
             // A focused search field means the user is typing: leave it open.
-            if !inner.inside.get() && inner.expanded.get() && !inner.panel.isKeyWindow() {
+            if !inner.inside.get() && inner.is_open() && !inner.panel.isKeyWindow() {
                 inner.collapse();
             }
         });
@@ -654,57 +1994,115 @@ impl Notch {
 
         let content_top = geometry.top_inset() + TAB_BAR_HEIGHT;
         let ui = ClipUi::with_style(mtm, EXPANDED_SIZE, content_top, callbacks, ListStyle::Cards);
-        let panel = FigPanel::new(mtm, geometry.expanded_frame());
-        let shape = ShapeView::new(
-            mtm,
-            NSRect::new(NSPoint::ZERO, EXPANDED_SIZE),
-            geometry.hardware,
-        );
-        panel.setContentView(Some(&shape));
-        // Fixed-size content: the shape grows around it instead of stretching it (see `set_frame_size`).
+        let rest = geometry.rest_size(Rest::Notch);
+        let panel = FigPanel::new(mtm, geometry.frame(rest.width, rest.height));
+        let root = RootView::new(mtm, NSRect::new(NSPoint::ZERO, rest));
+        panel.setContentView(Some(&root));
+        if let Some(layer) = root.layer() {
+            layer.setSpeed((1.0 / slow_motion()) as f32);
+        }
+
+        let surface = SurfaceView::new(mtm);
+        root.addSubview(&surface);
+        let background: Retained<NSView> = Retained::into_super(FillView::new(mtm, Paint::Slate));
+        surface.addSubview(&background);
+        let ink = FillView::new(mtm, Paint::Ink);
+        surface.addSubview(&ink);
+        let band = FillView::new(mtm, Paint::Band);
+        band.setAlphaValue(0.0);
+        surface.addSubview(&band);
+        let (left, right) = (EarView::new(mtm), EarView::new(mtm));
+        for ear in [&left, &right] {
+            ear.setAlphaValue(0.0);
+            surface.addSubview(ear);
+        }
+        // Fixed-size content: the shape grows around it instead of stretching it (see `layout_inside`).
         let content = NSView::initWithFrame(mtm.alloc(), NSRect::new(NSPoint::ZERO, EXPANDED_SIZE));
-        // Hidden while collapsed, so clicks on the resting shape reach the shape itself.
+        content.setWantsLayer(true);
+        // Hidden while closed, so clicks on the closed shape reach the shape itself.
         content.setHidden(true);
-        shape.addSubview(&content);
+        content.setAlphaValue(0.0);
+        let clip = NSView::initWithFrame(mtm.alloc(), NSRect::ZERO);
+        clip.setWantsLayer(true);
+        if let Some(layer) = clip.layer() {
+            round_bottom(&layer);
+        }
+        surface.addSubview(&clip);
+        clip.addSubview(&content);
         content.addSubview(&ui.view.root);
 
         let switcher = PageSwitcher::new(
             mtm,
             NSPoint::new(
                 SWITCHER_INSET,
-                EXPANDED_SIZE.height - geometry.top_inset() - 6.0 - switcher::HEIGHT,
+                EXPANDED_SIZE.height - geometry.top_inset() - 4.0 - switcher::HEIGHT,
             ),
         );
         content.addSubview(&switcher);
-
-        panel.setFrame_display(geometry.collapsed_frame(), false);
         ui.view.root.setHidden(true);
-        switcher.setHidden(true);
 
         let inner = Rc::new_cyclic(|me| Inner {
+            mtm,
             panel: Retained::clone(&panel),
-            shape: Retained::clone(&shape),
+            root: Retained::clone(&root),
+            surface: Retained::clone(&surface),
+            background: RefCell::new(background),
+            glass: RefCell::new(None),
+            ink,
+            band,
+            left,
+            right,
+            clip,
             content,
             view: ui.view.clone(),
             switcher: Retained::clone(&switcher),
             pages: RefCell::new(Vec::new()),
+            order: RefCell::new(Vec::new()),
+            badges: RefCell::new(Vec::new()),
             active: Cell::new(0),
+            shown: Cell::new(None),
             files_hint: Cell::new(false),
             geometry: Cell::new(geometry),
+            // Black until the app's settings arrive, so nothing glassy flashes before they do.
+            style: RefCell::new(Style {
+                material: Material::Black,
+                ..Style::default()
+            }),
+            shape: Cell::new(Shape::Rest),
             inside: Cell::new(false),
-            expanded: Cell::new(false),
             enabled: Cell::new(true),
             suppressed: Cell::new(false),
+            activities: RefCell::new(Vec::new()),
+            serial: Cell::new(0),
+            bars: RefCell::new(None),
+            generation: Cell::new(0),
+            pose: Cell::new(Pose {
+                size: rest,
+                radius: COLLAPSED_RADIUS,
+            }),
+            flight: Cell::new(None),
+            driver: RefCell::new(None),
             me: me.clone(),
-            anim: RefCell::new(None),
-            page_anim: RefCell::new(None),
         });
         *slot.borrow_mut() = Some(Rc::clone(&inner));
+        {
+            let weak = Rc::downgrade(&inner);
+            *surface.ivars().on_resize.borrow_mut() = Some(Rc::new(move |size| {
+                if let Some(inner) = weak.upgrade() {
+                    inner.layout_inside(size);
+                }
+            }));
+        }
+        instantly(|| {
+            let frame = inner.surface_frame(rest);
+            inner.surface.setFrame(frame);
+        });
 
         let clipboard_page = {
             let (view, callbacks) = (ui.view.clone(), Rc::clone(&ui.callbacks));
             let key_view = view.clone();
             Page {
+                id: "clipboard",
                 title: labels::get().clipboard_tab.clone(),
                 symbol: "doc.on.clipboard.fill",
                 root: Retained::into_super(Retained::clone(&ui.view.root)),
@@ -715,13 +2113,17 @@ impl Notch {
             }
         };
         inner.pages.borrow_mut().push(clipboard_page);
+        inner.sync_order();
 
         {
             let slot = Rc::clone(&slot);
-            switcher.set_on_select(move |index| {
+            switcher.set_on_select(move |slot_index| {
                 let inner = slot.borrow().clone();
                 if let Some(inner) = inner {
-                    inner.select_page(index);
+                    let page = inner.order.borrow().get(slot_index).copied();
+                    if let Some(page) = page {
+                        inner.select_page(page);
+                    }
                 }
             });
         }
@@ -731,30 +2133,27 @@ impl Notch {
             observers: Vec::new(),
             monitor: None,
         };
-        this.refresh_tabs();
 
-        {
-            let key_inner = Rc::clone(&inner);
-            panel.set_key_handler(move |key| key_inner.handle_key(key));
-            let on_pointer = Rc::clone(&inner);
-            *shape.ivars().on_pointer.borrow_mut() = Some(Rc::new(move || {
-                pointer_moved(&on_pointer, NSEvent::mouseLocation());
-            }));
-            let on_drag = Rc::clone(&inner);
-            *shape.ivars().on_drag.borrow_mut() = Some(Rc::new(move |entered| {
-                if entered {
-                    // Files are arriving: open straight onto the page that takes them.
-                    on_drag.files_hint.set(true);
-                    on_drag.inside.set(true);
-                    on_drag.expand(false);
-                } else {
-                    // Leaving the shape for a page inside it, or for good: ask where the pointer is now.
-                    pointer_moved(&on_drag, NSEvent::mouseLocation());
-                }
-            }));
-            let on_click = Rc::clone(&inner);
-            *shape.ivars().on_click.borrow_mut() = Some(Rc::new(move || on_click.expand(true)));
-        }
+        let key_inner = Rc::clone(&inner);
+        panel.set_key_handler(move |key| key_inner.handle_key(key));
+        let on_pointer = Rc::clone(&inner);
+        *root.ivars().on_pointer.borrow_mut() = Some(Rc::new(move || {
+            pointer_moved(&on_pointer, NSEvent::mouseLocation());
+        }));
+        let on_drag = Rc::clone(&inner);
+        *root.ivars().on_drag.borrow_mut() = Some(Rc::new(move |entered| {
+            if entered {
+                // Files are arriving: open straight onto the page that takes them.
+                on_drag.files_hint.set(true);
+                on_drag.inside.set(true);
+                on_drag.expand(false, None);
+            } else {
+                // Leaving the shape for a page inside it, or for good: ask where the pointer is now.
+                pointer_moved(&on_drag, NSEvent::mouseLocation());
+            }
+        }));
+        let on_click = Rc::clone(&inner);
+        *root.ivars().on_click.borrow_mut() = Some(Rc::new(move || on_click.expand(true, None)));
 
         let center = NSNotificationCenter::defaultCenter();
         let window: &AnyObject = &panel;
@@ -766,7 +2165,8 @@ impl Notch {
         });
         let relaid = Rc::clone(&inner);
         let on_screens = RcBlock::new(move |_: NonNull<NSNotification>| {
-            if let Some(geometry) = NotchGeometry::detect(mtm) {
+            let display = relaid.style.borrow().display;
+            if let Some(geometry) = NotchGeometry::detect_on(mtm, display) {
                 relaid.relayout(geometry);
             }
         });
@@ -807,6 +2207,13 @@ impl Notch {
         &self.ui.view
     }
 
+    /// Applies how the notch looks and behaves. Cheap to call again with the same style.
+    pub fn configure(&self, style: &Style) {
+        if *self.inner.style.borrow() != *style {
+            self.inner.apply_style(style.clone());
+        }
+    }
+
     /// Area every page must fill: the shape below the tab bar.
     pub fn page_frame(&self) -> NSRect {
         let top = self.inner.geometry.get().top_inset() + TAB_BAR_HEIGHT;
@@ -821,52 +2228,75 @@ impl Notch {
         self.inner.pages.borrow().len()
     }
 
-    /// Adds a tab after the existing ones; Command+its number selects it.
+    /// Adds a tab after the existing ones; Command and its number in the strip selects it.
     pub fn add_page(&self, page: Page) {
         page.root.setHidden(true);
         self.inner.content.addSubview(&page.root);
         self.inner.pages.borrow_mut().push(page);
-        self.refresh_tabs();
+        self.inner.sync_order();
     }
 
-    fn refresh_tabs(&self) {
-        let pages = self.inner.pages.borrow();
-        self.inner.switcher.set_items(
-            pages
-                .iter()
-                .map(|page| (page.symbol.to_owned(), page.title.clone()))
-                .collect(),
-        );
-        self.inner.switcher.set_selected(self.inner.active.get());
+    /// The ids and titles of the tabs, in the order they were added, for the settings page.
+    pub fn page_ids(&self) -> Vec<(&'static str, String)> {
+        self.inner
+            .pages
+            .borrow()
+            .iter()
+            .map(|p| (p.id, p.title.clone()))
+            .collect()
     }
 
-    /// Draws the open notch showing `page` into PNG bytes, without showing anything on screen: the shape is
-    /// laid out at its open size inside its own window and drawn from there. For checking the design.
+    /// Shows, replaces or (with `None`) ends a live activity in the closed notch. `slot` names its source.
+    pub fn set_activity(&self, slot: &'static str, activity: Option<Activity>) {
+        {
+            let mut activities = self.inner.activities.borrow_mut();
+            let at = activities.iter().position(|(s, _, _)| *s == slot);
+            match (activity, at) {
+                (Some(activity), Some(i)) => activities[i].1 = activity,
+                (Some(activity), None) => {
+                    let serial = self.inner.serial.get() + 1;
+                    self.inner.serial.set(serial);
+                    activities.push((slot, activity, serial));
+                }
+                (None, Some(i)) => {
+                    activities.remove(i);
+                }
+                (None, None) => return,
+            }
+        }
+        self.inner.refresh_activity();
+    }
+
+    /// Draws the open notch showing `page` into PNG bytes, without showing anything on screen: the shape is laid out
+    /// at its open size inside its own window and drawn on black from there. For checking the design.
     pub fn snapshot_png(&self, page: usize) -> Option<Vec<u8>> {
         let inner = &self.inner;
         if page >= inner.pages.borrow().len() {
             return None;
         }
-        let before = inner.shape.frame().size;
-        let was_open = inner.expanded.get();
-        inner.shape.set_expanded(true);
-        inner.content.setHidden(false);
-        inner.switcher.setHidden(false);
-        inner.shape.setFrameSize(EXPANDED_SIZE);
+        let was_open = inner.is_open();
+        let before = inner.surface.frame();
+        instantly(|| {
+            inner.content.setHidden(false);
+            inner.content.setAlphaValue(1.0);
+            inner.switcher.setHidden(false);
+            inner.ink.setAlphaValue(1.0);
+            inner
+                .surface
+                .setFrame(NSRect::new(NSPoint::ZERO, EXPANDED_SIZE));
+        });
+        let shape = inner.shape.replace(Shape::Open);
         inner.select_page(page);
-        // The fade-in has not run, and nothing is drawn while it is at zero.
-        inner.page_anim.borrow_mut().take();
-        inner.content.setAlphaValue(1.0);
         if let Some(shown) = inner.pages.borrow().get(page) {
             shown.root.setAlphaValue(1.0);
         }
-        let bounds = inner.shape.bounds();
+        let bounds = inner.surface.bounds();
         let png = inner
-            .shape
+            .surface
             .bitmapImageRepForCachingDisplayInRect(bounds)
             .and_then(|rep| {
                 inner
-                    .shape
+                    .surface
                     .cacheDisplayInRect_toBitmapImageRep(bounds, &rep);
                 // SAFETY: an empty properties dictionary is valid for PNG output.
                 unsafe {
@@ -877,26 +2307,36 @@ impl Notch {
                 }
             })
             .map(|data| data.to_vec());
-        if !was_open {
-            let pages = inner.pages.borrow();
-            if let Some(shown) = pages.get(inner.active.get()) {
-                (shown.on_hide)();
+        inner.shape.set(shape);
+        if was_open {
+            inner.ink.setAlphaValue(0.0);
+        } else {
+            if let Some(shown) = inner.shown.take()
+                && let Some(page) = inner.pages.borrow().get(shown)
+            {
+                (page.on_hide)();
             }
-            for p in pages.iter() {
-                p.root.setHidden(true);
-            }
-            drop(pages);
-            inner.active.set(0);
-            inner.switcher.setHidden(true);
-            inner.content.setHidden(true);
-            inner.shape.set_expanded(false);
+            instantly(|| {
+                inner.content.setHidden(true);
+                inner.content.setAlphaValue(0.0);
+                inner.surface.setFrame(before);
+            });
         }
-        inner.shape.setFrameSize(before);
         png
     }
 
     pub fn is_expanded(&self) -> bool {
-        self.inner.expanded.get()
+        self.inner.is_open()
+    }
+
+    /// The size the shape has on screen right now, mid-movement included: read from what the window server draws.
+    pub fn visible_size(&self) -> NSSize {
+        let Some(layer) = self.inner.surface.layer() else {
+            return NSSize::new(0.0, 0.0);
+        };
+        // SAFETY: the presentation layer is a read-only copy of the layer as it is drawn now.
+        let shown = unsafe { layer.presentationLayer() }.unwrap_or(layer);
+        shown.bounds().size
     }
 
     /// Shows or removes the notch panel. While it is off, hovering the top edge does nothing.
@@ -906,9 +2346,12 @@ impl Notch {
         }
         if enabled {
             self.inner.panel.orderFrontRegardless();
+            let target = self.inner.closed_shape();
+            self.inner.move_to(target);
         } else {
-            self.inner.collapse_with(false);
+            self.inner.collapse();
             self.inner.panel.orderOut(None);
+            self.inner.sync_bars();
         }
     }
 
@@ -925,15 +2368,22 @@ impl Notch {
         }
     }
 
-    /// Whether the pointer is over the notch right now; something that opened it by itself leaves it open
-    /// while the user is there.
+    /// Whether the pointer is over the notch right now; something that opened it by itself leaves it open while the
+    /// user is there.
     pub fn pointer_inside(&self) -> bool {
         self.inner.inside.get()
     }
 
     /// Marks a page's icon with a dot while it has something that needs the user.
     pub fn set_page_badge(&self, index: usize, on: bool) {
-        self.inner.switcher.set_badge(index, on);
+        {
+            let mut badges = self.inner.badges.borrow_mut();
+            badges.retain(|&i| i != index);
+            if on {
+                badges.push(index);
+            }
+        }
+        self.inner.sync_switcher();
     }
 
     /// Closes the notch, as moving the pointer away does.
@@ -943,18 +2393,43 @@ impl Notch {
 
     /// Opens without taking keyboard focus, as hovering does.
     pub fn open(&self) {
-        self.inner.expand(false);
+        self.inner.expand(false, None);
     }
 
     /// Opens and focuses the search field, as a click on the notch does.
     pub fn open_focused(&self) {
-        self.inner.expand(true);
+        self.inner.expand(true, None);
     }
 
-    /// Opens on the given page (0 is the clipboard).
+    /// Opens if closed, closes if open: for a shortcut.
+    pub fn toggle(&self) {
+        if self.inner.is_open() {
+            self.inner.collapse();
+        } else {
+            self.inner.expand(true, None);
+        }
+    }
+
+    /// Opens on the given page (0 is the clipboard). A page the user has hidden is not shown.
     pub fn open_page(&self, index: usize) {
-        self.inner.expand(false);
-        self.inner.select_page(index);
+        if self.inner.page_visible(index) {
+            self.inner.expand(false, Some(index));
+        }
+    }
+
+    /// Whether the user can see this page's tab.
+    pub fn page_shown(&self, index: usize) -> bool {
+        self.inner.page_visible(index)
+    }
+
+    /// Whether the notch is on a screen with a hardware notch.
+    pub fn on_hardware_notch(&self) -> bool {
+        self.inner.geometry.get().hardware
+    }
+
+    /// Where the notch is: its screen and its resting size.
+    pub fn geometry(&self) -> NotchGeometry {
+        self.inner.geometry.get()
     }
 }
 
@@ -994,6 +2469,15 @@ mod tests {
     }
 
     #[test]
+    fn a_screen_without_a_notch_can_show_one_or_nothing() {
+        let plain = geometry(false);
+        assert_eq!(plain.rest_size(Rest::Notch).height, 32.0);
+        assert_eq!(plain.rest_size(Rest::Hidden).height, HOT_ZONE_HEIGHT);
+        // The hardware cutout is always the cutout, whatever the setting says.
+        assert_eq!(geometry(true).rest_size(Rest::Hidden).height, 32.0);
+    }
+
+    #[test]
     fn trigger_area_is_taller_than_the_invisible_resting_shape() {
         let plain = geometry(false);
         let trigger = plain.trigger_rect();
@@ -1005,6 +2489,9 @@ mod tests {
             hardware.trigger_rect().size.height,
             hardware.collapsed_frame().size.height
         );
+        // A widened shape is caught over its whole width.
+        let wide = hardware.trigger_for(NSSize::new(300.0, 32.0));
+        assert_eq!(wide.size.width, 300.0 + 2.0 * TRIGGER_SIDE_SLACK);
     }
 
     #[test]
@@ -1040,6 +2527,101 @@ mod tests {
         assert!(
             g.top_inset() > g.notch.height,
             "content must clear the cutout"
+        );
+    }
+
+    #[test]
+    fn a_dark_or_grey_cover_still_gives_bars_that_read_on_black() {
+        let dark = brighten([0.10, 0.02, 0.02]);
+        assert!(dark[0] > 0.9 && dark[1] < dark[0], "{dark:?}");
+        let grey = brighten([0.3, 0.3, 0.3]);
+        assert!(grey.iter().all(|c| *c > 0.9));
+        let black = brighten([0.0, 0.0, 0.0]);
+        assert!(black.iter().all(|c| *c > 0.9));
+    }
+
+    #[test]
+    fn ears_are_wide_enough_for_a_square_and_never_too_wide() {
+        let height = 32.0;
+        let symbol = Ear::Symbol {
+            name: "terminal",
+            tone: Tone::Blue,
+            pulse: false,
+        };
+        assert!(symbol.width(height) >= height);
+        let long = Ear::Text {
+            text: "a very long text that should never fit".into(),
+            tone: Tone::Gray,
+        };
+        assert_eq!(long.width(height), EAR_MAX);
+        let bars = Ear::Bars {
+            levels: Rc::new(|_: &mut [f32]| {}),
+            color: [1.0, 1.0, 1.0],
+        };
+        assert!(bars.width(height) >= height * EAR_MIN_SHARE);
+    }
+
+    #[test]
+    fn the_opening_spring_overshoots_a_little_and_settles_in_time() {
+        let spring = Spring::new(0.42, 0.22, 0.0);
+        assert_eq!(spring.at(0.0), (0.0, 0.0));
+        let samples: Vec<f64> = (0..=120)
+            .map(|f| spring.at(f64::from(f) / 120.0).0)
+            .collect();
+        let peak = samples.iter().copied().fold(0.0, f64::max);
+        assert!(
+            (1.005..1.04).contains(&peak),
+            "one small overshoot, got {peak}"
+        );
+        assert!(
+            spring.at(0.2).0 > 0.85,
+            "most of the way in a fifth of a second"
+        );
+        let distance = 418.0;
+        let done = spring.settling_time(distance);
+        assert!((0.4..0.9).contains(&done), "settles in {done} s");
+        assert!(((1.0 - spring.at(done).0) * distance).abs() < 0.5);
+    }
+
+    #[test]
+    fn a_spring_without_bounce_never_overshoots_and_keeps_a_carried_speed() {
+        let spring = Spring::new(0.3, 0.0, 0.0);
+        let mut last = 0.0;
+        for f in 1..=120 {
+            let x = spring.at(f64::from(f) / 120.0).0;
+            assert!(x >= last && x <= 1.0, "monotonic up to the end");
+            last = x;
+        }
+        let moving = Spring::new(0.42, 0.22, -3.0);
+        assert!(
+            (moving.at(0.0).1 + 3.0).abs() < 1e-9,
+            "starts at the speed it was given"
+        );
+        assert!(
+            moving.at(0.01).0 < 0.0,
+            "first carries on the way it was going"
+        );
+        assert!(moving.settled(moving.settling_time(418.0), 418.0));
+    }
+
+    #[test]
+    fn poses_mix_size_and_radius_and_measure_the_larger_side() {
+        let (a, b) = (
+            Pose {
+                size: NSSize::new(200.0, 22.0),
+                radius: 10.0,
+            },
+            Pose {
+                size: EXPANDED_SIZE,
+                radius: PANEL_RADIUS,
+            },
+        );
+        assert_eq!(a.toward(b, 1.0), b);
+        assert_eq!(a.toward(b, 0.0), a);
+        assert_eq!(a.distance(b), 418.0);
+        assert!(
+            a.toward(b, 1.02).size.height > EXPANDED_SIZE.height,
+            "overshoot shows"
         );
     }
 }

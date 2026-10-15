@@ -570,7 +570,11 @@ impl SmartPopup {
         let size = self.panel.frame().size;
         self.panel.setFrameOrigin(origin_near_pointer(mtm, size));
         self.panel.makeKeyAndOrderFront(None);
-        self.close_on_outside_click();
+        // A window outside every screen (tests) has no clicks to wait for, and the person's own clicks must not
+        // close it.
+        if std::env::var_os("FIGGHOST_NOTCH_OFFSCREEN").is_none() {
+            self.close_on_outside_click();
+        }
     }
 
     /// Replaces the content of the open window, keeping its place and the highlighted row.

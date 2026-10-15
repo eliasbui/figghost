@@ -60,11 +60,14 @@ fn days_from_civil(year: i64, month: i64, day: i64) -> i64 {
 
 /// "2026-10-09T03:15:49.500Z" or with a numeric offset, as milliseconds since 1970.
 pub fn parse_rfc3339_ms(text: &str) -> Option<i64> {
+    // The numbers are read into narrow types so that a corrupt date is refused instead of overflowing the sums
+    // below, which these functions meet in files that anyone can edit.
+    let number = |field: &str| field.parse::<u16>().ok().map(i64::from);
     let (date, rest) = text.split_once('T')?;
     let mut parts = date.split('-');
-    let year: i64 = parts.next()?.parse().ok()?;
-    let month: i64 = parts.next()?.parse().ok()?;
-    let day: i64 = parts.next()?.parse().ok()?;
+    let year = number(parts.next()?)?;
+    let month = number(parts.next()?)?;
+    let day = number(parts.next()?)?;
     let (time, offset_s) = if let Some(time) = rest.strip_suffix('Z') {
         (time, 0)
     } else {
@@ -72,14 +75,14 @@ pub fn parse_rfc3339_ms(text: &str) -> Option<i64> {
         let (time, offset) = rest.split_at(at);
         let sign = if offset.starts_with('-') { -1 } else { 1 };
         let (hours, minutes) = offset[1..].split_once(':')?;
-        let seconds = hours.parse::<i64>().ok()? * 3600 + minutes.parse::<i64>().ok()? * 60;
+        let seconds = number(hours)? * 3600 + number(minutes)? * 60;
         (time, sign * seconds)
     };
     let (clock, fraction) = time.split_once('.').unwrap_or((time, ""));
     let mut clock = clock.split(':');
-    let hour: i64 = clock.next()?.parse().ok()?;
-    let minute: i64 = clock.next()?.parse().ok()?;
-    let second: i64 = clock.next()?.parse().ok()?;
+    let hour = number(clock.next()?)?;
+    let minute = number(clock.next()?)?;
+    let second = number(clock.next()?)?;
     let digits: String = fraction.chars().take(3).collect();
     let millis = if digits.is_empty() {
         0
@@ -147,7 +150,7 @@ pub fn codex_limits_from_line(line: &str) -> Option<Limits> {
 
 /// The newest session logs, newest first. Folders are named year/month/day and files start with their
 /// time, so sorting names is sorting by age and nothing has to be opened to find the recent ones.
-fn newest_rollouts(dir: &Path, depth: usize, want: usize, found: &mut Vec<PathBuf>) {
+pub(crate) fn newest_rollouts(dir: &Path, depth: usize, want: usize, found: &mut Vec<PathBuf>) {
     let Ok(read) = fs::read_dir(dir) else {
         return;
     };
@@ -300,6 +303,16 @@ mod tests {
         );
         assert_eq!(parse_rfc3339_ms("1970-01-01T00:00:01.5Z"), Some(1_500));
         assert_eq!(parse_rfc3339_ms("not a date"), None);
+    }
+
+    #[test]
+    fn numbers_too_big_to_be_a_date_are_refused_instead_of_overflowing() {
+        assert_eq!(parse_rfc3339_ms("99999999999999-01-01T00:00:00Z"), None);
+        assert_eq!(parse_rfc3339_ms("2026-10-15T99999999999:00:00Z"), None);
+        assert_eq!(
+            parse_rfc3339_ms("2026-10-15T07:00:00+99999999999999:00"),
+            None
+        );
     }
 
     #[test]

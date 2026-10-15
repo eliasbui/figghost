@@ -6,7 +6,7 @@
 use macos_sys::{
     MainThreadMarker,
     pasteboard::{Content, Pasteboard},
-    picker::{Callbacks, Picker, Source, Strings, place, sample::Grid},
+    picker::{Callbacks, Frozen, Picker, Source, Strings, place, sample::Grid},
 };
 use objc2_app_kit::{
     NSApplication, NSApplicationActivationPolicy, NSEvent, NSEventModifierFlags, NSEventType,
@@ -75,18 +75,37 @@ fn main() {
     let board = Rc::new(board);
     let allowed = Rc::new(Cell::new(true));
     let grabs: Rc<RefCell<Vec<NSPoint>>> = Rc::default();
-    let below_seen = Rc::new(Cell::new(0u32));
+    // How the synthetic freeze answers: at once, with a picture or without one, or only when told to.
+    let freezes = Rc::new(Cell::new(0usize));
+    let freeze_works = Rc::new(Cell::new(true));
+    let hold_freeze = Rc::new(Cell::new(false));
+    let held: Rc<RefCell<Option<Frozen>>> = Rc::default();
 
     let source = Source {
         access: {
             let a = Rc::clone(&allowed);
             Box::new(move || a.get())
         },
+        freeze: {
+            let (freezes, works, hold, held) = (
+                Rc::clone(&freezes),
+                Rc::clone(&freeze_works),
+                Rc::clone(&hold_freeze),
+                Rc::clone(&held),
+            );
+            Box::new(move |done| {
+                freezes.set(freezes.get() + 1);
+                if hold.get() {
+                    *held.borrow_mut() = Some(done);
+                } else {
+                    done(works.get());
+                }
+            })
+        },
         grab: {
-            let (grabs, below_seen) = (Rc::clone(&grabs), Rc::clone(&below_seen));
-            Box::new(move |p, cells, below| {
+            let grabs = Rc::clone(&grabs);
+            Box::new(move |p, cells| {
                 grabs.borrow_mut().push(p);
-                below_seen.set(below);
                 let half = (cells / 2) as f64;
                 let mut rgb = Vec::new();
                 for y in 0..cells {
@@ -153,8 +172,8 @@ fn main() {
         "the loupe does not cover the pointer",
     );
     check(
-        below_seen.get() != 0,
-        "the read is limited to what is below the catching panel",
+        freezes.get() == 1,
+        "the picture is taken once, when the picker starts",
     );
     fs::write(folder.join("loupe-hex.png"), picker.loupe_png().unwrap()).unwrap();
 
@@ -174,8 +193,8 @@ fn main() {
         "Tab wraps around to the first format",
     );
 
-    // A burst of moves is read a few times, and the last position is not lost.
-    let before = grabs.borrow().len();
+    // A move is a lookup in the picture that was taken, so every position is read at once and the last is
+    // never lost; the picture is not taken again.
     for i in 0..200 {
         mouse(
             &overlay,
@@ -183,12 +202,10 @@ fn main() {
             NSPoint::new(-28900.0 + f64::from(i) * 0.5, 200.0),
         );
     }
-    let burst = grabs.borrow().len() - before;
     check(
-        burst <= 2,
-        &format!("200 moves at once made {burst} reads, not 200"),
+        freezes.get() == 1,
+        "200 moves did not take the picture again",
     );
-    spin(0.15);
     let last = *grabs.borrow().last().unwrap();
     check(
         (last.x - (-28900.0 + 199.0 * 0.5)).abs() < 1e-6,
@@ -268,13 +285,125 @@ fn main() {
         "the right button ends it and copies nothing",
     );
 
+    // The picture takes a moment: nothing is on screen until it is there, and a second start meanwhile is
+    // ignored.
+    hold_freeze.set(true);
+    let taken = freezes.get();
+    picker.start(0, start);
+    check(
+        picker.is_active() && picker.catcher_window(0).is_none() && picker.loupe_frame().is_none(),
+        "while the picture is being taken the picker is active and nothing is on screen",
+    );
+    picker.start(0, start);
+    check(
+        freezes.get() == taken + 1,
+        "a second start while waiting takes no second picture",
+    );
+    let answer = held
+        .borrow_mut()
+        .take()
+        .expect("the picker asked for a picture");
+    answer(true);
+    check(
+        picker.catcher_window(0).is_some() && picker.loupe_frame().is_some(),
+        "the panels appear when the picture is there",
+    );
+    mouse(
+        &picker.catcher_window(1).unwrap(),
+        NSEventType::RightMouseDown,
+        start,
+    );
+
+    // Ended before the picture arrived: it is thrown away and nothing ever appears.
+    picker.start(0, start);
+    picker.cancel();
+    check(!picker.is_active(), "cancelling while waiting ends it");
+    let answer = held
+        .borrow_mut()
+        .take()
+        .expect("the picker asked for a picture");
+    answer(true);
+    check(
+        !picker.is_active() && picker.catcher_window(0).is_none(),
+        "a picture that arrives after the end shows nothing",
+    );
+    // Ended and started again meanwhile: only the newer picture counts.
+    picker.start(0, start);
+    let old = held.borrow_mut().take().expect("the first picture");
+    picker.cancel();
+    picker.start(0, start);
+    let new = held.borrow_mut().take().expect("the second picture");
+    old(true);
+    check(
+        picker.is_active() && picker.catcher_window(0).is_none(),
+        "the picture of an earlier start is ignored",
+    );
+    new(true);
+    check(
+        picker.catcher_window(0).is_some(),
+        "the picture of the current start is used",
+    );
+    picker.cancel();
+    hold_freeze.set(false);
+
+    // A picture that never comes is given up on after a few seconds: the loupe says it cannot read, a click
+    // only ends it, and the picture that turns up later is not used.
+    hold_freeze.set(true);
+    picker.start(0, start);
+    check(
+        picker.catcher_window(0).is_none(),
+        "nothing is on screen while the picture is awaited",
+    );
+    spin(3.4);
+    check(
+        picker.is_active() && picker.catcher_window(0).is_some(),
+        "after the wait the picker is shown, unable to read",
+    );
+    let reads = grabs.borrow().len();
+    let late = held
+        .borrow_mut()
+        .take()
+        .expect("the picker asked for a picture");
+    late(true);
+    let overlay = picker.catcher_window(1).unwrap();
+    mouse(
+        &overlay,
+        NSEventType::MouseMoved,
+        NSPoint::new(-28750.0, 250.0),
+    );
+    check(
+        grabs.borrow().len() == reads,
+        "the late picture is not used: nothing is read",
+    );
+    let count = board.change_count();
+    mouse(&overlay, NSEventType::LeftMouseDown, start);
+    check(
+        !picker.is_active() && board.change_count() == count,
+        "a click after the give-up ends it and copies nothing",
+    );
+    hold_freeze.set(false);
+
+    // A picture that cannot be taken is the same as no permission: the loupe says so, and a click copies
+    // nothing.
+    freeze_works.set(false);
+    let count = board.change_count();
+    picker.start(0, start);
+    let overlay = picker.catcher_window(1).unwrap();
+    mouse(&overlay, NSEventType::LeftMouseDown, start);
+    check(
+        !picker.is_active() && board.change_count() == count,
+        "a failed freeze ends with a click and copies nothing",
+    );
+    freeze_works.set(true);
+
     // Without the permission the loupe says so, and a click copies nothing.
     allowed.set(false);
     let reads = grabs.borrow().len();
+    let taken = freezes.get();
     picker.start(0, start);
     check(
-        grabs.borrow().len() == reads,
-        "no pixels are read without the permission",
+        grabs.borrow().len() == reads && freezes.get() == taken,
+        "no pixels are read and no picture is asked for without the permission",
     );
     fs::write(folder.join("loupe-denied.png"), picker.loupe_png().unwrap()).unwrap();
     let overlay = picker.catcher_window(1).unwrap();

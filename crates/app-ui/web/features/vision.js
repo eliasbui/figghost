@@ -1,7 +1,7 @@
 // Colour picker, and background removal for images.
 (window.__plugins = window.__plugins || []).push({
   id: 'vision',
-  icon: '<path d="M14 6l4 4M15.5 4.5a2.1 2.1 0 0 1 4 .3 2.1 2.1 0 0 1-.6 1.5L17 8l-2.5-2.5zM13.5 7.5l3 3-8.4 8.4a2 2 0 0 1-1.4.6H4.5v-2.2a2 2 0 0 1 .6-1.4z"/>',
+  icon: 'eyedropper.halffull',
   en: {
     'nav.vision': 'Colour picker', 'page.vision': 'Colour picker',
     'page.vision.sub': 'Point at any pixel on the screen, see it magnified and copy its colour.',
@@ -16,8 +16,6 @@
     'sec.vision.more': 'Images',
     'vision.bg.title': 'Remove background', 'vision.bg.desc': 'Right-click an image on the shelf and choose Remove background. A new PNG with a transparent background is made next to the original. Needs macOS 14 or later.',
     'vision.bg.yes': 'Available', 'vision.bg.no': 'Needs macOS 14',
-    'vision.text.title': 'Text recognition', 'vision.text.desc': 'Reads the text in an image, English and Vietnamese included, for the screen capture tools. Everything is done on this Mac.',
-    'vision.text.yes': 'Available', 'vision.text.no': 'Not available',
   },
   vi: {
     'nav.vision': 'Chọn màu', 'page.vision': 'Chọn màu',
@@ -33,8 +31,6 @@
     'sec.vision.more': 'Hình ảnh',
     'vision.bg.title': 'Xóa nền', 'vision.bg.desc': 'Bấm chuột phải vào một ảnh trên khay tệp và chọn Xóa nền. Một tệp PNG mới có nền trong suốt được tạo cạnh tệp gốc. Cần macOS 14 trở lên.',
     'vision.bg.yes': 'Có sẵn', 'vision.bg.no': 'Cần macOS 14',
-    'vision.text.title': 'Nhận dạng chữ', 'vision.text.desc': 'Đọc chữ trong ảnh, gồm cả tiếng Anh và tiếng Việt, cho các công cụ chụp màn hình. Mọi thứ được xử lý ngay trên máy này.',
-    'vision.text.yes': 'Có sẵn', 'vision.text.no': 'Không có',
   },
   build() {
     const clear = h('button', {
@@ -64,9 +60,7 @@
       sectionTitle(t('sec.vision.more')),
       card(
         row(t('vision.bg.title'), t('vision.bg.desc'),
-          pill(() => (S.vision.background_removal ? t('vision.bg.yes') : t('vision.bg.no')), () => S.vision.background_removal)),
-        row(t('vision.text.title'), t('vision.text.desc'),
-          pill(() => (S.vision.text_recognition ? t('vision.text.yes') : t('vision.text.no')), () => S.vision.text_recognition))),
+          pill(() => (S.vision.background_removal ? t('vision.bg.yes') : t('vision.bg.no')), () => S.vision.background_removal))),
     ];
   },
   selftest({ expect, go, sent, S }) {

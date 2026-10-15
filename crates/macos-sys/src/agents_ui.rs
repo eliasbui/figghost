@@ -22,6 +22,7 @@ const GAP: f64 = 10.0;
 const ROW_HEIGHT: f64 = 38.0;
 const HEADING_HEIGHT: f64 = 22.0;
 const USAGE_ROW: f64 = 26.0;
+const TOKENS_ROW: f64 = 22.0;
 const BUTTON_HEIGHT: f64 = 32.0;
 /// A command is shown over this many lines; the card is as tall as it needs for them.
 const COMMAND_LINES: usize = 3;
@@ -59,6 +60,16 @@ pub struct UsageData {
     pub reset: String,
 }
 
+/// One line of the tokens section: what an agent used today and this week, and its cost at API list prices.
+#[derive(Debug, Clone)]
+pub struct TokensData {
+    pub label: String,
+    /// "1.2M tokens  $3.45" for today.
+    pub today: String,
+    /// "Week $21.30".
+    pub week: String,
+}
+
 pub struct AgentsDisplay {
     /// The first command in line; the others wait behind it.
     pub approval: Option<ApprovalCardData>,
@@ -68,6 +79,8 @@ pub struct AgentsDisplay {
     pub sessions: Vec<SessionData>,
     pub usage_heading: String,
     pub usage: Vec<UsageData>,
+    pub tokens_heading: String,
+    pub tokens: Vec<TokensData>,
     pub empty_title: String,
     pub empty_hint: String,
 }
@@ -327,6 +340,60 @@ define_class!(
     unsafe impl NSObjectProtocol for UsageBars {}
 );
 
+pub struct TokenIvars {
+    rows: RefCell<Vec<TokensData>>,
+}
+
+define_class!(
+    // SAFETY: NSView allows subclassing; the ivars are only touched on the main thread and need no Drop.
+    #[unsafe(super(NSView))]
+    #[thread_kind = MainThreadOnly]
+    #[name = "FigAgentTokens"]
+    #[ivars = TokenIvars]
+    struct TokenRows;
+
+    impl TokenRows {
+        #[unsafe(method(isFlipped))]
+        fn is_flipped(&self) -> bool {
+            true
+        }
+
+        #[unsafe(method(drawRect:))]
+        fn draw_rect(&self, _dirty: NSRect) {
+            let width = self.bounds().size.width;
+            let (label_width, week_width) = (74.0, 120.0);
+            for (i, row) in self.ivars().rows.borrow().iter().enumerate() {
+                let middle = i as f64 * TOKENS_ROW + TOKENS_ROW / 2.0;
+                draw_text(
+                    &row.label,
+                    NSRect::new(NSPoint::new(0.0, middle - 8.0), NSSize::new(label_width, 16.0)),
+                    &attrs(11.5, Weight::Medium, style::TEXT_SECONDARY, Fit::Tail),
+                );
+                draw_text(
+                    &row.today,
+                    NSRect::new(
+                        NSPoint::new(label_width + 8.0, middle - 8.0),
+                        NSSize::new((width - label_width - 8.0 - week_width).max(40.0), 16.0),
+                    ),
+                    &attrs(11.5, Weight::Semibold, style::TEXT, Fit::Tail),
+                );
+                draw_text(
+                    &row.week,
+                    NSRect::new(NSPoint::new(width - week_width, middle - 8.0), NSSize::new(week_width, 16.0)),
+                    &text_attributes(
+                        &style::font(11.0, Weight::Regular),
+                        &white(style::TEXT_TERTIARY + 0.1),
+                        Fit::Tail,
+                        false,
+                    ),
+                );
+            }
+        }
+    }
+
+    unsafe impl NSObjectProtocol for TokenRows {}
+);
+
 pub struct NoteIvars {
     title: RefCell<String>,
     hint: RefCell<String>,
@@ -485,6 +552,10 @@ impl AgentsView {
             0.0
         } else {
             HEADING_HEIGHT + display.usage.len() as f64 * USAGE_ROW + 8.0
+        } + if display.tokens.is_empty() {
+            0.0
+        } else {
+            HEADING_HEIGHT + display.tokens.len() as f64 * TOKENS_ROW + 8.0
         };
         if !display.sessions.is_empty() {
             let room = top - cursor - usage_height - 28.0;
@@ -534,8 +605,35 @@ impl AgentsView {
             };
             self.root.addSubview(&bars);
             added.push(Retained::into_super(bars));
+            cursor += display.usage.len() as f64 * USAGE_ROW + 8.0;
         }
-        if display.approval.is_none() && display.sessions.is_empty() && display.usage.is_empty() {
+        if !display.tokens.is_empty() {
+            let heading = self.heading(mtm, &display.tokens_heading, cursor);
+            self.root.addSubview(&heading);
+            added.push(heading);
+            cursor += HEADING_HEIGHT;
+            let rows = {
+                let this = mtm.alloc::<TokenRows>().set_ivars(TokenIvars {
+                    rows: RefCell::new(display.tokens.clone()),
+                });
+                let height = display.tokens.len() as f64 * TOKENS_ROW;
+                let frame = NSRect::new(
+                    NSPoint::new(MARGIN + 2.0, top - cursor - height),
+                    NSSize::new(inner - 4.0, height),
+                );
+                // SAFETY: designated initializer with valid arguments on the main thread.
+                let rows: Retained<TokenRows> =
+                    unsafe { msg_send![super(this), initWithFrame: frame] };
+                rows
+            };
+            self.root.addSubview(&rows);
+            added.push(Retained::into_super(rows));
+        }
+        if display.approval.is_none()
+            && display.sessions.is_empty()
+            && display.usage.is_empty()
+            && display.tokens.is_empty()
+        {
             let note = {
                 let this = mtm.alloc::<EmptyNote>().set_ivars(NoteIvars {
                     title: RefCell::new(display.empty_title.clone()),
@@ -574,6 +672,7 @@ impl AgentsView {
     ) -> Page {
         let keys = Rc::clone(self);
         Page {
+            id: "agents",
             title: labels::get().agents_tab.clone(),
             symbol: "sparkles",
             root: Retained::into_super(Retained::clone(&self.root)),

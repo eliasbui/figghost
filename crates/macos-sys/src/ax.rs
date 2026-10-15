@@ -12,12 +12,23 @@ type AXValueRef = *const c_void;
 
 const AX_VALUE_POINT: i32 = 1;
 const AX_VALUE_SIZE: i32 = 2;
+const AX_VALUE_RECT: i32 = 3;
 
 #[repr(C)]
 #[derive(Clone, Copy, Default)]
 struct Pair {
     first: f64,
     second: f64,
+}
+
+/// The layout of CGRect.
+#[repr(C)]
+#[derive(Clone, Copy, Default)]
+struct Quad {
+    x: f64,
+    y: f64,
+    w: f64,
+    h: f64,
 }
 
 #[link(name = "ApplicationServices", kind = "framework")]
@@ -33,6 +44,12 @@ unsafe extern "C" {
         element: AXUIElementRef,
         attribute: CFStringRef,
         value: CFTypeRef,
+    ) -> i32;
+    fn AXUIElementCopyParameterizedAttributeValue(
+        element: AXUIElementRef,
+        attribute: CFStringRef,
+        parameter: CFTypeRef,
+        value: *mut CFTypeRef,
     ) -> i32;
     fn AXUIElementGetPid(element: AXUIElementRef, pid: *mut i32) -> i32;
     fn AXUIElementCopyElementAtPosition(
@@ -191,6 +208,31 @@ impl Element {
 
     pub fn point(&self, attribute: &str) -> Option<(f64, f64)> {
         self.pair(attribute, AX_VALUE_POINT)
+    }
+
+    /// The rect a parameterized attribute such as `AXBoundsForRange` gives for `parameter` (a value read from
+    /// this element, such as its `AXSelectedTextRange`), as (x, y, width, height) in the coordinates of
+    /// `AXPosition`.
+    pub fn rect_for(&self, attribute: &str, parameter: &Element) -> Option<(f64, f64, f64, f64)> {
+        let mut value: CFTypeRef = ptr::null();
+        // SAFETY: element and parameter are live, the name is a valid CFString and `value` a valid out pointer.
+        let status = unsafe {
+            AXUIElementCopyParameterizedAttributeValue(
+                self.0,
+                name(attribute).as_concrete_TypeRef(),
+                parameter.0,
+                &mut value,
+            )
+        };
+        let value = if status == 0 {
+            Element::own(value)?
+        } else {
+            return None;
+        };
+        let mut out = Quad::default();
+        // SAFETY: `out` matches the layout of CGRect.
+        let ok = unsafe { AXValueGetValue(value.0, AX_VALUE_RECT, ptr::from_mut(&mut out).cast()) };
+        ok.then_some((out.x, out.y, out.w, out.h))
     }
 
     pub fn size(&self, attribute: &str) -> Option<(f64, f64)> {

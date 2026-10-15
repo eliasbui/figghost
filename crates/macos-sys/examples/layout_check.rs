@@ -24,17 +24,41 @@ fn inspect(mtm: MainThreadMarker) -> usize {
     };
     let app = NSApplication::sharedApplication(mtm);
     let windows = app.windows();
+    // The open notch's window is at least as wide as the open shape (wider by the room for its shadow).
     let Some(window) = windows
         .iter()
-        .find(|w| w.frame().size.width == EXPANDED_SIZE.width)
+        .find(|w| w.frame().size.width >= EXPANDED_SIZE.width)
     else {
         println!("FAIL: no window of the expanded size");
         return 1;
     };
-    let Some(container) = window
+    // The window holds the shape; the shape holds the background, the ears and the pages' clip, and the clip holds the
+    // content, which is the one with the page strip in it.
+    let holds_strip = |view: &objc2_app_kit::NSView| {
+        view.subviews()
+            .iter()
+            .any(|s| s.class().name().to_string_lossy().contains("PageSwitcher"))
+    };
+    let content_of = |shape: &objc2_app_kit::NSView| {
+        shape
+            .subviews()
+            .iter()
+            .find_map(|clip| clip.subviews().iter().find(|v| holds_strip(v)))
+    };
+    let Some(surface) = window
         .contentView()
-        .and_then(|v| v.subviews().firstObject())
+        .and_then(|v| v.subviews().iter().find(|s| content_of(s).is_some()))
     else {
+        println!("FAIL: no open shape holds the pages");
+        return 1;
+    };
+    if surface.frame().size != EXPANDED_SIZE {
+        fail(format!(
+            "the open shape is {:?}, expected the expanded size",
+            surface.frame().size
+        ));
+    }
+    let Some(container) = content_of(&surface) else {
         println!("FAIL: the shape has no content container");
         return 1;
     };
@@ -119,6 +143,7 @@ fn main() {
                 on_previous: Box::new(|| {}),
                 on_play_pause: Box::new(|| {}),
                 on_next: Box::new(|| {}),
+                on_seek: Box::new(|_| {}),
             },
         );
         notch.add_page(media.page(|| {}, || {}));

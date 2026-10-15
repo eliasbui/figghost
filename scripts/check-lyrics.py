@@ -104,9 +104,15 @@ def press_when_shown(button, seconds=15):
     return outcome
 
 
-def cpu_percent():
-    out = subprocess.run(["ps", "-o", "%cpu=", "-p", str(process.pid)], capture_output=True).stdout.decode()
-    return float(out.strip() or 0)
+def cpu_seconds(pid):
+    """CPU time used so far, from `ps -o cputime` ([[h:]m:]s.cc). The `%cpu` column is an average over the whole
+    life of the process, which a busy start-up makes look like idle work."""
+    out = subprocess.run(["ps", "-o", "cputime=", "-p", str(pid)], capture_output=True, text=True).stdout.strip()
+    nums = [int(p) for p in out.replace(".", ":").split(":") if p.isdigit()]
+    if len(nums) < 2:
+        return 0.0
+    mins = nums[-3] if len(nums) >= 3 else 0
+    return mins * 60 + nums[-2] + nums[-1] / 100.0
 
 
 def children():
@@ -143,8 +149,10 @@ try:
     if outcome == "pressed":
         check(press_when_shown("Clipboard") == "pressed", "another tab can be opened again")
     time.sleep(3)
-    busy = cpu_percent()
-    check(process.poll() is None and busy < 1.0, f"idle ({busy:.1f}% CPU, helpers: {len(children())})")
+    before = cpu_seconds(process.pid)
+    time.sleep(6)
+    used = cpu_seconds(process.pid) - before
+    check(process.poll() is None and used < 0.06, f"idle (used {used:.2f} s of CPU in 6 s, under 1 percent; helpers: {len(children())})")
 finally:
     if waiting and waiting.poll() is None:
         waiting.kill()

@@ -7,10 +7,11 @@ use super::AttachEnv;
 use crate::{config::parse_hotkey, i18n, settings::model::Fault};
 use colour::{Format, Rgb};
 use macos_sys::{
-    MainThreadMarker, app,
+    MainThreadMarker, app, capture_ui,
     hotkey::Hotkey,
     pasteboard::{Pasteboard, Write},
-    picker::{Callbacks, Picker, Source, Strings, sample},
+    picker::{Callbacks, Picker, Source, Strings},
+    screen_capture,
     status_item::{Entry, Item},
     vision as engine, workspace,
 };
@@ -114,9 +115,15 @@ impl Feature {
     }
 
     fn pick(&self) {
-        if self.enabled.get() {
-            self.picker.start_at_pointer(self.format.get().index());
+        if !self.enabled.get() {
+            return;
         }
+        // The picture the loupe reads is the screenshots' (ScreenCaptureKit, macOS 14 and later).
+        if !screen_capture::capture_supported() {
+            capture_ui::toast(self.mtm, i18n::current().vision_needs_newer_macos());
+            return;
+        }
+        self.picker.start_at_pointer(self.format.get().index());
     }
 
     fn register(&self, shortcut: &str) -> Result<(), Fault> {
@@ -166,8 +173,7 @@ impl Feature {
     /// Facts only the running app knows, such as a permission, merged into this feature's part of the page state.
     pub fn runtime(&self) -> Value {
         json!({
-            "screen_access": sample::screen_access(),
-            "text_recognition": engine::text_recognition_available(),
+            "screen_access": screen_capture::screen_access(false),
             "background_removal": engine::background_removal_available(),
         })
     }
@@ -179,7 +185,7 @@ impl Feature {
         }
         // The system's own dialog appears the first time only; after that the list in System Settings is
         // the only place to switch it on.
-        if !sample::request_screen_access() {
+        if !screen_capture::screen_access(true) {
             workspace::open_url(SCREEN_RECORDING_PANE);
         }
         Some(Ok(()))
@@ -193,6 +199,7 @@ impl Feature {
             let pick = Rc::clone(&pick);
             app::after(0.15, move || pick.pick());
         })
+        .symbol(crate::menu::symbols::COLOR_PICKER)
         .visible_when(move || shown.enabled.get());
         vec![Entry::Item(item)]
     }

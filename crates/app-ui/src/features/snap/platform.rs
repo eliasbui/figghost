@@ -45,6 +45,7 @@ impl Held for Window {
 pub struct AppKit {
     mtm: MainThreadMarker,
     panel: snap_ui::ZonesPanel,
+    footprint: snap_ui::Footprint,
     notch: Option<Rc<Notch>>,
 }
 
@@ -53,18 +54,20 @@ impl AppKit {
         Self {
             mtm,
             panel: snap_ui::ZonesPanel::new(mtm),
+            footprint: snap_ui::Footprint::new(mtm),
             notch,
         }
     }
 
     fn spec(display: &Display, layouts: &[Layout]) -> snap_ui::ZonesSpec {
-        let panel = display.panel(layouts.len());
+        let panel = display.panel(layouts);
+        let language = i18n::current();
         snap_ui::ZonesSpec {
-            label: text_label(layouts),
+            label: language.snap_zones(layouts),
             width: panel.w,
             height: panel.h,
             cells: display
-                .cells(layouts.len())
+                .cells(layouts)
                 .into_iter()
                 .map(|c| Frame {
                     x: c.x - panel.x,
@@ -80,12 +83,12 @@ impl AppKit {
                     [g.x, g.y, g.w, g.h]
                 })
                 .collect(),
+            names: layouts
+                .iter()
+                .map(|l| language.snap_short(*l).to_owned())
+                .collect(),
         }
     }
-}
-
-fn text_label(layouts: &[Layout]) -> String {
-    i18n::current().snap_zones(layouts)
 }
 
 impl Platform for AppKit {
@@ -119,7 +122,7 @@ impl Platform for AppKit {
     }
 
     fn show(&self, display: &Display, layouts: &[Layout], hover: Option<usize>) {
-        let panel = display.panel(layouts.len());
+        let panel = display.panel(layouts);
         self.panel
             .show((panel.x, panel.y), &Self::spec(display, layouts), hover);
     }
@@ -130,6 +133,13 @@ impl Platform for AppKit {
 
     fn hide(&self) {
         self.panel.hide();
+    }
+
+    fn footprint(&self, target: Option<Rect>) {
+        match target {
+            Some(r) => self.footprint.show(frame(r)),
+            None => self.footprint.hide(),
+        }
     }
 
     fn hold_notch(&self, held: bool) {

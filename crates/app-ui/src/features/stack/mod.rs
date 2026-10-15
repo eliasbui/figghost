@@ -271,6 +271,7 @@ impl Feature {
             Item::new(&crate::i18n::current().stack_end_menu(0), move || {
                 end.run.finish();
             })
+            .symbol(crate::menu::symbols::COPY_STACK)
             .titled(move || crate::i18n::current().stack_end_menu(title.run.queued()))
             .visible_when({
                 let this = Rc::clone(this);

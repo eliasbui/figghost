@@ -6,6 +6,7 @@ pub mod cli;
 pub mod event;
 pub mod install;
 pub mod server;
+pub mod tokens;
 pub mod tracker;
 pub mod usage;
 pub mod wire;

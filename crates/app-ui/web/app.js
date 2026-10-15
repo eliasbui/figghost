@@ -23,32 +23,17 @@ function h(tag, attrs, ...kids) {
   return el;
 }
 
+// Glyphs are SF Symbols the app draws as white PNGs (window.__symbols, from settings/page.rs), used as a mask so
+// they take the text colour. Two older names are still used by the features.
+const SYMBOL_ALIASES = { close: 'xmark', refresh: 'arrow.clockwise' };
+const missingSymbols = new Set();
 function icon(name, cls) {
-  const el = document.createElementNS('http://www.w3.org/2000/svg', 'svg');
-  el.setAttribute('viewBox', '0 0 24 24');
-  el.setAttribute('aria-hidden', 'true');
-  if (cls) el.setAttribute('class', cls);
-  el.innerHTML = ICONS[name] || '';
-  return el;
+  const src = (window.__symbols || {})[SYMBOL_ALIASES[name] || name];
+  if (!src) missingSymbols.add(name);
+  return h('span', { class: 'glyph' + (cls ? ' ' + cls : ''), 'aria-hidden': 'true', style: src ? `--glyph:url("${src}")` : 'visibility:hidden' });
 }
-
-const ICONS = {
-  general: '<path d="M4 6h9M17 6h3M4 12h3M11 12h9M4 18h11M19 18h1"/><circle cx="15" cy="6" r="2"/><circle cx="9" cy="12" r="2"/><circle cx="17" cy="18" r="2"/>',
-  scroll: '<rect x="6" y="3" width="12" height="18" rx="6"/><path d="M12 7v4"/>',
-  clipboard: '<rect x="5" y="4" width="14" height="17" rx="3"/><path d="M9 4.5h6M9 10h6M9 14h4"/>',
-  notch: '<rect x="3" y="4" width="18" height="13" rx="3"/><path d="M9 4v2.2a1 1 0 0 0 1 1h4a1 1 0 0 0 1-1V4"/><path d="M8 21h8"/>',
-  tiling: '<rect x="3" y="4" width="18" height="16" rx="3"/><path d="M12 4v16M12 12h9"/>',
-  about: '<circle cx="12" cy="12" r="9"/><path d="M12 11v5M12 7.6v.01"/>',
-  plus: '<path d="M12 5v14M5 12h14"/>',
-  close: '<path d="M6 6l12 12M18 6L6 18"/>',
-  folder: '<path d="M3 7a2 2 0 0 1 2-2h4l2 2h8a2 2 0 0 1 2 2v8a2 2 0 0 1-2 2H5a2 2 0 0 1-2-2z"/>',
-  refresh: '<path d="M20 11a8 8 0 1 0-2.3 5.7M20 4v7h-7"/>',
-  trash: '<path d="M4 7h16M10 11v6M14 11v6M6 7l1 12a2 2 0 0 0 2 2h6a2 2 0 0 0 2-2l1-12M9 7V4h6v3"/>',
-  power: '<path d="M12 3v9M6.3 6.8a8 8 0 1 0 11.4 0"/>',
-  agents: '<path d="M11 3l1.9 5.6L18.5 10.5l-5.6 1.9L11 18l-1.9-5.6L3.5 10.5l5.6-1.9z"/><path d="M19 15l.7 2 2 .7-2 .7-.7 2-.7-2-2-.7 2-.7z"/>',
-};
-
-const GHOST = '<svg viewBox="0 0 24 24" aria-hidden="true"><path d="M12 2.5c-4.2 0-7.5 3.2-7.5 7.3V20c0 .8.9 1.2 1.5.7l1.6-1.4 1.6 1.4c.5.4 1.2.4 1.7 0l1.1-1 1.1 1c.5.4 1.2.4 1.7 0l1.6-1.4 1.6 1.4c.6.5 1.5.1 1.5-.7V9.8c0-4.1-3.3-7.3-7.5-7.3z"/><circle cx="9.2" cy="10.2" r="1.5" fill="#5b4bdc"/><circle cx="14.8" cy="10.2" r="1.5" fill="#5b4bdc"/></svg>';
+/** The app's own icon (window.__appIcon, drawn from Figghost.icns). */
+function appIcon(cls) { return h('img', { class: cls, src: window.__appIcon, alt: '' }); }
 
 function throttleBy(key, ms, fn) {
   const slots = (throttleBy.slots = throttleBy.slots || new Map());
@@ -240,6 +225,101 @@ const I18N = {
     'mcp.how': 'Thêm đoạn này vào cài đặt MCP của trợ lý:', 'mcp.copy': 'Sao chép cấu hình', 'mcp.copied': 'Đã chép vào clipboard.',
   },
 };
+
+// The notch, general and agents settings that came with the notch's live activities. Kept apart from the table
+// above so each block reads as one piece; they are merged into it before anything is drawn.
+Object.assign(I18N.en, {
+  'page.notch.sub': 'A panel that grows out of the top edge of your screen. Closed, it shows what is playing and what your coding agents do; under the pointer it opens into your tabs.',
+  'sec.notch.behavior': 'Behaviour',
+  'notch.hover.title': 'Open on hover', 'notch.hover.desc': 'Move the pointer onto the notch to open it. Off: a click opens it.',
+  'notch.delay.title': 'Hover delay', 'notch.delay.desc': 'How long the pointer rests on the notch before it opens. A longer delay keeps it shut when the pointer only passes by.',
+  'notch.delay.none': 'Immediately', 'notch.delay.ms': '{n} ms',
+  'notch.openpage.title': 'Opens on', 'notch.openpage.desc': 'The tab shown when the notch opens.',
+  'notch.openpage.activity': 'What is live', 'notch.openpage.last': 'The last tab used',
+  'notch.haptics.title': 'Haptic feedback', 'notch.haptics.desc': 'A light tap on a Force Touch trackpad when the notch opens under the pointer.',
+  'notch.shortcut.title': 'Open or close the notch', 'notch.shortcut.desc': 'A shortcut that works everywhere. Press Delete while recording to remove it.',
+  'sec.notch.look': 'Appearance',
+  'notch.material.title': 'Material', 'notch.material.desc': 'Liquid Glass lets the desktop show through and bends it at the edges. Closed, the notch stays black, like a hardware notch.',
+  'notch.material.glass': 'Liquid Glass', 'notch.material.clear': 'Clear glass', 'notch.material.black': 'Black',
+  'notch.motion.title': 'Motion', 'notch.motion.desc': 'How the notch moves as it opens, closes and widens. Reduce Motion in System Settings turns movement off.',
+  'notch.motion.spring': 'Spring', 'notch.motion.smooth': 'Smooth', 'notch.motion.none': 'None',
+  'notch.shadow.title': 'Shadow', 'notch.shadow.desc': 'A soft shadow under the open notch.',
+  'sec.notch.display': 'Display',
+  'notch.display.title': 'Show on', 'notch.display.desc': 'The screen the notch lives on.',
+  'notch.display.auto': 'The screen with a notch', 'notch.display.main': 'The main screen', 'notch.display.pointer': 'Where the pointer is',
+  'notch.rest.title': 'On a screen without a notch', 'notch.rest.desc': 'A black tab where a notch would be, or nothing until the pointer reaches the top edge.',
+  'notch.rest.hardware': 'This screen has a notch of its own.',
+  'notch.rest.notch': 'Notch', 'notch.rest.hidden': 'Hidden',
+  'notch.capture.title': 'Hide in screenshots and recordings', 'notch.capture.desc': 'The notch stays out of every screenshot and screen recording, including this app\'s own.',
+  'tabs.desc': 'Turn tabs on or off and change their order. Command + 1 to 9 follow this order.',
+  'tab.sound': 'Sound', 'tab.sound.desc': 'Volume, output and equalizer for each app that plays.',
+  'tab.media.desc': 'Previous, play and next for whatever plays, browsers included, with its cover, the app it comes from and the time.',
+  'tab.up': 'Move up', 'tab.down': 'Move down',
+  'sec.notch.live': 'Live activities',
+  'notch.livemedia.title': 'Music in the closed notch', 'notch.livemedia.desc': 'While something plays, in any app or browser, the closed notch shows its cover and moving bars. Point at it to open the player.',
+  'notch.waveform.title': 'Bars', 'notch.waveform.desc': 'Follow the sound the Mac plays (macOS asks once for System Audio Recording; nothing is recorded), or only move.',
+  'notch.waveform.live': 'Follow the sound', 'notch.waveform.animated': 'Move only',
+  'notch.liveagents.title': 'Coding agents in the closed notch', 'notch.liveagents.desc': 'While Claude Code or Codex works, the closed notch shows it with the share of the five-hour limit used. A question waits there too.',
+  'target.notch': 'the notch shortcut',
+
+  'sec.menuicon': 'Menu bar', 'menuicon.title': 'Show the icon in the menu bar', 'menuicon.desc': 'Without it, open Figghost again from Finder or Spotlight to reach these settings.',
+  'sec.appearance': 'Appearance', 'theme.title': 'Settings window', 'theme.desc': 'Light, dark, or as the system is.',
+  'general.theme.auto': 'Automatic', 'general.theme.light': 'Light', 'general.theme.dark': 'Dark',
+
+  'agents.ask.title': 'Open the notch for a question', 'agents.ask.desc': 'Off: a question waits in the closed notch, breathing, until you point at it. On: the notch opens by itself.',
+  'agents.peek.title': 'Say so in the notch when an agent finishes', 'agents.peek.desc': 'The closed notch shows it for a few seconds; it does not open.',
+  'sec.agents.tokens': 'Tokens and cost',
+  'agents.tokens.title': 'Count tokens and cost', 'agents.tokens.desc': 'Read from the transcripts Claude Code and Codex keep on this Mac; nothing is sent anywhere. The cost is what the same work would cost at Anthropic\'s API list prices. A subscription is billed a flat fee, so it is not a charge.',
+  'agents.spend.claude': 'Claude Code', 'agents.spend.codex': 'Codex',
+  'agents.spend.today': 'Today {tokens} tokens', 'agents.spend.week': 'Last 7 days {tokens} tokens',
+  'agents.spend.none': 'Nothing counted yet. The numbers appear once Claude Code or Codex has run on this Mac.',
+});
+Object.assign(I18N.vi, {
+  'page.notch.sub': 'Bảng mọc ra từ mép trên màn hình. Khi đóng, nó cho thấy bài đang phát và việc các tác tử lập trình đang làm; rê chuột lên thì mở ra các tab.',
+  'sec.notch.behavior': 'Hành vi',
+  'notch.hover.title': 'Mở khi rê chuột', 'notch.hover.desc': 'Đưa con trỏ lên notch để mở. Tắt thì cần nhấp chuột.',
+  'notch.delay.title': 'Độ trễ khi rê chuột', 'notch.delay.desc': 'Thời gian con trỏ dừng trên notch trước khi notch mở. Trễ lâu hơn thì notch không mở nhầm khi chuột chỉ lướt qua.',
+  'notch.delay.none': 'Ngay lập tức', 'notch.delay.ms': '{n} ms',
+  'notch.openpage.title': 'Mở vào', 'notch.openpage.desc': 'Tab hiện ra khi notch mở.',
+  'notch.openpage.activity': 'Theo hoạt động', 'notch.openpage.last': 'Tab dùng gần nhất',
+  'notch.haptics.title': 'Phản hồi xúc giác', 'notch.haptics.desc': 'Một cú chạm nhẹ trên trackpad Force Touch khi notch mở dưới con trỏ.',
+  'notch.shortcut.title': 'Mở hoặc đóng notch', 'notch.shortcut.desc': 'Phím tắt dùng ở mọi nơi. Nhấn Delete khi đang ghi để xóa.',
+  'sec.notch.look': 'Giao diện',
+  'notch.material.title': 'Chất liệu', 'notch.material.desc': 'Liquid Glass để màn hình phía sau hiện qua và khúc xạ ở mép. Khi đóng, notch vẫn màu đen như notch phần cứng.',
+  'notch.material.glass': 'Liquid Glass', 'notch.material.clear': 'Kính trong', 'notch.material.black': 'Đen',
+  'notch.motion.title': 'Chuyển động', 'notch.motion.desc': 'Cách notch chuyển động khi mở, đóng và nới rộng. Giảm chuyển động trong Cài đặt hệ thống sẽ tắt chuyển động.',
+  'notch.motion.spring': 'Lò xo', 'notch.motion.smooth': 'Mượt', 'notch.motion.none': 'Không',
+  'notch.shadow.title': 'Đổ bóng', 'notch.shadow.desc': 'Một lớp bóng mềm dưới notch khi mở.',
+  'sec.notch.display': 'Màn hình',
+  'notch.display.title': 'Hiển thị trên', 'notch.display.desc': 'Màn hình mà notch nằm trên đó.',
+  'notch.display.auto': 'Màn hình có notch', 'notch.display.main': 'Màn hình chính', 'notch.display.pointer': 'Màn hình có con trỏ',
+  'notch.rest.title': 'Trên màn hình không có notch', 'notch.rest.desc': 'Hiện một khối đen ở chỗ notch, hoặc không hiện gì cho đến khi con trỏ chạm mép trên.',
+  'notch.rest.hardware': 'Màn hình này có notch riêng.',
+  'notch.rest.notch': 'Notch', 'notch.rest.hidden': 'Ẩn',
+  'notch.capture.title': 'Ẩn khi chụp và quay màn hình', 'notch.capture.desc': 'Notch không xuất hiện trong ảnh chụp và video quay màn hình, kể cả của chính ứng dụng này.',
+  'tabs.desc': 'Bật, tắt và sắp xếp các tab. Command + 1 đến 9 theo đúng thứ tự này.',
+  'tab.sound': 'Âm thanh', 'tab.sound.desc': 'Âm lượng, thiết bị phát và bộ chỉnh âm cho từng ứng dụng đang phát.',
+  'tab.media.desc': 'Trước, phát và sau cho mọi thứ đang phát, kể cả trình duyệt, kèm ảnh bìa, ứng dụng nguồn và thời gian.',
+  'tab.up': 'Đưa lên', 'tab.down': 'Đưa xuống',
+  'sec.notch.live': 'Hoạt động trực tiếp',
+  'notch.livemedia.title': 'Nhạc trên notch đang đóng', 'notch.livemedia.desc': 'Khi có nội dung đang phát, ở bất kỳ ứng dụng hay trình duyệt nào, notch đang đóng hiện ảnh bìa và sóng nhạc. Đưa con trỏ lên để mở trình phát.',
+  'notch.waveform.title': 'Sóng nhạc', 'notch.waveform.desc': 'Chạy theo âm thanh máy đang phát (macOS hỏi quyền Ghi âm hệ thống một lần; không ghi lại gì), hoặc chỉ chuyển động.',
+  'notch.waveform.live': 'Theo âm thanh', 'notch.waveform.animated': 'Chỉ chuyển động',
+  'notch.liveagents.title': 'Tác tử lập trình trên notch đang đóng', 'notch.liveagents.desc': 'Khi Claude Code hoặc Codex đang làm việc, notch đang đóng cho thấy điều đó cùng mức đã dùng của hạn mức năm giờ. Câu hỏi cấp quyền cũng chờ ở đó.',
+  'target.notch': 'phím tắt notch',
+
+  'sec.menuicon': 'Thanh menu', 'menuicon.title': 'Hiện biểu tượng trên thanh menu', 'menuicon.desc': 'Khi tắt, mở lại Figghost từ Finder hoặc Spotlight để vào phần cài đặt này.',
+  'sec.appearance': 'Giao diện', 'theme.title': 'Cửa sổ cài đặt', 'theme.desc': 'Sáng, tối hoặc theo hệ thống.',
+  'general.theme.auto': 'Tự động', 'general.theme.light': 'Sáng', 'general.theme.dark': 'Tối',
+
+  'agents.ask.title': 'Mở notch khi có câu hỏi', 'agents.ask.desc': 'Tắt: câu hỏi chờ trên notch đang đóng, nhấp nháy nhẹ, cho đến khi bạn đưa con trỏ lên. Bật: notch tự mở ra.',
+  'agents.peek.title': 'Báo trên notch khi tác tử làm xong', 'agents.peek.desc': 'Notch đang đóng báo xong trong vài giây, không tự mở ra.',
+  'sec.agents.tokens': 'Token và chi phí',
+  'agents.tokens.title': 'Đếm token và chi phí', 'agents.tokens.desc': 'Đọc từ các bản ghi hội thoại Claude Code và Codex lưu trên máy Mac này; không gửi đi đâu. Chi phí là số tiền nếu làm cùng việc đó qua API theo bảng giá niêm yết của Anthropic. Gói đăng ký tính phí cố định nên đây không phải khoản bị trừ.',
+  'agents.spend.claude': 'Claude Code', 'agents.spend.codex': 'Codex',
+  'agents.spend.today': 'Hôm nay {tokens} token', 'agents.spend.week': '7 ngày qua {tokens} token',
+  'agents.spend.none': 'Chưa có số liệu. Con số hiện ra sau khi Claude Code hoặc Codex chạy trên máy này.',
+});
 
 let lang = 'en';
 const missingKeys = new Set();
@@ -606,7 +686,7 @@ function pill(textFn, goodFn) {
 
 function pageGeneral() {
   const hero = h('section', { class: 'hero card' },
-    h('div', { class: 'hero-mark', html: GHOST }),
+    appIcon('hero-mark'),
     h('div', {},
       h('h2', { text: 'Figghost' }),
       h('p', { text: t('hero.tagline') }),
@@ -645,6 +725,10 @@ function pageGeneral() {
     hero,
     sectionTitle(t('sec.startup')),
     card(loginRow, toggleRow('general.show_on_launch', t('showlaunch.title'), t('showlaunch.desc'))),
+    sectionTitle(t('sec.menuicon')),
+    card(toggleRow('general.menu_icon', t('menuicon.title'), t('menuicon.desc'))),
+    sectionTitle(t('sec.appearance')),
+    card(segRow('general.theme', t('theme.title'), t('theme.desc'), ['auto', 'light', 'dark'])),
     sectionTitle(t('sec.language')),
     card(row(t('lang.title'), t('lang.desc'), segmented({
       label: t('lang.title'),
@@ -947,26 +1031,136 @@ function pageClipboard() {
 
 // -- notch ----------------------------------------------------------
 
+function tabTitle(page) { return I18N.en['tab.' + page.id] ? t('tab.' + page.id) : page.title; }
+
 function notchStage() {
-  return h('div', { class: 'notch-stage', 'aria-hidden': 'true' },
-    h('div', { class: 'menubar' }),
-    h('div', { class: 'notch' },
-      h('div', { class: 'notch-body' },
-        h('div', { class: 'notch-tabs' }, h('span', { text: t('tab.clipboard') }), h('span', { text: t('tab.shelf') }), h('span', { text: t('tab.media') }), h('span', { text: t('tab.focus') }), h('span', { text: t('tab.agents') }), h('span', { text: t('tab.calendar') })),
-        h('div', { class: 'notch-line' }), h('div', { class: 'notch-line' }), h('div', { class: 'notch-line' }))),
-    h('div', { class: 'notch-note', text: t('notch.preview') }));
+  const tabs = h('div', { class: 'notch-tabs' });
+  const notch = h('div', { class: 'notch' },
+    h('div', { class: 'notch-body' }, tabs, h('div', { class: 'notch-line' }), h('div', { class: 'notch-line' }), h('div', { class: 'notch-line' })));
+  const stage = h('div', { class: 'notch-stage', 'aria-hidden': 'true' }, h('div', { class: 'menubar' }), notch, h('div', { class: 'notch-note', text: t('notch.preview') }));
+  reg(() => {
+    notch.className = 'notch mat-' + S.notch.material;
+    stage.className = 'notch-stage mo-' + S.notch.motion;
+    tabs.replaceChildren(...S.notch.pages.filter((p) => p.on).slice(0, 6).map((p) => h('span', { text: tabTitle(p) })));
+  });
+  return stage;
 }
 
 function infoRow(title, desc) { return row(title, desc, null); }
 
+/** A pop-up of fixed choices for a setting; numbers stay numbers. */
+function selectRow({ path, title, desc, options, when }) {
+  const el = h('select', { class: 'pick', 'aria-label': title });
+  const fill = () => {
+    const list = options();
+    const key = JSON.stringify(list) + lang;
+    if (el.dataset.key === key) return;
+    el.dataset.key = key;
+    el.replaceChildren(...list.map((o) => h('option', { value: String(o.value), text: o.label })));
+  };
+  el.addEventListener('change', () => change(path, typeof get(path) === 'number' ? +el.value : el.value));
+  reg(() => { fill(); el.value = String(get(path)); });
+  return row(title, desc, el, { when });
+}
+
+function segRow(path, title, desc, values, opts = {}) {
+  return row(title, desc, segmented({
+    label: title,
+    options: values.map((v) => ({ value: v, label: t(path + '.' + v) })),
+    value: () => get(path),
+    onPick: (v) => change(path, v),
+  }), opts);
+}
+
+/** Writes a new list of tabs: the page keeps every tab in order, the app keeps the ids of the ones that show. */
+function sendPages(pages) {
+  S.notch.pages = pages;
+  runSyncs();
+  send({ t: 'set', path: 'notch.pages', value: pages.filter((p) => p.on).map((p) => p.id) });
+}
+
+function tabRow(page) {
+  const pages = () => S.notch.pages;
+  const at = () => pages().findIndex((p) => p.id === page.id);
+  const title = tabTitle(page);
+  const move = (by) => {
+    const list = pages().slice();
+    const i = at(), j = i + by;
+    if (i < 0 || j < 0 || j >= list.length) return;
+    [list[i], list[j]] = [list[j], list[i]];
+    sendPages(list);
+  };
+  const up = h('button', { class: 'btn icon', 'aria-label': t('tab.up') + ': ' + title, title: t('tab.up'), onclick: () => move(-1) }, icon('chevron.up'));
+  const down = h('button', { class: 'btn icon', 'aria-label': t('tab.down') + ': ' + title, title: t('tab.down'), onclick: () => move(1) }, icon('chevron.down'));
+  const toggle = h('button', {
+    class: 'switch', role: 'switch', 'aria-label': title,
+    onclick: () => {
+      const list = pages().map((p) => (p.id === page.id ? { ...p, on: !p.on } : p));
+      if (list.some((p) => p.on)) sendPages(list);
+    },
+  });
+  reg(() => {
+    const now = pages()[at()];
+    const on = !!(now && now.on);
+    toggle.setAttribute('aria-checked', String(on));
+    // The last tab that shows cannot go: a notch with no tab could not be used.
+    toggle.disabled = on && pages().filter((p) => p.on).length === 1;
+    up.disabled = at() <= 0;
+    down.disabled = at() >= pages().length - 1;
+  });
+  return row(title, I18N.en['tab.' + page.id + '.desc'] ? t('tab.' + page.id + '.desc') : null, [h('span', { class: 'tab-order' }, up, down), toggle]);
+}
+
 function pageNotch() {
   const shelfCount = h('span', { class: 'row-title' });
   reg(() => { shelfCount.textContent = String(S.notch.shelf_count); });
+  const on = () => S.notch.enabled;
+  const delays = [0, 100, 200, 300, 500, 800];
+  const rest = segRow('notch.rest', t('notch.rest.title'), t('notch.rest.desc'), ['notch', 'hidden'], { when: () => on() && !S.notch.hardware });
+  const restDesc = $('.row-desc', rest);
+  reg(() => { restDesc.textContent = S.notch.hardware ? t('notch.rest.hardware') : t('notch.rest.desc'); });
   return [
     notchStage(),
     card(toggleRow('notch.enabled', t('notch.panel.title'), t('notch.panel.desc'))),
+    sectionTitle(t('sec.notch.behavior')),
+    card(
+      toggleRow('notch.open_on_hover', t('notch.hover.title'), t('notch.hover.desc'), { when: on }),
+      selectRow({
+        path: 'notch.hover_delay_ms', title: t('notch.delay.title'), desc: t('notch.delay.desc'),
+        when: () => on() && S.notch.open_on_hover,
+        options: () => {
+          const list = delays.map((n) => ({ value: n, label: n ? t('notch.delay.ms', { n }) : t('notch.delay.none') }));
+          if (!delays.includes(S.notch.hover_delay_ms)) list.push({ value: S.notch.hover_delay_ms, label: t('notch.delay.ms', { n: S.notch.hover_delay_ms }) });
+          return list;
+        },
+      }),
+      selectRow({
+        path: 'notch.open_page', title: t('notch.openpage.title'), desc: t('notch.openpage.desc'), when: on,
+        options: () => [{ value: 'activity', label: t('notch.openpage.activity') }, { value: 'last', label: t('notch.openpage.last') }]
+          .concat(S.notch.pages.filter((p) => p.on).map((p) => ({ value: p.id, label: tabTitle(p) }))),
+      }),
+      toggleRow('notch.haptics', t('notch.haptics.title'), t('notch.haptics.desc'), { when: on }),
+      row(t('notch.shortcut.title'), t('notch.shortcut.desc'), hotkeyButton('notch', { allowClear: true, label: t('notch.shortcut.title') }), { when: on })),
+    sectionTitle(t('sec.notch.look')),
+    card(
+      segRow('notch.material', t('notch.material.title'), t('notch.material.desc'), ['glass', 'clear', 'black'], { when: on }),
+      segRow('notch.motion', t('notch.motion.title'), t('notch.motion.desc'), ['spring', 'smooth', 'none'], { when: on }),
+      toggleRow('notch.shadow', t('notch.shadow.title'), t('notch.shadow.desc'), { when: on })),
+    sectionTitle(t('sec.notch.display')),
+    card(
+      selectRow({
+        path: 'notch.display', title: t('notch.display.title'), desc: t('notch.display.desc'), when: on,
+        options: () => ['auto', 'main', 'pointer'].map((v) => ({ value: v, label: t('notch.display.' + v) })),
+      }),
+      rest,
+      toggleRow('notch.hide_in_capture', t('notch.capture.title'), t('notch.capture.desc'), { when: on })),
+    sectionTitle(t('sec.notch.live')),
+    card(
+      toggleRow('notch.live_media', t('notch.livemedia.title'), t('notch.livemedia.desc'), { when: on }),
+      segRow('notch.waveform', t('notch.waveform.title'), t('notch.waveform.desc'), ['live', 'animated'], { when: () => on() && S.notch.live_media }),
+      toggleRow('notch.live_agents', t('notch.liveagents.title'), t('notch.liveagents.desc'), { when: on })),
     sectionTitle(t('sec.tabs')),
-    card(infoRow(t('tab.clipboard'), t('tab.clipboard.desc')), infoRow(t('tab.shelf'), t('tab.shelf.desc')), infoRow(t('tab.media'), t('tab.media.desc')), infoRow(t('tab.focus'), t('tab.focus.desc')), infoRow(t('tab.agents'), t('tab.agents.desc')), infoRow(t('tab.calendar'), t('tab.calendar.desc'))),
+    card(infoRow(t('tabs.desc'), null), dynamicList(() => S.notch.pages, tabRow, '')),
     sectionTitle(t('sec.shelf')),
     card(
       row(t('shelf.count'), null, shelfCount),
@@ -1030,6 +1224,20 @@ function usageRow() {
   return line;
 }
 
+function compact(n) {
+  return new Intl.NumberFormat(lang === 'vi' ? 'vi-VN' : 'en-US', { notation: 'compact', maximumFractionDigits: n < 1e4 ? 1 : 2 }).format(n);
+}
+function usd(amount) {
+  return new Intl.NumberFormat(lang === 'vi' ? 'vi-VN' : 'en-US', { style: 'currency', currency: 'USD', maximumFractionDigits: amount >= 1000 ? 0 : 2 }).format(amount);
+}
+
+/** What one agent used today and in the week, with the cost when there is a price. */
+function spendRow(spend) {
+  const line = (key, tokens, cost) => t(key, { tokens: compact(tokens) }) + (cost == null ? '' : ' · ' + usd(cost));
+  return row(t('agents.spend.' + spend.agent), line('agents.spend.today', spend.today, spend.today_cost),
+    h('span', { class: 'row-title', text: line('agents.spend.week', spend.week, spend.week_cost) }));
+}
+
 function pageAgents() {
   const body = [
     card(toggleRow('agents.enabled', t('agents.enable.title'), t('agents.enable.desc'))),
@@ -1038,10 +1246,15 @@ function pageAgents() {
     sectionTitle(t('sec.agents.answer')),
     card(
       row(t('agents.wait.title'), t('agents.wait.desc'), waitSelect(), { when: () => S.agents.enabled }),
+      toggleRow('agents.open_on_ask', t('agents.ask.title'), t('agents.ask.desc')),
       toggleRow('agents.sound', t('agents.sound.title'), t('agents.sound.desc')),
       toggleRow('agents.peek', t('agents.peek.title'), t('agents.peek.desc'))),
     sectionTitle(t('sec.agents.limits')),
     card(usageRow()),
+    sectionTitle(t('sec.agents.tokens')),
+    card(
+      toggleRow('agents.tokens', t('agents.tokens.title'), t('agents.tokens.desc')),
+      dynamicList(() => (S.agents.tokens ? S.agents.spend || [] : []), spendRow, t('agents.spend.none'))),
     sectionTitle(t('sec.agents.note')),
     card(infoRow(t('agents.note.title'), t('agents.note.body'))),
   ];
@@ -1082,7 +1295,7 @@ function pageTiling() {
 function pageAbout() {
   return [
     h('section', { class: 'hero card' },
-      h('div', { class: 'hero-mark', html: GHOST }),
+      appIcon('hero-mark'),
       h('div', {}, h('h2', { text: 'Figghost' }), h('p', { text: t('about.line') }))),
     card(
       row(t('about.version'), null, h('span', { class: 'row-title', text: S.app.version })),
@@ -1093,13 +1306,13 @@ function pageAbout() {
 }
 
 const PAGES = [
-  { id: 'general', icon: 'general', build: pageGeneral },
-  { id: 'scroll', icon: 'scroll', build: pageScroll },
-  { id: 'clipboard', icon: 'clipboard', build: pageClipboard },
-  { id: 'notch', icon: 'notch', build: pageNotch },
-  { id: 'agents', icon: 'agents', build: pageAgents },
-  { id: 'tiling', icon: 'tiling', build: pageTiling },
-  { id: 'about', icon: 'about', build: pageAbout },
+  { id: 'general', icon: 'gearshape.fill', build: pageGeneral },
+  { id: 'scroll', icon: 'computermouse.fill', build: pageScroll },
+  { id: 'clipboard', icon: 'doc.on.clipboard.fill', build: pageClipboard },
+  { id: 'notch', icon: 'rectangle.topthird.inset.filled', build: pageNotch },
+  { id: 'agents', icon: 'terminal.fill', build: pageAgents },
+  { id: 'tiling', icon: 'rectangle.split.2x1.fill', build: pageTiling },
+  { id: 'about', icon: 'info.circle.fill', build: pageAbout },
 ];
 
 // Pages, strings and cards that the features bring (web/features/*.js). A feature's page goes before
@@ -1108,10 +1321,7 @@ const PLUGINS = window.__plugins || [];
 for (const p of PLUGINS) {
   Object.assign(I18N.en, p.en || {});
   Object.assign(I18N.vi, p.vi || {});
-  if (p.build) {
-    ICONS[p.id] = p.icon || ICONS.about;
-    PAGES.splice(PAGES.findIndex((x) => x.id === 'tiling'), 0, { id: p.id, icon: p.id, build: p.build });
-  }
+  if (p.build) PAGES.splice(PAGES.findIndex((x) => x.id === 'tiling'), 0, { id: p.id, icon: p.icon || 'info.circle.fill', build: p.build });
 }
 function slotsFor(pageId) {
   return PLUGINS.flatMap((p) => (p.slots && p.slots[pageId] ? [].concat(p.slots[pageId]()) : []));
@@ -1137,15 +1347,15 @@ function accessPill() {
 function buildShell() {
   document.documentElement.lang = lang;
   $('#root').replaceChildren(
-    h('div', { id: 'aurora', 'aria-hidden': 'true' }, h('i'), h('i'), h('i')),
     h('div', { id: 'app' },
       h('aside', { id: 'sidebar', class: 'glass' },
         h('div', { class: 'dragzone', 'data-drag': '' }),
         h('div', { class: 'brand' },
-          h('div', { class: 'brand-mark', html: GHOST }),
+          appIcon('brand-icon'),
           h('div', {}, h('div', { class: 'brand-name', text: 'Figghost' }), h('div', { class: 'brand-ver', text: 'v' + S.app.version }))),
         h('nav', { id: 'nav', 'aria-label': 'Figghost' },
-          PAGES.map((p) => h('button', { class: 'nav-item', 'data-page': p.id, onclick: () => go(p.id) }, icon(p.icon), t('nav.' + p.id)))),
+          PAGES.map((p) => h('button', { class: 'nav-item', 'data-page': p.id, onclick: () => go(p.id) },
+            h('span', { class: 'nav-icon' }, icon(p.icon)), h('span', { class: 'nav-label', text: t('nav.' + p.id) })))),
         h('div', { class: 'side-foot' }, accessPill())),
       h('main', { id: 'main' },
         h('div', { class: 'dragzone', 'data-drag': '' }),
@@ -1192,8 +1402,6 @@ function applyDisplay() {
   list.toggle('reduce-transparency', !!S.env.reduce_transparency);
   list.toggle('reduce-motion', !!S.env.reduce_motion);
   list.toggle('increase-contrast', !!S.env.increase_contrast);
-  // The drifting colour is the only thing that animates on its own; stop it when nobody can see it.
-  list.toggle('still', !!S.env.reduce_motion || document.hidden);
 }
 
 function onState(next) {
@@ -1224,22 +1432,6 @@ window.__fig = {
   },
 };
 
-// Light that follows the pointer across a glass surface.
-let sheenFrame = 0;
-let sheenEvent = null;
-document.addEventListener('pointermove', (e) => {
-  sheenEvent = e;
-  if (sheenFrame) return;
-  sheenFrame = requestAnimationFrame(() => {
-    sheenFrame = 0;
-    const glass = sheenEvent.target.closest && sheenEvent.target.closest('.glass');
-    if (!glass) return;
-    const r = glass.getBoundingClientRect();
-    glass.style.setProperty('--mx', sheenEvent.clientX - r.left + 'px');
-    glass.style.setProperty('--my', sheenEvent.clientY - r.top + 'px');
-  });
-});
-
 // This is an app, not a web page: no browser context menu, except where the user may want to copy text.
 document.addEventListener('contextmenu', (e) => { if (!e.target.closest('.code')) e.preventDefault(); });
 
@@ -1248,7 +1440,6 @@ document.addEventListener('mousedown', (e) => { if (e.button === 0 && e.target.c
 document.addEventListener('dblclick', (e) => { if (e.target.closest('[data-drag]')) window.fig.zoom(); });
 window.addEventListener('blur', () => document.documentElement.classList.add('inactive'));
 window.addEventListener('focus', () => document.documentElement.classList.remove('inactive'));
-document.addEventListener('visibilitychange', applyDisplay);
 
 // ---------------------------------------------------------------- self-test (run by the headless check)
 
@@ -1285,6 +1476,7 @@ window.__selftest = function () {
       }
     }
     expect(missingKeys.size === 0, 'keys without English text: ' + [...missingKeys].join(', '));
+    expect(missingSymbols.size === 0, 'icons without a symbol: ' + [...missingSymbols].join(', '));
     setLang('en');
 
     // Controls send what the app expects.
@@ -1353,6 +1545,27 @@ window.__selftest = function () {
     wait.value = '60';
     wait.dispatchEvent(new Event('change'));
     expect(S.agents.wait === 60, 'the wait is a number of seconds');
+
+    // The notch page: choices send their words, the tab list sends the ids that show, in order, and never none.
+    go('notch');
+    sent.length = 0;
+    const black = [...document.querySelectorAll('.seg button')].find((b) => b.textContent === t('notch.material.black'));
+    black.click();
+    expect(sent.some((m) => m.t === 'set' && m.path === 'notch.material' && m.value === 'black'), 'the material is sent: ' + JSON.stringify(sent));
+    expect($('.notch').classList.contains('mat-black'), 'the preview follows the material');
+    S.notch.pages = [{ id: 'clipboard', title: 'Clipboard', on: true }, { id: 'media', title: 'Media', on: true }, { id: 'sound', title: 'Sound', on: false }];
+    runSyncs();
+    const tabRows = [...document.querySelectorAll('.card .row')].filter((r) => r.querySelector('.tab-order'));
+    expect(tabRows.length === 3, 'a row per tab: ' + tabRows.length);
+    sent.length = 0;
+    tabRows[1].querySelector('.tab-order .btn').click();
+    expect(sent.some((m) => m.t === 'set' && m.path === 'notch.pages' && JSON.stringify(m.value) === '["media","clipboard"]'), 'moving a tab sends the new order: ' + JSON.stringify(sent));
+    S.notch.pages = [{ id: 'clipboard', title: 'Clipboard', on: true }, { id: 'sound', title: 'Sound', on: false }];
+    runSyncs();
+    const lone = [...document.querySelectorAll('.card .row')].find((r) => r.querySelector('.tab-order'));
+    expect(lone.querySelector('.switch').disabled, 'the last tab that shows cannot be turned off');
+    go('agents');
+    expect(document.body.textContent.includes(t('agents.spend.claude')), 'the spend of Claude Code is listed');
 
     // Each feature's own checks (web/features/*.js).
     for (const p of PLUGINS) if (p.selftest) p.selftest({ expect, go, sent, S, h, $ });

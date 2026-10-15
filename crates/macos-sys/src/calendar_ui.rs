@@ -727,6 +727,7 @@ impl CalendarView {
     ) -> Page {
         let keys = Rc::clone(self);
         Page {
+            id: "calendar",
             title: title.to_owned(),
             symbol: "calendar",
             root: Retained::into_super(Retained::clone(&self.root)),

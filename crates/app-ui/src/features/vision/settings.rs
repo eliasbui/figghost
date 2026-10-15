@@ -14,7 +14,6 @@ pub fn state(config: &Config, runtime: &Value) -> Value {
         "shortcut": config.shortcut,
         "format": config.format().id(),
         "screen_access": fact("screen_access"),
-        "text_recognition": fact("text_recognition"),
         "background_removal": fact("background_removal"),
     })
 }
@@ -100,16 +99,11 @@ mod tests {
 
     #[test]
     fn runtime_facts_reach_the_page() {
-        let runtime =
-            json!({ "screen_access": true, "text_recognition": true, "background_removal": false });
+        let runtime = json!({ "screen_access": true, "background_removal": false });
         let s = state(&Config::default(), &runtime);
         assert_eq!(
-            (
-                s["screen_access"].clone(),
-                s["text_recognition"].clone(),
-                s["background_removal"].clone()
-            ),
-            (json!(true), json!(true), json!(false))
+            (s["screen_access"].clone(), s["background_removal"].clone()),
+            (json!(true), json!(false))
         );
         // A value of the wrong type is not trusted.
         let s = state(&Config::default(), &json!({ "screen_access": "yes" }));

@@ -98,6 +98,10 @@ pub enum Effect {
     Language,
     LoginItem(bool),
     VolumeHud(bool),
+    /// Show or hide the menu bar icon.
+    MenuIcon(bool),
+    /// The settings window's light or dark appearance changed.
+    Theme,
     History,
     Tiling,
     Notch,
@@ -147,6 +151,10 @@ pub struct Env {
     pub names: HashMap<String, String>,
     pub display: DisplayOptions,
     pub agents: crate::agents::Status,
+    /// The notch's tabs as (id, title) in the order they were added, empty without a notch.
+    pub notch_pages: Vec<(String, String)>,
+    /// The notch is on a screen with a hardware notch.
+    pub notch_hardware: bool,
     /// What the running features know that the page needs, by feature id.
     pub runtime: HashMap<&'static str, Value>,
 }
@@ -222,6 +230,8 @@ pub fn state(config: &Config, env: &Env) -> Value {
         "general": {
             "language": config.language,
             "show_on_launch": config.show_settings_on_launch,
+            "menu_icon": config.menu_icon,
+            "theme": config.theme,
         },
         "mouse": {
             "smooth": m.smooth,
@@ -247,20 +257,25 @@ pub fn state(config: &Config, env: &Env) -> Value {
             "enabled": config.mcp.enabled,
             "command": env.exe,
         },
-        "notch": {
-            "enabled": config.notch.enabled,
-            "volume_hud": config.volume_hud,
-            "shelf_count": env.shelf_count,
-        },
+        "notch": notch_state(config, env),
         "agents": {
             "enabled": config.agents.enabled,
             "wait": config.agents.approval_wait_seconds,
             "sound": config.agents.sound,
             "peek": config.agents.peek_when_done,
+            "open_on_ask": config.agents.open_on_ask,
+            "tokens": config.agents.tokens,
             "claude": agent_entry(&env.agents.claude),
             "codex": agent_entry(&env.agents.codex),
             "usage_tap": env.agents.usage_tap,
             "usage_known": env.agents.usage_known,
+            "spend": env.agents.spend.iter().map(|s| json!({
+                "agent": s.agent,
+                "today": s.today,
+                "week": s.week,
+                "today_cost": s.today_cost,
+                "week_cost": s.week_cost,
+            })).collect::<Vec<Value>>(),
         },
         "tiling": {
             "enabled": config.tiling.enabled,
@@ -271,6 +286,73 @@ pub fn state(config: &Config, env: &Env) -> Value {
         crate::features::state(config, &env.runtime, root);
     }
     state
+}
+
+/// The notch's part of the state: its switches, and every tab with whether it shows, in tab order (the shown ones
+/// in their order first, then the hidden ones).
+fn notch_state(config: &Config, env: &Env) -> Value {
+    let n = &config.notch;
+    let title_of = |id: &str| {
+        env.notch_pages
+            .iter()
+            .find(|(page, _)| page == id)
+            .map_or_else(|| id.to_owned(), |(_, title)| title.clone())
+    };
+    let known: Vec<&str> = if env.notch_pages.is_empty() {
+        crate::config::NOTCH_PAGES.to_vec()
+    } else {
+        env.notch_pages.iter().map(|(id, _)| id.as_str()).collect()
+    };
+    let shown: Vec<&str> = if n.pages.is_empty() {
+        known.clone()
+    } else {
+        n.pages
+            .iter()
+            .map(String::as_str)
+            .filter(|id| known.contains(id))
+            .collect()
+    };
+    let pages: Vec<Value> = shown
+        .iter()
+        .map(|id| (*id, true))
+        .chain(
+            known
+                .iter()
+                .filter(|id| !shown.contains(id))
+                .map(|id| (*id, false)),
+        )
+        .map(|(id, on)| json!({ "id": id, "title": title_of(id), "on": on }))
+        .collect();
+    json!({
+        "enabled": n.enabled,
+        "volume_hud": config.volume_hud,
+        "shelf_count": env.shelf_count,
+        "material": n.material,
+        "shadow": n.shadow,
+        "motion": n.motion,
+        "open_on_hover": n.open_on_hover,
+        "hover_delay_ms": n.hover_delay_ms,
+        "rest": n.rest,
+        "hide_in_capture": n.hide_in_capture,
+        "haptics": n.haptics,
+        "display": n.display,
+        "open_page": n.open_page,
+        "pages": pages,
+        "live_media": n.live_media,
+        "live_agents": n.live_agents,
+        "waveform": n.waveform,
+        "shortcut": n.shortcut,
+        "hardware": env.notch_hardware,
+    })
+}
+
+/// A word from a fixed list, or a refusal.
+fn one_of(value: &Value, words: &[&str]) -> Result<String, Fault> {
+    value
+        .as_str()
+        .filter(|w| words.contains(w))
+        .map(str::to_owned)
+        .ok_or_else(|| Fault::new("invalid_value", format!("expected one of {words:?}")))
 }
 
 fn flag(value: &Value) -> Result<bool, Fault> {
@@ -429,6 +511,83 @@ fn set(config: &mut Config, path: &str, value: &Value) -> Outcome {
             config.notch.enabled = flag(value)?;
             Ok(Effect::Notch)
         }
+        "general.menu_icon" => {
+            config.menu_icon = flag(value)?;
+            Ok(Effect::MenuIcon(config.menu_icon))
+        }
+        "general.theme" => {
+            config.theme = one_of(value, &["auto", "light", "dark"])?;
+            Ok(Effect::Theme)
+        }
+        "notch.material" => {
+            config.notch.material = one_of(value, &["glass", "clear", "black"])?;
+            Ok(Effect::Notch)
+        }
+        "notch.motion" => {
+            config.notch.motion = one_of(value, &["spring", "smooth", "none"])?;
+            Ok(Effect::Notch)
+        }
+        "notch.rest" => {
+            config.notch.rest = one_of(value, &["notch", "hidden"])?;
+            Ok(Effect::Notch)
+        }
+        "notch.display" => {
+            config.notch.display = one_of(value, &["auto", "main", "pointer"])?;
+            Ok(Effect::Notch)
+        }
+        "notch.waveform" => {
+            config.notch.waveform = one_of(value, &["live", "animated"])?;
+            Ok(Effect::Notch)
+        }
+        "notch.open_page" => {
+            let mut words = vec!["last", "activity"];
+            words.extend(crate::config::NOTCH_PAGES);
+            config.notch.open_page = one_of(value, &words)?;
+            Ok(Effect::Notch)
+        }
+        "notch.hover_delay_ms" => {
+            config.notch.hover_delay_ms = number(value, 0.0, 1000.0)?.round() as u32;
+            Ok(Effect::Notch)
+        }
+        "notch.pages" => {
+            let pages = crate::config::notch_pages(value);
+            let all_known = value
+                .as_array()
+                .is_some_and(|list| list.len() == pages.len());
+            // The page builds the list from the tabs it was given, so anything else is refused whole; and a notch
+            // without a single tab could never be used.
+            if pages.is_empty() || !all_known {
+                return Err(Fault::new("invalid_value", "expected a list of tab ids"));
+            }
+            config.notch.pages = pages;
+            Ok(Effect::Notch)
+        }
+        "notch.shadow"
+        | "notch.open_on_hover"
+        | "notch.hide_in_capture"
+        | "notch.haptics"
+        | "notch.live_media"
+        | "notch.live_agents" => {
+            let on = flag(value)?;
+            let n = &mut config.notch;
+            match path {
+                "notch.shadow" => n.shadow = on,
+                "notch.open_on_hover" => n.open_on_hover = on,
+                "notch.hide_in_capture" => n.hide_in_capture = on,
+                "notch.haptics" => n.haptics = on,
+                "notch.live_media" => n.live_media = on,
+                _ => n.live_agents = on,
+            }
+            Ok(Effect::Notch)
+        }
+        "agents.open_on_ask" => {
+            config.agents.open_on_ask = flag(value)?;
+            Ok(Effect::Agents)
+        }
+        "agents.tokens" => {
+            config.agents.tokens = flag(value)?;
+            Ok(Effect::Agents)
+        }
         "agents.enabled" => {
             config.agents.enabled = flag(value)?;
             Ok(Effect::Agents)
@@ -465,6 +624,9 @@ fn shortcut_of(config: &Config, target: &str) -> Option<String> {
     if target == "clipboard" {
         return Some(config.hotkey.clone());
     }
+    if target == "notch" {
+        return (!config.notch.shortcut.is_empty()).then(|| config.notch.shortcut.clone());
+    }
     let layout = Layout::ALL
         .into_iter()
         .find(|l| format!("tiling:{}", l.key()) == target)?;
@@ -477,7 +639,7 @@ fn shortcut_of(config: &Config, target: &str) -> Option<String> {
 }
 
 fn all_targets() -> Vec<String> {
-    let mut targets = vec!["clipboard".to_owned()];
+    let mut targets = vec!["clipboard".to_owned(), "notch".to_owned()];
     targets.extend(
         Layout::ALL
             .into_iter()
@@ -522,10 +684,14 @@ fn set_hotkey(config: &mut Config, target: &str, value: &str) -> Outcome {
     let tiling_layout = target
         .strip_prefix("tiling:")
         .and_then(|key| Layout::ALL.into_iter().find(|l| l.key() == key));
-    if target != "clipboard" && tiling_layout.is_none() {
+    if target != "clipboard" && target != "notch" && tiling_layout.is_none() {
         return Err(Fault::new("unknown_setting", target));
     }
     let value = value.trim();
+    if value.is_empty() && target == "notch" {
+        config.notch.shortcut.clear();
+        return Ok(Effect::Hotkey(target.to_owned()));
+    }
     if value.is_empty() {
         // Only a layout can go without a shortcut; the clipboard popup would become unreachable.
         let Some(layout) = tiling_layout else {
@@ -561,6 +727,7 @@ fn set_hotkey(config: &mut Config, target: &str, value: &str) -> Outcome {
                 .shortcuts
                 .insert(layout.key().into(), value.to_owned());
         }
+        None if target == "notch" => config.notch.shortcut = value.to_owned(),
         None => config.hotkey = value.to_owned(),
     }
     Ok(Effect::Hotkey(target.to_owned()))
@@ -604,6 +771,8 @@ mod tests {
             names: HashMap::from([("com.apple.Safari".to_owned(), "Safari".to_owned())]),
             display: DisplayOptions::default(),
             agents: crate::agents::Status::default(),
+            notch_pages: Vec::new(),
+            notch_hardware: false,
             runtime: HashMap::new(),
         }
     }
@@ -723,7 +892,15 @@ mod tests {
             .apps
             .insert("com.a".into(), core_mouse::AppRule::default());
         config.ignored_apps = vec!["com.b".into()];
-        let real = state(&config, &env());
+        let mut e = env();
+        e.agents.spend = vec![crate::agents::Spend {
+            agent: "claude",
+            today: 1,
+            week: 2,
+            today_cost: Some(0.5),
+            week_cost: Some(1.0),
+        }];
+        let real = state(&config, &e);
         let (mut a, mut b) = (Vec::new(), Vec::new());
         key_paths(&sample, "", &mut a);
         key_paths(&real, "", &mut b);
@@ -829,6 +1006,85 @@ mod tests {
             Ok(Effect::None)
         );
         assert!(!config.show_settings_on_launch);
+    }
+
+    #[test]
+    fn notch_settings_are_validated_and_reach_the_notch() {
+        let mut config = Config::default();
+        assert_eq!(
+            set_value(&mut config, "notch.material", json!("black")),
+            Ok(Effect::Notch)
+        );
+        assert_eq!(config.notch.material, "black");
+        for (path, bad) in [
+            ("notch.material", json!("wood")),
+            ("notch.motion", json!(3)),
+            ("notch.open_page", json!("nowhere")),
+            ("notch.pages", json!([])),
+            ("notch.pages", json!(["media", "bogus"])),
+            ("notch.pages", json!("media")),
+            ("notch.shadow", json!("yes")),
+        ] {
+            let before = config.notch.clone();
+            assert_eq!(
+                set_value(&mut config, path, bad.clone()).unwrap_err().code,
+                "invalid_value",
+                "{path} {bad}"
+            );
+            assert_eq!(config.notch, before, "{path} {bad}");
+        }
+        set_value(&mut config, "notch.pages", json!(["media", "clipboard"])).unwrap();
+        assert_eq!(config.notch.pages, ["media", "clipboard"]);
+        set_value(&mut config, "notch.hover_delay_ms", json!(5000)).unwrap();
+        assert_eq!(config.notch.hover_delay_ms, 1000);
+        set_value(&mut config, "notch.open_page", json!("agents")).unwrap();
+        // The state lists every tab once: the shown ones in their order, then the hidden ones.
+        let state = state(&config, &env());
+        let pages = state["notch"]["pages"].as_array().unwrap();
+        assert_eq!(pages.len(), crate::config::NOTCH_PAGES.len());
+        assert_eq!(
+            (pages[0]["id"].as_str(), pages[0]["on"].as_bool()),
+            (Some("media"), Some(true))
+        );
+        assert_eq!(pages[2]["on"], false);
+    }
+
+    #[test]
+    fn the_notch_shortcut_is_optional_and_shares_the_conflict_rules() {
+        let mut config = Config::default();
+        assert_eq!(
+            hotkey(&mut config, "notch", "ctrl+opt+n"),
+            Ok(Effect::Hotkey("notch".into()))
+        );
+        assert_eq!(config.notch.shortcut, "ctrl+opt+n");
+        assert_eq!(
+            hotkey(&mut config, "clipboard", "opt+ctrl+n")
+                .unwrap_err()
+                .detail,
+            "notch"
+        );
+        hotkey(&mut config, "notch", "").unwrap();
+        assert!(config.notch.shortcut.is_empty() && hotkey_spec(&config, "notch").is_none());
+    }
+
+    #[test]
+    fn general_menu_icon_and_theme() {
+        let mut config = Config::default();
+        assert_eq!(
+            set_value(&mut config, "general.menu_icon", json!(false)),
+            Ok(Effect::MenuIcon(false))
+        );
+        assert_eq!(
+            set_value(&mut config, "general.theme", json!("dark")),
+            Ok(Effect::Theme)
+        );
+        assert_eq!(
+            set_value(&mut config, "general.theme", json!("sepia"))
+                .unwrap_err()
+                .code,
+            "invalid_value"
+        );
+        assert_eq!(config.theme, "dark");
     }
 
     #[test]

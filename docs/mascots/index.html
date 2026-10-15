@@ -1,0 +1,32 @@
+<!doctype html>
+<html lang="en">
+<head>
+<meta charset="utf-8">
+<title>figghost mascots</title>
+<style>
+  body { margin: 24px; background: #111; color: #ddd; font: 13px Menlo, monospace; }
+  table { border-collapse: separate; border-spacing: 8px; }
+  th { font-weight: normal; color: #999; text-align: left; }
+  td img { display: block; width: 288px; height: 180px; background: #1d2b53; }
+  td a { display: block; }
+</style>
+</head>
+<body>
+<p>Open a picture for full size. The loops run inside each SVG; nothing here is scripted.</p>
+<table id="grid"></table>
+<template id="row"><tr><th></th></tr></template>
+<script>
+  // shortcut: list kept by hand, add a name here when a new character set lands.
+  const characters = ['spider', 'frog', 'ufo', 'ghost', 'wizard'];
+  const scenes = ['copy-text', 'copy-image', 'hub-add', 'hub-drop-guard', 'hub-drop-regret'];
+  const grid = document.getElementById('grid');
+  grid.insertAdjacentHTML('beforeend', '<tr><th></th>' + scenes.map(s => `<th>${s}</th>`).join('') + '</tr>');
+  for (const c of characters) {
+    grid.insertAdjacentHTML('beforeend', `<tr><th>${c}</th>` + scenes.map(s => {
+      const f = `${c}-${s}.svg`;
+      return `<td><a href="${f}"><img src="${f}" alt="${c} ${s}" onerror="this.parentNode.textContent='not yet'"></a></td>`;
+    }).join('') + '</tr>');
+  }
+</script>
+</body>
+</html>

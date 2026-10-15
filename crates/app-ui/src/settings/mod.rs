@@ -34,6 +34,8 @@ const ACCESSIBILITY_PANE: &str =
 const MAX_ICONS: usize = 60;
 const ICON_PIXELS: f64 = 48.0;
 
+type ShowIcon = Box<dyn Fn(bool)>;
+
 pub struct SettingsFeature {
     ctx: Rc<AppContext>,
     me: Weak<SettingsFeature>,
@@ -42,6 +44,8 @@ pub struct SettingsFeature {
     names: RefCell<HashMap<String, String>>,
     icons: RefCell<HashMap<String, String>>,
     last_state: RefCell<String>,
+    /// Shows or hides the menu bar icon; set once the menu exists.
+    menu_icon: RefCell<Option<ShowIcon>>,
 }
 
 impl SettingsFeature {
@@ -54,7 +58,29 @@ impl SettingsFeature {
             names: RefCell::default(),
             icons: RefCell::default(),
             last_state: RefCell::default(),
+            menu_icon: RefCell::default(),
         })
+    }
+
+    /// How a change of the "menu bar icon" setting reaches the menu bar.
+    pub fn on_menu_icon(&self, show: impl Fn(bool) + 'static) {
+        *self.menu_icon.borrow_mut() = Some(Box::new(show));
+    }
+
+    fn notch(&self) -> Option<Rc<macos_sys::notch::Notch>> {
+        self.ctx.clipboard.as_ref().and_then(|c| c.notch.clone())
+    }
+
+    /// The window follows the theme setting: the system's appearance, or always light or dark.
+    fn apply_theme(&self) {
+        let dark = match self.ctx.config.borrow().theme.as_str() {
+            "light" => Some(false),
+            "dark" => Some(true),
+            _ => None,
+        };
+        if let Some(window) = self.window.borrow().as_ref() {
+            window.set_dark(dark);
+        }
     }
 
     /// Opens the window, or brings it to the front. While it is open the app is a regular one, with a
@@ -90,6 +116,7 @@ impl SettingsFeature {
             },
         );
         *self.window.borrow_mut() = Some(Rc::clone(&window));
+        self.apply_theme();
         self.last_state.borrow_mut().clear();
         let weak = self.me.clone();
         *self.refresh.borrow_mut() = Some(app::every(REFRESH_SECONDS, move || {
@@ -158,6 +185,7 @@ impl SettingsFeature {
         let ids = config.mouse.apps.keys().chain(&config.ignored_apps);
         let names = ids.map(|id| (id.clone(), self.name_of(id))).collect();
         let login = login_item::status();
+        let notch = self.notch();
         Env {
             version: env!("CARGO_PKG_VERSION"),
             bundled: login != LoginItem::Unavailable,
@@ -178,6 +206,13 @@ impl SettingsFeature {
                 .as_ref()
                 .map(|agents| agents.status())
                 .unwrap_or_default(),
+            notch_pages: notch.as_ref().map_or_else(Vec::new, |n| {
+                n.page_ids()
+                    .into_iter()
+                    .map(|(id, title)| (id.to_owned(), title))
+                    .collect()
+            }),
+            notch_hardware: notch.as_ref().is_some_and(|n| n.on_hardware_notch()),
             runtime: self.ctx.features.runtime(),
         }
     }
@@ -283,9 +318,27 @@ impl SettingsFeature {
                 Ok(())
             }
             Effect::Notch => {
-                if let Some(notch) = self.ctx.clipboard.as_ref().and_then(|c| c.notch.as_ref()) {
+                if let Some(notch) = self.notch() {
+                    notch.configure(&config.notch.style());
                     notch.set_enabled(config.notch.enabled);
                 }
+                if let Some(agents) = &self.ctx.agents {
+                    agents.configure_notch(&config.notch);
+                }
+                if let Some(live) = &self.ctx.live_media {
+                    live.configure(&config.notch);
+                }
+                Ok(())
+            }
+            Effect::MenuIcon(show) => {
+                if let Some(set) = self.menu_icon.borrow().as_ref() {
+                    set(*show);
+                }
+                Ok(())
+            }
+            Effect::Theme => {
+                drop(config);
+                self.apply_theme();
                 Ok(())
             }
             Effect::Tiling => {
@@ -300,6 +353,14 @@ impl SettingsFeature {
     }
 
     fn register_hotkey(&self, config: &crate::config::Config, target: &str) -> Result<(), Fault> {
+        if target == "notch" {
+            let Some(clipboard) = &self.ctx.clipboard else {
+                return Ok(());
+            };
+            return clipboard
+                .set_notch_hotkey(hotkey_spec(config, target))
+                .map_err(|status| Fault::new("taken", format!("{target} (status {status})")));
+        }
         if target == "clipboard" {
             let (Some(clipboard), Some(spec)) = (&self.ctx.clipboard, hotkey_spec(config, target))
             else {
@@ -337,6 +398,11 @@ impl SettingsFeature {
             && let Err(status) = clipboard.set_hotkey(spec)
         {
             eprintln!("hotkey: cannot register again (status {status})");
+        }
+        if let Some(clipboard) = &self.ctx.clipboard
+            && let Err(status) = clipboard.set_notch_hotkey(hotkey_spec(&config, "notch"))
+        {
+            eprintln!("hotkey: cannot register the notch shortcut again (status {status})");
         }
         for failure in self.ctx.tiling.configure(&config.tiling) {
             eprintln!("tiling: {}", failure.note);
@@ -523,7 +589,7 @@ pub fn mcp_config(exe: &str) -> String {
     .unwrap_or_default()
 }
 
-fn base64(bytes: &[u8]) -> String {
+pub(crate) fn base64(bytes: &[u8]) -> String {
     const TABLE: &[u8; 64] = b"ABCDEFGHIJKLMNOPQRSTUVWXYZabcdefghijklmnopqrstuvwxyz0123456789+/";
     let mut out = String::with_capacity(bytes.len().div_ceil(3) * 4);
     for chunk in bytes.chunks(3) {

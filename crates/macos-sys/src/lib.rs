@@ -3,6 +3,7 @@
 
 pub mod agents_ui;
 pub mod app;
+pub mod audio_meter;
 pub mod audio_tap;
 pub mod ax;
 pub mod button;
@@ -20,6 +21,7 @@ pub mod labels;
 pub mod locale;
 pub mod login_item;
 pub mod media_ui;
+pub mod mascot;
 pub mod menubar;
 pub mod mixer_ui;
 pub mod notch;
@@ -35,6 +37,7 @@ pub mod recorder;
 pub mod reply;
 pub mod screen_capture;
 pub mod selection;
+pub mod services;
 pub mod shelf_ui;
 pub mod smart_ui;
 pub mod snap_ui;

@@ -35,7 +35,9 @@ for name in (".claude/settings.json", ".codex/hooks.json"):
 with open(os.path.join(data, "config.json"), "w") as f:
     json.dump(
         {
-            "agents": {"enabled": True, "approval_wait_seconds": WAIT_SECONDS, "sound": False, "peek_when_done": False},
+            # The buttons are pressed on the open notch; the default, a question that waits in the closed notch, has
+            # a step of its own at the end.
+            "agents": {"enabled": True, "approval_wait_seconds": WAIT_SECONDS, "sound": False, "peek_when_done": False, "open_on_ask": True},
             "show_settings_on_launch": False,
             "hotkey": "f13",
             "auto_paste": False,
@@ -302,6 +304,51 @@ try:
     hook("claude", event("Stop", session="s9"))
     time.sleep(0.5)
     check(trace().count("Stop from claude") == before + 1, "the restarted program receives events")
+
+    # 9. A private instance never touches the real agent files. The feature rewrites the paths of the hooks it
+    # installed each time it starts, so a test that forgot FIGGHOST_AGENTS_HOME used to repoint the real hooks
+    # at itself. Here HOME is a pretend one holding hooks that point at an old place, and only FIGGHOST_HOME is
+    # set: nothing of the pretend home may change.
+    stop()
+    pretend = os.path.join(root, "pretend-home")
+    os.makedirs(os.path.join(pretend, ".claude"))
+    os.makedirs(os.path.join(pretend, ".codex"))
+    old_hook = {"type": "command", "command": "'/old/place/Figghost' --figghost-hook claude", "timeout": 10}
+    for relative, doc in (
+        (".claude/settings.json", {"hooks": {"Stop": [{"hooks": [old_hook]}]}}),
+        (".codex/hooks.json", {"hooks": {"Stop": [{"hooks": [dict(old_hook, command=old_hook["command"].replace("claude", "codex"))]}]}}),
+    ):
+        with open(os.path.join(pretend, relative), "w") as f:
+            json.dump(doc, f)
+    before = {r: open(os.path.join(pretend, r), "rb").read() for r in (".claude/settings.json", ".codex/hooks.json")}
+    lonely_env = {k: v for k, v in env.items() if k != "FIGGHOST_AGENTS_HOME"}
+    lonely_env["HOME"] = pretend
+    lonely = subprocess.Popen([BIN, "--background"], env=lonely_env, stderr=subprocess.DEVNULL, stdout=subprocess.DEVNULL)
+    time.sleep(4)
+    alive = lonely.poll() is None
+    lonely.kill()
+    lonely.wait()
+    after = {r: open(os.path.join(pretend, r), "rb").read() for r in before}
+    check(alive, "an instance with agents on and only FIGGHOST_HOME set starts")
+    check(after == before, "and leaves the hooks of the home it was not pointed at exactly as they were")
+
+    # 10. By default a question waits in the closed notch instead of opening it: the notch stays closed, says
+    # so, and the question still goes back to the agent's own prompt when nobody answers.
+    with open(os.path.join(data, "config.json")) as f:
+        config = json.load(f)
+    config["agents"]["open_on_ask"] = False
+    with open(os.path.join(data, "config.json"), "w") as f:
+        json.dump(config, f)
+    check(start(), "the program starts again with the default for questions")
+    seen = trace().count(WAITING)
+    waiting = ask("q10", "make deploy")
+    check(wait_for_count(WAITING, seen + 1), "the question reaches the program")
+    check(wait_for_count("the closed notch shows a waiting question", 1), "the closed notch shows the question")
+    time.sleep(1.0)
+    check(press("Allow") == "not found", "and the notch did not open by itself")
+    out, took = answer_of(waiting)
+    check(out == "", "unanswered, it goes back to the agent's own prompt after the wait")
+    check(wait_for_count("the closed notch shows nothing", 1, seconds=15), "and the closed notch lets it go")
 finally:
     stop()
     shutil.rmtree(root, ignore_errors=True)

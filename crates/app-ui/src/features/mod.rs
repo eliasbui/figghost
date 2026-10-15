@@ -5,7 +5,7 @@
 
 use crate::{
     clipboard::Clipboard, config::Config, media::MediaFeature, settings::model::Fault,
-    tiling::Tiling,
+    shelf::ShelfFeature, tiling::Tiling,
 };
 use macos_sys::{MainThreadMarker, notch::Notch, status_item::Entry};
 use serde_json::{Map, Value};
@@ -14,6 +14,7 @@ use std::{collections::HashMap, path::Path, rc::Rc};
 pub mod calendar;
 pub mod capture;
 pub mod lyrics;
+pub mod mascot;
 pub mod menubar;
 pub mod smart;
 pub mod snap;
@@ -33,6 +34,8 @@ pub struct AttachEnv<'a> {
     pub tiling: &'a Rc<Tiling>,
     /// The media tab, `None` without a notch.
     pub media: Option<&'a Rc<MediaFeature>>,
+    /// The shelf tab, `None` without a notch.
+    pub shelf: Option<&'a Rc<ShelfFeature>>,
 }
 
 /// The running features, kept alive by the app context.
@@ -46,6 +49,7 @@ pub struct Features {
     pub snap: Option<Rc<snap::Feature>>,
     pub menubar: Option<Rc<menubar::Feature>>,
     pub stack: Option<Rc<stack::Feature>>,
+    pub mascot: Option<Rc<mascot::Feature>>,
 }
 
 impl Features {
@@ -59,6 +63,7 @@ impl Features {
             snap: snap::attach(env),
             menubar: menubar::attach(env),
             stack: stack::attach(env),
+            mascot: mascot::attach(env),
         }
     }
 
@@ -88,6 +93,9 @@ impl Features {
         }
         if let Some(f) = &self.stack {
             out.insert("stack", f.runtime());
+        }
+        if let Some(f) = &self.mascot {
+            out.insert("mascot", f.runtime());
         }
         out
     }
@@ -127,6 +135,10 @@ impl Features {
                 .stack
                 .as_ref()
                 .map_or(Ok(()), |f| f.configure(&config.stack)),
+            "mascot" => self
+                .mascot
+                .as_ref()
+                .map_or(Ok(()), |f| f.configure(&config.mascot)),
             _ => Ok(()),
         }
     }
@@ -157,6 +169,9 @@ impl Features {
         if let Some(f) = &self.stack {
             f.suspend_hotkeys();
         }
+        if let Some(f) = &self.mascot {
+            f.suspend_hotkeys();
+        }
     }
 
     pub fn resume_hotkeys(&self, config: &Config) {
@@ -183,6 +198,9 @@ impl Features {
         }
         if let Some(f) = &self.stack {
             f.resume_hotkeys(&config.stack);
+        }
+        if let Some(f) = &self.mascot {
+            f.resume_hotkeys(&config.mascot);
         }
     }
 
@@ -228,6 +246,11 @@ impl Features {
         {
             return Some(result);
         }
+        if let Some(f) = &self.mascot
+            && let Some(result) = f.action(name, &mut config.mascot)
+        {
+            return Some(result);
+        }
         None
     }
 
@@ -257,6 +280,9 @@ impl Features {
         }
         if let Some(f) = &self.stack {
             entries.extend(stack::Feature::menu_entries(f));
+        }
+        if let Some(f) = &self.mascot {
+            entries.extend(mascot::Feature::menu_entries(f));
         }
         entries
     }
@@ -301,6 +327,10 @@ pub fn state(
         "stack".into(),
         stack::settings::state(&config.stack, runtime.get("stack").unwrap_or(&none)),
     );
+    root.insert(
+        "mascot".into(),
+        mascot::settings::state(&config.mascot, runtime.get("mascot").unwrap_or(&none)),
+    );
 }
 
 /// A change of a setting whose path starts with a feature id. `None` when no feature owns the path; the
@@ -329,6 +359,9 @@ pub fn set(config: &mut Config, path: &str, value: &Value) -> Option<Result<&'st
         "stack" => {
             stack::settings::set(&mut config.stack, rest, value).map(|r| r.map(|()| "stack"))
         }
+        "mascot" => {
+            mascot::settings::set(&mut config.mascot, rest, value).map(|r| r.map(|()| "mascot"))
+        }
         _ => None,
     }
 }
@@ -337,7 +370,7 @@ pub fn set(config: &mut Config, path: &str, value: &Value) -> Option<Result<&'st
 pub fn shortcut_owner(target: &str) -> Option<&'static str> {
     let head = target.split(':').next()?;
     [
-        "smart", "capture", "vision", "lyrics", "calendar", "snap", "menubar", "stack",
+        "smart", "capture", "vision", "lyrics", "calendar", "snap", "menubar", "stack", "mascot",
     ]
     .into_iter()
     .find(|id| *id == head)
@@ -354,6 +387,7 @@ pub fn shortcuts(config: &Config) -> Vec<(String, String)> {
     all.extend(snap::settings::shortcuts(&config.snap));
     all.extend(menubar::settings::shortcuts(&config.menubar));
     all.extend(stack::settings::shortcuts(&config.stack));
+    all.extend(mascot::settings::shortcuts(&config.mascot));
     all
 }
 
@@ -380,6 +414,8 @@ pub fn set_shortcut(
             .map(|r| r.map(|()| "menubar")),
         "stack" => stack::settings::set_shortcut(&mut config.stack, target, value)
             .map(|r| r.map(|()| "stack")),
+        "mascot" => mascot::settings::set_shortcut(&mut config.mascot, target, value)
+            .map(|r| r.map(|()| "mascot")),
         _ => None,
     }
 }

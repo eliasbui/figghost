@@ -229,6 +229,79 @@ impl Language {
         }
     }
 
+    pub fn agents_tokens(self) -> &'static str {
+        match self {
+            Language::English => "Tokens and cost at API prices",
+            Language::Vietnamese => "Token và chi phí theo giá API",
+        }
+    }
+
+    /// A token count in a few characters: 950, 12.4K, 1.24M.
+    pub fn tokens_short(self, n: u64) -> String {
+        let (value, unit) = match n {
+            0..1_000 => return n.to_string(),
+            1_000..1_000_000 => (n as f64 / 1_000.0, "K"),
+            1_000_000..1_000_000_000 => (n as f64 / 1_000_000.0, "M"),
+            _ => (n as f64 / 1_000_000_000.0, "B"),
+        };
+        let text = if value < 10.0 {
+            format!("{value:.2}")
+        } else if value < 100.0 {
+            format!("{value:.1}")
+        } else {
+            format!("{value:.0}")
+        };
+        let text = match self {
+            Language::English => text,
+            Language::Vietnamese => text.replace('.', ","),
+        };
+        format!("{text}{unit}")
+    }
+
+    /// An amount in US dollars: $3.45, $1,204.
+    pub fn dollars(self, amount: f64) -> String {
+        let cents = (amount * 100.0).round() as i64;
+        let (whole, part) = (cents / 100, cents % 100);
+        let digits = whole.to_string();
+        let mut grouped = String::new();
+        for (i, c) in digits.chars().enumerate() {
+            if i > 0 && (digits.len() - i) % 3 == 0 {
+                grouped.push(match self {
+                    Language::English => ',',
+                    Language::Vietnamese => '.',
+                });
+            }
+            grouped.push(c);
+        }
+        match self {
+            Language::English if whole >= 1_000 => format!("${grouped}"),
+            Language::English => format!("${grouped}.{part:02}"),
+            Language::Vietnamese if whole >= 1_000 => format!("{grouped} US$"),
+            Language::Vietnamese => format!("{grouped},{part:02} US$"),
+        }
+    }
+
+    /// "1.24M tokens  $3.45" for what an agent used today; the cost only when it is known.
+    pub fn tokens_today(self, tokens: u64, cost: Option<f64>) -> String {
+        let count = match self {
+            Language::English => format!("{} tokens", self.tokens_short(tokens)),
+            Language::Vietnamese => format!("{} token", self.tokens_short(tokens)),
+        };
+        match cost {
+            Some(cost) => format!("{count}  {}", self.dollars(cost)),
+            None => count,
+        }
+    }
+
+    /// "Week $21.30", or the tokens of the week when there is no price.
+    pub fn tokens_week(self, tokens: u64, cost: Option<f64>) -> String {
+        let amount = cost.map_or_else(|| self.tokens_short(tokens), |c| self.dollars(c));
+        match self {
+            Language::English => format!("Week {amount}"),
+            Language::Vietnamese => format!("Tuần {amount}"),
+        }
+    }
+
     pub fn agents_state(self, state: State) -> &'static str {
         match (self, state) {
             (Language::English, State::Waiting) => "Waiting for you",
@@ -434,8 +507,8 @@ impl Language {
                 media_previous: "Trước".into(),
                 media_play_pause: "Phát / Tạm dừng".into(),
                 media_next: "Sau".into(),
-                media_hint: "Điều khiển ứng dụng đang phát. Thông tin bài hát: Music và Spotify."
-                    .into(),
+                media_position: "Vị trí phát".into(),
+                media_hint: "Điều khiển ứng dụng đang phát, kể cả trình duyệt.".into(),
                 media_playing: "Đang phát".into(),
                 media_paused: "Đã tạm dừng".into(),
                 focus_tab: "Tập trung".into(),
@@ -488,6 +561,26 @@ pub fn current() -> Language {
 #[cfg(test)]
 mod tests {
     use super::*;
+
+    #[test]
+    fn token_counts_and_dollars_read_well_in_both_languages() {
+        let (en, vi) = (Language::English, Language::Vietnamese);
+        assert_eq!(en.tokens_short(950), "950");
+        assert_eq!(en.tokens_short(12_400), "12.4K");
+        assert_eq!(en.tokens_short(1_240_000), "1.24M");
+        assert_eq!(vi.tokens_short(1_240_000), "1,24M");
+        assert_eq!(en.dollars(3.454), "$3.45");
+        assert_eq!(en.dollars(1_204.4), "$1,204");
+        assert_eq!(vi.dollars(3.45), "3,45 US$");
+        assert_eq!(vi.dollars(1_204.0), "1.204 US$");
+        assert_eq!(
+            en.tokens_today(1_240_000, Some(3.45)),
+            "1.24M tokens  $3.45"
+        );
+        assert_eq!(vi.tokens_today(380_000, None), "380K token");
+        assert_eq!(en.tokens_week(2_100_000, None), "Week 2.10M");
+        assert_eq!(vi.tokens_week(0, Some(21.3)), "Tuần 21,30 US$");
+    }
 
     fn tags(list: &[&str]) -> Vec<String> {
         list.iter().map(|s| (*s).to_owned()).collect()
@@ -642,6 +735,7 @@ mod tests {
                 &labels.media_previous,
                 &labels.media_play_pause,
                 &labels.media_next,
+                &labels.media_position,
                 &labels.media_hint,
                 &labels.media_playing,
                 &labels.media_paused,

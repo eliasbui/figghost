@@ -35,6 +35,8 @@ pub trait Platform {
     fn show(&self, display: &Display, layouts: &[Layout], hover: Option<usize>);
     fn set_hover(&self, hover: Option<usize>);
     fn hide(&self);
+    /// Shows where the window would land, gliding there from where it showed before, or fades it away.
+    fn footprint(&self, frame: Option<Rect>);
     /// Keeps the notch closed while the row is up.
     fn hold_notch(&self, held: bool);
     /// Runs `f` shortly: the app that owns the window is still finishing its own drag when the button comes up.
@@ -48,22 +50,24 @@ pub struct Controller<P> {
     displays: RefCell<Vec<Display>>,
     held: RefCell<Option<Box<dyn Held>>>,
     shown: Cell<View>,
+    landing: Cell<Option<Rect>>,
 }
 
 impl<P: Platform> Controller<P> {
     pub fn new(platform: P, layouts: Vec<Layout>) -> Self {
         Self {
             platform,
-            machine: RefCell::new(Machine::new(layouts.len())),
+            machine: RefCell::new(Machine::new(layouts.clone())),
             layouts: RefCell::new(layouts),
             displays: RefCell::new(Vec::new()),
             held: RefCell::new(None),
             shown: Cell::new(View::default()),
+            landing: Cell::new(None),
         }
     }
 
     pub fn set_zones(&self, layouts: Vec<Layout>) {
-        self.machine.borrow_mut().set_zones(layouts.len());
+        self.machine.borrow_mut().set_zones(layouts.clone());
         *self.layouts.borrow_mut() = layouts;
         self.held.borrow_mut().take();
         self.sync();
@@ -96,12 +100,20 @@ impl<P: Platform> Controller<P> {
         self.cancel();
         // Without Accessibility there is no window to find: nothing is looked at and nothing is done.
         if !self.platform.trusted() {
+            crate::trace::log("snap: a press, but Accessibility is not granted");
             return;
         }
-        let pressed = self
-            .platform
-            .grab(at)
-            .filter(|p| snap::is_title_bar_press(p.frame, at, &p.role) && !p.window.full_screen());
+        let pressed = self.platform.grab(at).filter(|p| {
+            let title_bar = snap::is_title_bar_press(p.frame, at, &p.role);
+            if !title_bar {
+                crate::trace::log(&format!(
+                    "snap: a press on {} {:.0} points into a window, not its title bar",
+                    p.role,
+                    at.1 - p.frame.y
+                ));
+            }
+            title_bar && !p.window.full_screen()
+        });
         let on_title_bar = pressed.is_some();
         let displays = if on_title_bar {
             self.platform.displays()
@@ -159,6 +171,10 @@ impl<P: Platform> Controller<P> {
             }
             (Some(_), Some(_)) if before.hover != now.hover => self.platform.set_hover(now.hover),
             _ => {}
+        }
+        let landing = self.machine.borrow().footprint();
+        if self.landing.replace(landing) != landing {
+            self.platform.footprint(landing);
         }
     }
 }
@@ -241,6 +257,13 @@ mod tests {
         fn hide(&self) {
             self.log.borrow_mut().push("hide".into());
         }
+        fn footprint(&self, frame: Option<Rect>) {
+            self.log
+                .borrow_mut()
+                .push(frame.map_or("footprint none".into(), |f| {
+                    format!("footprint {} {} {} {}", f.x, f.y, f.w, f.h)
+                }));
+        }
         fn hold_notch(&self, held: bool) {
             self.log.borrow_mut().push(format!("notch {held}"));
         }
@@ -286,7 +309,7 @@ mod tests {
     /// The pointer position over the middle of zone `zone` of display `display`.
     fn over(c: &Controller<Fake>, display: usize, zone: usize) -> Point {
         let d = c.platform.displays[display];
-        let cell = d.cells(6)[zone];
+        let cell = d.cells(&c.layouts.borrow())[zone];
         (cell.x + cell.w / 2.0, cell.y + cell.h / 2.0)
     }
 
@@ -305,10 +328,13 @@ mod tests {
                 "grab",
                 "moved?",
                 "notch true",
-                "show x0 n6 hoverNone",
+                "show x0 n10 hoverNone",
                 "hover Some(1)",
+                // Where the window will land shows with the zone, and is exactly where it is put.
+                "footprint 960 25 960 1055",
                 "hide",
                 "notch false",
+                "footprint none",
                 "later",
                 // The right half of the usable area of the first screen.
                 "place 960 25 960 1055",
@@ -322,10 +348,11 @@ mod tests {
         c.handle(Mouse::Down((500.0, 310.0)));
         c.handle(Mouse::Dragged((520.0, 290.0)));
         c.handle(Mouse::Dragged((1920.0 + 1280.0, -100.0)));
-        let on = over(&c, 1, 5);
+        let on = over(&c, 1, 2);
         c.handle(Mouse::Dragged(on));
         c.handle(Mouse::Up(on));
-        assert!(lines(&log).contains(&"show x1920 n6 hoverNone".to_owned()));
+        assert!(lines(&log).contains(&"show x1920 n10 hoverNone".to_owned()));
+        assert!(lines(&log).contains(&"footprint 1920 -75 2560 1415".to_owned()));
         // Maximize: the whole usable area of the second screen.
         assert_eq!(lines(&log).last().unwrap(), "place 1920 -75 2560 1415");
     }
@@ -403,11 +430,42 @@ mod tests {
         c.handle(Mouse::Up((960.0, 600.0)));
         let l = lines(&log);
         assert!(l.contains(&"hover Some(0)".to_owned()) && l.contains(&"hide".to_owned()));
+        assert!(l.contains(&"footprint 0 25 960 1055".to_owned()));
         assert!(
             !l.iter().any(|x| x.starts_with("place") || x == "later"),
             "{l:?}"
         );
-        assert_eq!(l.last().unwrap(), "notch false");
+        assert_eq!(&l[l.len() - 3..], ["hide", "notch false", "footprint none"]);
+    }
+
+    #[test]
+    fn the_footprint_follows_the_lit_zone_and_leaves_with_it() {
+        let (c, log) = rig(true, Some(("AXWindow", true, false)));
+        c.handle(Mouse::Down((500.0, 310.0)));
+        c.handle(Mouse::Dragged((520.0, 290.0)));
+        c.handle(Mouse::Dragged((960.0, 1.0)));
+        for zone in [0, 6, 6, 3] {
+            c.handle(Mouse::Dragged(over(&c, 0, zone)));
+        }
+        // Up into the strip above the zones: still shown, nothing lit.
+        c.handle(Mouse::Dragged((960.0, 1.0)));
+        let l = lines(&log);
+        let footprints: Vec<&str> = l
+            .iter()
+            .filter(|x| x.starts_with("footprint"))
+            .map(String::as_str)
+            .collect();
+        assert_eq!(
+            footprints,
+            [
+                "footprint 0 25 960 1055",
+                // The top left quarter, once: staying on a zone does not ask again.
+                "footprint 0 25 960 528",
+                "footprint 0 25 640 1055",
+                "footprint none",
+            ]
+        );
+        assert!(!l.contains(&"hide".to_owned()), "the zones still show");
     }
 
     #[test]
