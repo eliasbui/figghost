@@ -5,7 +5,7 @@ use objc2::{
     runtime::{AnyObject, Bool, ProtocolObject},
 };
 use objc2_app_kit::{
-    NSApplicationActivationPolicy, NSImage, NSModalResponseOK, NSOpenPanel, NSWorkspace,
+    NSApplicationActivationPolicy, NSImage, NSModalResponseOK, NSOpenPanel, NSScreen, NSWorkspace,
     NSWorkspaceDidActivateApplicationNotification,
 };
 use objc2_foundation::{
@@ -210,6 +210,14 @@ pub fn display_options() -> DisplayOptions {
         reduce_motion: workspace.accessibilityDisplayShouldReduceMotion(),
         increase_contrast: workspace.accessibilityDisplayShouldIncreaseContrast(),
     }
+}
+
+/// The names of the screens, main first, as the notch's display setting offers them.
+pub fn screen_names(mtm: MainThreadMarker) -> Vec<String> {
+    NSScreen::screens(mtm)
+        .iter()
+        .map(|s| s.localizedName().to_string())
+        .collect()
 }
 
 /// The app running as `pid`, when it is one the user can see: it has a Dock icon or a menu bar item.

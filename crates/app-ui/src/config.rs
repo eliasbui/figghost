@@ -128,6 +128,22 @@ fn word(value: &serde_json::Value, words: &[&str], default: &str) -> String {
         .to_owned()
 }
 
+/// The screen setting: one of the fixed words, or `screen:<name>` of one of the screens (a name that is gone
+/// again falls back to `auto` when the notch asks for it).
+fn screen_choice(value: &serde_json::Value, default: &str) -> String {
+    match value.as_str() {
+        Some(text) if ["auto", "main", "pointer"].contains(&text) => text.to_owned(),
+        Some(text)
+            if text
+                .strip_prefix("screen:")
+                .is_some_and(|name| !name.is_empty()) =>
+        {
+            text.to_owned()
+        }
+        _ => default.to_owned(),
+    }
+}
+
 /// The tab ids in `value` that exist, each once, in the given order.
 pub fn notch_pages(value: &serde_json::Value) -> Vec<String> {
     let mut pages: Vec<String> = Vec::new();
@@ -165,7 +181,7 @@ impl From<serde_json::Value> for NotchConfig {
             rest: word(&v["rest"], &["notch", "hidden"], &d.rest),
             hide_in_capture: flag("hide_in_capture", d.hide_in_capture),
             haptics: flag("haptics", d.haptics),
-            display: word(&v["display"], &["auto", "main", "pointer"], &d.display),
+            display: screen_choice(&v["display"], &d.display),
             open_page,
             pages: notch_pages(&v["pages"]),
             live_media: flag("live_media", d.live_media),
@@ -204,10 +220,13 @@ impl NotchConfig {
             },
             hide_in_capture: self.hide_in_capture,
             haptics: self.haptics,
-            display: match self.display.as_str() {
-                "main" => Display::Main,
-                "pointer" => Display::Pointer,
-                _ => Display::Auto,
+            display: match self.display.strip_prefix("screen:") {
+                Some(name) if !name.is_empty() => Display::Screen(name.to_owned()),
+                _ => match self.display.as_str() {
+                    "main" => Display::Main,
+                    "pointer" => Display::Pointer,
+                    _ => Display::Auto,
+                },
             },
             open_page: match self.open_page.as_str() {
                 "last" => OpenPage::Last,
@@ -715,6 +734,27 @@ mod tests {
             "a choice made since stands"
         );
         fs::remove_dir_all(dir).unwrap();
+    }
+
+    #[test]
+    fn the_notch_can_be_pinned_to_a_named_screen() {
+        let json = serde_json::json!({ "notch": { "display": "screen:LG FHD" } });
+        let notch: NotchConfig = serde_json::from_value(json["notch"].clone()).unwrap();
+        assert_eq!(notch.display, "screen:LG FHD");
+        assert_eq!(
+            notch.style().display,
+            macos_sys::notch::Display::Screen("LG FHD".into())
+        );
+        // A screen name that is really a word of the setting, and an empty name, are the default.
+        for bad in ["screen:", "screen", "LGFHD", ""] {
+            let json = serde_json::json!({ "display": bad });
+            let notch: NotchConfig = serde_json::from_value(json).unwrap();
+            assert_eq!(notch.display, "auto", "{bad} was taken as a screen");
+        }
+        // What is saved reads back the same.
+        let again: NotchConfig =
+            serde_json::from_value(serde_json::to_value(&notch).unwrap()).unwrap();
+        assert_eq!(again, notch);
     }
 
     #[test]

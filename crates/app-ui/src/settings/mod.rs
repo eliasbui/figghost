@@ -2,6 +2,7 @@
 
 pub mod model;
 mod page;
+mod release;
 
 use crate::{context::AppContext, i18n, trace};
 use core_agents::Agent;
@@ -36,6 +37,20 @@ const ICON_PIXELS: f64 = 48.0;
 
 type ShowIcon = Box<dyn Fn(bool)>;
 
+thread_local! {
+    static FEATURE: RefCell<Weak<SettingsFeature>> = const { RefCell::new(Weak::new()) };
+}
+
+/// Runs `f` on the window's feature, if it is still there, from a callback of another thread that hopped to
+/// the main one.
+fn with_feature(f: impl FnOnce(&SettingsFeature)) {
+    FEATURE.with(|slot| {
+        if let Some(feature) = slot.borrow().upgrade() {
+            f(&feature);
+        }
+    });
+}
+
 pub struct SettingsFeature {
     ctx: Rc<AppContext>,
     me: Weak<SettingsFeature>,
@@ -46,11 +61,13 @@ pub struct SettingsFeature {
     last_state: RefCell<String>,
     /// Shows or hides the menu bar icon; set once the menu exists.
     menu_icon: RefCell<Option<ShowIcon>>,
+    /// The page of the latest release found by the update check, for the button that opens it.
+    release: RefCell<Option<String>>,
 }
 
 impl SettingsFeature {
     pub fn new(ctx: Rc<AppContext>) -> Rc<Self> {
-        Rc::new_cyclic(|me| Self {
+        let feature = Rc::new_cyclic(|me| Self {
             ctx,
             me: me.clone(),
             window: RefCell::default(),
@@ -59,7 +76,10 @@ impl SettingsFeature {
             icons: RefCell::default(),
             last_state: RefCell::default(),
             menu_icon: RefCell::default(),
-        })
+            release: RefCell::default(),
+        });
+        FEATURE.with(|slot| *slot.borrow_mut() = Rc::downgrade(&feature));
+        feature
     }
 
     /// How a change of the "menu bar icon" setting reaches the menu bar.
@@ -213,6 +233,7 @@ impl SettingsFeature {
                     .collect()
             }),
             notch_hardware: notch.as_ref().is_some_and(|n| n.on_hardware_notch()),
+            screens: workspace::screen_names(self.ctx.mtm),
             runtime: self.ctx.features.runtime(),
         }
     }
@@ -422,6 +443,12 @@ impl SettingsFeature {
                 workspace::open_url(ACCESSIBILITY_PANE);
             }
             "open_login_settings" => login_item::open_settings(),
+            "check_updates" => self.check_updates(),
+            "open_release" => {
+                if let Some(url) = self.release.borrow().clone() {
+                    workspace::open_url(&url);
+                }
+            }
             "open_config" => {
                 let _ = std::fs::create_dir_all(&self.ctx.home);
                 workspace::open_path(&self.ctx.home);
@@ -466,6 +493,34 @@ impl SettingsFeature {
             }
         }
         self.push_state(true);
+    }
+
+    /// Asks GitHub for the latest release on a background thread, so the window never waits on the network,
+    /// and tells the page what came back.
+    fn check_updates(&self) {
+        self.post(&json!({ "t": "update", "state": "checking" }));
+        std::thread::spawn(|| {
+            let answer = match release::latest() {
+                Ok(release) => {
+                    let newer = release::newer(&release.version, env!("CARGO_PKG_VERSION"));
+                    json!({
+                        "t": "update",
+                        "state": if newer { "newer" } else { "current" },
+                        "version": release.version,
+                        "url": release.url,
+                    })
+                }
+                Err(detail) => json!({ "t": "update", "state": "failed", "detail": detail }),
+            };
+            app::on_main(move || with_feature(|this| this.update_arrived(answer)));
+        });
+    }
+
+    fn update_arrived(&self, answer: Value) {
+        if let Some(url) = answer["url"].as_str() {
+            *self.release.borrow_mut() = Some(url.to_owned());
+        }
+        self.post(&answer);
     }
 
     /// Adds our hooks to an agent's file, or takes them out. Installing also turns the listening on, since

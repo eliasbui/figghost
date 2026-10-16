@@ -2,6 +2,7 @@
 """Mascot scenes for figghost: pixel sprites drawn by Codex, animated here as SVG.
 
   build.py extract <sheet.png> <name>   cut a generated 4 x 3 sprite sheet into ART/<name>.png
+  build.py compose <sheet.png> <name>   cut a generated sheet of loose sprites into ART/<name>.png
   build.py [name ...]                   write <name>-<scene>.svg for every art/*.png (or the names given)
   build.py check                        self-test, then check every SVG here
 
@@ -177,6 +178,170 @@ def extract(sheet, name):
     ART.mkdir(exist_ok=True)
     write_png(ART / f"{name}.png", out)
     print(f"wrote {ART / (name + '.png')}")
+
+
+def components(lab):
+    """Every group of touching non-key pixels in a label grid, as sets of points."""
+    h, w = len(lab), len(lab[0])
+    seen, parts = set(), []
+    for y in range(h):
+        for x in range(w):
+            if lab[y][x] < 0 or (x, y) in seen:
+                continue
+            seen.add((x, y))
+            part, todo = set(), [(x, y)]
+            while todo:
+                qx, qy = todo.pop()
+                part.add((qx, qy))
+                for dx in (-1, 0, 1):
+                    for dy in (-1, 0, 1):
+                        q = (qx + dx, qy + dy)
+                        if 0 <= q[0] < w and 0 <= q[1] < h and q not in seen and lab[q[1]][q[0]] >= 0:
+                            seen.add(q)
+                            todo.append(q)
+            parts.append(part)
+    return parts
+
+
+def box(part):
+    xs, ys = [x for x, _ in part], [y for _, y in part]
+    return min(xs), max(xs), min(ys), max(ys)
+
+
+def box_gap(a, b):
+    """How far apart two boxes are, 0 or less when they touch."""
+    ax0, ax1, ay0, ay1 = box(a)
+    bx0, bx1, by0, by1 = box(b)
+    return max(bx0 - ax1, ax0 - bx1, by0 - ay1, ay0 - by1)
+
+
+def phase(positions, u):
+    """Where the grid of art pixels starts in one sprite: the average position of its edges, modulo u."""
+    c = sum(math.cos(2 * math.pi * p / u) for p in positions)
+    s = sum(math.sin(2 * math.pi * p / u) for p in positions)
+    return (math.atan2(s, c) / (2 * math.pi) * u) % u
+
+
+def fit_scale(edges, u0):
+    """The art pixel size that puts the most edges of every sprite on the grid lines. `block_grid` is
+    a few per cent out, and a few per cent is a whole art pixel over the 16 to 64 art pixels a sprite is
+    across, which shows up as a chewed edge. Halves and thirds of the true size fit the edges of one
+    sprite just as well, so all the sprites are fitted together, which is what rules them out."""
+    def cost(u):
+        total = 0.0
+        for positions in edges:
+            ox = phase(positions, u)
+            total += sum((min((p - ox) % u, u - (p - ox) % u) / u) ** 2 for p in positions) / len(positions)
+        return total / len(edges)
+
+    sweep = [u0 * (1 + d / 200) for d in range(-40, 41)]
+    return min(sweep, key=lambda u: (round(cost(u), 6), abs(u - u0)))
+
+
+def compose(sheet, name, art=ART):
+    """Cut a generated sheet of loose sprites into the twelve frames of ART/<name>.png: the same job
+    as `extract`, for a sheet whose sprites answer to no grid. The sprites are found by what touches
+    what, put in reading order, sampled on the art's own pixel grid (the size of the most common
+    one, so no frame is drawn at another scale) and stood in the frame with their middle over the
+    middle, which is how `extract` lines up the frames of a grid sheet."""
+    w, h, px = read_png(sheet)
+    lab = [[classify(p) for p in row] for row in px]
+    parts = [p for p in components(lab) if len(p) > (w * h) // 2000]
+    if not parts:
+        raise ValueError(f"{sheet}: no sprite found")
+    while True:  # a rope or a thread a sprite holds onto is part of that sprite, not one of its own
+        near = next(((i, j) for i in range(len(parts)) for j in range(i + 1, len(parts))
+                     if box_gap(parts[i], parts[j]) <= 3), None)
+        if not near:
+            break
+        i, j = near
+        parts[i] |= parts.pop(j)
+    biggest = max(len(p) for p in parts)
+    parts = [p for p in parts if len(p) > biggest // 5]
+    if not all(box(p)[0] > 0 and box(p)[1] < w - 1 and box(p)[2] > 0 and box(p)[3] < h - 1 for p in parts):
+        print("warning: a sprite touches the edge of the sheet, so part of it may be missing")
+
+    def edges(part):
+        """Where the ink of one sprite starts, stops or changes colour: the art's pixel grid shows
+        up in those positions, and only in that sprite's own, so one sprite cannot set another's. Both
+        sides of the sprite are read, one art pixel past its box, or its own outline is unseen."""
+        x0, x1, y0, y1 = box(part)
+        xs, ys = [], []
+        for y in range(y0, min(y1 + 2, h)):
+            for x in range(x0, min(x1 + 2, w)):
+                here, before, above = (x, y) in part, (x - 1, y) in part, (x, y - 1) in part
+                if here != before or (here and before and lab[y][x] != lab[y][x - 1]):
+                    xs.append(x)
+                if here != above or (here and above and lab[y][x] != lab[y - 1][x]):
+                    ys.append(y)
+        return xs, ys
+
+    heights = sorted(box(p)[3] - box(p)[2] for p in parts)
+    row_gap = heights[len(heights) // 2] * 0.6
+    rows = []
+    for p in sorted(parts, key=lambda p: (box(p)[2] + box(p)[3]) / 2):
+        cy = (box(p)[2] + box(p)[3]) / 2
+        cx = (box(p)[0] + box(p)[1]) / 2
+        if not rows or cy - (sum(y for y, _, _ in rows[-1]) / len(rows[-1])) > row_gap:
+            rows.append([])
+        rows[-1].append((cy, cx, p))
+    parts = [p for row in rows for _, _, p in sorted(row, key=lambda item: item[1])]
+    if len(parts) != 12:
+        raise ValueError(f"{sheet}: {len(parts)} sprites in {len(rows)} rows, need 12; "
+                         f"sizes {sorted(len(p) for p in parts)}")
+
+    part_edges = [edges(p) for p in parts]
+    rough_x = [block_grid(xs, box(p)[1] - box(p)[0] + 1)[0] for (xs, _), p in zip(part_edges, parts)]
+    rough_y = [block_grid(ys, box(p)[3] - box(p)[2] + 1)[0] for (_, ys), p in zip(part_edges, parts)]
+    ux0 = sorted(rough_x)[len(rough_x) // 2]
+    uy0 = sorted(rough_y)[len(rough_y) // 2]
+    ux = fit_scale([xs for xs, _ in part_edges], ux0)
+    uy = fit_scale([ys for _, ys in part_edges], uy0)
+    print(f"one art pixel is {ux:.2f} x {uy:.2f} image pixels")
+
+    cells = []
+    for frame, (part, (xs, ys)) in enumerate(zip(parts, part_edges)):
+        x0, x1, y0, y1 = box(part)
+        ox, oy = phase(xs, ux), phase(ys, uy)
+
+        def sample(cx, cy):
+            votes = {}
+            for y in range(int(cy - uy * 0.2), int(cy + uy * 0.2) + 1):
+                for x in range(int(cx - ux * 0.2), int(cx + ux * 0.2) + 1):
+                    if (x, y) in part:
+                        votes[lab[y][x]] = votes.get(lab[y][x], 0) + 1
+            return max(votes, key=votes.get) if votes else -1
+
+        grid = {}
+        for i in range(math.floor((x0 - ox) / ux), math.ceil((x1 - ox) / ux) + 1):
+            for j in range(math.floor((y0 - oy) / uy), math.ceil((y1 - oy) / uy) + 1):
+                v = sample(ox + (i + 0.5) * ux, oy + (j + 0.5) * uy)
+                if v >= 0:
+                    grid[(i, j)] = v
+        if not grid:
+            raise ValueError(f"{sheet}: frame {frame} ({FRAMES[frame]}) came out empty")
+        # The middle of the body, which is where the frame holds the sprite, as in `extract`: what
+        # survives a 3 x 3 opening is the body, and arms, staffs and tears move around it.
+        core = [(x, y) for (x, y) in part if all((x + dx, y + dy) in part for dx in (-1, 0, 1) for dy in (-1, 0, 1))] or list(part)
+        gi = math.floor((sum(x for x, _ in core) / len(core) - ox) / ux)
+        gj = math.floor((sum(y for _, y in core) / len(core) - oy) / uy)
+        swap = RECOLOR.get(name, {})
+        cells.append({(i - gi + CELL // 2, j - gj + CELL // 2): swap.get(v, v) for (i, j), v in grid.items()})
+        gw = max(i for i, _ in grid) - min(i for i, _ in grid) + 1
+        gh = max(j for _, j in grid) - min(j for _, j in grid) + 1
+        print(f"  {FRAMES[frame]:10s} {gw:2d} x {gh:2d} art pixels")
+
+    lost = sum(1 for c in cells for x, y in c if not (0 <= x < CELL and 0 <= y < CELL))
+    if lost:
+        print(f"warning: {lost} pixels fall outside the {CELL} px cells and are dropped")
+    out = [[-1] * (CELL * 12) for _ in range(CELL)]
+    for k, cell in enumerate(cells):
+        for (x, y), v in cell.items():
+            if 0 <= x < CELL and 0 <= y < CELL:
+                out[y][k * CELL + x] = v
+    art.mkdir(exist_ok=True)
+    write_png(art / f"{name}.png", out)
+    print(f"wrote {art / (name + '.png')}")
 
 
 # Sprites
@@ -451,6 +616,7 @@ STYLE = {
     "ufo": dict(ray="beam", haul="lift", shield="beam", side=(0, -26), reach=30, verb="beams up"),
     "ghost": dict(ray="wisp", haul="float", shield="bubble", side=(-18, 0), reach=20, verb="reaches with a wisp for"),
     "wizard": dict(ray="magic", strike="bolt", haul="float", shield="circle", side=(-20, 0), reach=22, verb="zaps"),
+    "mario": dict(ray="bolt", haul="tugs", shield="rect", side=(-18, 2), reach=20, verb="snatches"),
 }
 
 
@@ -842,6 +1008,29 @@ def check():
         write_png(f"{d}/t.png", grid)
         w, h, px = read_png(f"{d}/t.png")
         assert [[classify(p) for p in row] for row in px] == grid
+        # `compose` on a sheet of loose sprites: twelve sprites of four sizes in three rows of four,
+        # each in the colour of its column, so what comes out can be counted, measured and placed.
+        sizes = [(18, 17), (16, 19), (17, 18), (20, 16), (19, 17), (16, 18), (17, 19), (18, 16),
+                 (20, 18), (16, 17), (19, 18), (17, 16)]
+        unit, cell_dim = 3, 24  # one art pixel in the sheet is three image pixels; cells of 24 x 24 art pixels
+        loose = [[-1] * (cell_dim * 4 * unit) for _ in range(cell_dim * 3 * unit)]
+        for k, (sw, sh) in enumerate(sizes):
+            col = 8 + k % 4
+            for y in range(sh * unit):
+                for x in range(sw * unit):
+                    c = col if ((x // unit) + (y // unit)) % 2 == 0 else 0
+                    loose[(k // 4) * cell_dim * unit + (cell_dim - sh) // 2 * unit + y][(k % 4) * cell_dim * unit + (cell_dim - sw) // 2 * unit + x] = c
+        write_png(f"{d}/loose.png", loose)
+        compose(f"{d}/loose.png", "check", art=pathlib.Path(d))
+        cw, ch, cut = read_png(f"{d}/check.png")
+        assert (cw, ch) == (CELL * 12, CELL), (cw, ch)
+        for k, (sw, sh) in enumerate(sizes):
+            ink = {(x - k * CELL, y): classify(cut[y][x]) for y in range(CELL) for x in range(k * CELL, (k + 1) * CELL)}
+            ink = {p: v for p, v in ink.items() if v >= 0}
+            xs, ys = [x for x, _ in ink], [y for _, y in ink]
+            assert len(ink) == sw * sh, f"frame {k}: {len(ink)} pixels, wanted {sw * sh}"
+            assert (max(xs) - min(xs) + 1, max(ys) - min(ys) + 1) == (sw, sh), f"frame {k} is the wrong size: {xs} x {ys}"
+            assert set(ink.values()) == {8 + k % 4, 0}, f"frame {k} is not the {k}th sprite"
     t = Track([(0, {"x": 0}), (50, {"x": 10}, STEP), (60, {"x": 20})])
     assert (t.at(25)["x"], t.at(55)["x"], t.at(99)["x"]) == (5, 10, 20)
     bad = ("<animate", "<set", "<script", "foreignObject", "<image", "filter", "mask", "http://", "https://")
@@ -859,6 +1048,8 @@ def check():
 if __name__ == "__main__":
     if sys.argv[1:2] == ["extract"]:
         extract(sys.argv[2], sys.argv[3])
+    elif sys.argv[1:2] == ["compose"]:
+        compose(sys.argv[2], sys.argv[3])
     elif sys.argv[1:2] == ["check"]:
         check()
     else:

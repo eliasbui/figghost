@@ -46,3 +46,9 @@ objc2-event-kit = "0.3"
 lto = "thin"
 codegen-units = 1
 strip = true
+# The one cdylib (the Now Playing adapter, loaded by /usr/bin/perl) must not be stripped: the strip step of
+# this toolchain leaves its LINKEDIT string pool misaligned, and dyld then refuses to load it with
+# "mis-aligned LINKEDIT string pool", which silently leaves the app without Now Playing. The extra kilobytes
+# are worth a library that loads.
+[profile.release.package.nowplaying-adapter]
+strip = false

@@ -24,7 +24,7 @@ use objc2::{
     sel,
 };
 use objc2_app_kit::{
-    NSAnimatablePropertyContainer, NSAnimationContext,
+    NSAnimatablePropertyContainer, NSAnimationContext, NSApplication,
     NSApplicationDidChangeScreenParametersNotification, NSBezierPath, NSBitmapImageFileType,
     NSColor, NSCompositingOperation, NSDragOperation, NSDraggingDestination, NSDraggingInfo,
     NSEvent, NSEventMask, NSGlassEffectView, NSGlassEffectViewStyle, NSGradient,
@@ -136,14 +136,16 @@ pub enum Rest {
 }
 
 /// Which screen the notch lives on.
-#[derive(Debug, Clone, Copy, PartialEq, Eq)]
+#[derive(Debug, Clone, PartialEq, Eq)]
 pub enum Display {
     /// The built-in screen with a notch, else the main screen.
     Auto,
     /// The screen with the menu bar.
     Main,
-    /// Whichever screen the pointer reaches the top of.
+    /// Whichever screen the pointer is on.
     Pointer,
+    /// One screen by name, as the settings window offers them; a screen that is gone falls back to `Auto`.
+    Screen(String),
 }
 
 /// The tab the notch shows when it opens.
@@ -204,6 +206,20 @@ pub struct NotchGeometry {
     pub hardware: bool,
 }
 
+/// The height of the menu bar. `NSStatusBar.thickness()` still answers 22 where the bar is drawn 30 high
+/// (macOS 27), and the tab at rest has to fill the bar to look like a cutout, so the menu bar is asked for its
+/// own height and the status bar is only the fallback.
+fn menu_bar_height() -> f64 {
+    let thickness = NSStatusBar::systemStatusBar().thickness();
+    let Some(mtm) = MainThreadMarker::new() else {
+        return thickness;
+    };
+    let height = NSApplication::sharedApplication(mtm)
+        .mainMenu()
+        .map_or(0.0, |menu| menu.menuBarHeight());
+    if height > 0.0 { height } else { thickness }
+}
+
 impl NotchGeometry {
     /// Prefers the notched built-in display; falls back to the menu-bar screen with a pill-sized notch.
     pub fn detect(mtm: MainThreadMarker) -> Option<Self> {
@@ -221,6 +237,11 @@ impl NotchGeometry {
             });
         }
         let screens = NSScreen::screens(mtm);
+        let named = |name: &str| {
+            screens
+                .iter()
+                .find(|s| s.localizedName().to_string() == name)
+        };
         let chosen = match display {
             Display::Auto => screens
                 .iter()
@@ -234,7 +255,23 @@ impl NotchGeometry {
                     .find(|s| contains(s.frame(), p))
                     .or_else(|| screens.firstObject())
             }
+            Display::Screen(ref name) => named(name).or_else(|| screens.firstObject()),
         }?;
+        Some(Self::of_screen(&chosen))
+    }
+
+    /// The geometry of the screen that holds `point`: where something that follows the pointer (the mascot)
+    /// plays, even when the notch itself is on another screen.
+    pub fn detect_at(mtm: MainThreadMarker, point: NSPoint) -> Option<Self> {
+        // For tests: the notch is far outside every screen, so nothing of it may show on the real one.
+        if std::env::var_os("FIGGHOST_NOTCH_OFFSCREEN").is_some() {
+            return None;
+        }
+        let screens = NSScreen::screens(mtm);
+        let chosen = screens
+            .iter()
+            .find(|s| contains(s.frame(), point))
+            .or_else(|| screens.firstObject())?;
         Some(Self::of_screen(&chosen))
     }
 
@@ -251,7 +288,7 @@ impl NotchGeometry {
         }
         Self {
             screen: s.frame(),
-            notch: NSSize::new(PILL_WIDTH, NSStatusBar::systemStatusBar().thickness()),
+            notch: NSSize::new(PILL_WIDTH, menu_bar_height()),
             hardware: false,
         }
     }
@@ -1851,7 +1888,7 @@ impl Inner {
             self.set_material(style.material);
         }
         if before.display != style.display
-            && let Some(geometry) = NotchGeometry::detect_on(self.mtm, style.display)
+            && let Some(geometry) = NotchGeometry::detect_on(self.mtm, style.display.clone())
         {
             self.geometry.set(geometry);
         }
@@ -1918,12 +1955,12 @@ fn pointer_moved(inner: &Rc<Inner>, p: NSPoint) {
         return;
     }
     let mut geometry = inner.geometry.get();
-    // Following the pointer: a pointer at the top of another screen brings the closed notch there.
+    // Following the pointer: the closed notch goes to whichever screen the pointer is on, so it (and the mascot)
+    // is in front of the person, and a pointer at the top of that screen opens it.
     if inner.style.borrow().display == Display::Pointer
         && !inner.is_open()
         && !contains(geometry.screen, p)
         && let Some(found) = NotchGeometry::detect_on(inner.mtm, Display::Pointer)
-        && p.y >= found.screen.origin.y + found.screen.size.height - TRIGGER_MIN_HEIGHT
     {
         inner.relayout(found);
         geometry = found;
@@ -2191,7 +2228,7 @@ impl Notch {
         });
         let relaid = Rc::clone(&inner);
         let on_screens = RcBlock::new(move |_: NonNull<NSNotification>| {
-            let display = relaid.style.borrow().display;
+            let display = relaid.style.borrow().display.clone();
             if let Some(geometry) = NotchGeometry::detect_on(mtm, display) {
                 relaid.relayout(geometry);
             }

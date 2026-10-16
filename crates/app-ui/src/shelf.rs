@@ -146,18 +146,23 @@ impl ShelfFeature {
                 }
             })
         };
+        let on_added: Rc<RefCell<Option<AddedHook>>> = Rc::default();
         let callbacks = {
-            let (on_drop_shelf, on_drop_refresh) = (Rc::clone(&shelf), Rc::clone(&refresh));
+            let (on_drop_shelf, on_drop_refresh, on_drop_added) =
+                (Rc::clone(&shelf), Rc::clone(&refresh), Rc::clone(&on_added));
             let (on_remove_shelf, on_remove_refresh) = (Rc::clone(&shelf), Rc::clone(&refresh));
             let (action_shelf, action_refresh) = (Rc::clone(&shelf), Rc::clone(&refresh));
             ShelfCallbacks {
                 on_drop: Box::new(move |paths| {
                     {
                         let mut shelf = on_drop_shelf.borrow_mut();
-                        shelf.add(paths, now_ms());
+                        shelf.add(paths.clone(), now_ms());
                         save(&shelf);
                     }
                     on_drop_refresh();
+                    if let Some(hook) = &*on_drop_added.borrow() {
+                        hook(&paths);
+                    }
                 }),
                 on_remove: Box::new(move |path| {
                     {
@@ -204,7 +209,6 @@ impl ShelfFeature {
             });
         }
         refresh();
-        let on_added: Rc<RefCell<Option<AddedHook>>> = Rc::default();
         let services = {
             let (shelf, refresh, on_added) =
                 (Rc::clone(&shelf), Rc::clone(&refresh), Rc::clone(&on_added));
@@ -229,7 +233,7 @@ impl ShelfFeature {
         }
     }
 
-    /// Told the files that came in through the Services menu, after they are on the shelf.
+    /// Told the files that came into the shelf, after they are on the shelf.
     pub fn on_added(&self, hook: impl Fn(&[String]) + 'static) {
         *self.on_added.borrow_mut() = Some(Box::new(hook));
     }

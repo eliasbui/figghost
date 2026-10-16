@@ -24,7 +24,7 @@ Every picture below is drawn by the app itself, with no screen: `app-ui/settings
 
 **Settings** — Liquid Glass, both themes, two languages.
 
-![The settings window: a glass sidebar with the app's pages, and cards for launching at login, the menu bar icon, the settings window's appearance and the language](docs/images/settings-general.png)
+![The settings window: a sidebar with a search field over the app's pages, and grouped cards for launching at login, the menu bar icon, the settings window's appearance and the language](docs/images/settings-general.png)
 
 **The notch** — seven tabs. The Clipboard tab, and the Shelf tab, where dropped files are kept as references to where they live: right-click one to ZIP it, convert it, make it smaller, remove its background or copy the text in the picture.
 
@@ -74,7 +74,7 @@ The app icon is drawn by code: `cargo run -p macos-sys --example make_icon -- X.
 
 ## Design
 
-The settings window follows Apple's Liquid Glass guidance: navigation and controls are glass, everything that is read sits on denser surfaces, colour is for state, and only what the user touches moves, briefly for feedback and with springs for things that travel. Contrast was measured, not guessed: text is at least 4.5:1 and the edge of an off control at least 3:1 on the worst backdrops, in both themes, and nothing the user must read is below 12 px. Every effect has a fallback for Reduce transparency, Increase contrast and Reduce motion, focus is always visible, every control has a name, and the whole window works from the keyboard. All tokens are CSS variables at the top of `crates/app-ui/web/app.css`.
+The settings window is a macOS window, not a web page that looks like one. The sidebar is a full-height pane with the window's three buttons on it and a field over the list that finds a page by name; the content is grouped sections of a label and its control. Every size and colour is the system's own, measured from AppKit rather than guessed: a 54 by 24 switch, 24 tall buttons, pop-up buttons, segmented controls and fields (20 for the small control size), 13 pt labels with 11 pt small print, and NSColor's ink, accent and separators. Under it the page follows Apple's Liquid Glass guidance: navigation and controls are glass, everything that is read sits on denser surfaces, colour is for state, and only what the user touches moves, briefly for feedback and with springs for things that travel. Contrast was measured, not guessed: text is at least 4.5:1 and the edge of an off control at least 3:1 on the worst backdrops, in both themes. Every effect has a fallback for Reduce transparency, Increase contrast and Reduce motion, focus is always visible, every control has a name, and the whole window works from the keyboard. All tokens are CSS variables at the top of `crates/app-ui/web/app.css`.
 
 ## Configuration
 
@@ -105,5 +105,5 @@ The repository layout, the programs in `crates/*/examples` that check the app, a
 
 MIT, see [LICENSE](LICENSE).
 
-The settings window is set in Inter, which is under the SIL Open Font License 1.1: see
+The settings window is set in SF Pro, the system's own font, so it reads as the rest of macOS does. Inter is bundled as the fallback for a machine without it, under the SIL Open Font License 1.1: see
 [crates/app-ui/assets/Inter-OFL.txt](crates/app-ui/assets/Inter-OFL.txt).

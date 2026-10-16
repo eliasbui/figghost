@@ -31,7 +31,8 @@
       { "id": "calendar", "title": "Calendar", "on": true },
       { "id": "sound", "title": "Sound", "on": false }
     ],
-    "live_media": true, "live_agents": true, "waveform": "live", "shortcut": "", "hardware": false
+    "live_media": true, "live_agents": true, "waveform": "live", "shortcut": "", "hardware": false,
+    "screens": ["Built-in Retina Display", "Sidecar"]
   },
   "agents": {
     "enabled": true, "wait": 30, "sound": true, "peek": true, "open_on_ask": false, "tokens": true,

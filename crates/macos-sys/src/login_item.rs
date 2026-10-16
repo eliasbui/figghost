@@ -1,5 +1,6 @@
 //! Start at login, through the app's own bundle (macOS 13 and later).
 
+use objc2_foundation::NSBundle;
 use objc2_service_management::{SMAppService, SMAppServiceStatus};
 
 #[derive(Debug, Clone, Copy, PartialEq, Eq)]
@@ -12,6 +13,11 @@ pub enum LoginItem {
     Unavailable,
 }
 
+/// Whether this program runs from an app bundle, which is what the system registers as a login item.
+fn bundled() -> bool {
+    NSBundle::mainBundle().bundleIdentifier().is_some()
+}
+
 pub fn status() -> LoginItem {
     // SAFETY: plain Objective-C calls with no arguments.
     let status = unsafe { SMAppService::mainAppService().status() };
@@ -20,7 +26,13 @@ pub fn status() -> LoginItem {
     } else if status == SMAppServiceStatus::RequiresApproval {
         LoginItem::NeedsApproval
     } else if status == SMAppServiceStatus::NotFound {
-        LoginItem::Unavailable
+        // A bundled app that has never been registered also answers "not found", so this is only
+        // "nothing to register" when there is no bundle to point the system at.
+        if bundled() {
+            LoginItem::Disabled
+        } else {
+            LoginItem::Unavailable
+        }
     } else {
         LoginItem::Disabled
     }

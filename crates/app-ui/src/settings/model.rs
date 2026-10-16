@@ -157,6 +157,8 @@ pub struct Env {
     pub notch_pages: Vec<(String, String)>,
     /// The notch is on a screen with a hardware notch.
     pub notch_hardware: bool,
+    /// The names of the screens, main first, for the notch's display setting.
+    pub screens: Vec<String>,
     /// What the running features know that the page needs, by feature id.
     pub runtime: HashMap<&'static str, Value>,
 }
@@ -346,6 +348,7 @@ fn notch_state(config: &Config, env: &Env) -> Value {
         "waveform": n.waveform,
         "shortcut": n.shortcut,
         "hardware": env.notch_hardware,
+        "screens": env.screens,
     })
 }
 
@@ -356,6 +359,21 @@ fn one_of(value: &Value, words: &[&str]) -> Result<String, Fault> {
         .filter(|w| words.contains(w))
         .map(str::to_owned)
         .ok_or_else(|| Fault::new("invalid_value", format!("expected one of {words:?}")))
+}
+
+/// The screen setting: a fixed word, or `screen:<name>` of one of the screens the app knows.
+fn screen_choice(value: &Value) -> Result<String, Fault> {
+    match value.as_str() {
+        Some(text) if ["auto", "main", "pointer"].contains(&text) => Ok(text.to_owned()),
+        Some(text)
+            if text
+                .strip_prefix("screen:")
+                .is_some_and(|name| !name.is_empty()) =>
+        {
+            Ok(text.to_owned())
+        }
+        _ => Err(Fault::new("invalid_value", "expected a screen")),
+    }
 }
 
 fn flag(value: &Value) -> Result<bool, Fault> {
@@ -539,7 +557,7 @@ fn set(config: &mut Config, path: &str, value: &Value) -> Outcome {
             Ok(Effect::Notch)
         }
         "notch.display" => {
-            config.notch.display = one_of(value, &["auto", "main", "pointer"])?;
+            config.notch.display = screen_choice(value)?;
             Ok(Effect::Notch)
         }
         "notch.waveform" => {
@@ -780,6 +798,7 @@ mod tests {
             agents: crate::agents::Status::default(),
             notch_pages: Vec::new(),
             notch_hardware: false,
+            screens: Vec::new(),
             runtime: HashMap::new(),
         }
     }
