@@ -144,7 +144,7 @@ define_class!(
         #[unsafe(method(drawRect:))]
         fn draw_rect(&self, _dirty: NSRect) {
             let bounds = self.bounds();
-            style::fill_rounded(bounds, style::CARD_RADIUS, &white(0.09));
+            style::card(bounds, style::CARD_RADIUS);
             let mut edge = Tone::Orange.color();
             edge = edge.colorWithAlphaComponent(0.5);
             style::stroke_rounded(bounds, style::CARD_RADIUS, &edge, 1.2);
@@ -225,7 +225,7 @@ define_class!(
                     NSPoint::new(0.0, top + 2.0),
                     NSSize::new(width, ROW_HEIGHT - 4.0),
                 );
-                style::fill_rounded(card, 12.0, &white(0.07));
+                style::card(card, 12.0);
                 let middle = top + ROW_HEIGHT / 2.0;
                 style::fill_circle(
                     NSRect::new(NSPoint::new(14.0, middle - 4.0), NSSize::new(8.0, 8.0)),
@@ -306,7 +306,7 @@ define_class!(
                     NSPoint::new(bar_x, middle - 3.0),
                     NSSize::new(bar_width, 6.0),
                 );
-                style::fill_capsule(track, &white(style::CONTROL));
+                style::well(track, 3.0);
                 if let Some(fraction) = row.fraction {
                     let fraction = fraction.clamp(0.0, 1.0);
                     let tone = if fraction >= 0.9 {

@@ -26,6 +26,8 @@ cp "$TARGET/release/libfigghost_nowplaying.dylib" "$APP/Contents/Frameworks/"
 # Drawn by the make_icon example in macos-sys: cargo run -p macos-sys --example make_icon -- X.iconset,
 # then iconutil -c icns X.iconset -o crates/app-ui/assets/Figghost.icns
 cp "$ROOT/crates/app-ui/assets/Figghost.icns" "$APP/Contents/Resources/Figghost.icns"
+# Inter, the font of the settings page, is inside the executable; its licence travels with the app.
+cp "$ROOT/crates/app-ui/assets/Inter-OFL.txt" "$APP/Contents/Resources/Inter-OFL.txt"
 
 cat > "$APP/Contents/Info.plist" <<'PLIST'
 <?xml version="1.0" encoding="UTF-8"?>

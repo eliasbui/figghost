@@ -398,10 +398,9 @@ impl ShelfCanvas {
                 NSSize::new(tile.size.width - 6.0, tile.size.height - 4.0),
             );
             if selected == Some(index) {
-                style::fill_rounded(card, 14.0, &style::white(0.17));
-                style::stroke_rounded(card, 14.0, &style::white(0.38), 1.5);
+                style::card_selected(card, 14.0, &style::Tone::Blue);
             } else {
-                style::fill_rounded(card, 14.0, &style::white(0.07));
+                style::card(card, 14.0);
             }
             let icon = self.icon(path);
             // SAFETY: called from drawRect: with a valid graphics context; a zero source rect means the whole image.
@@ -434,7 +433,7 @@ impl ShelfCanvas {
                 NSPoint::new(8.0, 6.0),
                 NSSize::new(bounds.size.width - 16.0, bounds.size.height - 12.0),
             );
-            style::fill_rounded(zone, style::CARD_RADIUS, &style::white(0.06));
+            style::card(zone, style::CARD_RADIUS);
             style::stroke_rounded(zone, style::CARD_RADIUS, &style::white(0.7), 2.0);
         }
     }

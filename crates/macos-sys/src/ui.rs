@@ -465,10 +465,9 @@ impl ListView {
             NSSize::new(width - 20.0, CARD_ROW_HEIGHT - 6.0),
         );
         if selected {
-            style::fill_rounded(card, 14.0, &style::white(0.17));
-            style::stroke_rounded(card, 14.0, &style::white(0.38), 1.5);
+            style::card_selected(card, 16.0, &Tone::Blue);
         } else {
-            style::fill_rounded(card, 14.0, &style::white(0.07));
+            style::card(card, 16.0);
         }
         let middle = top + CARD_ROW_HEIGHT / 2.0;
         let mut left = card.origin.x + 14.0;
@@ -522,7 +521,7 @@ impl ListView {
                 NSPoint::new(right - 36.0, middle - 10.0),
                 NSSize::new(36.0, 20.0),
             );
-            style::fill_capsule(key, &style::white(0.12));
+            style::control(key, 10.0, style::Control::Rest);
             draw_text(
                 &label,
                 NSRect::new(
@@ -574,8 +573,7 @@ impl ListView {
                 NSPoint::new(6.0, top + 2.0),
                 NSSize::new(width - 12.0, ROW_HEIGHT - 4.0),
             );
-            NSColor::selectedContentBackgroundColor().setFill();
-            NSBezierPath::bezierPathWithRoundedRect_xRadius_yRadius(rect, 8.0, 8.0).fill();
+            style::card_selected_color(rect, 10.0, &NSColor::selectedContentBackgroundColor());
         }
         if row.pinned {
             let bar = NSRect::new(

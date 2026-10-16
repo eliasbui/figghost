@@ -9,7 +9,7 @@ use crate::{audio::SoftVolume, trace};
 use macos_sys::{
     MainThreadMarker, app,
     event_tap::{EventTap, EventView, TapError, Verdict, mask},
-    hud::{self, Hud},
+    hud::{self, Hud, HudStyle},
     system_keys::{SYSTEM_DEFINED, SystemKey},
     volume::{self, Volume},
 };
@@ -39,9 +39,9 @@ pub struct VolumeHud {
 }
 
 impl VolumeHud {
-    pub fn new(mtm: MainThreadMarker, soft: Arc<SoftVolume>) -> Self {
+    pub fn new(mtm: MainThreadMarker, soft: Arc<SoftVolume>, style: HudStyle) -> Self {
         Self {
-            _hud: Hud::new(mtm),
+            _hud: Hud::with_style(mtm, style),
             tap: Rc::default(),
             retry: Rc::default(),
             hardware: Arc::default(),
@@ -52,6 +52,11 @@ impl VolumeHud {
 
     pub fn is_enabled(&self) -> bool {
         self.hardware.load(Ordering::Relaxed)
+    }
+
+    /// The look of the indicator, as chosen in the settings.
+    pub fn set_style(&self, style: HudStyle) {
+        self._hud.set_style(style);
     }
 
     fn wanted(&self) -> bool {

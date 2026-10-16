@@ -145,7 +145,11 @@ impl Shell {
         // The mixer saves what is changed on its notch page, so it shares the one config with the settings.
         let config = Rc::new(RefCell::new(config));
         let audio = AudioFeature::start(mtm, &config, home.clone(), notch.as_deref());
-        let volume_hud = Rc::new(VolumeHud::new(mtm, audio.engine.soft_volume()));
+        let volume_hud = Rc::new(VolumeHud::new(
+            mtm,
+            audio.engine.soft_volume(),
+            config.borrow().notch.hud_style(),
+        ));
         if config.borrow().volume_hud {
             volume_hud.enable_when_possible();
         }

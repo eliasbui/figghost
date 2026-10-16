@@ -300,6 +300,10 @@ impl SettingsFeature {
                 permissions::accessibility_trusted(true);
                 Fault::new("accessibility_needed", "volume_hud")
             }),
+            Effect::Hud => {
+                self.ctx.volume_hud.set_style(config.notch.hud_style());
+                Ok(())
+            }
             Effect::History => {
                 if let Some(clipboard) = &self.ctx.clipboard {
                     clipboard.history.configure(

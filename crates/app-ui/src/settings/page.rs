@@ -95,6 +95,36 @@ const SYMBOL_POINTS: f64 = 16.0;
 const SCALE: f64 = 2.0;
 const APP_ICON: &[u8] = include_bytes!("../../assets/Figghost.icns");
 
+/// Inter, the page's font: two subsets of one variable file, `wght` 100..900, for the Latin and the
+/// Vietnamese of the interface. Bundled under the SIL Open Font License (`assets/Inter-OFL.txt`), because
+/// the page fetches nothing at run time.
+const FONTS: &[(&[u8], &str)] = &[
+    (
+        include_bytes!("../../assets/Inter-latin.woff2"),
+        "U+0000-00FF,U+0131,U+0152-0153,U+02BB-02BC,U+02C6,U+02DA,U+02DC,U+0304,U+0308,U+0329,U+2000-206F,U+20AC,U+2122,U+2191,U+2193,U+2212,U+2215,U+FEFF,U+FFFD",
+    ),
+    (
+        include_bytes!("../../assets/Inter-vietnamese.woff2"),
+        "U+0102-0103,U+0110-0111,U+0128-0129,U+0168-0169,U+01A0-01A1,U+01AF-01B0,U+0300-0301,U+0303-0304,U+0308-0309,U+0323,U+0329,U+1EA0-1EF9,U+20AB",
+    ),
+];
+
+/// The two `@font-face` rules, with the fonts themselves inline. The ranges are the ones the subsets were
+/// cut for, so a character outside them (a key symbol such as `⌥`) comes from the system font instead.
+fn font_faces() -> String {
+    FONTS
+        .iter()
+        .map(|(bytes, range)| {
+            format!(
+                "@font-face {{ font-family: Inter; font-style: normal; font-weight: 100 900; \
+                 src: url(data:font/woff2;base64,{}) format('woff2'); unicode-range: {}; }}\n",
+                base64(bytes),
+                range
+            )
+        })
+        .collect()
+}
+
 /// `window.__symbols` (name to a white PNG) and `window.__appIcon`, drawn by the system since the page may
 /// load nothing. A symbol this system lacks is left out and its glyph stays empty.
 fn assets() -> String {
@@ -133,7 +163,7 @@ fn base64(bytes: &[u8]) -> String {
 
 pub fn html() -> String {
     let script = format!("{}\n{}\n{SCRIPT}", assets(), FEATURE_SCRIPTS.join("\n"));
-    let style = format!("{STYLE}\n{}", FEATURE_STYLES.join("\n"));
+    let style = format!("{}{STYLE}\n{}", font_faces(), FEATURE_STYLES.join("\n"));
     INDEX
         .replace("/*__CSS__*/", &style)
         .replace("/*__JS__*/", &script)

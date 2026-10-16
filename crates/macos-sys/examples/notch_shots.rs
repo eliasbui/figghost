@@ -77,6 +77,8 @@ fn main() {
     let video = args.iter().any(|a| a == "--video");
     let material = match args.get(1).map(String::as_str) {
         Some("clear") => Material::ClearGlass,
+        Some("ink") => Material::Ink,
+        Some("accent") => Material::Accent,
         Some("black") => Material::Black,
         _ => Material::Glass,
     };

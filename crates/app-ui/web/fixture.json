@@ -20,7 +20,7 @@
   "mcp": { "enabled": false, "command": "/Applications/Figghost.app/Contents/MacOS/Figghost" },
   "notch": {
     "enabled": true, "volume_hud": false, "shelf_count": 4,
-    "material": "glass", "shadow": true, "motion": "spring", "open_on_hover": true, "hover_delay_ms": 120,
+    "material": "glass", "hud": "notch", "shadow": true, "motion": "spring", "open_on_hover": true, "hover_delay_ms": 120,
     "rest": "notch", "hide_in_capture": false, "haptics": true, "display": "auto", "open_page": "activity",
     "pages": [
       { "id": "clipboard", "title": "Clipboard", "on": true },

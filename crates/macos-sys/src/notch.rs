@@ -80,8 +80,39 @@ pub enum Material {
     Glass,
     /// Liquid Glass with a light tint, more of the desktop shows through.
     ClearGlass,
+    /// Liquid Glass with a heavy dark tint: darker than `Glass` without becoming opaque, so the desktop is
+    /// still there, folded along the top of the shape.
+    Ink,
+    /// Clear glass tinted with the accent colour the user chose: the one material that is a colour rather
+    /// than a shade.
+    Accent,
     /// Black, slightly lighter at the bottom, like the hardware notch grown larger.
     Black,
+}
+
+/// The Liquid Glass style and tint of a material, or `None` for the ones that are not glass. The tint is the
+/// colour the glass is darkened or coloured with.
+pub fn glass_tint(material: Material) -> Option<(NSGlassEffectViewStyle, Retained<NSColor>)> {
+    let tint = |alpha: f64| style::black(alpha);
+    Some(match material {
+        Material::Glass => (NSGlassEffectViewStyle::Regular, tint(0.42)),
+        Material::ClearGlass => (NSGlassEffectViewStyle::Clear, tint(0.18)),
+        Material::Ink => (NSGlassEffectViewStyle::Regular, tint(0.72)),
+        Material::Accent => (
+            NSGlassEffectViewStyle::Clear,
+            NSColor::controlAccentColor().colorWithAlphaComponent(0.55),
+        ),
+        Material::Black => return None,
+    })
+}
+
+/// The vibrancy material standing in for a glass one before macOS 26. The tint cannot be applied to it, so
+/// the two darker materials take the darker material instead.
+pub fn vibrancy_of(material: Material) -> NSVisualEffectMaterial {
+    match material {
+        Material::Ink => NSVisualEffectMaterial::FullScreenUI,
+        _ => NSVisualEffectMaterial::HUDWindow,
+    }
 }
 
 /// How the shape moves between its states.
@@ -1778,27 +1809,22 @@ impl Inner {
     fn set_material(&self, material: Material) {
         let mtm = self.mtm;
         self.glass.borrow_mut().take();
+        let glass_look = glass_tint(material);
         let view: Retained<NSView> = match material {
             Material::Black => Retained::into_super(FillView::new(mtm, Paint::Slate)),
-            Material::Glass | Material::ClearGlass
-                if AnyClass::get(c"NSGlassEffectView").is_some() =>
-            {
+            _ if glass_look.is_some() && AnyClass::get(c"NSGlassEffectView").is_some() => {
+                let (look, tint) = glass_look.expect("checked just above");
                 let glass = NSGlassEffectView::initWithFrame(mtm.alloc(), NSRect::ZERO);
-                let (look, tint) = if material == Material::Glass {
-                    (NSGlassEffectViewStyle::Regular, 0.42)
-                } else {
-                    (NSGlassEffectViewStyle::Clear, 0.18)
-                };
                 glass.setStyle(look);
-                glass.setTintColor(Some(&style::black(tint)));
+                glass.setTintColor(Some(&tint));
                 glass.setCornerRadius(self.radius_of(self.shape.get()).max(COLLAPSED_RADIUS));
                 *self.glass.borrow_mut() = Some(Retained::clone(&glass));
                 Retained::into_super(glass)
             }
             // Before macOS 26 there is no Liquid Glass: a dark vibrancy material stands in.
-            Material::Glass | Material::ClearGlass => {
+            _ => {
                 let effect = NSVisualEffectView::initWithFrame(mtm.alloc(), NSRect::ZERO);
-                effect.setMaterial(NSVisualEffectMaterial::HUDWindow);
+                effect.setMaterial(vibrancy_of(material));
                 effect.setBlendingMode(NSVisualEffectBlendingMode::BehindWindow);
                 effect.setState(NSVisualEffectState::Active);
                 Retained::into_super(effect)
@@ -2287,6 +2313,7 @@ impl Notch {
         });
         let shape = inner.shape.replace(Shape::Open);
         inner.select_page(page);
+        inner.switcher.settle();
         if let Some(shown) = inner.pages.borrow().get(page) {
             shown.root.setAlphaValue(1.0);
         }

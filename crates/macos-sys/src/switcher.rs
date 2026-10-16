@@ -1,12 +1,16 @@
 //! The strip of page icons at the top of the open notch: a capsule with one glyph per page, the current
 //! page in white. It replaces a row of text tabs, so any number of pages fit in a small space.
 
-use crate::style::{self, TEXT_SECONDARY, black, fill_capsule, white};
+use crate::style::{self, Control, TEXT_SECONDARY, black, white};
 use objc2::{
-    AnyThread, DefinedClass, MainThreadMarker, MainThreadOnly, define_class, msg_send, rc::Retained,
+    AnyThread, DefinedClass, MainThreadMarker, MainThreadOnly, Message, define_class, msg_send,
+    rc::{Retained, Weak},
+    sel,
+    runtime::AnyObject,
 };
-use objc2_app_kit::{NSEvent, NSTrackingArea, NSTrackingAreaOptions, NSView};
-use objc2_foundation::{NSObjectProtocol, NSPoint, NSRect, NSSize, NSString};
+use objc2_app_kit::{NSEvent, NSScreen, NSTrackingArea, NSTrackingAreaOptions, NSView};
+use objc2_foundation::{NSObject, NSObjectProtocol, NSPoint, NSRect, NSRunLoop, NSRunLoopCommonModes, NSSize, NSString};
+use objc2_quartz_core::CADisplayLink;
 use std::{
     cell::{Cell, RefCell},
     rc::Rc,
@@ -27,10 +31,50 @@ type SelectHandler = Rc<dyn Fn(usize)>;
 pub struct SwitcherIvars {
     items: RefCell<Vec<(String, String)>>,
     selected: Cell<usize>,
+    /// Where the chosen pill is drawn, which follows `selected` instead of jumping to it.
+    shown: Cell<f64>,
+    /// The display link that carries the pill, kept only while it is moving.
+    glide: RefCell<Option<Retained<CADisplayLink>>>,
     /// Pages with something that needs the user, marked with a dot.
     badges: RefCell<Vec<usize>>,
     hovered: Cell<Option<usize>>,
     on_select: RefCell<Option<SelectHandler>>,
+}
+
+pub struct GlideIvars {
+    switcher: Weak<PageSwitcher>,
+}
+
+// What the display link calls on every frame while the pill travels.
+define_class!(
+    // SAFETY: NSObject allows subclassing; the ivar is only touched on the main thread.
+    #[unsafe(super(NSObject))]
+    #[thread_kind = MainThreadOnly]
+    #[name = "FigSwitcherGlide"]
+    #[ivars = GlideIvars]
+    struct Glide;
+
+    impl Glide {
+        #[unsafe(method(tick:))]
+        fn tick(&self, link: &CADisplayLink) {
+            // The last frame lets go of the display link, which lets go of this object: both are kept alive
+            // until this call returns.
+            let (_alive, _link) = (self.retain(), link.retain());
+            if let Some(switcher) = self.ivars().switcher.load() {
+                switcher.step();
+            }
+        }
+    }
+
+    unsafe impl NSObjectProtocol for Glide {}
+);
+
+impl Glide {
+    fn new(mtm: MainThreadMarker, switcher: Weak<PageSwitcher>) -> Retained<Self> {
+        let this = mtm.alloc::<Self>().set_ivars(GlideIvars { switcher });
+        // SAFETY: NSObject's designated initializer.
+        unsafe { msg_send![super(this), init] }
+    }
 }
 
 define_class!(
@@ -88,6 +132,8 @@ impl PageSwitcher {
         let ivars = SwitcherIvars {
             items: RefCell::new(Vec::new()),
             selected: Cell::new(0),
+            shown: Cell::new(0.0),
+            glide: RefCell::new(None),
             badges: RefCell::new(Vec::new()),
             hovered: Cell::new(None),
             on_select: RefCell::new(None),
@@ -127,6 +173,67 @@ impl PageSwitcher {
 
     pub fn set_selected(&self, index: usize) {
         self.ivars().selected.set(index);
+        self.start_glide();
+    }
+
+    /// Puts the pill on the chosen page at once, for a frame that must not catch it in flight: a snapshot.
+    pub fn settle(&self) {
+        self.ivars().shown.set(self.ivars().selected.get() as f64);
+        if let Some(link) = self.ivars().glide.borrow_mut().take() {
+            link.invalidate();
+        }
+        self.setNeedsDisplay(true);
+    }
+
+    /// Carries the pill to the page the user chose: one step of an exponential approach per frame, which
+    /// starts fast and settles without arriving early, the way a liquid glass control follows a finger.
+    pub fn step(&self) {
+        let iv = self.ivars();
+        let toward = iv.selected.get() as f64;
+        let from = iv.shown.get();
+        let left = toward - from;
+        if left.abs() < 0.004 {
+            iv.shown.set(toward);
+            // A run loop keeps a display link that is only released, and the link keeps this view: it has to be
+            // invalidated to stop the frames.
+            if let Some(link) = iv.glide.borrow_mut().take() {
+                link.invalidate();
+            }
+        } else {
+            iv.shown.set(from + left * 0.28);
+        }
+        self.setNeedsDisplay(true);
+    }
+
+    fn start_glide(&self) {
+        if self.ivars().glide.borrow().is_some() {
+            self.setNeedsDisplay(true);
+            return;
+        }
+        // The screen's display link keeps the pill in step with the frames the window server draws, and lets go
+        // of the run loop the moment it settles. macOS 13 has none: there the pill arrives at once.
+        let mtm = MainThreadMarker::new().expect("main thread");
+        let screen = self
+            .window()
+            .and_then(|window| window.screen())
+            .or_else(|| NSScreen::mainScreen(mtm));
+        let Some(screen) = screen.filter(|s| s.respondsToSelector(sel!(displayLinkWithTarget:selector:)))
+        else {
+            self.ivars().shown.set(self.ivars().selected.get() as f64);
+            self.setNeedsDisplay(true);
+            return;
+        };
+        let target = Glide::new(mtm, Weak::from_retained(&self.retain()));
+        // SAFETY: the target answers `tick:`, taking the display link, which is what the selector names.
+        let link = unsafe {
+            screen.displayLinkWithTarget_selector(
+                AsRef::<AnyObject>::as_ref(&target),
+                sel!(tick:),
+            )
+        };
+        // SAFETY: the main run loop, in the common modes so frames also come while the pointer is held down.
+        unsafe { link.addToRunLoop_forMode(&NSRunLoop::mainRunLoop(), NSRunLoopCommonModes) };
+        self.ivars().glide.borrow_mut().replace(link);
         self.setNeedsDisplay(true);
     }
 
@@ -153,19 +260,24 @@ impl PageSwitcher {
 
     fn paint(&self) {
         let bounds = self.bounds();
-        fill_capsule(bounds, &white(style::CONTROL));
+        // A well holds the row of pages; the pill that marks the chosen one is the only thing that stands out of it.
+        style::well(bounds, HEIGHT / 2.0);
         let items = self.ivars().items.borrow();
         let (selected, hovered) = (self.ivars().selected.get(), self.ivars().hovered.get());
+        let shown = self.ivars().shown.get();
+        let pill = NSRect::new(
+            NSPoint::new(PAD + shown * ITEM_WIDTH, PAD),
+            NSSize::new(ITEM_WIDTH, HEIGHT - 2.0 * PAD),
+        );
+        style::card_bright(pill, pill.size.height / 2.0);
         for (i, (symbol, _)) in items.iter().enumerate() {
             let cell = NSRect::new(
                 NSPoint::new(PAD + i as f64 * ITEM_WIDTH, PAD),
                 NSSize::new(ITEM_WIDTH, HEIGHT - 2.0 * PAD),
             );
             let on = i == selected;
-            if on {
-                fill_capsule(cell, &white(0.94));
-            } else if hovered == Some(i) {
-                fill_capsule(cell, &white(0.12));
+            if !on && hovered == Some(i) {
+                style::control(cell, cell.size.height / 2.0, Control::Hover);
             }
             let ink = if on {
                 black(0.88)

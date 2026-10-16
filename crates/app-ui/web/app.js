@@ -116,6 +116,8 @@ const I18N = {
     'tab.shelf': 'Shelf', 'tab.shelf.desc': 'Drop files to keep them handy and drag them out again. Right-click a file to compress it or convert an image. Only references are stored.', 'tab.media': 'Media', 'tab.media.desc': 'Previous, play and next for whatever is playing; track details for Music and Spotify.',
     'tab.focus': 'Focus', 'tab.focus.desc': 'A countdown for work sessions: 15, 25, 45 or 60 minutes. The notch opens and a sound plays when time is up.',
     'sec.volume': 'Volume', 'vol.title': 'Volume indicator in the notch', 'vol.desc': 'Replaces the system volume display. Needs Accessibility. Shift + Option moves in finer steps.',
+    'vol.style.title': 'Indicator style', 'vol.style.desc': 'How the volume panel looks while the keys are pressed.',
+    'vol.style.notch': 'Notch', 'vol.style.glass': 'Liquid Glass', 'vol.style.corner': 'Corner capsule', 'vol.style.bar': 'Level bar',
     'shelf.count': 'Files on the shelf', 'shelf.clear': 'Clear shelf', 'shelf.clear.desc': 'Removes the references only. Your files are not touched.',
     'sec.shelf': 'Shelf',
 
@@ -204,6 +206,8 @@ const I18N = {
     'tab.shelf': 'Khay', 'tab.shelf.desc': 'Thả tệp vào để giữ tạm và kéo ra lại. Nhấp chuột phải vào tệp để nén hoặc đổi định dạng ảnh. Chỉ lưu đường dẫn tham chiếu.', 'tab.media': 'Media', 'tab.media.desc': 'Trước, phát và sau cho ứng dụng đang phát; thông tin bài hát cho Music và Spotify.',
     'tab.focus': 'Tập trung', 'tab.focus.desc': 'Đồng hồ đếm ngược cho phiên làm việc: 15, 25, 45 hoặc 60 phút. Notch tự mở và có âm báo khi hết giờ.',
     'sec.volume': 'Âm lượng', 'vol.title': 'Chỉ báo âm lượng trong notch', 'vol.desc': 'Thay màn hình âm lượng của hệ thống. Cần quyền Trợ năng. Shift + Option để chỉnh từng bước nhỏ.',
+    'vol.style.title': 'Kiểu chỉ báo', 'vol.style.desc': 'Bảng âm lượng trông thế nào trong lúc nhấn phím.',
+    'vol.style.notch': 'Notch', 'vol.style.glass': 'Liquid Glass', 'vol.style.corner': 'Viên góc phải', 'vol.style.bar': 'Thanh mức',
     'shelf.count': 'Tệp trên khay', 'shelf.clear': 'Dọn khay', 'shelf.clear.desc': 'Chỉ xóa phần tham chiếu. Tệp của bạn không bị động tới.',
     'sec.shelf': 'Khay tệp',
 
@@ -240,7 +244,7 @@ Object.assign(I18N.en, {
   'notch.shortcut.title': 'Open or close the notch', 'notch.shortcut.desc': 'A shortcut that works everywhere. Press Delete while recording to remove it.',
   'sec.notch.look': 'Appearance',
   'notch.material.title': 'Material', 'notch.material.desc': 'Liquid Glass lets the desktop show through and bends it at the edges. Closed, the notch stays black, like a hardware notch.',
-  'notch.material.glass': 'Liquid Glass', 'notch.material.clear': 'Clear glass', 'notch.material.black': 'Black',
+  'notch.material.glass': 'Liquid Glass', 'notch.material.clear': 'Clear glass', 'notch.material.ink': 'Ink glass', 'notch.material.accent': 'Accent glass', 'notch.material.black': 'Black',
   'notch.motion.title': 'Motion', 'notch.motion.desc': 'How the notch moves as it opens, closes and widens. Reduce Motion in System Settings turns movement off.',
   'notch.motion.spring': 'Spring', 'notch.motion.smooth': 'Smooth', 'notch.motion.none': 'None',
   'notch.shadow.title': 'Shadow', 'notch.shadow.desc': 'A soft shadow under the open notch.',
@@ -286,7 +290,7 @@ Object.assign(I18N.vi, {
   'notch.shortcut.title': 'Mở hoặc đóng notch', 'notch.shortcut.desc': 'Phím tắt dùng ở mọi nơi. Nhấn Delete khi đang ghi để xóa.',
   'sec.notch.look': 'Giao diện',
   'notch.material.title': 'Chất liệu', 'notch.material.desc': 'Liquid Glass để màn hình phía sau hiện qua và khúc xạ ở mép. Khi đóng, notch vẫn màu đen như notch phần cứng.',
-  'notch.material.glass': 'Liquid Glass', 'notch.material.clear': 'Kính trong', 'notch.material.black': 'Đen',
+  'notch.material.glass': 'Liquid Glass', 'notch.material.clear': 'Kính trong', 'notch.material.ink': 'Kính mực', 'notch.material.accent': 'Kính màu nhấn', 'notch.material.black': 'Đen',
   'notch.motion.title': 'Chuyển động', 'notch.motion.desc': 'Cách notch chuyển động khi mở, đóng và nới rộng. Giảm chuyển động trong Cài đặt hệ thống sẽ tắt chuyển động.',
   'notch.motion.spring': 'Lò xo', 'notch.motion.smooth': 'Mượt', 'notch.motion.none': 'Không',
   'notch.shadow.title': 'Đổ bóng', 'notch.shadow.desc': 'Một lớp bóng mềm dưới notch khi mở.',
@@ -1143,9 +1147,11 @@ function pageNotch() {
       row(t('notch.shortcut.title'), t('notch.shortcut.desc'), hotkeyButton('notch', { allowClear: true, label: t('notch.shortcut.title') }), { when: on })),
     sectionTitle(t('sec.notch.look')),
     card(
-      segRow('notch.material', t('notch.material.title'), t('notch.material.desc'), ['glass', 'clear', 'black'], { when: on }),
-      segRow('notch.motion', t('notch.motion.title'), t('notch.motion.desc'), ['spring', 'smooth', 'none'], { when: on }),
-      toggleRow('notch.shadow', t('notch.shadow.title'), t('notch.shadow.desc'), { when: on })),
+      selectRow({
+        path: 'notch.material', title: t('notch.material.title'), desc: t('notch.material.desc'), when: on,
+        options: () => ['glass', 'clear', 'ink', 'accent', 'black'].map((v) => ({ value: v, label: t('notch.material.' + v) })),
+      }),
+      segRow('notch.motion', t('notch.motion.title'), t('notch.motion.desc'), ['spring', 'smooth', 'none'], { when: on }),      toggleRow('notch.shadow', t('notch.shadow.title'), t('notch.shadow.desc'), { when: on })),
     sectionTitle(t('sec.notch.display')),
     card(
       selectRow({
@@ -1166,7 +1172,12 @@ function pageNotch() {
       row(t('shelf.count'), null, shelfCount),
       row(t('shelf.clear'), t('shelf.clear.desc'), button(t('shelf.clear'), () => send({ t: 'action', name: 'clear_shelf' }), { icon: 'trash', small: true }))),
     sectionTitle(t('sec.volume')),
-    card(toggleRow('notch.volume_hud', t('vol.title'), t('vol.desc'))),
+    card(
+      toggleRow('notch.volume_hud', t('vol.title'), t('vol.desc')),
+      selectRow({
+        path: 'notch.hud', title: t('vol.style.title'), desc: t('vol.style.desc'), when: () => S.notch.volume_hud,
+        options: () => ['notch', 'glass', 'corner', 'bar'].map((v) => ({ value: v, label: t('vol.style.' + v) })),
+      })),
   ];
 }
 
@@ -1354,6 +1365,7 @@ function buildShell() {
           appIcon('brand-icon'),
           h('div', {}, h('div', { class: 'brand-name', text: 'Figghost' }), h('div', { class: 'brand-ver', text: 'v' + S.app.version }))),
         h('nav', { id: 'nav', 'aria-label': 'Figghost' },
+          h('div', { class: 'nav-thumb', 'aria-hidden': 'true' }),
           PAGES.map((p) => h('button', { class: 'nav-item', 'data-page': p.id, onclick: () => go(p.id) },
             h('span', { class: 'nav-icon' }, icon(p.icon)), h('span', { class: 'nav-label', text: t('nav.' + p.id) })))),
         h('div', { class: 'side-foot' }, accessPill())),
@@ -1363,6 +1375,38 @@ function buildShell() {
         h('div', { id: 'scroller' }))),
     h('div', { id: 'toast', 'aria-live': 'polite' }),
     h('div', { id: 'modal' }));
+  litGlass();
+  moveThumb();
+}
+
+/** The chosen page is one pill that glides to the row the user picked, so the eye follows the change of page. */
+function moveThumb() {
+  const nav = $('#nav');
+  const thumb = nav && nav.querySelector('.nav-thumb');
+  if (!thumb) return;
+  const item = nav.querySelector('.nav-item[aria-current="page"]');
+  if (!item) { thumb.style.opacity = '0'; return; }
+  if (!thumb.dataset.placed) {
+    // The first placement is where the pill already is; only later changes travel.
+    thumb.style.transition = 'none';
+    requestAnimationFrame(() => { thumb.style.transition = ''; });
+    thumb.dataset.placed = '1';
+  }
+  thumb.style.height = item.offsetHeight + 'px';
+  thumb.style.transform = 'translateY(' + item.offsetTop + 'px)';
+  thumb.style.opacity = '1';
+}
+
+/** The highlight the pointer carries over the sidebar, as Liquid Glass does. */
+function litGlass() {
+  const glass = $('#sidebar');
+  if (!glass) return;
+  glass.classList.add('lit');
+  glass.addEventListener('pointermove', (event) => {
+    const rect = glass.getBoundingClientRect();
+    glass.style.setProperty('--mx', (event.clientX - rect.left) + 'px');
+    glass.style.setProperty('--my', (event.clientY - rect.top) + 'px');
+  });
 }
 
 function go(id) {
@@ -1377,9 +1421,13 @@ function go(id) {
   const scroller = $('#scroller');
   pageSyncs = scoped(() => scroller.replaceChildren(h('div', { class: 'page' }, [].concat(page.build(), slotsFor(page.id)))));
   scroller.scrollTop = 0;
+  // The parts of the page come up one after another, so the change of page reads as a movement.
+  const built = scroller.querySelector('.page');
+  if (built) [...built.children].forEach((el, i) => el.style.setProperty('--i', String(Math.min(i, 10))));
   for (const item of document.querySelectorAll('.nav-item')) {
     if (item.dataset.page === current) item.setAttribute('aria-current', 'page'); else item.removeAttribute('aria-current');
   }
+  moveThumb();
   send({ t: 'page', id: current });
 }
 
@@ -1549,10 +1597,19 @@ window.__selftest = function () {
     // The notch page: choices send their words, the tab list sends the ids that show, in order, and never none.
     go('notch');
     sent.length = 0;
-    const black = [...document.querySelectorAll('.seg button')].find((b) => b.textContent === t('notch.material.black'));
-    black.click();
-    expect(sent.some((m) => m.t === 'set' && m.path === 'notch.material' && m.value === 'black'), 'the material is sent: ' + JSON.stringify(sent));
-    expect($('.notch').classList.contains('mat-black'), 'the preview follows the material');
+    // The material and the indicator style are pop-up buttons; the tab list is the segmented one.
+    const material = [...document.querySelectorAll('select.pick')].find((s) => s.getAttribute('aria-label') === t('notch.material.title'));
+    material.value = 'accent';
+    material.dispatchEvent(new Event('change'));
+    expect(sent.some((m) => m.t === 'set' && m.path === 'notch.material' && m.value === 'accent'), 'the material is sent: ' + JSON.stringify(sent));
+    expect($('.notch').classList.contains('mat-accent'), 'the preview follows the material');
+    S.notch.volume_hud = true;
+    runSyncs();
+    sent.length = 0;
+    const hud = [...document.querySelectorAll('select.pick')].find((s) => s.getAttribute('aria-label') === t('vol.style.title'));
+    hud.value = 'bar';
+    hud.dispatchEvent(new Event('change'));
+    expect(sent.some((m) => m.t === 'set' && m.path === 'notch.hud' && m.value === 'bar'), 'the indicator style is sent: ' + JSON.stringify(sent));
     S.notch.pages = [{ id: 'clipboard', title: 'Clipboard', on: true }, { id: 'media', title: 'Media', on: true }, { id: 'sound', title: 'Sound', on: false }];
     runSyncs();
     const tabRows = [...document.querySelectorAll('.card .row')].filter((r) => r.querySelector('.tab-order'));
@@ -1584,3 +1641,5 @@ function setLang(code) {
 }
 
 send({ t: 'ready' });
+// The pill follows the chosen row; a resize moves the rows, so it has to be placed again.
+window.addEventListener('resize', () => moveThumb());

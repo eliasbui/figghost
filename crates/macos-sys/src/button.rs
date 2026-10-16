@@ -2,10 +2,7 @@
 //! One class for all three keeps every page's controls identical in size, colour and feedback.
 
 use crate::{
-    style::{
-        self, BUTTON_RADIUS, CONTROL, CONTROL_HOVER, CONTROL_PRESSED, TEXT, Tone, Weight, black,
-        fill_capsule, fill_circle, fill_rounded, white,
-    },
+    style::{self, BUTTON_RADIUS, Control, TEXT, Tone, Weight, black, white},
     widgets::{Fit, draw_text, text_attributes},
 };
 use objc2::{
@@ -287,43 +284,48 @@ impl TouchButton {
         let (look, enabled) = (iv.look.get(), iv.enabled.get());
         let solid = matches!(look, Look::Round { filled: true })
             || (matches!(look, Look::Chip | Look::Rect) && iv.selected.get());
-        let level = if iv.pressed.get() && enabled {
-            CONTROL_PRESSED
-        } else if iv.hovered.get() && enabled {
-            CONTROL_HOVER
+        // What separates the looks of a control is only how it is being used.
+        let state = if !enabled {
+            Control::Disabled
+        } else if iv.pressed.get() {
+            Control::Pressed
+        } else if iv.hovered.get() {
+            Control::Hover
+        } else if iv.selected.get() {
+            Control::Chosen
         } else {
-            CONTROL
+            Control::Rest
         };
-        let fade = if enabled { 1.0 } else { 0.38 };
-        let (fill, ink) = if solid {
-            let alpha = if iv.pressed.get() {
-                0.72
-            } else if iv.hovered.get() {
-                1.0
+        let ink = if solid { black(0.88) } else { white(TEXT) };
+        let dim = match state {
+            Control::Pressed => 0.80,
+            Control::Hover => 1.0,
+            Control::Disabled => 0.62,
+            _ => 0.95,
+        };
+        // Every control is glass: a shape lit from above with an edge that holds it together. A solid one is the
+        // bright glass the light goes through; the rest stand on the surface.
+        let shape = |rect: NSRect, radius: f64| {
+            if solid {
+                style::card_bright_alpha(rect, radius, dim);
             } else {
-                0.93
-            };
-            // A solid button that cannot be pressed stays readable: its fill dims, its ink does not.
-            (white(alpha * if enabled { 1.0 } else { 0.62 }), black(0.88))
-        } else {
-            (white(level * fade), white(TEXT * fade))
+                style::control(rect, radius, state);
+            }
         };
         match look {
             Look::Round { .. } => {
                 let side = bounds.size.width.min(bounds.size.height);
-                fill_circle(
-                    NSRect::new(
-                        NSPoint::new(
-                            (bounds.size.width - side) / 2.0,
-                            (bounds.size.height - side) / 2.0,
-                        ),
-                        NSSize::new(side, side),
+                let circle = NSRect::new(
+                    NSPoint::new(
+                        (bounds.size.width - side) / 2.0,
+                        (bounds.size.height - side) / 2.0,
                     ),
-                    &fill,
+                    NSSize::new(side, side),
                 );
+                shape(circle, side / 2.0);
             }
-            Look::Rect => fill_rounded(bounds, BUTTON_RADIUS, &fill),
-            Look::Chip => fill_capsule(bounds, &fill),
+            Look::Rect => shape(bounds, BUTTON_RADIUS),
+            Look::Chip => shape(bounds, bounds.size.height / 2.0),
         }
 
         let glyph_color = match (iv.tone.get(), solid) {
@@ -383,9 +385,9 @@ impl TouchButton {
         }
         if detail_width > 0.0 {
             let dim = if solid {
-                black(0.45 * fade)
+                black(0.45)
             } else {
-                white(0.45 * fade)
+                white(0.45)
             };
             draw_text(
                 &detail,

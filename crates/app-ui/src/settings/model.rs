@@ -98,6 +98,8 @@ pub enum Effect {
     Language,
     LoginItem(bool),
     VolumeHud(bool),
+    /// The look of the volume indicator changed.
+    Hud,
     /// Show or hide the menu bar icon.
     MenuIcon(bool),
     /// The settings window's light or dark appearance changed.
@@ -328,6 +330,7 @@ fn notch_state(config: &Config, env: &Env) -> Value {
         "volume_hud": config.volume_hud,
         "shelf_count": env.shelf_count,
         "material": n.material,
+        "hud": n.hud,
         "shadow": n.shadow,
         "motion": n.motion,
         "open_on_hover": n.open_on_hover,
@@ -520,8 +523,12 @@ fn set(config: &mut Config, path: &str, value: &Value) -> Outcome {
             Ok(Effect::Theme)
         }
         "notch.material" => {
-            config.notch.material = one_of(value, &["glass", "clear", "black"])?;
+            config.notch.material = one_of(value, &["glass", "clear", "ink", "accent", "black"])?;
             Ok(Effect::Notch)
+        }
+        "notch.hud" => {
+            config.notch.hud = one_of(value, &["notch", "glass", "corner", "bar"])?;
+            Ok(Effect::Hud)
         }
         "notch.motion" => {
             config.notch.motion = one_of(value, &["spring", "smooth", "none"])?;

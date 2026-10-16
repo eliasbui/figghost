@@ -62,7 +62,8 @@ pub const NOTCH_PAGES: [&str; 7] = [
 pub struct NotchConfig {
     /// The notch panel, with its hover trigger. Off removes it from the screen entirely.
     pub enabled: bool,
-    /// What the open notch is made of: `glass`, `clear` (glass with less tint) or `black`.
+    /// What the open notch is made of: `glass`, `clear` (glass with less tint), `ink` (glass, heavily tinted),
+    /// `accent` (clear glass in the accent colour) or `black`.
     pub material: String,
     pub shadow: bool,
     /// How it moves: `spring`, `smooth` or `none`.
@@ -89,6 +90,9 @@ pub struct NotchConfig {
     pub waveform: String,
     /// A global shortcut that opens or closes the notch; empty for none.
     pub shortcut: String,
+    /// The look of the volume indicator: `notch` (black, under the cutout), `glass` (the same shape in Liquid
+    /// Glass), `corner` (a capsule in the corner) or `bar` (the level filling the shape).
+    pub hud: String,
 }
 
 impl Default for NotchConfig {
@@ -110,6 +114,7 @@ impl Default for NotchConfig {
             live_agents: true,
             waveform: "live".into(),
             shortcut: String::new(),
+            hud: "notch".into(),
         }
     }
 }
@@ -150,7 +155,7 @@ impl From<serde_json::Value> for NotchConfig {
             .to_owned();
         Self {
             enabled: flag("enabled", d.enabled),
-            material: word(&v["material"], &["glass", "clear", "black"], &d.material),
+            material: word(&v["material"], &["glass", "clear", "ink", "accent", "black"], &d.material),
             shadow: flag("shadow", d.shadow),
             motion: word(&v["motion"], &["spring", "smooth", "none"], &d.motion),
             open_on_hover: flag("open_on_hover", d.open_on_hover),
@@ -167,6 +172,7 @@ impl From<serde_json::Value> for NotchConfig {
             live_agents: flag("live_agents", d.live_agents),
             waveform: word(&v["waveform"], &["live", "animated"], &d.waveform),
             shortcut: v["shortcut"].as_str().unwrap_or("").trim().to_owned(),
+            hud: word(&v["hud"], &["notch", "glass", "corner", "bar"], &d.hud),
         }
     }
 }
@@ -178,6 +184,8 @@ impl NotchConfig {
         Style {
             material: match self.material.as_str() {
                 "clear" => Material::ClearGlass,
+                "ink" => Material::Ink,
+                "accent" => Material::Accent,
                 "black" => Material::Black,
                 _ => Material::Glass,
             },
@@ -208,6 +216,11 @@ impl NotchConfig {
             },
             pages: self.pages.clone(),
         }
+    }
+
+    /// What the volume indicator needs to know.
+    pub fn hud_style(&self) -> macos_sys::hud::HudStyle {
+        macos_sys::hud::HudStyle::named(&self.hud)
     }
 }
 
@@ -734,6 +747,37 @@ mod tests {
             serde_json::from_value(serde_json::to_value(&notch).unwrap()).unwrap();
         assert_eq!(again, notch);
         fs::remove_dir_all(dir).unwrap();
+    }
+
+    #[test]
+    fn every_look_a_setting_names_reaches_the_panel_it_is_for() {
+        use macos_sys::hud::HudStyle;
+        use macos_sys::notch::Material;
+        let mut notch = NotchConfig::default();
+        for (word, material) in [
+            ("glass", Material::Glass),
+            ("clear", Material::ClearGlass),
+            ("ink", Material::Ink),
+            ("accent", Material::Accent),
+            ("black", Material::Black),
+        ] {
+            notch.material = word.into();
+            assert_eq!(notch.style().material, material, "{word}");
+        }
+        for (word, style) in [
+            ("notch", HudStyle::Notch),
+            ("glass", HudStyle::Glass),
+            ("corner", HudStyle::Corner),
+            ("bar", HudStyle::Bar),
+        ] {
+            notch.hud = word.into();
+            assert_eq!(notch.hud_style(), style, "{word}");
+        }
+        // A word nothing knows falls back to the default rather than to nothing.
+        notch.material = "wood".into();
+        notch.hud = "bolt".into();
+        assert_eq!(notch.style().material, Material::Glass);
+        assert_eq!(notch.hud_style(), HudStyle::Notch);
     }
 
     #[test]

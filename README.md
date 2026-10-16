@@ -71,3 +71,6 @@ The repository layout, the programs in `crates/*/examples` that check the app, a
 ## License
 
 MIT, see [LICENSE](LICENSE).
+
+The settings window is set in Inter, which is under the SIL Open Font License 1.1: see
+[crates/app-ui/assets/Inter-OFL.txt](crates/app-ui/assets/Inter-OFL.txt).

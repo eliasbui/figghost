@@ -371,8 +371,7 @@ fn paint_row(row: &SmartRow, index: usize, selected: bool, width: f64) {
         NSSize::new(width - 2.0 * PAD, ROW - 4.0),
     );
     if selected {
-        style::fill_rounded(card, 12.0, &style::white(0.17));
-        style::stroke_rounded(card, 12.0, &style::white(0.34), 1.5);
+        style::card_selected(card, 12.0, &style::Tone::Blue);
     }
     let middle = top + ROW / 2.0;
     let tile = NSRect::new(

@@ -227,7 +227,7 @@ fn draw_item(item: &Item, width: f64, height: f64) {
         }
         Item::Alert { y, data } => {
             let card = rect(0.0, *y, width, ALERT_HEIGHT);
-            style::fill_rounded(card, style::CARD_RADIUS, &white(0.09));
+            style::card(card, style::CARD_RADIUS);
             let edge = Tone::Orange.color().colorWithAlphaComponent(0.5);
             style::stroke_rounded(card, style::CARD_RADIUS, &edge, 1.2);
             let inner = width - 2.0 * CARD_PAD;
@@ -270,7 +270,7 @@ fn draw_item(item: &Item, width: f64, height: f64) {
             join_width,
         } => {
             let row = rect(0.0, y + 2.0, width, EVENT_HEIGHT - 4.0);
-            style::fill_rounded(row, 12.0, &white(0.07));
+            style::card(row, 12.0);
             style::fill_capsule(
                 rect(12.0, y + 9.0, 4.0, EVENT_HEIGHT - 18.0),
                 &srgb(data.color, 1.0),
@@ -348,11 +348,7 @@ fn draw_item(item: &Item, width: f64, height: f64) {
             }
         }
         Item::Reminder { y, data } => {
-            style::fill_rounded(
-                rect(0.0, y + 2.0, width, REMINDER_HEIGHT - 4.0),
-                10.0,
-                &white(0.07),
-            );
+            style::card(rect(0.0, y + 2.0, width, REMINDER_HEIGHT - 4.0), 10.0);
             style::fill_circle(rect(10.0, y + 12.0, 10.0, 10.0), &srgb(data.color, 1.0));
             let font = style::font(11.5, Weight::Regular);
             let when_width = text_width(&data.when, &font) + 2.0;

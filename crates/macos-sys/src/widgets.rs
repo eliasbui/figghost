@@ -51,7 +51,8 @@ pub fn view_png(view: &NSView) -> Option<Vec<u8>> {
 /// An SF Symbol in white on a clear background, `points` on its longer side at `scale` pixels per point,
 /// as PNG bytes; `None` for a name the system does not know. A web page tints it with a CSS mask.
 pub fn symbol_png(name: &str, points: f64, scale: f64) -> Option<Vec<u8>> {
-    let image = style::symbol(name, points, &NSColor::whiteColor())?;
+    // The page shows these glyphs at 10 to 16 pixels, where SF Symbols' Small variant is the readable one.
+    let image = style::small_symbol(name, points, &NSColor::whiteColor())?;
     png_at(&image, image.size(), scale)
 }
 
