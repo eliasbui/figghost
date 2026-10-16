@@ -1,4 +1,12 @@
-# figghost
+<p align="center">
+  <img src="docs/images/icon.png" width="112" alt="">
+</p>
+
+<h1 align="center">figghost</h1>
+
+<p align="center">
+  <img src="docs/images/banner.png" width="100%" alt="A black notch pill above frosted glass cards: a clipboard list, a volume slider, window layouts, a media bar and a calendar tile">
+</p>
 
 An all-in-one macOS app written in Rust, with a pure AppKit shell (the `objc2` crates) and a settings window that is a web page on a Liquid Glass window: it combines a scrolling tool, a clipboard history, a notch panel and per-app sound, and the rest of what a notch toolbox does.
 
@@ -9,6 +17,28 @@ An all-in-one macOS app written in Rust, with a pure AppKit shell (the `objc2` c
 - Off until switched on in the settings: Smart Select (units, money, times and translation for the selected text), screenshots, scrolling capture and screen recordings with an editor (like CleanShot X), a colour picker, a calendar with meeting alerts, a clipboard mascot, dragging a window onto the notch to snap it, and hiding menu bar icons.
 
 Opening the app opens its settings window; closing the window sends the app back to the menu bar. Settings live in `~/Library/Application Support/Figghost/config.json`. The interface is available in English and Vietnamese.
+
+## Screenshots
+
+Every picture below is drawn by the app itself, with no screen: `app-ui/settings_preview snap`, `macos-sys/render_notch`, `render_snap` and `render_smart`.
+
+**Settings** — Liquid Glass, both themes, two languages.
+
+![The settings window: a glass sidebar with the app's pages, and cards for launching at login, the menu bar icon, the settings window's appearance and the language](docs/images/settings-general.png)
+
+**The notch** — seven tabs. The Clipboard tab, and the Shelf tab, where dropped files are kept as references to where they live: right-click one to ZIP it, convert it, make it smaller, remove its background or copy the text in the picture.
+
+![The Clipboard tab of the notch with rows of copied text and their times](docs/images/notch-clipboard.png)
+
+![The Shelf tab of the notch with files and folders, and the hint about dropping, opening, dragging out and removing](docs/images/notch-shelf.png)
+
+**Window snapping** — the layouts that hang under the notch while a window is dragged by its title bar.
+
+![The twelve drop zones, each a small screen with the part it takes, one of them chosen](docs/images/snap-zones.png)
+
+**Smart Select** — select text anywhere and press the shortcut; a small window next to the pointer says what it is.
+
+![Smart Select answering 5 km with 3.107 mi and 16,404 ft](docs/images/smart-select.png)
 
 ## Install
 
