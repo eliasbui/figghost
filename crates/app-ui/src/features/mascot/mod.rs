@@ -134,6 +134,18 @@ pub fn attach(env: &AttachEnv) -> Option<Rc<Feature>> {
     Some(feature)
 }
 
+/// The notch-sized hole at the top of `screen`, centred: where the character comes out of and goes back to.
+fn place_on(screen: NSRect, size: NSSize) -> Place {
+    let hole = NSRect::new(
+        NSPoint::new(
+            screen.origin.x + (screen.size.width - size.width) / 2.0,
+            screen.origin.y + screen.size.height - size.height,
+        ),
+        size,
+    );
+    Place { hole, screen }
+}
+
 fn centre(r: NSRect) -> NSPoint {
     NSPoint::new(
         r.origin.x + r.size.width / 2.0,
@@ -193,14 +205,24 @@ impl Feature {
                 (geometry.screen, geometry.notch)
             }
         };
-        let hole = NSRect::new(
-            NSPoint::new(
-                screen.origin.x + (screen.size.width - size.width) / 2.0,
-                screen.origin.y + screen.size.height - size.height,
-            ),
-            NSSize::new(size.width, size.height),
-        );
-        Some(Place { hole, screen })
+        Some(place_on(screen, size))
+    }
+
+    /// Where a chip taken from `target` plays: the notch's own place while the target is on the notch's screen,
+    /// and the top of the target's screen otherwise, so a copy made on another display is fetched there instead
+    /// of being dragged over to the notch's screen.
+    fn place_for(&self, target: NSPoint) -> Option<Place> {
+        let place = self.place();
+        if let Some(notch) = &self.notch
+            && mascot::screen_at(self.mtm, target) == Some(notch.geometry().screen)
+        {
+            return place;
+        }
+        // A copy made on another display is fetched there; with no screen for that point (the checks run with
+        // the notch off every screen) the notch's own place is all there is.
+        NotchGeometry::detect_at(self.mtm, target)
+            .map(|geometry| place_on(geometry.screen, geometry.notch))
+            .or(place)
     }
 
     fn copied(&self, copied: Copied) {
@@ -228,7 +250,7 @@ impl Feature {
         if !self.active() || self.follow.borrow().is_some() {
             return;
         }
-        let (Some(place), Some(sheet)) = (self.place(), self.sheet()) else {
+        let (Some(place), Some(sheet)) = (self.place_for(target), self.sheet()) else {
             return;
         };
         trace::log(&format!(

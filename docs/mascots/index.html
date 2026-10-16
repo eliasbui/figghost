@@ -17,7 +17,7 @@
 <template id="row"><tr><th></th></tr></template>
 <script>
   // shortcut: list kept by hand, add a name here when a new character set lands.
-  const characters = ['spider', 'frog', 'ufo', 'ghost', 'wizard'];
+  const characters = ['spider', 'frog', 'ufo', 'ghost', 'wizard', 'mario'];
   const scenes = ['copy-text', 'copy-image', 'hub-add', 'hub-drop-guard', 'hub-drop-regret'];
   const grid = document.getElementById('grid');
   grid.insertAdjacentHTML('beforeend', '<tr><th></th>' + scenes.map(s => `<th>${s}</th>`).join('') + '</tr>');

@@ -50,7 +50,7 @@ pub fn set(config: &mut Config, path: &str, value: &Value) -> Option<Result<(), 
             .as_str()
             .and_then(Character::parse)
             .map(|c| config.character = c)
-            .ok_or_else(|| invalid("expected spider, frog, ufo, ghost or wizard")),
+            .ok_or_else(|| invalid("expected spider, frog, ufo, ghost, wizard or mario")),
         "farewell" => value
             .as_str()
             .and_then(Farewell::parse)
@@ -137,6 +137,6 @@ mod tests {
         assert_eq!(state["character"], "ufo");
         assert_eq!(state["farewell"], "regret");
         assert_eq!(state["accessibility"], true);
-        assert_eq!(state["characters"].as_array().unwrap().len(), 5);
+        assert_eq!(state["characters"].as_array().unwrap().len(), 6);
     }
 }

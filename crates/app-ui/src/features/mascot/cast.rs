@@ -14,15 +14,17 @@ pub enum Character {
     Ufo,
     Ghost,
     Wizard,
+    Mario,
 }
 
 impl Character {
-    pub const ALL: [Character; 5] = [
+    pub const ALL: [Character; 6] = [
         Character::Spider,
         Character::Frog,
         Character::Ufo,
         Character::Ghost,
         Character::Wizard,
+        Character::Mario,
     ];
 
     pub fn as_str(self) -> &'static str {
@@ -32,6 +34,7 @@ impl Character {
             Character::Ufo => "ufo",
             Character::Ghost => "ghost",
             Character::Wizard => "wizard",
+            Character::Mario => "mario",
         }
     }
 
@@ -46,6 +49,7 @@ impl Character {
             Character::Ufo => include_bytes!("../../../assets/mascots/ufo.png"),
             Character::Ghost => include_bytes!("../../../assets/mascots/ghost.png"),
             Character::Wizard => include_bytes!("../../../assets/mascots/wizard.png"),
+            Character::Mario => include_bytes!("../../../assets/mascots/mario.png"),
         }
     }
 
@@ -58,6 +62,7 @@ impl Character {
             Character::Ufo => (Ray::Beam, Ray::Beam, Haul::Float, Guard::Cone, 2.0),
             Character::Ghost => (Ray::Wisp, Ray::Wisp, Haul::Float, Guard::Bubble, 2.0),
             Character::Wizard => (Ray::Magic, Ray::Bolt, Haul::Float, Guard::Ring, 1.5),
+            Character::Mario => (Ray::Bolt, Ray::Bolt, Haul::Tugs, Guard::Box, 1.5),
         };
         Style {
             ray,

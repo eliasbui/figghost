@@ -75,6 +75,7 @@ const SYMBOLS: &[&str] = &[
     "doc.on.clipboard.fill",
     "rectangle.topthird.inset.filled",
     "terminal.fill",
+    "magnifyingglass",
     "text.magnifyingglass",
     "camera.viewfinder",
     "eyedropper.halffull",

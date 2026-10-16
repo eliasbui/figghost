@@ -49,6 +49,7 @@ function throttleBy(key, ms, fn) {
 
 const I18N = {
   en: {
+    'side.search': 'Search', 'side.clear': 'Clear search', 'side.none': 'No settings found',
     'nav.general': 'General', 'nav.scroll': 'Scrolling', 'nav.clipboard': 'Clipboard', 'nav.notch': 'Notch', 'nav.agents': 'AI agents', 'nav.tiling': 'Window snapping', 'nav.about': 'About',
     'page.general': 'General', 'page.general.sub': 'Startup, language and permissions.',
     'page.scroll': 'Scrolling', 'page.scroll.sub': 'Smooth, reversible mouse-wheel scrolling. Trackpads and the Magic Mouse are never touched.',
@@ -129,6 +130,9 @@ const I18N = {
     'about.line': 'Smooth scrolling like Mos, clipboard history like Maccy, a notch toolbox like OneNotch.',
     'about.version': 'Version', 'about.privacy': 'Privacy', 'about.privacy.val': 'Everything stays on this Mac. Nothing is sent anywhere.', 'about.quit': 'Quit Figghost',
     'about.quit.desc': 'Stops scrolling, clipboard and notch features until you open the app again.',
+    'about.update': 'Check for updates', 'about.update.desc': 'Asks GitHub for the latest release. Nothing is downloaded for you.', 'about.update.check': 'Check now',
+    'about.update.checking': 'Checking GitHub…', 'about.update.current': 'This is the latest version ({v}).',
+    'about.update.newer': 'Version {v} is out.', 'about.update.failed': 'Could not check: {detail}', 'about.update.open': 'Download',
 
     'rec.press': 'Press shortcut', 'rec.esc': 'Esc to cancel',
     'fault.invalid_value': 'That value is not valid.', 'fault.unknown_setting': 'Unknown setting.', 'fault.invalid_app_id': 'That app cannot be used.', 'fault.needs_modifier': 'Add Control, Option, Shift or Command.',
@@ -139,6 +143,7 @@ const I18N = {
     'mcp.how': 'Add this to the assistant\'s MCP settings:', 'mcp.copy': 'Copy configuration', 'mcp.copied': 'Copied to the clipboard.',
   },
   vi: {
+    'side.search': 'Tìm', 'side.clear': 'Xóa tìm kiếm', 'side.none': 'Không có mục nào',
     'nav.general': 'Chung', 'nav.scroll': 'Cuộn chuột', 'nav.clipboard': 'Clipboard', 'nav.notch': 'Notch', 'nav.agents': 'Tác tử AI', 'nav.tiling': 'Chia cửa sổ', 'nav.about': 'Giới thiệu',
     'page.general': 'Chung', 'page.general.sub': 'Khởi động, ngôn ngữ và quyền truy cập.',
     'page.scroll': 'Cuộn chuột', 'page.scroll.sub': 'Cuộn mượt và đảo chiều cho con lăn chuột. Trackpad và Magic Mouse không bị can thiệp.',
@@ -219,6 +224,9 @@ const I18N = {
     'about.line': 'Cuộn mượt như Mos, lịch sử clipboard như Maccy, hộp công cụ notch như OneNotch.',
     'about.version': 'Phiên bản', 'about.privacy': 'Riêng tư', 'about.privacy.val': 'Mọi thứ nằm trên máy Mac này. Không gửi đi đâu cả.', 'about.quit': 'Thoát Figghost',
     'about.quit.desc': 'Dừng cuộn mượt, clipboard và notch cho đến khi bạn mở lại ứng dụng.',
+    'about.update': 'Kiểm tra bản mới', 'about.update.desc': 'Hỏi GitHub xem có bản phát hành mới nhất chưa. Không tự tải về máy.', 'about.update.check': 'Kiểm tra',
+    'about.update.checking': 'Đang hỏi GitHub…', 'about.update.current': 'Bạn đang dùng bản mới nhất ({v}).',
+    'about.update.newer': 'Đã có bản {v}.', 'about.update.failed': 'Không kiểm tra được: {detail}', 'about.update.open': 'Tải về',
 
     'rec.press': 'Nhấn phím tắt', 'rec.esc': 'Esc để hủy',
     'fault.invalid_value': 'Giá trị không hợp lệ.', 'fault.unknown_setting': 'Thiết lập không tồn tại.', 'fault.invalid_app_id': 'Không dùng được ứng dụng này.', 'fault.needs_modifier': 'Thêm Control, Option, Shift hoặc Command.',
@@ -728,23 +736,24 @@ function pageGeneral() {
   return [
     hero,
     sectionTitle(t('sec.startup')),
-    card(loginRow, toggleRow('general.show_on_launch', t('showlaunch.title'), t('showlaunch.desc'))),
-    sectionTitle(t('sec.menuicon')),
-    card(toggleRow('general.menu_icon', t('menuicon.title'), t('menuicon.desc'))),
+    card(
+      loginRow,
+      toggleRow('general.show_on_launch', t('showlaunch.title'), t('showlaunch.desc')),
+      toggleRow('general.menu_icon', t('menuicon.title'), t('menuicon.desc'))),
     sectionTitle(t('sec.appearance')),
-    card(segRow('general.theme', t('theme.title'), t('theme.desc'), ['auto', 'light', 'dark'])),
-    sectionTitle(t('sec.language')),
-    card(row(t('lang.title'), t('lang.desc'), segmented({
-      label: t('lang.title'),
-      options: [{ value: 'auto', label: t('lang.auto') }, { value: 'en', label: t('lang.en') }, { value: 'vi', label: t('lang.vi') }],
-      value: () => S.general.language,
-      onPick: (v) => { change('general.language', v); applyLanguage(); },
-    }))),
+    card(
+      segRow('general.theme', t('theme.title'), t('theme.desc'), ['auto', 'light', 'dark']),
+      row(t('lang.title'), t('lang.desc'), segmented({
+        label: t('lang.title'),
+        options: [{ value: 'auto', label: t('lang.auto') }, { value: 'en', label: t('lang.en') }, { value: 'vi', label: t('lang.vi') }],
+        value: () => S.general.language,
+        onPick: (v) => { change('general.language', v); applyLanguage(); },
+      }))),
     restart,
     sectionTitle(t('sec.permissions')),
-    card(access),
-    sectionTitle(t('sec.data')),
-    card(row(t('data.title'), t('data.desc'), button(t('data.open'), () => send({ t: 'action', name: 'open_config' }), { icon: 'folder', small: true }))),
+    card(
+      access,
+      row(t('data.title'), t('data.desc'), button(t('data.open'), () => send({ t: 'action', name: 'open_config' }), { icon: 'folder', small: true }))),
   ];
 }
 
@@ -1004,10 +1013,9 @@ function pageClipboard() {
   const count = h('span', { class: 'row-title' });
   reg(() => { count.textContent = S.clipboard.count.toLocaleString(); });
   return [
-    sectionTitle(t('sec.shortcut')),
-    card(row(t('clip.hotkey.title'), t('clip.hotkey.desc'), hotkeyButton('clipboard', { label: t('clip.hotkey.title') }))),
     sectionTitle(t('sec.pasting')),
     card(
+      row(t('clip.hotkey.title'), t('clip.hotkey.desc'), hotkeyButton('clipboard', { label: t('clip.hotkey.title') })),
       toggleRow('clipboard.auto_paste', t('paste.auto.title'), t('paste.auto.desc')),
       toggleRow('clipboard.paste_plain', t('paste.plain.title'), t('paste.plain.desc'))),
     sectionTitle(t('sec.history')),
@@ -1156,7 +1164,8 @@ function pageNotch() {
     card(
       selectRow({
         path: 'notch.display', title: t('notch.display.title'), desc: t('notch.display.desc'), when: on,
-        options: () => ['auto', 'main', 'pointer'].map((v) => ({ value: v, label: t('notch.display.' + v) })),
+        options: () => ['auto', 'main', 'pointer'].map((v) => ({ value: v, label: t('notch.display.' + v) }))
+          .concat((S.notch.screens || []).map((name) => ({ value: 'screen:' + name, label: name }))),
       }),
       rest,
       toggleRow('notch.hide_in_capture', t('notch.capture.title'), t('notch.capture.desc'), { when: on })),
@@ -1303,6 +1312,33 @@ function pageTiling() {
 
 // -- about ----------------------------------------------------------
 
+// The answer of the last update check; the app sends it when GitHub replies.
+let release = { state: 'idle', version: '', detail: '' };
+function onUpdate(message) {
+  release = message;
+  runSyncs();
+}
+
+/** The version row: the app's own version, and a button that asks GitHub for a newer one. */
+function updateRow() {
+  const desc = h('div', { class: 'row-desc' });
+  const open = button(t('about.update.open'), () => send({ t: 'action', name: 'open_release' }), { small: true, primary: true });
+  const check = button(t('about.update.check'), () => send({ t: 'action', name: 'check_updates' }), { small: true, icon: 'refresh' });
+  const el = h('div', { class: 'row' },
+    h('div', { class: 'row-text' }, h('div', { class: 'row-title', text: t('about.update') }), desc),
+    h('div', { class: 'row-control' }, open, check));
+  reg(() => {
+    desc.textContent = release.state === 'checking' ? t('about.update.checking')
+      : release.state === 'current' ? t('about.update.current', { v: S.app.version })
+      : release.state === 'newer' ? t('about.update.newer', { v: release.version })
+      : release.state === 'failed' ? t('about.update.failed', { detail: release.detail })
+      : t('about.update.desc');
+    open.style.display = release.state === 'newer' ? '' : 'none';
+    check.disabled = release.state === 'checking';
+  });
+  return el;
+}
+
 function pageAbout() {
   return [
     h('section', { class: 'hero card' },
@@ -1310,6 +1346,7 @@ function pageAbout() {
       h('div', {}, h('h2', { text: 'Figghost' }), h('p', { text: t('about.line') }))),
     card(
       row(t('about.version'), null, h('span', { class: 'row-title', text: S.app.version })),
+      updateRow(),
       row(t('about.privacy'), t('about.privacy.val'), null),
       row(t('data.title'), S.app.config_dir, button(t('data.open'), () => send({ t: 'action', name: 'open_config' }), { icon: 'folder', small: true }))),
     card(row(t('about.quit'), t('about.quit.desc'), button(t('about.quit'), () => send({ t: 'action', name: 'quit' }), { icon: 'power', small: true, danger: true }))),
@@ -1355,19 +1392,80 @@ function accessPill() {
   return el;
 }
 
+/** The field that finds a page by name, the way the sidebar of System Settings has one. Every page stays in
+    the list; only the ones that do not match are put away, and the highlight follows the list. */
+function pageSearch() {
+  const input = h('input', { type: 'search', autocomplete: 'off', spellcheck: 'false', placeholder: t('side.search'), 'aria-label': t('side.search') });
+  const clear = h('button', { class: 'search-clear', 'aria-label': t('side.clear'), onclick: () => { input.value = ''; apply(); input.focus(); } }, icon('xmark'));
+  clear.style.display = 'none';
+  const el = h('div', { class: 'search' }, icon('magnifyingglass'), input, clear);
+  const apply = () => {
+    const query = input.value.trim().toLowerCase();
+    clear.style.display = input.value ? '' : 'none';
+    let shown = 0;
+    for (const item of document.querySelectorAll('.nav-item')) {
+      const found = !query || item.textContent.toLowerCase().includes(query);
+      item.hidden = !found;
+      if (found) shown++;
+    }
+    for (const sep of document.querySelectorAll('.nav-sep')) {
+      sep.hidden = !!query;
+    }
+    const none = $('#nav .nav-empty');
+    if (none) none.hidden = shown > 0;
+    moveThumb();
+  };
+  input.addEventListener('input', apply);
+  input.addEventListener('keydown', (event) => {
+    if (event.key !== 'Escape') return;
+    // Escape clears the field rather than closing anything else.
+    event.stopPropagation();
+    input.value = '';
+    apply();
+  });
+  reg(() => {
+    input.placeholder = t('side.search');
+    input.setAttribute('aria-label', t('side.search'));
+    clear.setAttribute('aria-label', t('side.clear'));
+  });
+  return el;
+}
+
+function renderNavItems() {
+  const groupOf = (id) => {
+    if (id === 'general') return 1;
+    if (['scroll', 'clipboard', 'tiling'].includes(id)) return 2;
+    if (['notch', 'agents', 'calendar'].includes(id)) return 3;
+    if (['smart', 'capture', 'vision'].includes(id)) return 4;
+    return 5;
+  };
+  const sorted = [...PAGES].sort((a, b) => groupOf(a.id) - groupOf(b.id));
+  const elements = [];
+  let lastGroup = null;
+  for (const p of sorted) {
+    const g = groupOf(p.id);
+    if (lastGroup !== null && g !== lastGroup) {
+      elements.push(h('div', { class: 'nav-sep', 'aria-hidden': 'true' }));
+    }
+    lastGroup = g;
+    elements.push(h('button', { class: 'nav-item', 'data-page': p.id, onclick: () => go(p.id) },
+      h('span', { class: 'nav-icon' }, icon(p.icon)),
+      h('span', { class: 'nav-label', text: t('nav.' + p.id) })));
+  }
+  return elements;
+}
+
 function buildShell() {
   document.documentElement.lang = lang;
   $('#root').replaceChildren(
     h('div', { id: 'app' },
       h('aside', { id: 'sidebar', class: 'glass' },
         h('div', { class: 'dragzone', 'data-drag': '' }),
-        h('div', { class: 'brand' },
-          appIcon('brand-icon'),
-          h('div', {}, h('div', { class: 'brand-name', text: 'Figghost' }), h('div', { class: 'brand-ver', text: 'v' + S.app.version }))),
+        h('div', { class: 'side-head' }, pageSearch()),
         h('nav', { id: 'nav', 'aria-label': 'Figghost' },
           h('div', { class: 'nav-thumb', 'aria-hidden': 'true' }),
-          PAGES.map((p) => h('button', { class: 'nav-item', 'data-page': p.id, onclick: () => go(p.id) },
-            h('span', { class: 'nav-icon' }, icon(p.icon)), h('span', { class: 'nav-label', text: t('nav.' + p.id) })))),
+          ...renderNavItems(),
+          h('div', { class: 'nav-empty', hidden: true, text: t('side.none') })),
         h('div', { class: 'side-foot' }, accessPill())),
       h('main', { id: 'main' },
         h('div', { class: 'dragzone', 'data-drag': '' }),
@@ -1385,7 +1483,7 @@ function moveThumb() {
   const thumb = nav && nav.querySelector('.nav-thumb');
   if (!thumb) return;
   const item = nav.querySelector('.nav-item[aria-current="page"]');
-  if (!item) { thumb.style.opacity = '0'; return; }
+  if (!item || item.hidden) { thumb.style.opacity = '0'; return; }
   if (!thumb.dataset.placed) {
     // The first placement is where the pill already is; only later changes travel.
     thumb.style.transition = 'none';
@@ -1476,6 +1574,7 @@ window.__fig = {
       case 'running': onRunning(message); break;
       case 'icons': onIcons(message.icons); break;
       case 'curve': onCurve(message); break;
+      case 'update': onUpdate(message); break;
     }
   },
 };
@@ -1623,6 +1722,36 @@ window.__selftest = function () {
     expect(lone.querySelector('.switch').disabled, 'the last tab that shows cannot be turned off');
     go('agents');
     expect(document.body.textContent.includes(t('agents.spend.claude')), 'the spend of Claude Code is listed');
+
+    // The update row follows what the app reports back from GitHub.
+    go('about');
+    const btn = (label) => [...document.querySelectorAll('.btn')].find((b) => b.textContent === label);
+    sent.length = 0;
+    btn(t('about.update.check')).click();
+    expect(sent.some((m) => m.t === 'action' && m.name === 'check_updates'), 'the update button asks the app: ' + JSON.stringify(sent));
+    expect(btn(t('about.update.open')).style.display === 'none', 'nothing to download before an answer');
+    window.__fig.recv({ t: 'update', state: 'newer', version: '9.9.9', url: 'https://example.com/release' });
+    expect($('#scroller').textContent.includes('9.9.9'), 'the row names the version GitHub answered with');
+    sent.length = 0;
+    btn(t('about.update.open')).click();
+    expect(sent.some((m) => m.t === 'action' && m.name === 'open_release'), 'the download button opens the release page: ' + JSON.stringify(sent));
+    window.__fig.recv({ t: 'update', state: 'failed', detail: 'offline' });
+    expect($('#scroller').textContent.includes('offline'), 'a failed check says why');
+    window.__fig.recv({ t: 'update', state: 'idle' });
+
+    // The field in the sidebar keeps the pages whose name matches, and puts them all back when it is cleared.
+    const navItems = () => [...document.querySelectorAll('.nav-item')];
+    const field = $('.search input');
+    field.value = 'clip';
+    field.dispatchEvent(new Event('input'));
+    const shown = navItems().filter((item) => !item.hidden);
+    expect(shown.length === 1 && shown[0].dataset.page === 'clipboard', 'the field keeps the pages that match: ' + shown.length);
+    field.value = 'zzz';
+    field.dispatchEvent(new Event('input'));
+    expect(navItems().every((item) => item.hidden) && !$('#nav .nav-empty').hidden, 'a search that matches nothing says so');
+    field.value = '';
+    field.dispatchEvent(new Event('input'));
+    expect(navItems().every((item) => !item.hidden) && $('#nav .nav-empty').hidden, 'clearing the field shows every page');
 
     // Each feature's own checks (web/features/*.js).
     for (const p of PLUGINS) if (p.selftest) p.selftest({ expect, go, sent, S, h, $ });

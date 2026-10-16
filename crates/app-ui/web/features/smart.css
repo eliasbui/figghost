@@ -1,7 +1,7 @@
 /* Smart Select: the icon of its page and its text fields. Built from the variables at the top of app.css. */
 .nav-item[data-page="smart"] { --tile: #12a594; }
 input.text-field {
-  width: 100%; height: 24px; padding: 0 8px; border: 0; border-radius: 6px;
+  width: 100%; height: var(--h-control); padding: 0 8px; border: 0; border-radius: var(--r-field);
   background: var(--field); color: var(--text); font: var(--fs-body) var(--font);
   box-shadow: inset 0 0 0 1px var(--field-edge);
 }
