@@ -1,4 +1,5 @@
-//! What the shelf can do with a file: compress it, convert an image, remove its background, show it in Finder.
+//! What the shelf can do with a file: compress it, convert an image, make it smaller, remove its
+//! background, read its text, show it in Finder.
 //! The jobs run the tools that ship with macOS (`ditto` and `sips`) or the Vision framework next to the
 //! original, and never change the original.
 
@@ -24,7 +25,10 @@ pub enum Action {
     ToPng,
     ToJpeg,
     ToHeic,
+    Half,
+    Quarter,
     RemoveBackground,
+    CopyText,
     Reveal,
     Remove,
 }
@@ -37,7 +41,10 @@ impl Action {
             Action::ToPng => "png",
             Action::ToJpeg => "jpeg",
             Action::ToHeic => "heic",
+            Action::Half => "half",
+            Action::Quarter => "quarter",
             Action::RemoveBackground => "remove_background",
+            Action::CopyText => "copy_text",
             Action::Reveal => "reveal",
             Action::Remove => "remove",
         }
@@ -49,7 +56,10 @@ impl Action {
             Action::ToPng,
             Action::ToJpeg,
             Action::ToHeic,
+            Action::Half,
+            Action::Quarter,
             Action::RemoveBackground,
+            Action::CopyText,
             Action::Reveal,
             Action::Remove,
         ]
@@ -79,10 +89,13 @@ pub fn available(path: &Path) -> Vec<Action> {
         if !matches!(ext.as_str(), "heic" | "heif") {
             actions.push(Action::ToHeic);
         }
+        actions.push(Action::Half);
+        actions.push(Action::Quarter);
         // Needs macOS 14; older systems do not see the item at all.
         if macos_sys::vision::background_removal_available() {
             actions.push(Action::RemoveBackground);
         }
+        actions.push(Action::CopyText);
     }
     actions.push(Action::Reveal);
     actions.push(Action::Remove);
@@ -151,12 +164,103 @@ pub fn job(action: Action, source: &Path) -> Option<Job> {
         Action::ToPng => image("png", "png"),
         Action::ToJpeg => image("jpeg", "jpg"),
         Action::ToHeic => image("heic", "heic"),
-        Action::RemoveBackground | Action::Reveal | Action::Remove => return None,
+        Action::Half
+        | Action::Quarter
+        | Action::RemoveBackground
+        | Action::CopyText
+        | Action::Reveal
+        | Action::Remove => return None,
     })
 }
 
-/// Largest image the background removal reads: it is decoded to raw pixels in memory.
-const MAX_CUTOUT_BYTES: u64 = 64 * 1024 * 1024;
+/// The two smaller sizes the shelf offers: the shape is kept, both sides shrink.
+#[derive(Debug, Clone, Copy, PartialEq, Eq)]
+pub enum Size {
+    Half,
+    Quarter,
+}
+
+impl Size {
+    const fn percent(self) -> u32 {
+        match self {
+            Size::Half => 50,
+            Size::Quarter => 25,
+        }
+    }
+
+    /// The word the new file is named with.
+    const fn word(self) -> &'static str {
+        match self {
+            Size::Half => "half",
+            Size::Quarter => "quarter",
+        }
+    }
+}
+
+/// Both sides at `percent` of their size, rounded to the nearest pixel and never below one: a one pixel
+/// image stays one pixel instead of disappearing.
+pub fn scaled(width: u32, height: u32, percent: u32) -> (u32, u32) {
+    let at = |side: u32| ((side * percent + 50) / 100).max(1);
+    (at(width), at(height))
+}
+
+/// The pixel size of an image, read with `sips`; the same tool that writes the smaller copy.
+fn image_size(source: &Path) -> Result<(u32, u32), String> {
+    let out = Command::new("/usr/bin/sips")
+        .args(["-g", "pixelWidth", "-g", "pixelHeight"])
+        .arg(source)
+        .stdin(Stdio::null())
+        .output()
+        .map_err(|e| format!("cannot start sips: {e}"))?;
+    let text = String::from_utf8_lossy(&out.stdout);
+    let side = |key: &str| {
+        text.lines()
+            .find_map(|l| l.trim().strip_prefix(&format!("{key}:")))
+            .and_then(|v| v.trim().parse::<u32>().ok())
+    };
+    match (side("pixelWidth"), side("pixelHeight")) {
+        (Some(w), Some(h)) if w > 0 && h > 0 => Ok((w, h)),
+        _ => Err("the image cannot be read".into()),
+    }
+}
+
+/// Writes `source` at the smaller size next to it and returns the new file. The format and the shape are
+/// kept, and the original is never touched. A GIF comes out as a still picture, as it already does through
+/// the convert actions: `sips` writes one image.
+pub fn resize(source: &Path, size: Size) -> Result<PathBuf, String> {
+    let ext = extension(source);
+    if !IMAGE_EXTENSIONS.contains(&ext.as_str()) {
+        return Err("the file is not an image".into());
+    }
+    let (width, height) = image_size(source)?;
+    let (width, height) = scaled(width, height, size.percent());
+    let dir = source.parent().ok_or("the file has no folder")?;
+    let stem = source
+        .file_stem()
+        .ok_or("the file has no name")?
+        .to_string_lossy()
+        .into_owned();
+    let output = unique_output(dir, &format!("{stem} {}", size.word()), &ext);
+    let job = Job {
+        program: "/usr/bin/sips",
+        // The order sips wants: height first, then width.
+        args: vec![
+            "-z".into(),
+            height.to_string().into(),
+            width.to_string().into(),
+            source.as_os_str().to_owned(),
+            "--out".into(),
+            output.as_os_str().to_owned(),
+        ],
+        output,
+    };
+    run(&job)?;
+    Ok(job.output)
+}
+
+/// Largest image the shelf decodes itself: background removal and text recognition hold the pixels in
+/// memory. The jobs that hand the file to `sips` have no such limit.
+const MAX_IMAGE_BYTES: u64 = 64 * 1024 * 1024;
 
 /// Writes the subject of `source` with a transparent background to a new PNG next to it and returns its
 /// path. Never replaces a file: the name is taken with `create_new`.
@@ -168,7 +272,7 @@ pub fn cut_out(source: &Path) -> Result<PathBuf, String> {
         .to_string_lossy()
         .into_owned();
     let size = fs::metadata(source).map_err(|e| e.to_string())?.len();
-    if size > MAX_CUTOUT_BYTES {
+    if size > MAX_IMAGE_BYTES {
         return Err("the image is too large".into());
     }
     let png = macos_sys::vision::remove_background(&fs::read(source).map_err(|e| e.to_string())?)?;
@@ -197,12 +301,25 @@ pub fn cut_out(source: &Path) -> Result<PathBuf, String> {
 
 /// Runs the action on a file and returns the file it made.
 pub fn make(action: Action, source: &Path) -> Result<PathBuf, String> {
-    if action == Action::RemoveBackground {
-        return cut_out(source);
+    match action {
+        Action::RemoveBackground => return cut_out(source),
+        Action::Half => return resize(source, Size::Half),
+        Action::Quarter => return resize(source, Size::Quarter),
+        _ => {}
     }
     let job = job(action, source).ok_or("this action makes no file")?;
     run(&job)?;
     Ok(job.output)
+}
+
+/// The picture of `source`, for the action that reads the image instead of writing a file. The caller is on
+/// the main thread when the text is recognised, which is where the answer comes back.
+pub fn load_image(source: &Path) -> Result<macos_sys::screen_capture::Shot, String> {
+    let size = fs::metadata(source).map_err(|e| e.to_string())?.len();
+    if size > MAX_IMAGE_BYTES {
+        return Err("the image is too large".into());
+    }
+    macos_sys::screen_capture::Shot::from_file(source)
 }
 
 /// Runs the job and waits for it, up to a few minutes. The new file exists when this returns `Ok`.
@@ -291,7 +408,10 @@ mod tests {
                 "zip",
                 "png",
                 "heic",
+                "half",
+                "quarter",
                 "remove_background",
+                "copy_text",
                 "reveal",
                 "remove"
             ]
@@ -302,7 +422,10 @@ mod tests {
                 "zip",
                 "jpeg",
                 "heic",
+                "half",
+                "quarter",
                 "remove_background",
+                "copy_text",
                 "reveal",
                 "remove"
             ]
@@ -313,7 +436,10 @@ mod tests {
                 "zip",
                 "png",
                 "jpeg",
+                "half",
+                "quarter",
                 "remove_background",
+                "copy_text",
                 "reveal",
                 "remove"
             ]
@@ -331,7 +457,10 @@ mod tests {
             Action::ToPng,
             Action::ToJpeg,
             Action::ToHeic,
+            Action::Half,
+            Action::Quarter,
             Action::RemoveBackground,
+            Action::CopyText,
             Action::Reveal,
             Action::Remove,
         ] {
@@ -366,6 +495,11 @@ mod tests {
         );
         assert!(job(Action::Reveal, &photo).is_none() && job(Action::Remove, &photo).is_none());
         assert!(job(Action::RemoveBackground, &photo).is_none());
+        assert!(job(Action::CopyText, &photo).is_none());
+        assert!(
+            job(Action::Half, &photo).is_none(),
+            "a smaller size needs the size of the original first"
+        );
         let _ = fs::remove_dir_all(dir);
     }
 
@@ -535,6 +669,80 @@ mod tests {
             .map(|e| e.unwrap().file_name())
             .collect();
         assert_eq!(names, ["fake.png"]);
+        let _ = fs::remove_dir_all(dir);
+    }
+
+    #[test]
+    fn a_smaller_size_keeps_the_shape_and_never_rounds_to_nothing() {
+        assert_eq!(scaled(1920, 1080, 50), (960, 540));
+        assert_eq!(scaled(1920, 1080, 25), (480, 270));
+        assert_eq!(
+            scaled(1921, 1081, 50),
+            (961, 541),
+            "an odd side is rounded, not dropped"
+        );
+        assert_eq!(scaled(3, 3, 50), (2, 2), "rounded to the nearest pixel");
+        assert_eq!(scaled(1, 1, 25), (1, 1), "never zero pixels");
+    }
+
+    #[test]
+    fn resizing_writes_a_smaller_copy_in_the_same_format_next_to_the_original() {
+        let dir = temp_dir();
+        let source = dir.join("badge.bmp");
+        fs::write(&source, disc_bmp(256)).unwrap();
+        let half = make(Action::Half, &source).unwrap();
+        assert_eq!(half, dir.join("badge half.bmp"));
+        assert_eq!(sips_value(&half, "pixelWidth"), "128");
+        assert_eq!(sips_value(&half, "pixelHeight"), "128");
+        let quarter = make(Action::Quarter, &source).unwrap();
+        assert_eq!(quarter, dir.join("badge quarter.bmp"));
+        assert_eq!(sips_value(&quarter, "pixelWidth"), "64");
+        assert_eq!(
+            fs::read(&source).unwrap(),
+            disc_bmp(256),
+            "the original is untouched"
+        );
+        // A second run does not replace the first result.
+        assert_eq!(
+            make(Action::Half, &source).unwrap(),
+            dir.join("badge half 2.bmp")
+        );
+        let _ = fs::remove_dir_all(dir);
+    }
+
+    #[test]
+    fn resizing_something_that_is_not_an_image_fails_cleanly_and_leaves_no_file() {
+        let dir = temp_dir();
+        let notes = dir.join("notes.txt");
+        fs::write(&notes, "not a picture").unwrap();
+        assert!(
+            resize(&notes, Size::Half).is_err(),
+            "the kind of file is looked at before sips is asked"
+        );
+        let fake = dir.join("fake.png");
+        fs::write(&fake, "not a picture").unwrap();
+        assert!(make(Action::Half, &fake).is_err());
+        assert!(make(Action::Quarter, &dir.join("gone.png")).is_err());
+        let mut names: Vec<_> = fs::read_dir(&dir)
+            .unwrap()
+            .map(|e| e.unwrap().file_name())
+            .collect();
+        names.sort();
+        assert_eq!(names, ["fake.png", "notes.txt"]);
+        let _ = fs::remove_dir_all(dir);
+    }
+
+    #[test]
+    fn the_picture_of_a_file_can_be_read_and_a_file_of_another_kind_says_so() {
+        let dir = temp_dir();
+        let source = dir.join("disc.bmp");
+        fs::write(&source, disc_bmp(64)).unwrap();
+        let shot = load_image(&source).unwrap();
+        assert_eq!((shot.width(), shot.height()), (64, 64));
+        let fake = dir.join("fake.png");
+        fs::write(&fake, "not a picture").unwrap();
+        assert!(load_image(&fake).is_err());
+        assert!(load_image(&dir.join("gone.png")).is_err());
         let _ = fs::remove_dir_all(dir);
     }
 }

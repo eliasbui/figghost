@@ -1227,7 +1227,11 @@ mod tests {
     #[test]
     fn the_script_never_launches_a_closed_player() {
         for player in Player::ALL {
-            if is_running(player) {
+            let path = match player {
+                Player::Music => "/System/Applications/Music.app",
+                Player::Spotify => "/Applications/Spotify.app",
+            };
+            if !std::path::Path::new(path).exists() || is_running(player) {
                 continue;
             }
             let out = run_capture(

@@ -158,6 +158,49 @@ impl Language {
         }
     }
 
+    pub fn shelf_menu_half(self) -> &'static str {
+        match self {
+            Language::English => "Resize to half",
+            Language::Vietnamese => "Đổi kích thước còn một nửa",
+        }
+    }
+
+    pub fn shelf_menu_quarter(self) -> &'static str {
+        match self {
+            Language::English => "Resize to a quarter",
+            Language::Vietnamese => "Đổi kích thước còn một phần tư",
+        }
+    }
+
+    pub fn shelf_menu_copy_text(self) -> &'static str {
+        match self {
+            Language::English => "Copy text from the image",
+            Language::Vietnamese => "Sao chép chữ trong ảnh",
+        }
+    }
+
+    pub fn shelf_text_copied(self, lines: usize) -> String {
+        match self {
+            Language::English if lines == 1 => "Copied 1 line of text".to_owned(),
+            Language::English => format!("Copied {lines} lines of text"),
+            Language::Vietnamese => format!("Đã sao chép {lines} dòng chữ"),
+        }
+    }
+
+    pub fn shelf_no_text(self) -> &'static str {
+        match self {
+            Language::English => "No text found in the image",
+            Language::Vietnamese => "Không tìm thấy chữ trong ảnh",
+        }
+    }
+
+    pub fn shelf_image_failed(self, detail: &str) -> String {
+        match self {
+            Language::English => format!("Cannot read the image: {detail}"),
+            Language::Vietnamese => format!("Không đọc được ảnh: {detail}"),
+        }
+    }
+
     pub fn shelf_menu_reveal(self) -> &'static str {
         match self {
             Language::English => "Show in Finder",
@@ -692,6 +735,13 @@ mod tests {
                 language.agents_as_of("2 days ago"),
                 language.shelf_menu_zip().to_owned(),
                 language.shelf_menu_convert("PNG"),
+                language.shelf_menu_half().to_owned(),
+                language.shelf_menu_quarter().to_owned(),
+                language.shelf_menu_copy_text().to_owned(),
+                language.shelf_text_copied(1),
+                language.shelf_text_copied(3),
+                language.shelf_no_text().to_owned(),
+                language.shelf_image_failed("the image cannot be read"),
                 language.shelf_menu_reveal().to_owned(),
                 language.shelf_menu_remove().to_owned(),
                 language.menu_smooth_for("Safari"),

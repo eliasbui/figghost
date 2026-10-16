@@ -137,7 +137,7 @@ fn main() {
             if (opened - EXPANDED_SIZE.height).abs() > 0.5 {
                 failures.push("the notch did not settle at the open height");
             }
-            if peak < EXPANDED_SIZE.height || peak > EXPANDED_SIZE.height * 1.08 {
+            if !(EXPANDED_SIZE.height..=EXPANDED_SIZE.height * 1.08).contains(&peak) {
                 failures.push("the spring should overshoot a little, and only a little");
             }
             if height_at(250) >= EXPANDED_SIZE.height * 0.9 || height_at(250) <= rest + 20.0 {

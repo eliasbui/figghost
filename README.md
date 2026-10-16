@@ -34,6 +34,8 @@ Rust is installed with rustup into `~/.cargo`. Keep the build directory outside 
     scripts/bundle.sh            # creates dist/Figghost.app
     scripts/release.sh 0.2.1     # publishes a release and points the Homebrew cask at it (DRY_RUN=1 to check first)
 
+For development, create a persistent local Code Signing certificate in Keychain Access (for example, `Figghost Local`) and install the watcher once with `cargo install cargo-watch`. Then `SIGN_IDENTITY="Figghost Local" scripts/dev.sh` rebuilds and restarts the local app whenever source files change. The stable identity keeps the Accessibility permission across rebuilds; stop the watcher with Control-C.
+
 Accessibility access is tied to the code signature of the app. The default ad-hoc signature changes on every build, so access has to be granted again. To keep it, create a local code-signing certificate in Keychain and run `SIGN_IDENTITY="Certificate name" scripts/bundle.sh`.
 
 Accessibility is needed for smooth scrolling, automatic paste, window snapping and the volume indicator. Without it the app still runs: the popup and the notch work, items are copied for a manual paste, and the scroll engine starts by itself once access is granted. Music and Spotify ask once for permission to be read by the media tab.
@@ -63,6 +65,7 @@ The shell uses AppKit through `objc2`, not GPUI or Tauri. The search field must 
 1. Try the unverified items in [docs/verification.md](docs/verification.md) on real hardware, starting with the ones that need real input or a real screen: Smart Select and screen capture from their shortcuts, the colour picker, Copy Stack, dragging a window to the notch, the menu bar icons, a calendar alert, lyrics with a playing track, physical volume keys, Telex and VNI typing, a notched display, launch at login.
 2. From the OneNotch list, what is left: object removal, the system live activities (charging, Bluetooth, Focus), lock screen presence, gestures on the notch and a notch on every display.
 3. A Developer ID signature and notarization, which also settles the permissions that have to be granted again after each ad-hoc build.
+4. What to take from Raycast and PowerToys, and which of it is possible on macOS from an ad-hoc signed app, is in [docs/research-raycast-powertoys.md](docs/research-raycast-powertoys.md).
 
 ## Development
 

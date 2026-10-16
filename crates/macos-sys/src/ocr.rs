@@ -9,8 +9,9 @@ use objc2_vision::{
     VNRequestTextRecognitionLevel,
 };
 
-/// Languages tried in this order, when this system's Vision knows them.
-const LANGUAGES: [&str; 2] = ["vi-VT", "en-US"];
+/// Languages tried in this order, when this system's Vision knows them. One it does not know is dropped,
+/// and recognition then leans on the automatic detection.
+pub const LANGUAGES: [&str; 2] = ["vi-VT", "en-US"];
 
 #[derive(Debug, Clone, Default, PartialEq, Eq)]
 pub struct Recognized {

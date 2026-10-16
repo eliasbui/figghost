@@ -11,12 +11,14 @@ use objc2_core_graphics::{
     CGColorRenderingIntent, CGDataProvider, CGImage, CGPreflightScreenCaptureAccess,
     CGRequestScreenCaptureAccess, CGWarpMouseCursorPosition,
 };
-use objc2_foundation::{NSArray, NSDictionary, NSError, NSPoint, NSRect, NSSize};
+use objc2_foundation::{NSArray, NSData, NSDictionary, NSError, NSPoint, NSRect, NSSize};
 use objc2_screen_capture_kit::{
     SCCaptureResolutionType, SCContentFilter, SCRunningApplication, SCScreenshotManager,
     SCShareableContent, SCStreamConfiguration, SCWindow,
 };
 use std::{
+    fs,
+    path::Path,
     ptr::NonNull,
     sync::{Arc, Mutex, PoisonError},
 };
@@ -129,6 +131,16 @@ impl Shot {
         // SAFETY: the pointer comes from a live CGImage; retaining it keeps it alive as a CF object.
         let image = unsafe { CFRetained::retain(NonNull::from(&*image)) };
         Some(Self { image, scale })
+    }
+
+    /// A picture in a file on disk, for the images the shelf holds: text recognition reads a shot. A file
+    /// of another kind is an error, not a crash.
+    pub fn from_file(path: &Path) -> Result<Shot, String> {
+        let bytes = fs::read(path).map_err(|e| e.to_string())?;
+        let data = NSData::with_bytes(&bytes);
+        // A file of another kind gives None instead of anything unsound.
+        let rep = NSBitmapImageRep::imageRepWithData(&data).ok_or("the image cannot be read")?;
+        Self::from_bitmap(&rep, 1.0).ok_or_else(|| "the image cannot be read".into())
     }
 
     /// A copy of the pixels; `None` unless they are 4 bytes each, as screen captures are.

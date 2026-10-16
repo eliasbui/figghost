@@ -280,8 +280,13 @@ pub fn fetch(style: Style, place: Place, target: NSPoint, chip: Chip) -> Script 
     let stick = Track::new(0.0)
         .to(reached, 1.0, Ease::Step)
         .to(let_go, 0.0, Ease::Step);
+    // Comes out with a bounce, braces itself when the ray goes taut, and hops once when it has the copy.
     let actor = Track::new(inside)
-        .to(0.2, home, Ease::Out)
+        .to(0.05, inside, Ease::Step)
+        .to(0.26, home, Ease::Spring)
+        .to(0.5, home, Ease::Step)
+        .to(0.58, NSPoint::new(home.x, home.y - side * 0.09), Ease::Out)
+        .to(0.72, home, Ease::Spring)
         .to(1.4, home, Ease::Step)
         .to(1.42, NSPoint::new(home.x, home.y + 6.0), Ease::Out)
         .to(1.66, inside, Ease::In);
@@ -292,13 +297,26 @@ pub fn fetch(style: Style, place: Place, target: NSPoint, chip: Chip) -> Script 
     } else {
         ALERT
     };
-    let mut frames = vec![(0.0, ALERT), (0.2, look), (0.3, ALERT), (0.52, PULL_A)];
+    // A double take: it looks the wrong way first, then at the copy, and it keeps looking while the ray goes
+    // out. Going back in, it waves the copy goodbye.
+    let away = if look == LOOK_LEFT {
+        LOOK_RIGHT
+    } else {
+        LOOK_LEFT
+    };
+    let mut frames = vec![
+        (0.0, ALERT),
+        (0.08, away),
+        (0.22, look),
+        (0.45, look),
+        (0.52, PULL_A),
+    ];
     for (i, &(t, _, _)) in haul.iter().enumerate().filter(|(_, k)| k.2 != Ease::Step) {
         if t < 0.96 {
             frames.push((t, if i % 2 == 0 { PULL_B } else { PULL_A }));
         }
     }
-    frames.extend([(0.98, ALERT), (1.12, HAPPY), (1.5, IDLE)]);
+    frames.extend([(0.98, ALERT), (1.12, HAPPY), (1.3, WAVE), (1.5, IDLE)]);
     let width = half_width(&chip) + 6.0;
     let strike_ends = if style.strike == style.ray { 0.0 } else { 0.52 };
     Script {
@@ -420,12 +438,15 @@ impl Follow {
                     size: 30.0,
                     turn: t * 40.0,
                 });
+                // It keeps an eye on the file and on where it is going: left, right, then takes stock.
                 if t < 0.3 {
                     ALERT
-                } else if (t / 0.35) as i64 % 2 == 0 {
-                    LOOK_LEFT
                 } else {
-                    LOOK_RIGHT
+                    match ((t - 0.3) / 0.35) as i64 % 3 {
+                        0 => LOOK_LEFT,
+                        1 => LOOK_RIGHT,
+                        _ => ALERT,
+                    }
                 }
             }
             Farewell::Regret => {
@@ -762,6 +783,49 @@ mod tests {
             .iter()
             .any(|s| matches!(s, Shape::Ray { to, .. } if *to == file));
         assert!(tether, "a regret holds the file by its ray");
+    }
+
+    #[test]
+    fn the_pop_out_bounces_and_the_catch_has_a_hop() {
+        let script = fetch(spider(), place(), NSPoint::new(400.0, 500.0), Chip::Text);
+        let home = place().home(&spider());
+        let y = |t: f64| sprite_of(&script.at(t)).1.y;
+        // It comes out past where it waits, then settles back under the notch.
+        let bounce = (0..=20)
+            .map(|i| y(0.05 + 0.01 * f64::from(i)))
+            .fold(f64::INFINITY, f64::min);
+        assert!(bounce < home.y - 2.0, "no bounce in the pop out: {bounce}");
+        assert!((y(0.45) - home.y).abs() < 0.5, "it waits at home");
+        // The ray goes taut and it braces itself, then springs back.
+        assert!(y(0.58) < home.y - 2.0, "no brace when it hauls");
+        assert!((y(0.72) - home.y).abs() < 0.5, "it springs back");
+    }
+
+    #[test]
+    fn it_looks_the_wrong_way_first_and_waves_the_copy_goodbye() {
+        // A target to the left: the wrong way is to the right.
+        let script = fetch(spider(), place(), NSPoint::new(400.0, 500.0), Chip::Text);
+        assert_eq!(sprite_of(&script.at(0.1)).0, LOOK_RIGHT, "the wrong way");
+        assert_eq!(sprite_of(&script.at(0.3)).0, LOOK_LEFT, "then at the copy");
+        assert_eq!(sprite_of(&script.at(1.35)).0, WAVE, "and waves it in");
+    }
+
+    #[test]
+    fn a_guard_looks_around_while_it_follows() {
+        let mut guard = Follow::new(
+            spider(),
+            place(),
+            Farewell::Guard,
+            NSPoint::new(900.0, 900.0),
+        );
+        guard.moved(NSPoint::new(600.0, 300.0));
+        let mut seen = Vec::new();
+        for i in 0..=360 {
+            seen.push(sprite_of(&guard.frame(f64::from(i) / 60.0)).0);
+        }
+        for frame in [ALERT, LOOK_LEFT, LOOK_RIGHT] {
+            assert!(seen.contains(&frame), "the guard never shows frame {frame}");
+        }
     }
 
     #[test]

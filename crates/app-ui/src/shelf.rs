@@ -7,8 +7,10 @@ use crate::{
     shelf_actions::{self, Action},
 };
 use macos_sys::{
-    MainThreadMarker, app,
+    MainThreadMarker, app, capture_ui,
     notch::Notch,
+    ocr,
+    pasteboard::{Pasteboard, Write},
     services::{self, Services},
     shelf_ui::{Drag, ShelfAction, ShelfCallbacks, ShelfView},
     workspace,
@@ -16,7 +18,7 @@ use macos_sys::{
 use serde::{Deserialize, Serialize};
 use std::{
     cell::RefCell,
-    fs, io,
+    env, fs, io,
     os::unix::fs::DirBuilderExt,
     path::{Path, PathBuf},
     rc::Rc,
@@ -177,6 +179,7 @@ impl ShelfFeature {
                         action_refresh();
                     }
                     Some(Action::Reveal) => workspace::reveal(Path::new(path)),
+                    Some(Action::CopyText) => start_text_copy(path),
                     Some(other) => start_job(other, path),
                     None => {}
                 }),
@@ -272,6 +275,9 @@ fn menu_for(path: &str) -> Vec<ShelfAction> {
             Action::ToJpeg => language.shelf_menu_convert("JPEG"),
             Action::ToHeic => language.shelf_menu_convert("HEIC"),
             Action::RemoveBackground => language.vision_remove_background().to_owned(),
+            Action::Half => language.shelf_menu_half().to_owned(),
+            Action::Quarter => language.shelf_menu_quarter().to_owned(),
+            Action::CopyText => language.shelf_menu_copy_text().to_owned(),
             Action::Reveal => language.shelf_menu_reveal().to_owned(),
             Action::Remove => language.shelf_menu_remove().to_owned(),
         };
@@ -300,6 +306,51 @@ fn start_job(action: Action, path: &str) {
             eprintln!("shelf: {e}");
             app::on_main(workspace::beep);
         }
+    });
+}
+
+/// A named pasteboard keeps tests away from the user's real clipboard, as the history does.
+fn pasteboard() -> Pasteboard {
+    match env::var("FIGGHOST_PASTEBOARD") {
+        Ok(name) => Pasteboard::named(&name),
+        Err(_) => Pasteboard::general(),
+    }
+}
+
+/// Reads the text of an image: the file is read on a worker thread, the picture is recognised on the main
+/// thread, where the answer comes back, and the text is copied and shown in a toast, as a capture with
+/// text recognition does.
+fn start_text_copy(path: &str) {
+    let source = PathBuf::from(path);
+    std::thread::spawn(move || {
+        let shot = shelf_actions::load_image(&source);
+        app::on_main(move || {
+            // Back on the main thread, where the recognition and the toast live.
+            let Some(mtm) = MainThreadMarker::new() else {
+                return;
+            };
+            let shot = match shot {
+                Ok(shot) => shot,
+                Err(e) => {
+                    eprintln!("shelf: {e}");
+                    capture_ui::toast(mtm, &i18n::current().shelf_image_failed(&e));
+                    return;
+                }
+            };
+            ocr::recognize(&shot, move |result| {
+                let text = i18n::current();
+                match result {
+                    Ok(found) if !found.is_empty() => {
+                        let mut parts = found.lines.clone();
+                        parts.extend(found.codes.iter().cloned());
+                        pasteboard().write(Write::Text(&parts.join("\n")));
+                        capture_ui::toast(mtm, &text.shelf_text_copied(parts.len()));
+                    }
+                    Ok(_) => capture_ui::toast(mtm, text.shelf_no_text()),
+                    Err(e) => capture_ui::toast(mtm, &text.shelf_image_failed(&e)),
+                }
+            });
+        });
     });
 }
 

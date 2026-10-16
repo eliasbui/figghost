@@ -1,3 +1,25 @@
 /target
 /dist
+.figghost-dev.pid
 .DS_Store
+__pycache__/
+
+# Local tooling: these hold each AI assistant's own configuration, not the project's code.
+.agents/
+.augment/
+.claude/
+.codebuddy/
+.codewhale/
+.continue/
+.cursor/
+.factory/
+.gemini/
+.kilocode/
+.kiro/
+.opencode/
+.qoder/
+.roo/
+.trae/
+.warp/
+.windsurf/
+.github/prompts/

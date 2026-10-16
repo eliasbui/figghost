@@ -5,6 +5,20 @@
   width: 72px; height: 72px; flex: none;
   background-repeat: no-repeat; background-size: 864px 72px; background-position: 0 0;
   image-rendering: pixelated;
+  /* Alive, but one whole frame at a time: it stands, blinks, and stands again. steps(1, end) holds each
+     frame instead of sliding between them, so the art never lands on half a pixel. */
+  animation: mascot-idle 6.5s steps(1, end) infinite;
 }
-/* The pleased frame, the eighth. */
-.mascot-sprite:hover { background-position: -504px 0; }
+/* The frames of the sheet: 0 idle, 1 blink, 7 pleased (the eighth), 8 proud. */
+@keyframes mascot-idle {
+  0%, 88% { background-position: 0 0; }
+  90%, 94% { background-position: -72px 0; }
+  96%, 100% { background-position: 0 0; }
+}
+/* Pointing at the picture: it beams and hops on the spot, on whole frames and whole pixels. */
+.mascot-sprite:hover { animation: mascot-pleased 1.1s steps(1, end) infinite; }
+@keyframes mascot-pleased {
+  0%, 45% { background-position: -504px 0; transform: translateY(0); }
+  50%, 95% { background-position: -576px 0; transform: translateY(-3px); }
+  100% { background-position: -504px 0; transform: translateY(0); }
+}
