@@ -1,228 +1,27 @@
 # figghost
 
-An all-in-one macOS app written in Rust, with a pure AppKit shell (the `objc2` crates) and a settings window that is a web page on a Liquid Glass window. It combines three tools in one process, and the rest of what a notch toolbox does.
+An all-in-one macOS app written in Rust, with a pure AppKit shell (the `objc2` crates) and a settings window that is a web page on a Liquid Glass window: it combines a scrolling tool, a clipboard history, a notch panel and per-app sound, and the rest of what a notch toolbox does.
 
 - Scrolling (like Mos): smooth mouse-wheel scrolling, a reverse direction for external mice only, modifier keys (sideways, faster, zoom) and per-app rules.
-- Clipboard history (like Maccy): text with its formatting, links, code, images and files, instant search, pinning with a paste letter, and a popup at the pointer.
-- Notch panel (like OneNotch): a black shape that grows out of the top edge of the screen with seven tabs (clipboard, file shelf, media, focus timer, AI agents, calendar, sound). It also provides window snapping, an optional volume indicator and an AI assistant (MCP) server for the clipboard history. The tab to follow Claude Code and Codex answers their permission requests from the notch.
+- Clipboard history (like Maccy): text, links, code, images and files, instant search, pinning with a paste letter, Copy Stack, pinned boards, sensitive data kept out or masked, and a popup at the pointer.
+- Notch panel (like OneNotch): a black shape that grows out of the top edge of the screen with seven tabs (clipboard, shelf, media, focus, AI agents, calendar, sound), window snapping, an optional volume indicator, lyrics, and an AI assistant (MCP) server for the clipboard history. The agents tab answers Claude Code's and Codex's permission requests from the notch.
 - Sound (like SoundSource and Boom 3D): volume to 400 %, mute, output device and equalizer for each app, effects on everything played, and volume keys for speakers the system cannot turn down.
-- Everything else is off until it is switched on in the settings: Smart Select (units, money, times and translation for the selected text), screenshots, scrolling capture and screen recordings with an editor (like CleanShot X), a colour picker, lyrics, a calendar with meeting alerts, Copy Stack, pinned boards, protection for sensitive clipboard data, a clipboard mascot, dragging a window onto the notch to snap it, and hiding menu bar icons.
+- Off until switched on in the settings: Smart Select (units, money, times and translation for the selected text), screenshots, scrolling capture and screen recordings with an editor (like CleanShot X), a colour picker, a calendar with meeting alerts, a clipboard mascot, dragging a window onto the notch to snap it, and hiding menu bar icons.
 
-Opening the app opens its settings window, like any other app. Closing the window sends the app back to the menu bar; opening it again, from Finder, Spotlight or the Dock, brings the window back. The interface is available in English and Vietnamese.
-
-## Settings window
-
-A web page (HTML, CSS and JavaScript compiled into the program, nothing loaded from disk or the network) shown in a WKWebView on a window whose background is the system's Liquid Glass (`NSGlassEffectView`, with a vibrancy fallback on older systems). The page talks to the app through one JSON channel in each direction, and every change is checked on the Rust side before it touches the config. Changes take effect at once and are saved to `config.json`.
-
-Pages: General (launch at login, open the window at start, language, permissions), Scrolling (switches, a live curve of the glide drawn by the engine's own smoother, a test pad that measures what the wheel does, modifier keys, per-app rules), Clipboard (shortcut recorder, paste behaviour, history size, ignored apps, AI assistants, key cheat sheet), Notch (preview, panel switch, volume indicator, shelf), AI agents (follow Claude Code and Codex, connect and disconnect their hooks, wait time, sound, usage limits), Smart Select, Capture (screenshots and recordings), Colour picker, Calendar and Window snapping (13 layouts with a recorder each, and the drop zones of the notch); lyrics, Copy Stack, boards, sensitive data and the menu bar icons are cards on the Notch and Clipboard pages.
-
-The window is only open while it needs to be: the web view is created when it opens and released when it closes, so an app with its window closed uses the memory of a menu bar utility.
-
-## Features
-
-Scrolling
-
-- Wheel events are swallowed and replaced by smooth pixel-based scroll frames that add up to the same distance. Trackpad and Magic Mouse events, events the app posted itself, and events with an unhandled modifier pass through untouched.
-- Hold Shift for smooth sideways scrolling, Option to scroll several times as far (the factor is a setting), and, if enabled, Command to zoom (it sends Command Plus and Command Minus, in the direction of the physical wheel).
-- Per-app rules: with Smooth scrolling on, an app set to Off is a block list entry; with it off, an app set to On is an allow list entry. Reverse can be overridden per app as well.
-
-Clipboard
-
-- Records text (with its RTF and HTML forms), links, code, images and file lists. Items marked concealed, transient or auto-generated by the source app, and password managers, are never stored.
-- SQLite with an FTS5 trigram index. Search ignores case and Vietnamese diacritics and falls back to fuzzy matching. Filters: `@image @link @code @text @file @pin`.
-- Popup at the pointer with a global shortcut (default Command+Shift+C) that does not take focus from the app in use. Enter pastes with formatting (or without, if you chose plain text by default), Option+Shift+Enter pastes the other way. Option+P pins an item and gives it a letter; Command plus that letter pastes it. Option+Delete removes.
-- Copy Stack (off by default): a double press of Option (or Command, Control or Shift) starts a stack. While it runs, every copy is queued and a small pill counts the items; each Command+V puts the next queued item on the clipboard just before the app reads it (first in, first out) and the key goes through untouched. The stack ends when the queue is empty or at another double press, and is never kept across a restart. Needs Accessibility; only plain Command+V is followed.
-- Pinned boards: up to 8 named boards for pinned items, a chip for each next to the filter chips in the notch list and the popup, `@name` in the search, Option+B to file the selected item in the next board and a right click for a menu. Boards are added, renamed and deleted in Settings; deleting a board keeps its items pinned.
-- Sensitive data (off by default): card numbers (Luhn checked), well known API key and token shapes, bearer tokens, JWTs, private key blocks and the value after a password or secret label are recognised. Choose to store them hidden and delete them after 1 minute to 1 day (default 10 minutes), or not at all. A hidden item shows as dots with a lock, is not searchable, is not given to AI assistants, and is shown with Return (or a click) and pasted with the next one. Items from password managers and concealed copies are still always left out.
-- The history database is upgraded in place to version 3 when this version starts; the old file is copied once to `history.sqlite.v2.bak` first (the name stays the same for a version 1 file).
-
-Notch panel
-
-- Hovering the top edge of the screen opens it. Clicking it focuses the search field. Command+1 to 9 switch tabs. Turning the panel off in the settings removes it from the screen.
-- The shape moves frame by frame on the screen's own clock: a spring that overshoots a little as it opens (Motion "Spring"), the same without overshoot ("Smooth"), or no movement at all, where the new shape fades in and a shape that gets smaller first fades out ("None", and Reduce Motion). Liquid Glass grows with the shape on every frame, the pages show only inside the shape, the black of the closed notch turns to glass as it opens, and the shadow follows the shape. A movement that turns another around keeps its speed.
-- Clipboard tab: the same list as the popup. Shelf tab: drop files to keep them handy and drag them out again; only references are stored. Right-click a file to compress it to a ZIP, convert an image to PNG, JPEG or HEIC (the new file is made next to the original and joins the shelf), show it in Finder or remove it. Media tab: previous, play/pause and next, and what plays in whichever app plays it (browsers included) with its cover; clicking or dragging the bar under the track moves the track there (VoiceOver sees the bar as a slider). Focus tab: a countdown of 15, 25, 45 or 60 minutes; the notch opens and a sound plays when time is up.
-
-AI agents (off by default)
-
-- Follows Claude Code and Codex through their hooks. Figghost adds its own entries to `~/.claude/settings.json` and `~/.codex/hooks.json` next to whatever is there (other tools' hooks, other keys and the order of the keys are kept, a backup is written once as `*.figghost-backup`, a file that cannot be read is never overwritten) and removes only its own. A hook runs `Figghost --figghost-hook <agent>`, which reduces the agent's input to what the notch needs, sends one line over a private unix socket (`agents.sock`, mode 0600) and exits.
-- A permission request opens the notch with the command, the tool and the folder, and Allow and Deny buttons (Return allows, Option+Delete denies). Requests that arrive together are answered one after the other. Without an answer in the chosen wait (5 to 100 seconds), or when the app is not running or goes away, the hook prints nothing and the agent asks in its own terminal as it always did: a failure here never blocks an agent.
-- Sessions are listed with their folder and state (working, waiting for you, done). When an agent finishes, the notch can open for a few seconds and play a sound.
-- Usage limits: Codex's are read from its own session logs (`~/.codex/sessions`). Claude Code reports its five-hour and weekly limits only to its status line, so showing them is a separate switch that makes Figghost the status line, which runs the previous one unchanged afterwards (the previous command is kept and given back when the switch is turned off).
-- A request shows the command, the path or the address of the tool call, so file contents are not shown for the file tools; a tool with none of those (an MCP tool, for example) shows the beginning of its arguments instead. Each part is cut to a few hundred characters before it leaves the hook, stays on this machine, and is held only while the request is open. Another app that answers the same requests (OneNotch, for example) asks as well, and the first answer wins: turn one of them off.
-
-Smart Select (off by default)
-
-- Select text in any app and press a shortcut (default Control+Option+S, or the menu bar item): a small window next to the pointer says what the text is. A length, weight, volume, area, speed, temperature or data size is shown in the other system (5 km is 3.107 mi and 16,404 ft; 72 F is 22.22 C; 1.5 GB is 1.397 GiB). An amount of money ($100, 50 EUR, 5tr d, 2.5 ty VND) is shown in the currencies you chose, at the exchange rates of the day. A time with a zone (3pm PST, 15:30 UTC+7, 9am in Tokyo) is shown in your own zone and in the zones you chose, with daylight saving time from the system's database. Any other text is translated into the language you chose. Return copies the highlighted answer, Command plus a digit copies that row, Escape closes.
-- The selection is read through Accessibility. An app that does not share its selection (many browsers and Electron apps) is read by copying it for a moment: the whole clipboard is saved first and put back as it was, the history does not record either change, and if anything on the clipboard cannot be saved in full nothing is copied at all.
-- The internet is a separate switch, off by default. Exchange rates are a download from open.er-api.com (a table of rates; nothing about you or your text is sent) kept in `rates.json` and refreshed at most once an hour when the provider has new ones. Translation sends the selected text, at most 450 characters, to api.mymemory.translated.net and nothing else; the answer is shown as plain text. Both go through the system's curl, which reads its arguments from standard input, so the text is not in the list of processes.
-
-Screenshots and recordings (off by default)
-
-- Capture an area, a window or a display. The screen freezes while the overlay is up, with a loupe and the size of the selection: Space switches to picking windows, Return takes the whole display, Escape cancels. A window is taken alone, with its shadow. Once the feature is on, Command+Shift+2 captures an area or a window and Command+Shift+1 copies the text of an area (Vision, Vietnamese and English, plus QR and bar codes). Every kind (area, window, screen, screen after a countdown, text, scrolling capture, recording, GIF) can get a shortcut in the settings, and all of them are in the Capture menu of the menu bar item.
-- After a capture the picture is saved (to the folder of macOS's own screenshots, else the Desktop; an existing file is never overwritten), copied, and shown in a quick panel in a corner with Copy, Save, Edit, Pin and Close; it closes by itself after 8 seconds unless the pointer is on it. Dragging the thumbnail drops the file into another app. A pin floats the picture above every window, where it was taken.
-- Editor: arrows, lines, frames, ellipses, highlights, text, numbered steps, pixelate and crop, a palette of seven colours, and a background of six gradients with padding, rounded corners and a shadow; undo and redo. The picture keeps the capture's resolution. Done writes it back over the capture's file.
-- Scrolling capture: the content of an area scrolls by itself one step at a time and the frames are stitched into one tall picture, until the content stops moving, the picture is full, or Done.
-- Recordings (macOS 15 or later): MP4 (H.264) or GIF of an area, a window or a display, with a bar that shows the time, Stop and Cancel; the recording shortcut or Stop Recording in the menu stops it too. Options in the settings: the computer's audio, the microphone, the camera in a round bubble that can be dragged, clicks, and the shortcuts pressed (plain typing is never shown). The app's own windows stay out of a recording, except the camera and the key display. GIFs run at 12.5 frames per second, at most 960 pixels wide.
-- Needs the Screen Recording permission and macOS 14 or later (older systems show a message).
-
-Colour picker and image tools (picker off by default)
-
-- A global shortcut (default Control+Option+Command+8, changeable or removable in the settings) opens a loupe that follows the pointer across displays: the pixels around it magnified with a grid, and the colour under the middle one. Tab changes the format (HEX, RGB, HSL, HSB), a click copies the value and ends the picker, Escape ends it. The loupe never covers the pixels it reads and a click is taken by the picker, not passed to the app below. It reads from the same frozen picture of every display that the screenshots use, taken once when the picker starts (about a tenth of a second, before any panel of the picker is on screen), so a move of the pointer is only a lookup and nothing runs while the picker is off; the colour is that of the moment the picker started, and a picture that does not come within three seconds is given up on with the loupe saying it cannot read. It needs the Screen Recording permission and macOS 14 or later; without the permission the loupe and the settings say so and nothing is read, and on an older system a notice says it is not available.
-- Right-click an image on the shelf and choose Remove background (macOS 14 and later): the main subject is kept, the rest is made transparent, and a new PNG with the same pixel size is made next to the original and joins the shelf. It runs on this Mac and sends nothing anywhere. Reading the text of a capture is the screenshots' own feature (Command+Shift+1), not this one.
-
-Lyrics (off by default)
-
-- The Media tab shows the sung line large with the previous and the next dim, following Music or Spotify: the playback position is read in the same poll as the track and carried forward by a timer that only runs while synced lyrics are visible and the music plays. Lyrics come from lrclib.net (free, no key) only with "Fetch lyrics online" on; then the artist, track and album names and the length of the track are sent to lrclib.net, and nothing else. What is found is kept under the data folder (`lyrics-cache`, at most 500 files and 8 MiB, lyrics only, mode 0700), a track without lyrics is not asked about again for 3 days, and a failure or rate limit is never remembered as "no lyrics". Unsynced lyrics are shown as scrolling text. With fetching off only lyrics already kept are shown.
-
-Calendar (off by default)
-
-- A notch tab with today's and tomorrow's events grouped by day, each with its time, title, place and the colour of its calendar, and the reminders that are due by tomorrow or overdue, each with a button to complete it. A page with nothing to show says why (feature off, access not given, denied, restricted, nothing planned) and offers the one button that helps.
-- Meeting alerts: a chosen number of minutes before an event (1 to 60, default 5) the notch opens for a few seconds on this tab, plays a system sound if wanted, and shows the event with Dismiss and Join buttons; Return joins and Option+Delete dismisses. Join shows when the event's URL, location or notes contain a meeting link. Only https links to Zoom, Google Meet, Microsoft Teams and Webex are accepted (the host is checked as a whole, and an Outlook Safe Links wrapper is unwrapped and checked), and the link opens in the default handler. The tab is marked while an alert waits.
-- Events come from EventKit, which expands recurring events, so each occurrence has its own time, and events of another time zone land on the right local day. Nothing polls: one timer is armed for the next alert or midnight, and the calendar database's change notification refreshes the page. Cancelled events and events you declined are left out. Access is asked for only when the feature or reminders are turned on, or a button is pressed, never at launch. Everything stays on this Mac; the only change made to your data is marking a reminder complete when you press its button.
-
-Window snapping
-
-- 13 layouts (halves, quarters, thirds, maximize, center) on global shortcuts, using the Accessibility API. Defaults: Control+Option plus Left, Right, Up, Down, U, I, J, K, Return, C, D, F, G. Every shortcut can be changed or removed in the settings.
-
-Clipboard mascot (off by default)
-
-- A small pixel character (a spider, a frog, a UFO, a ghost or a wizard) comes out of the notch when something is copied, reaches for it in its own way (silk, a tongue, a beam of light, a wisp, a bolt and then a spell), brings a stand-in back (a text chip, a picture, the file's icon, never the content) and takes it into the notch. It aims at the selected text where the app says where that is (Accessibility), and at the pointer otherwise. A copy takes about 1.7 seconds and the character is gone afterwards.
-- When a file is dragged out of the shelf it either guards it (escorts it to where it is dropped, behind a shield, and salutes) or misses it (holds on by its ray until the file is gone, then waves goodbye with a tear), as chosen in the settings. A drag that is given up makes it relieved.
-- "Add to Figghost Shelf" in the Services menu, which Finder shows when files are right clicked (under Services or Quick Actions), puts files on the shelf; with the mascot on, the character brings them up. This works with the mascot off too.
-- It draws on a click-through panel above the notch that is on screen only while something plays, with the pictures in `crates/app-ui/assets/mascots` (12 frames each, cut by `docs/mascots/build.py` from generated sprite sheets; `docs/mascots/index.html` shows the same scenes as SVG). Nothing plays with Reduce motion on, and nothing runs while it is off but a look at the switch on each copy. A Try button on the Clipboard page plays a copy toward the pointer, to choose a character.
-
-Drag to the notch (off by default)
-
-- Drag a window by its title bar to the top edge of a screen and a row of drop zones hangs from the notch: left half, right half, left, middle and right third and maximize by default; any 1 to 8 of halves, thirds, quarters and maximize can be chosen in the settings. Releasing on a zone puts the window in that layout on that screen, inside the usable area, with the same Accessibility calls as the shortcuts; releasing anywhere else changes nothing. A press counts only on the title bar strip of a window and not on a control, and the window must really follow the pointer; a browser's tab strip counts as its title bar, since that is where its windows are dragged. The row never takes focus and passes clicks through, the notch stays closed while it shows, and it needs Accessibility (without it nothing is looked at; macOS is asked once per launch while it is missing, and the settings show the state).
-
-Menu bar icons (off by default)
-
-- Adds an arrow and a divider to the menu bar. Hold Command and drag other apps' icons to the left of the divider; the arrow hides and shows them, they hide again by themselves after a chosen time, and an option shows them also when the pointer rests on the arrow. How long the divider can be is not fixed (macOS 27 drops a status item that is longer than the room the status area has, according to other apps' reports), so Figghost measures the longest length that is laid out, checks again after every hide, when the screens change and when the front app changes, and leaves the icons showing, saying so in the settings, where none works. Icons that do not fit beside the notch are hidden by macOS and cannot be shown by this. Turning it off, quitting or crashing gives every icon back.
-
-Sound (macOS 14.2 or later)
-
-- A Sound tab in the notch lists the apps that are playing. Each has a volume from 0 to 400 % (the middle of the slider is 100 %), mute, the output device to play on, and an equalizer preset. Helper processes, such as a browser's renderers, count as their app.
-- Effects on everything played: a 10-band equalizer (31 Hz to 16 kHz, 17 presets or custom bands), Magic Boost (quiet passages louder), Night mode (loud scenes down, dialogue up) and stereo width. A limiter keeps boosted sound from clipping.
-- Speakers without hardware volume (HDMI or DisplayPort): the volume keys move a software volume, shown by the volume indicator.
-- How it works: Core Audio process taps. Only apps whose settings differ from the defaults are tapped, so nothing changes until a setting does. A tapped app is muted at the source and played again, processed, on its output through a private aggregate device; an idle one is released after 5 seconds. It needs the System Audio Recording permission, which macOS asks for the first time an app is changed.
-
-Volume indicator (off by default)
-
-- Replaces the system volume display with one that hangs from the top edge. It needs Accessibility. If the output device has no hardware volume (HDMI speakers, for example), the keys move the software volume of Sound instead.
-
-AI assistants (off by default)
-
-- `Figghost --mcp` is a Model Context Protocol server over standard input and output with two tools, `clipboard_search` and `clipboard_get`. An assistant starts it; the settings show the JSON to add to the assistant's configuration. It only reads the history, shows nothing until it is switched on in the settings, and a switch change takes effect on the next call without restarting the assistant. Anything in the history can be read while it is on.
-
-Menu bar item ("Fig")
-
-- Settings, Accessibility prompt (only while access is missing), smooth and reverse toggles, smooth scrolling for the frontmost app, volume indicator, open the clipboard, clear unpinned history, launch at login, open the config folder, quit.
-
-## Status
-
-Verified on this machine (macOS 27, Apple silicon Mac mini, one external 1920x1080 display), with private instances so that the real clipboard and settings were never touched:
-
-- The settings page, in WebKit with no window shown: its own checks (both languages complete, every page builds with labelled controls, switches, sliders, presets and the shortcut recorder send the messages the app expects), and snapshots in light, dark, reduced transparency and reduced motion. A deliberately broken page was caught.
-- The web bridge: messages both ways, a navigation away from the page is cancelled, script errors are reported with their line.
-- The real settings window: it opens at launch with the Dock icon, takes focus and sits on the system glass; the web view follows every resize; closing it returns the app to the menu bar and the focus to the previous app; opening the app again (as Finder or the Dock does) brings it back, and never makes a second window; a background start (`--background`) opens none.
-- Scrolling engine rules with unit tests for every modifier combination, and a decision time of about 20 microseconds against a 1 ms budget. The curve drawn in the settings matches what the smoother really does within 0.4%.
-- Clipboard: formatted text pastes with and without formatting on a real (private) pasteboard; a database written by the previous version is upgraded without loss; pin letters, plain text and the new order rules have tests.
-- The MCP server end to end through the real program over standard input and output: off by default, on without a restart, filters, full text, protocol errors, clean exit.
-- AI agents, with `scripts/check-agents.py` against the real program in a private folder with a pretend home for the agents' files (the real `~/.claude` and `~/.codex` are never touched) and the notch placed outside every screen: events from Claude Code and Codex reach the program in a few milliseconds; a request nobody answers prints nothing after the wait; the Allow and Deny buttons, pressed through the accessibility tree, make the hook print the allow and deny decisions, two requests at once are answered in order; a 1.5 MB command, garbage input and an unknown agent are survived; with the program gone, or killed while a request waits, the hook ends at once and prints nothing; a stale socket is replaced by the next start. Installing, removing and the status line wrapper are tested on files shaped like real ones, and the installed command is run in a real shell from a path with spaces and quotes. A private instance never touches the agents' real files: with a pretend `HOME` holding hooks that point at an old place and only `FIGGHOST_HOME` set, the program starts and leaves them exactly as they were (before this was fixed, such a run repointed them at itself; the check fails on the old program and passes on the new one).
-- Smart Select: the reading and conversion rules have 66 unit tests (separators in both number styles, conversions in every dimension, money parsing in many spellings, times and zones, the translation answer and its failures, the download through a local server including quoting of quotes, newlines and ampersands, error statuses, an answer that never ends and one that is too large); time zone offsets are checked against the real system database (New York and London move with daylight saving time); the answer window is rendered to images in both languages and checked for arrow keys, Return, Command plus a digit and the refusal to copy a message, using key events delivered in the process; the settings page has its own checks and the shared settings rules refuse bad currencies, zones and shortcuts that clash with another. `scripts/check-smart.py` runs the real program on private instances (the text to answer for comes from `FIGGHOST_SMART_TEXT`, the window opens outside every screen, the exchange rates come from a file in the data folder, nothing touches the network) and reads the answers through the accessibility tree: a length in miles and feet, a decimal comma in Vietnamese, a temperature, an amount of money with its rates, Vietnamese shorthand (5tr), a time in the other zones with the system's daylight saving time, the hint to turn on the internet for plain words, the currencies chosen in the settings, and no window while the feature is off. It needs an unlocked screen and skips otherwise.
-- Copy Stack, boards and sensitive data: the upgrade from synthetic version 1 and version 2 databases shaped like the real ones loses nothing (items, pin letters, formatting, search index) and leaves the old file as `history.sqlite.v2.bak` byte for byte, once, mode 0600 (the write-ahead log is folded in first); a board round trip (add, file, search by `@name` with words, fuzzy and other filters, move, unpin, rename, delete) and the name rules; masked items hidden from lists, search and the index, expiry, and the three choices; the secret detector on positive, negative and near miss samples (order numbers, phone numbers, UUIDs, hashes, prose and code about passwords); the Copy Stack mechanics with a fake clock and fake events and the tap callback fed real `CGEvent`s that were created and never posted; the list surface driven with synthetic events on a panel outside every screen; `scripts/check-stack.py` runs the real program and checks the upgrade and backup, hidden and plain copies, expiry, and idle CPU.
-- Drag to the notch: the geometry and the drag state machine (zones on notched and notchless screens, three screens with different sizes and negative origins, a drag that did not start on a window, a press on a control, a window that does not follow the pointer, leaving a zone, a missed release, Accessibility missing) in `core-window` and the controller tests; `app-ui/snap_check` runs the real controller, zones panel, notch and pointer translation on a pretend screen far outside every real one, with the dragged window as a script (the row appears centred, cannot take focus and passes clicks, the open notch closes for it, a drop places the window on the right half, releasing elsewhere touches nothing); `grab_check` runs the Accessibility lookup against the real desktop (yes or no only). Menu bar icons: the rules and the search for a working divider length against a pretend bar that drops long items, including a cutoff that moves with the front app, a new display and giving up.
-- Colour picker and image tools: background removal on a synthetic image (alpha 255 at the centre and 0 in all four corners, same size out as in) and through the shelf action for BMP, JPEG and HEIC inputs, never overwriting; the colour maths (HEX with 3, 6 and 8 digits, RGB, HSL, HSB, exact round trips); the loupe driven with synthetic events on panels outside every screen and a synthetic screen (Tab and Shift+Tab, Escape, Return, the right button, a click, following the pointer to another display, 200 moves reading every position without taking the picture again, nothing read and no picture asked for without the permission, a picture that is still being taken when the picker is ended or started again, a picture that cannot be taken, a picture that never comes), with the copied text asserted on a private pasteboard; the lookup in the frozen picture (which pixel is under the pointer on a display with a negative origin, on a picture of two pixels to the point and of 1.5, at every edge where part of the grid lies outside the picture) with unit tests on synthetic pictures; the loupe and the settings page rendered and looked at; `scripts/check-vision.py` starts the real program on private instances with the picker on, off and with no shortcut and survives a hostile config.
-- Lyrics: the LRC parser and lookup on realistic and hostile samples (5 MB file, absurd timestamps, no newline, 200 000 timestamps on one line, control characters); the LRCLIB client against a local server (the exact query and User-Agent, 404, 429 with Retry-After, garbage, no server, an over-size body, plain http refused); the cache (round trip, expiry of "no lyrics", seven kinds of corrupt file moved aside, count and size caps) and the service (fetch once and never again, fetching off never touches the network, newest request wins); the AppleScript compiles with `osacompile`; the Media tab drawn in every state in both languages; `scripts/check-lyrics.py` starts the real program and checks it idles.
-- Calendar: the link parser on realistic Zoom, Meet, Teams and Webex invitations including look-alike hosts and tracking parameters; the alert scheduler with a pretend clock (overlaps, a changed lead time, a moved or deleted event, sleeping through an alert, recurring occurrences); day grouping across a daylight saving change and another time zone, in both languages; the notch page drawn in every state in both languages with its buttons and keys pressed in process; the EventKit wrapper run without access (states, an unauthorised store, a refused request); `scripts/check-calendar.py` starts the real program and checks that it never asks for access at launch and idles.
-- Sound: a test tone routed to a virtual device at 50 % arrived at exactly half its level (RMS 0.003528 against 0.007055), the built-in speakers' software volume at 25 % gave a quarter, and an idle route was released after its grace time. The equalizer, compressor and limiter have unit tests, including the 31 Hz band at 48 kHz.
-- Screenshots: through the real shortcut on a private instance, an area was saved, copied as PNG and shown in the quick panel, which closed by itself. Freezing every display and the window capture with its shadow (`capture_check`), text recognition in Vietnamese and English, about 105 ms once warm (`ocr_check`), and the editor drawing every mark at the capture's resolution (`editor_check`) have checks of their own; `scripts/check-capture.py` starts the real program with the feature on and off, and it idles at 0 %, reports a shortcut that is taken and survives a hostile config.
-- Scrolling capture through its real shortcut on a private instance: a 300-line list scrolled by itself to its end and came out as one picture 5,403 pixels tall from a 380-pixel area. Text recognition through its shortcut read both lines of a test window, Vietnamese with diacritics and English, in 115 ms.
-- Recordings, through the real shortcuts on a private instance: an MP4 of the whole screen and a GIF of an area (stopped with the bar's Stop button, pressed through accessibility), each saved and put on the pasteboard as a file, the GIF's temporary video removed. `record_check`: three seconds of an area become an MP4 of the right length and size, the key display shows in the video while a key is up and is gone once it fades, a GIF made from it loops with the expected frames, a recording of a window that is gone reports an error instead of starting, and the computer's audio and the microphone each add a sound track.
-- The Capture page of the settings passes the page's own checks, and its state has the shape of the sample data (a unit test).
-- The notch: `anim_check` samples the shape as the window server draws it, and the spring opens past the full height by about 2 % (448 of 440 points) before it settles, and shrinks back to rest. It also samples the glass's own shape, the element SwiftUI lays out inside the glass view, and finds it at the shape's size on every one of about 300 samples. That was the cause of a rough opening: Core Animation moved only the outside of the glass view, and the glass itself took its final size on the first frame while the black shape was still growing. The movement is now laid out frame by frame instead (a spring computed in `notch.rs`, unit tested), on the screen's display link; `layout_check` finds every page inside the open shape and one icon per page. `notch_shots` showed it on the real screen over a window of its own: the black tab at rest, the ears with a symbol and moving bars, the open notch in Liquid Glass with its shadow, clear glass and black. On the way it showed that Liquid Glass turns flat grey when anything of the same window lies under it (a shadow layer did), which is why the shadow is the window's own.
-- Live activities and agents: `scripts/check-agents.py` now also starts the program with the default for questions and checks that a question shows in the closed notch, that the notch does not open by itself, and that the question still goes back to the agent's prompt after the wait. The cover colour, the moving bars, the ear widths and the lenient reading of every new notch setting have unit tests.
-- Tokens and cost: the ledgers agree exactly with an independent count written in Python on 29,451 Claude Code messages over five days (message counts, the four token counts and the cost to six decimals) and on 469 Codex events. On this Mac the first count of a week reads 2.1 GB in 0.8 to 2.3 s on a background thread, a later count 30 to 70 ms; the process that ran it peaked at 27 MB, holding some 52,600 messages (each kept as a hash of its ids and its counters).
-- Seeking: `seek_check` drives the Media tab's bar through accessibility (it is a slider; one step from 0:10 of 5:00 asks for 0:25) and a silent test player that takes seeks (MPRemoteCommandCenter) received exactly 25.0 seconds, through the adapter's `figghost_np_seek` in `/usr/bin/perl`; the test player became Now Playing for the run and Edge, paused, was Now Playing again afterwards, untouched.
-- Now Playing: `nowplaying_check` read Microsoft Edge playing YouTube (title, channel, position, length, a 5.5 KB cover) through the adapter loaded by `/usr/bin/perl`; the perl process used 0.0 % CPU and about 20 MB while nothing changed, exits when its pipe closes or the app is gone, and the watcher restarts it after a crash and falls back to Music and Spotify when it cannot run (unit tests with a bogus library).
-- The level meter: `meter_check` played a quiet 100 Hz and a 7 kHz tone: the lowest band rose to 0.79 and the highest stayed at 0 for the first, the reverse (0.78) for the second; no aggregate device or tap was left after 10 start and stop cycles; the meter used 0.25 to 0.35 % CPU with music playing.
-- Drag to the notch: `scripts/check-snap.sh` (47 checks) shows the footprint at exactly the frame a drop applies, under the layouts, taking no clicks, gliding between layouts, gone after the drop.
-- The menu bar: every symbol used by the menus resolves on this Mac (a unit test fails on an unknown name); the icon was drawn at 1x and 2x and looked at.
-- The settings window: the page's own checks pass, including new ones for the notch page (choices send their words, the preview follows the material, moving a tab sends the new order, the last tab that shows cannot be turned off) and the token lines; every page was rendered in light and dark and both languages and looked at.
-- A private instance of the bundle starts with no messages, runs the adapter and idles; its memory footprint is 30 MB against 29 MB for the previous build measured the same way.
-- Earlier work, still passing: scrolling pipeline with synthetic events, popup, real paste into a controlled target, notch hover, shelf drop from another process, tiling through real shortcuts, volume indicator with synthetic keys; `scripts/check-lyrics.py`, `check-calendar.py`, `check-vision.py`, `check-capture.py` and `check-smart.py` pass on the new build.
-- Resources of the final build: with the settings window closed 0.0% CPU and 22 to 23 MB, with no web processes (the web view is created when the window opens). With it open 0.1% CPU, 33 MB for the app plus three WebKit helper processes (GPU 32 MB, page 26 MB, network 5 MB, together 63 MB, 96 MB in all). Dropping the window four times in a row released the web view every time; the page and network helpers exit at once and the GPU helper about a minute later, and quitting the app removes all of them.
-- Clipboard mascot: the story of every scene (where the character, the ray and the copy are at each moment, the thread of the spider, the bolt of the wizard, a target off the screen brought onto it, the follow of a drag, guard and miss endings) with unit tests on plain data; the drawing of every character in every scene by `app-ui/mascot_check`, looked at frame by frame; the hook that is told of real copies beside the one Copy Stack takes, and not of the app's own writes; the settings card, its strings in both languages and the messages it sends, by the page's self-test; `scripts/check-mascot.py` runs the real program on a private instance and checks that a copy on a named pasteboard makes the chosen character play once per copy, that nothing plays while it is off, and that the program keeps running; the Info.plist with the Services entry and the Vietnamese title pass `plutil`.
-- Quality gates: `cargo test --workspace`, `cargo clippy --workspace --all-targets -- -D warnings` and `cargo fmt --check` are clean.
-
-Not verified:
-
-- The new notch movement seen on screen: the screen was locked while it was written, so it was verified by sampling the shape and the glass (above), not by eye; `notch_shots --video` and its slow-motion mode, made to look at it frame by frame, need an unlocked screen and have not run. Dragging the Media bar with a real mouse, and seeking a real Music, Spotify or browser tab (only the test player was moved). A real window drag onto the notch after the change for browser tab strips.
-
-- Clicking and typing in the real settings window with the pointer and keyboard (the page and the bridge are verified separately, in WebKit and in unit tests), and pressing its close button while watching memory (the release of the web view is verified without a screen, see `web_release_check`).
-- Launch at login from the installed app, and that a login launch stays silent.
-- Physical volume keys, a playing Music or Spotify, Telex and VNI typing, a Mac with a hardware notch, trackpads and Magic Mouse.
-- The focus timer's sound and the notch opening itself when time runs out, the shelf's right-click menu on screen (its jobs are tested with the real tools), and the new Option+Shift+Enter and pin letters on screen.
-- That a background start leaves the frontmost app alone: `scripts/check-focus.sh` now passes `--background`, but it needs an unlocked screen with a terminal in front, so it was not re-run after the settings window was added.
-- That dragging a file onto the collapsed notch switches straight to the shelf tab.
-- The new notch with a real pointer: hover with the chosen delay, pointing at the ears, haptic feedback, the shortcut, following the pointer to another screen, and the black band that merges open glass with a hardware notch (this Mac has no notch). A live music activity in the bundled app with something really playing (nothing played during the end-to-end run; the ears were checked with a scripted activity), Safari and Chrome through Now Playing (only Edge was tried), the System Audio Recording prompt for the bundle (the terminal already had the permission), and the meter following a change of output device.
-- The menu bar icon on a light menu bar and on a Retina screen, and hiding it from the settings on a real menu bar.
-- Hooks installed into the real files of Claude Code and Codex and a real agent asking for a permission: the hook formats and decision shape were taken from their documentation and from the files on this machine, not from a live run. In particular what Claude Code does with a hook that is still waiting when the permission is answered in its terminal first, whether the usage limits reach the status line as documented, and how Codex asks to review new hooks.
-- The pointer on the real notch for the agents tab (hover, clicking the buttons with a mouse, Return and Option+Delete), the sound, and the notch opening by itself when an agent finishes: the buttons were pressed through accessibility on a notch outside the screen.
-- Smart Select on screen: pressing the shortcut in another app, reading a real selection through Accessibility and through the copy fallback (the clipboard being saved and put back), the window next to the pointer and closing it with a click elsewhere, and a live translation. `scripts/check-smart.py` covers the rest through the real program (see Status).
-- Copy Stack, boards, sensitive data: a real double press of a modifier key and a real Command+V into another app (so the chain from key to pasted text is verified in parts, not end to end), the monitor starting by itself when Accessibility is granted while the app runs, and the board menu and the pill on a real screen.
-- Drag to the notch: a real drag with a real mouse (the global monitor receiving other apps' events, the title bar rule against real apps with unified toolbars or Electron and Chrome title bars, Stage Manager), moving a real window by a drop (a window outside every screen is not listed among an app's Accessibility windows, so none could be driven; the placement call is the one the shortcuts use), a notched display and several real displays. Menu bar icons: everything on a real menu bar (order next to the "Fig" item, Command-drag, whether hiding really pushes icons away on macOS 27, a notched screen, hover on the arrow); the macOS 27 behaviour described above comes from other apps' reports, not from a run here. Please run it once on real hardware before relying on it.
-- Colour picker: reading a real frozen picture (the picture is the screenshots' own, which the capture checks run end to end, but the picker was only given synthetic ones, so the alignment of the loupe with a real Retina display is untested), the shortcut firing from a real key, a click not reaching the app below, the keyboard returning to the previous app, the Screen Recording prompt, the shelf menu item on screen, Remove background on photographs and macOS 13.
-- Clipboard mascot: the panel on a real screen (it was drawn to PNG files and played on a stage outside every screen), the aim at a real selection through Accessibility in other apps, a real drag out of the shelf into another app with the panel passing the drop through, the Services item in Finder's right click menu after `scripts/bundle.sh` (the provider and the Info.plist entry were checked, the menu was not opened), and several displays (a target on another screen is brought onto the notch's screen).
-- Lyrics: a real playing track (the position, album and length from the real players, drift against the audio, seeking), the real lrclib.net, the lyrics area on a real screen and with Reduce Motion on. The poll is every 1.5 seconds, so a seek shows after up to about 2 seconds. The User-Agent names the app and its version but has no project link yet; LRCLIB asks for one.
-- Calendar: reading real events and reminders (needs the Calendars and Reminders permission, which was not held), the system prompts, completing a reminder, recurring and other-zone events as EventKit returns them, an alert opening the notch on its own with its sound on a real screen, Join opening a real browser, and a hardware notch. One manual check: in Calendar.app make a throwaway calendar with an event starting in 7 minutes whose location is a Meet link, turn the feature on in Settings and answer the prompts, then check the event and its Join button, that the notch opens by itself 5 minutes before, and that completing a reminder works.
-- The camera bubble: this Mac has no camera.
-- Whether a recording with the computer's audio hears an app twice while the Sound tab is changing that app.
-- The Sound tab with Bluetooth outputs, an output that changes its sample rate while playing, and many apps at once.
-- Notarization.
-
-Not built from the OneNotch description: iCloud sync, object removal (circling something to remove it), automatic redaction of sensitive data in screenshots, the live activities (charging, network, Bluetooth), lock screen presence, an audio spectrum.
-
-## Languages
-
-The `language` setting accepts `auto` (default), `en` or `vi`. `auto` takes the first system language that has a translation and falls back to English. The settings window changes language at once; menus and the notch change after a restart (the page offers a button). To add one, add a variant to `Language` in `crates/app-ui/src/i18n.rs`, where every string is a method with an exhaustive `match`, and a dictionary to `web/app.js`, where a self-check lists every missing key.
-
-## Design
-
-The settings window follows the Liquid Glass guidance of Apple platforms, applied with the `ui-ux-pro-max` design skill and a structured critique:
-
-- Two layers. Navigation and controls are glass: translucent, blurred, lit from above. Everything that is read (cards, lists, code) sits on denser surfaces.
-- Colour is for state. The backdrop colour is still; only things the user touches move, with short durations for feedback and springs for things that travel.
-- Contrast was measured, not guessed: text is at least 4.5:1 and the edge of an off control at least 3:1 on the worst backdrops, in both themes. Nothing the user must read is below 12 px.
-- Every effect has a fallback: Reduce transparency makes surfaces opaque and removes the backdrop, Increase contrast strengthens edges and text, Reduce motion removes movement.
-- Focus is always visible, every control has a name, and the whole window works from the keyboard.
-
-All tokens are CSS variables at the top of `crates/app-ui/web/app.css`.
-
-## Repository layout
-
-- `crates/macos-sys`: all `unsafe` code and FFI: panels, event tap, event posting, Carbon hotkeys, pasteboard, app tracking, CoreAudio, the list, popup, notch and its pages, the web view host and glass window, status item, application lifecycle.
-- `crates/core-mouse`: the scroll engine (source classification, decision, smoother, frame pump).
-- `crates/core-clipboard`: history core (SQLite store with formatting and pin letters, search, classification, ignore policy).
-- `crates/core-window`: tiling layouts as pure geometry.
-- `crates/core-smart`: what a piece of text means: numbers in both styles, unit conversion, money, times and zones, the translation request and answer, and the one GET through curl.
-- `crates/core-capture`: screen capture without an interface: geometry and file names, the stitcher of scrolling capture, the editor's document, and key names for the key display of a recording.
-- `crates/core-audio-fx`: the sound processing of Sound as plain Rust: equalizer, compressor, limiter and smoothed gain.
-- `crates/core-lyrics`: lyrics without an interface: the LRC parser and lookup, the LRCLIB client, the disk cache and the non-blocking lookup service.
-- `crates/core-calendar`: calendar logic without an interface: meeting links, the alert scheduler, day grouping and the wording of dates and times in both languages.
-- `crates/core-agents`: the Claude Code and Codex side with no interface: hook events, the unix socket server and the wire format, the session tracker, the hook installer, the usage readers and the hook command.
-- `crates/app-ui`: composition root, configuration, language tables, the feature controllers, the settings model and bridge (`src/settings`), the MCP server, and the web page (`web/index.html`, `app.css`, `app.js`, `fixture.json`).
-- `scripts/bundle.sh` builds `Figghost.app`; `scripts/check-agents.py` runs the agents feature through the real program and pretend agents; `scripts/check-smart.py` does the same for Smart Select; `scripts/check-capture.py`, `check-vision.py`, `check-lyrics.py` and `check-calendar.py` start the real program on private instances with their feature on and off and check that it survives a hostile config and idles; `scripts/check-focus.sh` checks that a background start (`--background`, what a login item uses) does not change the frontmost app.
+Opening the app opens its settings window; closing the window sends the app back to the menu bar. Settings live in `~/Library/Application Support/Figghost/config.json`. The interface is available in English and Vietnamese.
 
 ## Install
 
-On an Apple silicon Mac with macOS 13 or later, with Homebrew:
+An Apple silicon Mac with macOS 13 or later. With Homebrew:
 
     brew tap eliasbui/figghost
-    brew trust --tap eliasbui/figghost
-    brew install --cask figghost
+    brew install --cask eliasbui/figghost/figghost
 
-Homebrew asks you to trust a tap that is not its own before it loads it. The app is signed ad hoc and not notarized, so the cask removes the quarantine flag after it installs it, as other open source notch apps do; build it yourself (below) if you would rather not. `brew uninstall --cask figghost` removes the app, and `--zap` its data in `~/Library/Application Support/Figghost` too.
+Without Homebrew:
+
+    curl -fsSL https://raw.githubusercontent.com/eliasbui/figghost/main/scripts/install.sh | sh
+
+Writing the cask out in full installs it from the tap and trusts only that cask, so no `brew trust` is needed. Both ways put `Figghost.app` in `/Applications` (the script takes `DEST=~/Applications` for somewhere else). The app is signed ad hoc and not notarized, so both remove the quarantine flag after installing it, as other open source notch apps do; build it yourself (below) if you would rather not. `brew uninstall --cask figghost` removes the app, and `--zap` its data in `~/Library/Application Support/Figghost` too. Nothing updates itself: run the same command again, and grant Accessibility again, because macOS ties the grant to the code signature.
 
 ## Build and run
 
@@ -241,116 +40,19 @@ Accessibility is needed for smooth scrolling, automatic paste, window snapping a
 
 The app icon is drawn by code: `cargo run -p macos-sys --example make_icon -- X.iconset`, then `iconutil -c icns X.iconset -o crates/app-ui/assets/Figghost.icns`.
 
+## Design
+
+The settings window follows Apple's Liquid Glass guidance: navigation and controls are glass, everything that is read sits on denser surfaces, colour is for state, and only what the user touches moves, briefly for feedback and with springs for things that travel. Contrast was measured, not guessed: text is at least 4.5:1 and the edge of an off control at least 3:1 on the worst backdrops, in both themes, and nothing the user must read is below 12 px. Every effect has a fallback for Reduce transparency, Increase contrast and Reduce motion, focus is always visible, every control has a name, and the whole window works from the keyboard. All tokens are CSS variables at the top of `crates/app-ui/web/app.css`.
+
 ## Configuration
 
-`~/Library/Application Support/Figghost/config.json`, written by the settings window. Missing values use defaults, out-of-range values are clamped, and an unreadable file is moved to `config.json.bad` instead of being overwritten. Files written by older versions load unchanged.
-
-    {
-      "language": "auto",
-      "show_settings_on_launch": true,
-      "hotkey": "cmd+shift+c",
-      "auto_paste": true,
-      "paste_plain": false,
-      "volume_hud": false,
-      "history_limit": 500,
-      "ignored_apps": ["com.example.vault"],
-      "mcp": { "enabled": false },
-      "agents": { "enabled": false, "approval_wait_seconds": 30, "sound": true, "peek_when_done": true },
-      "capture": {
-        "enabled": false,
-        "folder": "",
-        "save": true,
-        "copy": true,
-        "quick_panel": true,
-        "quick_seconds": 8,
-        "timer_seconds": 5,
-        "shortcuts": { "area": "cmd+shift+2", "text": "" },
-        "record": { "system_audio": false, "microphone": false, "camera": false, "clicks": true, "keys": false }
-      },
-      "audio": {
-        "enabled": true,
-        "apps": { "com.spotify.client": { "volume": 1.5, "muted": false, "output": "", "eq": "bass_boost" } },
-        "devices": { "<device UID>": { "volume": 0.5, "muted": false } },
-        "effects": { "eq": "", "custom_eq": [0, 0, 0, 0, 0, 0, 0, 0, 0, 0], "boost": 0.0, "night": false, "width": 1.0 }
-      },
-      "stack": { "enabled": false, "modifier": "option", "sensitive": "off", "expire_minutes": 10 },
-      "snap": { "enabled": false, "zones": ["left", "right", "first_third", "center_third", "last_third", "maximize"] },
-      "menubar": { "enabled": false, "auto_seconds": 10, "click_only": true },
-      "vision": { "enabled": false, "shortcut": "ctrl+opt+cmd+8", "format": "hex" },
-      "lyrics": { "enabled": false, "fetch": false },
-      "calendar": { "enabled": false, "lead_minutes": 5, "sound": true, "reminders": true, "all_day": true, "excluded": [] },
-      "smart": {
-        "enabled": false,
-        "shortcut": "ctrl+opt+s",
-        "internet": false,
-        "translate_to": "auto",
-        "currencies": ["USD", "EUR", "VND"],
-        "zones": ["UTC", "America/New_York", "Europe/London", "Asia/Tokyo"]
-      },
-      "notch": { "enabled": true },
-      "mouse": {
-        "smooth": true,
-        "reverse": false,
-        "step_px": 36.0,
-        "speed": 1.0,
-        "duration_ms": 360.0,
-        "shift_horizontal": true,
-        "option_boost": true,
-        "boost": 5.0,
-        "command_zoom": false,
-        "apps": { "com.example.game": { "smooth": false } }
-      },
-      "tiling": {
-        "enabled": true,
-        "shortcuts": { "left": "ctrl+opt+left", "center": "" }
-      }
-    }
-
-`capture.folder` empty means the folder of macOS's own screenshots, else the Desktop; it may start with `~/`. `capture.shortcuts` holds only the changed ones (`area window screen timer text scroll record gif`; an empty string removes one, a built-in one too); `capture.quick_seconds` 0 keeps the quick panel until it is closed. In `audio`, a volume is 0 to 4 (1 is unchanged), `output` is a device UID (empty follows the system's output), `eq` is a preset (`flat bass_boost bass_reducer treble_boost treble_reducer vocal loudness rock pop electronic hip_hop jazz classical acoustic spoken movie gaming`, or `custom` for `custom_eq`, 10 bands in dB within 12 either way), `boost` is 0 to 1 and `width` 0 (mono) to 2. `stack.modifier` is `option`, `command`, `control` or `shift`; `stack.sensitive` is `off`, `mask` or `never`; `stack.expire_minutes` is 1 to 1440. `snap.zones` takes layout names (those of `tiling.shortcuts` except `center`), unknown and repeated names are ignored; `menubar.auto_seconds` is 0 (never) to 3600. In `notch`, `material` is `glass`, `clear` or `black`; `motion` is `spring`, `smooth` or `none`; `hover_delay_ms` is 0 to 1000; `open_page` is `activity`, `last` or a tab id; `display` is `auto` (the built-in screen with a notch, else the main one), `main` or `pointer` (the screen whose top edge the pointer reaches); `rest` is what a screen without a notch shows, `notch` or `hidden`; `pages` lists the tabs to show in order (empty shows all; ids `clipboard shelf media focus agents calendar sound`); `waveform` is `live` or `animated`; `shortcut` opens and closes the notch (empty for none). `theme` is `auto`, `light` or `dark`. A value of the wrong type or an unknown word in any of these falls back to the default instead of making the file unreadable.
-
-`version` records the layout of the file. A file without it was written before window snapping by dragging was on by default, and every such file had `"snap": {"enabled": false}` written into it whether or not the user ever chose that, so it is turned on once when such a file loads; a choice made after that stands.
-
-A shortcut needs at least one modifier, except function keys (f1 to f20). An empty shortcut turns that layout off. Layout names: `left right top bottom top_left top_right bottom_left bottom_right maximize center first_third center_third last_third`.
-
-Environment variables: `FIGGHOST_HOME` changes the data directory, `FIGGHOST_PASTEBOARD` uses a named pasteboard instead of the real clipboard, `FIGGHOST_AGENTS_HOME` changes where `.claude` and `.codex` are looked for (with `FIGGHOST_HOME` set and no `FIGGHOST_AGENTS_HOME` they are looked for in an empty folder inside `FIGGHOST_HOME`, because the agents feature rewrites the paths of the hooks it installed each time it starts and a private instance must never reach the real files), and `FIGGHOST_NOTCH_OFFSCREEN` places the notch and the Smart Select window outside every screen, and `FIGGHOST_SMART_TEXT` with `FIGGHOST_SMART_OPEN` makes Smart Select answer for a given text as soon as the app is up (all of these are for tests), and `FIGGHOST_TRACE=1` prints a timeline to stderr. Arguments: `--show-settings` always opens the window, `--background` never does, `--mcp` runs the assistant server, `--figghost-hook <claude|codex>` and `--figghost-statusline` are what the agents run (they never start the interface).
+`~/Library/Application Support/Figghost/config.json`, written by the settings window. Missing values use defaults, out-of-range values are clamped, and an unreadable file is moved to `config.json.bad` instead of being overwritten. Files written by older versions load unchanged. Every key, every accepted value, and the environment variables and arguments the test instances use are in [docs/configuration.md](docs/configuration.md).
 
 ## Data and privacy
 
-History lives in `~/Library/Application Support/Figghost` (`history.sqlite`, an `images` folder, `shelf.json`, and, depending on the features you turn on, `agents.sock`, `claude-usage.json` and `statusline-chain` (agents), `rates.json` (Smart Select exchange rates), `lyrics-cache` (lyrics) and `history.sqlite.v2.bak` (a copy made once before the database was upgraded)), with directory mode 0700 and no encryption. Screenshots and recordings are saved in the folder of macOS's own screenshots (else the Desktop) unless you choose another; the key display of a recording shows shortcuts and keys such as Return, never plain typing. The Sound tab processes the audio of the apps it changes in memory and records nothing; the bars of the closed notch measure the level of what plays in memory and keep nothing. The token count reads the agents' transcripts on this Mac and keeps only the sums in memory. What plays is read through the system's Now Playing on this Mac only; lyrics are looked up only for Music and Spotify, never for a video in a browser. The clipboard mascot shows a stand-in for what was copied, never its content, and keeps nothing. Items flagged by the source app and password managers are skipped, but a password copied from another source can still be stored: use the ignored apps list or clear the history. The settings page is loaded from a string and cannot reach the network; the web view keeps nothing on disk.
+History lives in `~/Library/Application Support/Figghost` (`history.sqlite`, an `images` folder, `shelf.json` and the files of the features you turn on), with directory mode 0700 and no encryption. Screenshots and recordings are saved in the folder of macOS's own screenshots (else the Desktop) unless you choose another; the key display of a recording shows shortcuts and keys such as Return, never plain typing. Items flagged by the source app and password managers are skipped, but a password copied from another source can still be stored: use the ignored apps list or clear the history. The settings page is loaded from a string and cannot reach the network. Everything else stays on this Mac.
 
 Nothing is sent over the network unless you turn it on, and then only what the settings text says: Smart Select downloads a table of exchange rates (nothing about you) and, to translate, sends the selected text (at most 450 characters) to api.mymemory.translated.net; lyrics send the artist, track and album names and the track length to lrclib.net. Both go through the system's curl over https. The permissions asked for are Accessibility (shortcuts that act on other apps, the volume indicator, Copy Stack, Smart Select, drag to the notch), Screen Recording (screenshots, recordings and the colour picker, only when you use them), System Audio Recording (Sound, the first time an app is changed, a recording with the computer's audio, and the bars of the closed notch when they follow the sound), Microphone and Camera (a recording, when turned on in its options), Calendars and Reminders (only when you turn the calendar on) and Automation of Music and Spotify (the Media tab).
-
-## Development tools
-
-Programs in `crates/*/examples`. Some of them post real input events, so read the warnings.
-
-- `app-ui/settings_preview`: runs the real settings page in WebKit with no window. `selftest` runs the page's own checks; `snap <page> <out.png> [--dark] [--lang vi] [--size WxH] [--backdrop light|dark|color] [--patch json]` renders a page.
-- `macos-sys/web_probe`: checks the web bridge end to end in a transparent window.
-- `macos-sys/window_check`: opens the real glass window without showing it, resizes it and checks that the web view follows.
-- `macos-sys/web_release_check`: opens and drops the glass window four times and checks that the web view is released each time and that no WebKit helper outlives the last window (it waits for WebKit's GPU helper, so it takes about a minute).
-- `macos-sys/hotkey_swap`: checks that a global shortcut can be released and registered again, which is how the settings change one.
-- `macos-sys/layout_check`: opens the notch with its tabs and checks that every page lies inside the window and the tab bar is centred.
-- `macos-sys/render_smart`: draws the Smart Select window in every state and checks its keys with events delivered in the process. `macos-sys/ax_dump <pid>` prints the accessibility tree of a process (the terminal needs Accessibility access and the screen has to be unlocked).
-- `macos-sys/capture_check [folder]`: freezes every display, lists the windows and captures the front one alone, writing PNGs and checking their sizes. `overlay_check` drives the selection overlay with synthetic input (it posts input, so leave the machine alone), `ocr_check` reads known Vietnamese and English text back, `editor_check` draws every mark of the editor at the capture's resolution, and `record_check` records three seconds with the key display, makes a GIF and checks the sound tracks of the computer's audio and the microphone. `text_window` and `scroll_target` are targets for text recognition and scrolling capture; `post_input` posts keys, moves, clicks, drags and scrolls. `scripts/check-capture.py <program>`: the start of the capture feature through the real program.
-- `macos-sys/tap_check`, `tap_meter`: the process tap path with a quiet test tone, and the level one process sends to its devices. `mixer_demo` draws the Sound tab.
-- `macos-sys/stack_check`: the clipboard list with boards and hidden rows, and the keyboard watchers of Copy Stack, in process on a panel outside every screen. `macos-sys/named_board <name> write <text> | read | release`: writes to a named pasteboard (never the general one) to play an app that copies. `scripts/check-stack.py <program> <named_board>`: the end to end check (about two minutes, because it waits for a one minute expiry); it posts no input events.
-- `app-ui/snap_check` (`scripts/check-snap.sh`): window snapping through the real controller, panel and notch on a pretend screen (refuses to run without `FIGGHOST_NOTCH_OFFSCREEN=1`); `macos-sys/render_snap` draws the drop zones to PNG files; `macos-sys/grab_check` runs the Accessibility lookup of window snapping against one point of the real screen and prints only yes or no.
-- `macos-sys/picker_check <folder>`: the colour picker through synthetic events and a synthetic frozen screen on panels outside every screen, including a picture that arrives late or never; writes the loupe to PNG files. `app-ui/lyrics_preview <folder> en|vi`: the Media tab with lyrics in each state. `macos-sys/render_calendar <folder>`: the Calendar page in each state, with its buttons and keys checked. `macos-sys/eventkit_check`: prints the permission states and what an unauthorised store returns; it stops before reading if access already exists.
-- `app-ui/mascot_check [folder]`: draws every character of the clipboard mascot in every scene, at the moments that tell the story, to PNG files (default `/tmp/mascot-check`). `scripts/check-mascot.py <program> <named_board>`: the mascot through the real program on a private instance (about 15 seconds); it posts no input events.
-- `macos-sys/anim_check`: runs the notch's open and close animation outside every screen and checks the spring as the window server draws it (rest, overshoot, full size, back to rest) and that Liquid Glass has the shape's size on every sample. `ANIM_ON_SCREEN=1` runs it on the real screen, `ANIM_VERBOSE=1` prints every sample.
-- `macos-sys/seek_check`: seeks what plays from the Media tab's bar, driven through accessibility; run it while a player that takes seeks is Now Playing.
-- `macos-sys/notch_shots <folder> [glass|clear|black] [spring|smooth|none] [--video]`: shows the notch on the real screen over a colourful window of its own (so only that window is captured) at rest, with a live activity, open and closed again, and writes a screenshot of each. It takes no focus and moves no pointer. `--video` records the movement to `motion.mp4` with ScreenCaptureKit instead; with `FIGGHOST_SLOW_MOTION=25` the notch plays every movement 25 times slower and the opening is captured as a run of screenshots. Both need an unlocked screen.
-- `macos-sys/nowplaying_check`: runs the Now Playing watcher with the adapter and prints what plays once a second. `macos-sys/meter_check`: plays two quiet tones and checks that the level meter's low and high bands rise for them. `macos-sys/status_icon <folder>`: draws the menu bar icon at 1x and 2x.
-- `macos-sys/render_notch`: draws every notch page, including the agents tab with and without a pending request, to PNG files.
-- `scripts/check-agents.py <program>`: the agents feature end to end (see Status). It presses buttons through accessibility, posts no input events and needs no unlocked screen, but needs Accessibility for the terminal; without it that step is reported as skipped.
-- `macos-sys/render_ui`, `render_pages`, `notch_demo`, `hud_demo`: draw the list, the focus and media pages, the notch and the volume indicator.
-- `macos-sys/make_icon`: draws the app icon at every size.
-- `core-mouse/probe`: runs the scroll engine with a recording output. It swallows the real mouse wheel while it runs.
-- `macos-sys/loopback`: checks the scroll, paste and media or volume key posting paths with an observer tap that swallows what this process posts.
-- `macos-sys/volume_check`: reads the output volume through CoreAudio and writes the same values back.
-- `macos-sys/post_key`: presses a media or volume key at the HID level. Warning: when delivered, the system acts on it. It changes the real volume, and a play key can start Music.
-- `macos-sys/key_probe`: prints every system-defined key event the session sees and lets them through (so the system still acts on them).
-- `macos-sys/drag_source`, `dnd_check`, `paste_target`, `check_composition`, `tile_check`: a draggable file for cross-process drops, an in-process drag and drop check, a window that records the keys it receives, an input method guard check, and a tiling check on the example's own window.
 
 ## Technology choices
 
@@ -358,9 +60,13 @@ The shell uses AppKit through `objc2`, not GPUI or Tauri. The search field must 
 
 ## Next steps
 
-1. Try the unverified items above on real hardware, starting with the ones that need real input or a real screen: Smart Select and screen capture from their shortcuts, the colour picker, Copy Stack, dragging a window to the notch, the menu bar icons, a calendar alert, lyrics with a playing track, physical volume keys, Telex and VNI typing, a notched display, launch at login.
+1. Try the unverified items in [docs/verification.md](docs/verification.md) on real hardware, starting with the ones that need real input or a real screen: Smart Select and screen capture from their shortcuts, the colour picker, Copy Stack, dragging a window to the notch, the menu bar icons, a calendar alert, lyrics with a playing track, physical volume keys, Telex and VNI typing, a notched display, launch at login.
 2. From the OneNotch list, what is left: object removal, the system live activities (charging, Bluetooth, Focus), lock screen presence, gestures on the notch and a notch on every display.
 3. A Developer ID signature and notarization, which also settles the permissions that have to be granted again after each ad-hoc build.
+
+## Development
+
+The repository layout, the programs in `crates/*/examples` that check the app, and how to add a language are in [docs/development.md](docs/development.md). What has been verified and what has not is in [docs/verification.md](docs/verification.md).
 
 ## License
 

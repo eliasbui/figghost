@@ -65,8 +65,11 @@ trap 'rm -rf "$WORK"' EXIT
     echo "Figghost $VERSION, for Apple silicon Macs with macOS 13 or later."
     echo
     echo "    brew tap eliasbui/figghost"
-    echo "    brew trust --tap eliasbui/figghost"
-    echo "    brew install --cask figghost      # or: brew upgrade --cask figghost"
+    echo "    brew install --cask eliasbui/figghost/figghost"
+    echo
+    echo "Writing the cask out in full trusts only that cask, so no brew trust is needed. Without Homebrew:"
+    echo
+    echo "    curl -fsSL https://raw.githubusercontent.com/eliasbui/figghost/main/scripts/install.sh | sh"
     echo
     echo "Changes:"
     echo

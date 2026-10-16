@@ -1,0 +1,54 @@
+# Development
+
+Layout of the repository, and the programs that check it. See [README.md](../README.md) to build and run.
+
+- `crates/macos-sys`: all `unsafe` code and FFI: panels, event tap, event posting, Carbon hotkeys, pasteboard, app tracking, CoreAudio, the list, popup, notch and its pages, the web view host and glass window, status item, application lifecycle.
+- `crates/core-mouse`: the scroll engine (source classification, decision, smoother, frame pump).
+- `crates/core-clipboard`: history core (SQLite store with formatting and pin letters, search, classification, ignore policy).
+- `crates/core-window`: tiling layouts as pure geometry.
+- `crates/core-smart`: what a piece of text means: numbers in both styles, unit conversion, money, times and zones, the translation request and answer, and the one GET through curl.
+- `crates/core-capture`: screen capture without an interface: geometry and file names, the stitcher of scrolling capture, the editor's document, and key names for the key display of a recording.
+- `crates/core-audio-fx`: the sound processing of Sound as plain Rust: equalizer, compressor, limiter and smoothed gain.
+- `crates/core-lyrics`: lyrics without an interface: the LRC parser and lookup, the LRCLIB client, the disk cache and the non-blocking lookup service.
+- `crates/core-calendar`: calendar logic without an interface: meeting links, the alert scheduler, day grouping and the wording of dates and times in both languages.
+- `crates/core-agents`: the Claude Code and Codex side with no interface: hook events, the unix socket server and the wire format, the session tracker, the hook installer, the usage readers and the hook command.
+- `crates/app-ui`: composition root, configuration, language tables, the feature controllers, the settings model and bridge (`src/settings`), the MCP server, and the web page (`web/index.html`, `app.css`, `app.js`, `fixture.json`).
+- `scripts/bundle.sh` builds `Figghost.app`; `scripts/check-agents.py` runs the agents feature through the real program and pretend agents; `scripts/check-smart.py` does the same for Smart Select; `scripts/check-capture.py`, `check-vision.py`, `check-lyrics.py` and `check-calendar.py` start the real program on private instances with their feature on and off and check that it survives a hostile config and idles; `scripts/check-focus.sh` checks that a background start (`--background`, what a login item uses) does not change the frontmost app.
+## Development tools
+
+
+Programs in `crates/*/examples`. Some of them post real input events, so read the warnings.
+
+- `app-ui/settings_preview`: runs the real settings page in WebKit with no window. `selftest` runs the page's own checks; `snap <page> <out.png> [--dark] [--lang vi] [--size WxH] [--backdrop light|dark|color] [--patch json]` renders a page.
+- `macos-sys/web_probe`: checks the web bridge end to end in a transparent window.
+- `macos-sys/window_check`: opens the real glass window without showing it, resizes it and checks that the web view follows.
+- `macos-sys/web_release_check`: opens and drops the glass window four times and checks that the web view is released each time and that no WebKit helper outlives the last window (it waits for WebKit's GPU helper, so it takes about a minute).
+- `macos-sys/hotkey_swap`: checks that a global shortcut can be released and registered again, which is how the settings change one.
+- `macos-sys/layout_check`: opens the notch with its tabs and checks that every page lies inside the window and the tab bar is centred.
+- `macos-sys/render_smart`: draws the Smart Select window in every state and checks its keys with events delivered in the process. `macos-sys/ax_dump <pid>` prints the accessibility tree of a process (the terminal needs Accessibility access and the screen has to be unlocked).
+- `macos-sys/capture_check [folder]`: freezes every display, lists the windows and captures the front one alone, writing PNGs and checking their sizes. `overlay_check` drives the selection overlay with synthetic input (it posts input, so leave the machine alone), `ocr_check` reads known Vietnamese and English text back, `editor_check` draws every mark of the editor at the capture's resolution, and `record_check` records three seconds with the key display, makes a GIF and checks the sound tracks of the computer's audio and the microphone. `text_window` and `scroll_target` are targets for text recognition and scrolling capture; `post_input` posts keys, moves, clicks, drags and scrolls. `scripts/check-capture.py <program>`: the start of the capture feature through the real program.
+- `macos-sys/tap_check`, `tap_meter`: the process tap path with a quiet test tone, and the level one process sends to its devices. `mixer_demo` draws the Sound tab.
+- `macos-sys/stack_check`: the clipboard list with boards and hidden rows, and the keyboard watchers of Copy Stack, in process on a panel outside every screen. `macos-sys/named_board <name> write <text> | read | release`: writes to a named pasteboard (never the general one) to play an app that copies. `scripts/check-stack.py <program> <named_board>`: the end to end check (about two minutes, because it waits for a one minute expiry); it posts no input events.
+- `app-ui/snap_check` (`scripts/check-snap.sh`): window snapping through the real controller, panel and notch on a pretend screen (refuses to run without `FIGGHOST_NOTCH_OFFSCREEN=1`); `macos-sys/render_snap` draws the drop zones to PNG files; `macos-sys/grab_check` runs the Accessibility lookup of window snapping against one point of the real screen and prints only yes or no.
+- `macos-sys/picker_check <folder>`: the colour picker through synthetic events and a synthetic frozen screen on panels outside every screen, including a picture that arrives late or never; writes the loupe to PNG files. `app-ui/lyrics_preview <folder> en|vi`: the Media tab with lyrics in each state. `macos-sys/render_calendar <folder>`: the Calendar page in each state, with its buttons and keys checked. `macos-sys/eventkit_check`: prints the permission states and what an unauthorised store returns; it stops before reading if access already exists.
+- `app-ui/mascot_check [folder]`: draws every character of the clipboard mascot in every scene, at the moments that tell the story, to PNG files (default `/tmp/mascot-check`). `scripts/check-mascot.py <program> <named_board>`: the mascot through the real program on a private instance (about 15 seconds); it posts no input events.
+- `macos-sys/anim_check`: runs the notch's open and close animation outside every screen and checks the spring as the window server draws it (rest, overshoot, full size, back to rest) and that Liquid Glass has the shape's size on every sample. `ANIM_ON_SCREEN=1` runs it on the real screen, `ANIM_VERBOSE=1` prints every sample.
+- `macos-sys/seek_check`: seeks what plays from the Media tab's bar, driven through accessibility; run it while a player that takes seeks is Now Playing.
+- `macos-sys/notch_shots <folder> [glass|clear|black] [spring|smooth|none] [--video]`: shows the notch on the real screen over a colourful window of its own (so only that window is captured) at rest, with a live activity, open and closed again, and writes a screenshot of each. It takes no focus and moves no pointer. `--video` records the movement to `motion.mp4` with ScreenCaptureKit instead; with `FIGGHOST_SLOW_MOTION=25` the notch plays every movement 25 times slower and the opening is captured as a run of screenshots. Both need an unlocked screen.
+- `macos-sys/nowplaying_check`: runs the Now Playing watcher with the adapter and prints what plays once a second. `macos-sys/meter_check`: plays two quiet tones and checks that the level meter's low and high bands rise for them. `macos-sys/status_icon <folder>`: draws the menu bar icon at 1x and 2x.
+- `macos-sys/render_notch`: draws every notch page, including the agents tab with and without a pending request, to PNG files.
+- `scripts/check-agents.py <program>`: the agents feature end to end (see Status). It presses buttons through accessibility, posts no input events and needs no unlocked screen, but needs Accessibility for the terminal; without it that step is reported as skipped.
+- `macos-sys/render_ui`, `render_pages`, `notch_demo`, `hud_demo`: draw the list, the focus and media pages, the notch and the volume indicator.
+- `macos-sys/make_icon`: draws the app icon at every size.
+- `core-mouse/probe`: runs the scroll engine with a recording output. It swallows the real mouse wheel while it runs.
+- `macos-sys/loopback`: checks the scroll, paste and media or volume key posting paths with an observer tap that swallows what this process posts.
+- `macos-sys/volume_check`: reads the output volume through CoreAudio and writes the same values back.
+- `macos-sys/post_key`: presses a media or volume key at the HID level. Warning: when delivered, the system acts on it. It changes the real volume, and a play key can start Music.
+- `macos-sys/key_probe`: prints every system-defined key event the session sees and lets them through (so the system still acts on them).
+- `macos-sys/drag_source`, `dnd_check`, `paste_target`, `check_composition`, `tile_check`: a draggable file for cross-process drops, an in-process drag and drop check, a window that records the keys it receives, an input method guard check, and a tiling check on the example's own window.
+
+## Languages
+
+
+The `language` setting accepts `auto` (default), `en` or `vi`. `auto` takes the first system language that has a translation and falls back to English. The settings window changes language at once; menus and the notch change after a restart (the page offers a button). To add one, add a variant to `Language` in `crates/app-ui/src/i18n.rs`, where every string is a method with an exhaustive `match`, and a dictionary to `web/app.js`, where a self-check lists every missing key.
+
