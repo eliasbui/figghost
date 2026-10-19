@@ -19,6 +19,7 @@ const FEATURE_SCRIPTS: &[&str] = &[
     include_str!("../../web/features/menubar.js"),
     include_str!("../../web/features/stack.js"),
     include_str!("../../web/features/mascot.js"),
+    include_str!("../../web/features/mole.js"),
 ];
 const FEATURE_STYLES: &[&str] = &[
     include_str!("../../web/features/smart.css"),
@@ -30,6 +31,7 @@ const FEATURE_STYLES: &[&str] = &[
     include_str!("../../web/features/menubar.css"),
     include_str!("../../web/features/stack.css"),
     include_str!("../../web/features/mascot.css"),
+    include_str!("../../web/features/mole.css"),
 ];
 const FEATURE_FIXTURES: &[(&str, &str)] = &[
     (
@@ -65,6 +67,7 @@ const FEATURE_FIXTURES: &[(&str, &str)] = &[
         "mascot",
         include_str!("../../web/features/mascot.fixture.json"),
     ),
+    ("mole", include_str!("../../web/features/mole.fixture.json")),
 ];
 
 /// The SF Symbols the page draws (app.js `icon()`): page icons and button glyphs. The page's self-test fails
@@ -82,6 +85,7 @@ const SYMBOLS: &[&str] = &[
     "calendar",
     "rectangle.split.2x1.fill",
     "info.circle.fill",
+    "sparkles",
     "plus",
     "xmark",
     "folder",

@@ -1,0 +1,26 @@
+/* Mole: the cleaning and health page. Styles for web/features/mole.js, using the variables at the top of app.css. */
+.mole-meters { display: grid; grid-template-columns: repeat(3, 1fr); gap: 16px; padding: 12px var(--row-inset); }
+.mole-meter-label { display: flex; justify-content: space-between; color: var(--text-2); font-size: var(--fs-small); }
+.mole-meter-label b { color: var(--text); font-weight: 600; }
+.mole-bar { height: 6px; margin-top: 6px; border-radius: 999px; background: var(--field); overflow: hidden; }
+.mole-bar > span { display: block; height: 100%; border-radius: 999px; background: var(--accent); transition: width 0.3s; }
+.mole-bar.hot > span { background: var(--bad); }
+.mole-score { font-size: 24px; font-weight: 650; font-variant-numeric: tabular-nums; }
+.mole-actions { display: flex; gap: 8px; }
+.mole-section { padding: 8px var(--row-inset); }
+.mole-section + .mole-section { border-top: 0.5px solid var(--stroke); }
+.mole-section-name { font-weight: 600; margin-bottom: 4px; }
+.mole-line { color: var(--text-2); font-size: var(--fs-small); padding: 1px 0; overflow-wrap: anywhere; }
+.mole-line.item { color: var(--text); }
+.mole-summary { padding: 10px var(--row-inset); font-weight: 600; }
+.mole-summary div + div { margin-top: 2px; font-weight: 400; color: var(--text-2); }
+.mole-list > .mole-app, .mole-app { display: flex; align-items: center; gap: 10px; padding: 8px var(--row-inset); }
+.mole-app + .mole-app { border-top: 0.5px solid var(--stroke); }
+.mole-app-name { flex: 1; min-width: 0; overflow: hidden; text-overflow: ellipsis; white-space: nowrap; }
+.mole-app-size { flex: none; color: var(--text-2); font-size: var(--fs-small); }
+.mole-entry { -webkit-appearance: none; appearance: none; display: grid; grid-template-columns: 1fr auto; gap: 2px 10px; width: 100%; padding: 8px var(--row-inset); border: 0; background: none; color: var(--text); font: var(--fs-body) var(--font); text-align: left; }
+.mole-entry.dir { cursor: pointer; }
+.mole-entry.dir:hover { background: var(--fill); }
+.mole-entry .mole-bar { grid-column: 1 / -1; }
+.mole-entry-size { color: var(--text-2); font-size: var(--fs-small); }
+.mole-summary .btn { margin-top: 6px; font-weight: 400; }

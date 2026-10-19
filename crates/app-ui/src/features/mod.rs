@@ -16,6 +16,7 @@ pub mod capture;
 pub mod lyrics;
 pub mod mascot;
 pub mod menubar;
+pub mod mole;
 pub mod smart;
 pub mod snap;
 pub mod stack;
@@ -50,6 +51,7 @@ pub struct Features {
     pub menubar: Option<Rc<menubar::Feature>>,
     pub stack: Option<Rc<stack::Feature>>,
     pub mascot: Option<Rc<mascot::Feature>>,
+    pub mole: Option<Rc<mole::Feature>>,
 }
 
 impl Features {
@@ -64,6 +66,7 @@ impl Features {
             menubar: menubar::attach(env),
             stack: stack::attach(env),
             mascot: mascot::attach(env),
+            mole: mole::attach(env),
         }
     }
 
@@ -96,6 +99,9 @@ impl Features {
         }
         if let Some(f) = &self.mascot {
             out.insert("mascot", f.runtime());
+        }
+        if let Some(f) = &self.mole {
+            out.insert("mole", f.runtime());
         }
         out
     }
@@ -251,6 +257,11 @@ impl Features {
         {
             return Some(result);
         }
+        if let Some(f) = &self.mole
+            && let Some(result) = f.action(name)
+        {
+            return Some(result);
+        }
         None
     }
 
@@ -330,6 +341,10 @@ pub fn state(
     root.insert(
         "mascot".into(),
         mascot::settings::state(&config.mascot, runtime.get("mascot").unwrap_or(&none)),
+    );
+    root.insert(
+        "mole".into(),
+        mole::settings::state(runtime.get("mole").unwrap_or(&none)),
     );
 }
 
