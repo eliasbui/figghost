@@ -13,6 +13,7 @@
       "history_limit": 500,
       "ignored_apps": ["com.example.vault"],
       "mcp": { "enabled": false },
+      "update": { "auto": false },
       "agents": { "enabled": false, "approval_wait_seconds": 30, "sound": true, "peek_when_done": true },
       "capture": {
         "enabled": false,
@@ -65,6 +66,8 @@
     }
 
 `capture.folder` empty means the folder of macOS's own screenshots, else the Desktop; it may start with `~/`. `capture.shortcuts` holds only the changed ones (`area window screen timer text scroll record gif`; an empty string removes one, a built-in one too); `capture.quick_seconds` 0 keeps the quick panel until it is closed. In `audio`, a volume is 0 to 4 (1 is unchanged), `output` is a device UID (empty follows the system's output), `eq` is a preset (`flat bass_boost bass_reducer treble_boost treble_reducer vocal loudness rock pop electronic hip_hop jazz classical acoustic spoken movie gaming`, or `custom` for `custom_eq`, 10 bands in dB within 12 either way), `boost` is 0 to 1 and `width` 0 (mono) to 2. `stack.modifier` is `option`, `command`, `control` or `shift`; `stack.sensitive` is `off`, `mask` or `never`; `stack.expire_minutes` is 1 to 1440. `snap.zones` takes layout names (those of `tiling.shortcuts` except `center`), unknown and repeated names are ignored; `menubar.auto_seconds` is 0 (never) to 3600. In `notch`, `material` is `glass`, `clear` or `black`; `motion` is `spring`, `smooth` or `none`; `hover_delay_ms` is 0 to 1000; `open_page` is `activity`, `last` or a tab id; `display` is `auto` (the built-in screen with a notch, else the main one), `main` or `pointer` (the screen whose top edge the pointer reaches); `rest` is what a screen without a notch shows, `notch` or `hidden`; `pages` lists the tabs to show in order (empty shows all; ids `clipboard shelf media focus agents calendar sound`); `waveform` is `live` or `animated`; `shortcut` opens and closes the notch (empty for none). `theme` is `auto`, `light` or `dark`. A value of the wrong type or an unknown word in any of these falls back to the default instead of making the file unreadable.
+
+`update.auto` installs a new version as soon as the daily check finds it, instead of asking first; either way it is used from the next launch. The check itself cannot be turned off. When it last got an answer is kept in the file `update-check` of the data folder (seconds since 1970); delete the file to have the next check come at once. A program that does not run from an app (a build folder) never checks by itself.
 
 `version` records the layout of the file. A file without it was written before window snapping by dragging was on by default, and every such file had `"snap": {"enabled": false}` written into it whether or not the user ever chose that, so it is turned on once when such a file loads; a choice made after that stands.
 

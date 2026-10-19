@@ -12,7 +12,7 @@ Layout of the repository, and the programs that check it. See [README.md](../REA
 - `crates/core-lyrics`: lyrics without an interface: the LRC parser and lookup, the LRCLIB client, the disk cache and the non-blocking lookup service.
 - `crates/core-calendar`: calendar logic without an interface: meeting links, the alert scheduler, day grouping and the wording of dates and times in both languages.
 - `crates/core-agents`: the Claude Code and Codex side with no interface: hook events, the unix socket server and the wire format, the session tracker, the hook installer, the usage readers and the hook command.
-- `crates/app-ui`: composition root, configuration, language tables, the feature controllers, the settings model and bridge (`src/settings`), the MCP server, and the web page (`web/index.html`, `app.css`, `app.js`, `fixture.json`).
+- `crates/app-ui`: composition root, configuration, language tables, the feature controllers, the settings model and bridge (`src/settings`), the updater (`src/update`: the look at GitHub every day, the download and swap of the app, the popup that says what is new), the MCP server, and the web page (`web/index.html`, `app.css`, `app.js`, `fixture.json`).
 - `scripts/bundle.sh` builds `Figghost.app`; `scripts/check-agents.py` runs the agents feature through the real program and pretend agents; `scripts/check-smart.py` does the same for Smart Select; `scripts/check-capture.py`, `check-vision.py`, `check-lyrics.py` and `check-calendar.py` start the real program on private instances with their feature on and off and check that it survives a hostile config and idles; `scripts/check-focus.sh` checks that a background start (`--background`, what a login item uses) does not change the frontmost app.
 ## Development tools
 
@@ -20,6 +20,7 @@ Layout of the repository, and the programs that check it. See [README.md](../REA
 Programs in `crates/*/examples`. Some of them post real input events, so read the warnings.
 
 - `app-ui/settings_preview`: runs the real settings page in WebKit with no window. `selftest` runs the page's own checks; `snap <page> <out.png> [--dark] [--lang vi] [--size WxH] [--backdrop light|dark|color] [--patch json]` renders a page.
+- `app-ui/update_preview`: runs the real update popup in WebKit with no window. `selftest` runs the page's own checks; `snap <available|installing|ready|blocked> <out.png> [--dark] [--lang vi] [--few]` renders one state. The installing code has its own tests with a served, signed app in a scratch folder; `cargo test -p app-ui -- --ignored --nocapture github_answers` reads the real latest release.
 - `macos-sys/web_probe`: checks the web bridge end to end in a transparent window.
 - `macos-sys/window_check`: opens the real glass window without showing it, resizes it and checks that the web view follows.
 - `macos-sys/web_release_check`: opens and drops the glass window four times and checks that the web view is released each time and that no WebKit helper outlives the last window (it waits for WebKit's GPU helper, so it takes about a minute).
@@ -50,5 +51,5 @@ Programs in `crates/*/examples`. Some of them post real input events, so read th
 ## Languages
 
 
-The `language` setting accepts `auto` (default), `en` or `vi`. `auto` takes the first system language that has a translation and falls back to English. The settings window changes language at once; menus and the notch change after a restart (the page offers a button). To add one, add a variant to `Language` in `crates/app-ui/src/i18n.rs`, where every string is a method with an exhaustive `match`, and a dictionary to `web/app.js`, where a self-check lists every missing key.
+The `language` setting accepts `auto` (default), `en` or `vi`. `auto` takes the first system language that has a translation and falls back to English. The settings window changes language at once; menus and the notch change after a restart (the page offers a button). To add one, add a variant to `Language` in `crates/app-ui/src/i18n.rs`, where every string is a method with an exhaustive `match`, and a dictionary to `web/app.js`, where a self-check lists every missing key (the update popup, `web/update.html`, keeps a small dictionary of its own, checked the same way).
 

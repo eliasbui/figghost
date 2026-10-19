@@ -68,6 +68,7 @@ fn sample(state: &str, lang: &str, few: bool) -> Value {
         "current": "0.5.0",
         "changes": changes,
         "stage": "downloading",
+        "percent": 42,
         "detail": "cannot write to /Applications: Permission denied",
     })
 }

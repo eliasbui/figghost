@@ -91,6 +91,7 @@ fn status(phase: &Phase) -> Value {
         Phase::Installing(release, stage) => {
             let mut message = named("installing", release);
             message["stage"] = json!(stage.name());
+            message["percent"] = json!(stage.percent());
             message
         }
         Phase::Ready(release) => named("ready", release),
@@ -105,10 +106,10 @@ fn status(phase: &Phase) -> Value {
 /// What the popup is told; nothing for the phases that are no question to the user.
 fn view(phase: &Phase, language: &str, current: &str) -> Option<Value> {
     let (state, release, stage, detail) = match phase {
-        Phase::Available(release) => ("available", release, "", ""),
-        Phase::Installing(release, stage) => ("installing", release, stage.name(), ""),
-        Phase::Ready(release) => ("ready", release, "", ""),
-        Phase::Blocked(release, detail) => ("blocked", release, "", detail.as_str()),
+        Phase::Available(release) => ("available", release, None, ""),
+        Phase::Installing(release, stage) => ("installing", release, Some(*stage), ""),
+        Phase::Ready(release) => ("ready", release, None, ""),
+        Phase::Blocked(release, detail) => ("blocked", release, None, detail.as_str()),
         _ => return None,
     };
     Some(json!({
@@ -118,7 +119,8 @@ fn view(phase: &Phase, language: &str, current: &str) -> Option<Value> {
         "version": release.version,
         "current": current,
         "changes": release.changes,
-        "stage": stage,
+        "stage": stage.map_or("", Stage::name),
+        "percent": stage.and_then(Stage::percent),
         "detail": detail,
     }))
 }
@@ -307,7 +309,7 @@ impl UpdateFeature {
                 "this copy of Figghost is not an installed app".into(),
             ));
         };
-        self.set(Phase::Installing(release.clone(), Stage::Downloading));
+        self.set(Phase::Installing(release.clone(), Stage::Downloading(0)));
         std::thread::spawn(move || {
             let result = install::install(&release, &bundle, |stage| {
                 app::on_main(move || with_feature(|this| this.staged(stage)));
@@ -384,6 +386,7 @@ impl UpdateFeature {
         );
         *self.popup.borrow_mut() = Some(Rc::clone(&window));
         window.show(self.mtm);
+        trace::log("update: the popup is open");
     }
 
     fn refresh_popup(&self) {
@@ -403,6 +406,9 @@ impl UpdateFeature {
         let Ok(message) = serde_json::from_str::<Value>(text) else {
             return;
         };
+        if message["t"] == "action" {
+            trace::log(&format!("update: the popup asks for {}", message["name"]));
+        }
         match message["t"].as_str() {
             Some("ready") => {
                 self.popup_ready.set(true);
@@ -491,10 +497,14 @@ mod tests {
         assert_eq!(state(&Phase::Available(new.clone())), "available");
         assert_eq!(state(&Phase::Ready(new.clone())), "ready");
 
-        let installing = status(&Phase::Installing(new.clone(), Stage::Downloading));
+        let installing = status(&Phase::Installing(new.clone(), Stage::Downloading(42)));
         assert_eq!(installing["state"], "installing");
         assert_eq!(installing["stage"], "downloading");
+        assert_eq!(installing["percent"], 42);
         assert_eq!(installing["version"], "0.6.0");
+        let checking = status(&Phase::Installing(new.clone(), Stage::Checking));
+        assert_eq!(checking["stage"], "checking");
+        assert!(checking["percent"].is_null());
 
         let blocked = status(&Phase::Blocked(new, "no permission".into()));
         assert_eq!(blocked["state"], "blocked");
@@ -525,7 +535,20 @@ mod tests {
 
         let blocked = view(&Phase::Blocked(new.clone(), "why".into()), "en", "0.5.0").unwrap();
         assert_eq!(blocked["detail"], "why");
-        let installing = view(&Phase::Installing(new, Stage::Checking), "en", "0.5.0").unwrap();
-        assert_eq!(installing["stage"], "checking");
+        let checking = view(
+            &Phase::Installing(new.clone(), Stage::Checking),
+            "en",
+            "0.5.0",
+        )
+        .unwrap();
+        assert_eq!(checking["stage"], "checking");
+        let downloading = view(
+            &Phase::Installing(new, Stage::Downloading(7)),
+            "en",
+            "0.5.0",
+        )
+        .unwrap();
+        assert_eq!(downloading["stage"], "downloading");
+        assert_eq!(downloading["percent"], 7);
     }
 }

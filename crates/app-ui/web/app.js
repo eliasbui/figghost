@@ -133,7 +133,7 @@ const I18N = {
     'about.update': 'Check for updates', 'about.update.desc': 'Looks for a new version every day. Press Check now to look at once; a new version is downloaded and installed for you.', 'about.update.check': 'Check now',
     'about.update.checking': 'Checking GitHub…', 'about.update.current': 'This is the latest version ({v}).',
     'about.update.available': 'Version {v} is available.', 'about.update.install': 'Update',
-    'about.update.downloading': 'Downloading version {v}…', 'about.update.installing': 'Installing version {v}…',
+    'about.update.downloading': 'Downloading version {v}… {p}%', 'about.update.installing': 'Installing version {v}…',
     'about.update.ready': 'Version {v} is installed. Restart Figghost to use it.', 'about.update.restart': 'Restart',
     'about.update.blocked': 'Version {v} is out, but it could not be installed here: {detail}', 'about.update.open': 'Download',
     'about.update.failed': 'Could not check: {detail}',
@@ -232,7 +232,7 @@ const I18N = {
     'about.update': 'Kiểm tra bản mới', 'about.update.desc': 'Mỗi ngày tự hỏi GitHub xem có bản mới chưa. Bấm Kiểm tra để hỏi ngay; bản mới sẽ được tải và cài sẵn cho bạn.', 'about.update.check': 'Kiểm tra',
     'about.update.checking': 'Đang hỏi GitHub…', 'about.update.current': 'Bạn đang dùng bản mới nhất ({v}).',
     'about.update.available': 'Đã có bản {v}.', 'about.update.install': 'Cập nhật',
-    'about.update.downloading': 'Đang tải bản {v}…', 'about.update.installing': 'Đang cài bản {v}…',
+    'about.update.downloading': 'Đang tải bản {v}… {p}%', 'about.update.installing': 'Đang cài bản {v}…',
     'about.update.ready': 'Đã cài bản {v}. Khởi động lại Figghost để dùng.', 'about.update.restart': 'Khởi động lại',
     'about.update.blocked': 'Đã có bản {v} nhưng không cài được ở đây: {detail}', 'about.update.open': 'Tải về',
     'about.update.failed': 'Không kiểm tra được: {detail}',
@@ -1345,7 +1345,7 @@ function updateRow() {
     desc.textContent = state === 'checking' ? t('about.update.checking')
       : state === 'current' ? t('about.update.current', { v: S.app.version })
       : state === 'available' ? t('about.update.available', { v })
-      : state === 'installing' ? t(release.stage === 'downloading' ? 'about.update.downloading' : 'about.update.installing', { v })
+      : state === 'installing' ? t(release.stage === 'downloading' ? 'about.update.downloading' : 'about.update.installing', { v, p: release.percent || 0 })
       : state === 'ready' ? t('about.update.ready', { v })
       : state === 'blocked' ? t('about.update.blocked', { v, detail })
       : state === 'failed' ? t('about.update.failed', { detail })
@@ -1760,8 +1760,8 @@ window.__selftest = function () {
     btn(t('about.update.install')).click();
     expect(pressed('install_update'), 'the update button installs: ' + JSON.stringify(sent));
 
-    window.__fig.recv({ t: 'update', state: 'installing', version: '9.9.9', stage: 'downloading' });
-    expect($('#scroller').textContent.includes(t('about.update.downloading', { v: '9.9.9' })), 'the download is shown');
+    window.__fig.recv({ t: 'update', state: 'installing', version: '9.9.9', stage: 'downloading', percent: 42 });
+    expect($('#scroller').textContent.includes(t('about.update.downloading', { v: '9.9.9', p: 42 })), 'the download is shown with how far it is');
     expect(btn(t('about.update.check')).disabled, 'no second check while one installs');
     window.__fig.recv({ t: 'update', state: 'installing', version: '9.9.9', stage: 'checking' });
     expect($('#scroller').textContent.includes(t('about.update.installing', { v: '9.9.9' })), 'and then the install');

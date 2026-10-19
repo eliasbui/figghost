@@ -12,6 +12,7 @@ use std::{
     os::unix::fs::DirBuilderExt,
     path::{Path, PathBuf},
     process::{Command, Stdio},
+    time::Duration,
 };
 
 const CURL: &str = "/usr/bin/curl";
@@ -27,10 +28,13 @@ const STAGE: &str = ".Figghost-update";
 const OLD: &str = ".Figghost-old";
 const MAX_ZIP: u64 = 300 << 20;
 const DOWNLOAD_SECONDS: u64 = 600;
+/// How often the size of the file that is arriving is looked at, for the percentage.
+const PROGRESS_INTERVAL: Duration = Duration::from_millis(250);
 
 #[derive(Debug, Clone, Copy, PartialEq, Eq)]
 pub enum Stage {
-    Downloading,
+    /// How much of the zip has arrived, in percent.
+    Downloading(u8),
     Checking,
     Installing,
 }
@@ -38,9 +42,16 @@ pub enum Stage {
 impl Stage {
     pub fn name(self) -> &'static str {
         match self {
-            Stage::Downloading => "downloading",
+            Stage::Downloading(_) => "downloading",
             Stage::Checking => "checking",
             Stage::Installing => "installing",
+        }
+    }
+
+    pub fn percent(self) -> Option<u8> {
+        match self {
+            Stage::Downloading(percent) => Some(percent),
+            _ => None,
         }
     }
 }
@@ -116,8 +127,8 @@ fn prepare(
     progress: &impl Fn(Stage),
 ) -> Result<PathBuf, String> {
     let zip = stage.join("update.zip");
-    progress(Stage::Downloading);
-    download(&asset.url, &zip)?;
+    progress(Stage::Downloading(0));
+    download(&asset.url, &zip, asset.size, progress)?;
     progress(Stage::Checking);
     check_zip(&zip, asset)?;
     run(
@@ -134,15 +145,17 @@ fn prepare(
     Ok(fresh)
 }
 
-fn download(url: &str, to: &Path) -> Result<(), String> {
+/// Fetches `url` into `to` with curl, telling `progress` how far it is while it goes: `size` is what GitHub says
+/// the file will be.
+fn download(url: &str, to: &Path, size: u64, progress: &impl Fn(Stage)) -> Result<(), String> {
     // Loopback http is for the tests, as in `core_smart::net`; the address of a real release is always https.
     let protocol = if url.starts_with("http://127.0.0.1") {
         "=http"
     } else {
         "=https"
     };
-    let status = Command::new(CURL)
-        .args(["--silent", "--show-error", "--fail", "--location"])
+    let mut curl = Command::new(CURL);
+    curl.args(["--silent", "--show-error", "--fail", "--location"])
         .args(["--proto", protocol, "--proto-redir", protocol])
         .args(["--connect-timeout", "15"])
         .args(["--max-time", &DOWNLOAD_SECONDS.to_string()])
@@ -154,15 +167,31 @@ fn download(url: &str, to: &Path) -> Result<(), String> {
         .arg(url)
         .stdin(Stdio::null())
         .stdout(Stdio::null())
-        .stderr(Stdio::null())
-        .status()
-        .map_err(|e| {
-            if e.kind() == std::io::ErrorKind::NotFound {
-                "curl is missing".to_owned()
-            } else {
-                format!("cannot start curl: {e}")
-            }
-        })?;
+        .stderr(Stdio::null());
+    let mut child = curl.spawn().map_err(|e| {
+        if e.kind() == std::io::ErrorKind::NotFound {
+            "curl is missing".to_owned()
+        } else {
+            format!("cannot start curl: {e}")
+        }
+    })?;
+    let mut told = 0;
+    let status = loop {
+        match child.try_wait() {
+            Ok(Some(status)) => break status,
+            Ok(None) => {}
+            Err(e) => return Err(format!("cannot wait for curl: {e}")),
+        }
+        let arrived = fs::metadata(to).map_or(0, |m| m.len());
+        // Never 100 until curl has finished: the last bytes are still to be checked.
+        let percent =
+            u8::try_from((arrived.saturating_mul(100) / size.max(1)).min(99)).unwrap_or(99);
+        if percent != told {
+            told = percent;
+            progress(Stage::Downloading(percent));
+        }
+        std::thread::sleep(PROGRESS_INTERVAL);
+    };
     match status.code() {
         Some(0) => Ok(()),
         // Could not resolve, could not connect, timed out, no response, TLS trouble.
@@ -394,6 +423,37 @@ mod tests {
         url
     }
 
+    /// Like `serve`, but the body comes in ten pieces with a pause before each.
+    fn serve_slowly(file: &Path) -> String {
+        let listener = TcpListener::bind("127.0.0.1:0").unwrap();
+        let url = format!(
+            "http://127.0.0.1:{}/Figghost.zip",
+            listener.local_addr().unwrap().port()
+        );
+        let body = fs::read(file).unwrap();
+        thread::spawn(move || {
+            let (mut stream, _) = listener.accept().unwrap();
+            let mut reader = BufReader::new(stream.try_clone().unwrap());
+            loop {
+                let mut line = String::new();
+                if reader.read_line(&mut line).unwrap_or(0) == 0 || line == "\r\n" {
+                    break;
+                }
+            }
+            let head = format!(
+                "HTTP/1.1 200 OK\r\nContent-Length: {}\r\nConnection: close\r\n\r\n",
+                body.len()
+            );
+            let _ = stream.write_all(head.as_bytes());
+            for piece in body.chunks(body.len().div_ceil(10)) {
+                thread::sleep(Duration::from_millis(120));
+                let _ = stream.write_all(piece);
+                let _ = stream.flush();
+            }
+        });
+        url
+    }
+
     fn release(version: &str, zip: &Path, sha256: Option<String>) -> Release {
         Release {
             version: version.into(),
@@ -436,6 +496,37 @@ mod tests {
         );
         assert_eq!(bundle_of(Path::new("/x/Foo/Contents/MacOS/Figghost")), None);
         assert_eq!(bundle_of(Path::new("app-ui")), None);
+    }
+
+    #[test]
+    fn a_slow_download_reports_how_far_it_is() {
+        let scratch = Scratch::new();
+        let source = scratch.path("source.bin");
+        fs::write(&source, vec![7u8; 100_000]).unwrap();
+        let url = serve_slowly(&source);
+        let target = scratch.path("target.bin");
+
+        let told = RefCell::new(Vec::new());
+        download(&url, &target, 100_000, &|stage: Stage| {
+            told.borrow_mut()
+                .push(stage.percent().expect("only the download reports"))
+        })
+        .unwrap();
+
+        let told = told.into_inner();
+        assert!(
+            told.len() >= 2,
+            "a download of over a second reports more than once: {told:?}"
+        );
+        assert!(
+            told.windows(2).all(|pair| pair[0] < pair[1]),
+            "it only moves forward: {told:?}"
+        );
+        assert!(
+            told.iter().all(|&percent| percent <= 99),
+            "it is not done until it is checked: {told:?}"
+        );
+        assert_eq!(fs::read(&target).unwrap().len(), 100_000);
     }
 
     #[test]
@@ -543,10 +634,10 @@ mod tests {
         let folder = app.parent().unwrap();
         assert!(!folder.join(STAGE).exists(), "the download is cleaned up");
         assert!(!folder.join(OLD).exists(), "the old version is cleaned up");
-        assert_eq!(
-            *stages.borrow(),
-            [Stage::Downloading, Stage::Checking, Stage::Installing]
-        );
+        // The download reports its percentages in between; what matters here is the order of the stages.
+        let mut names: Vec<&str> = stages.borrow().iter().map(|s| s.name()).collect();
+        names.dedup();
+        assert_eq!(names, ["downloading", "checking", "installing"]);
         // And it is a whole app that opens as such.
         check_app(&app, "2.0.0").unwrap();
     }
