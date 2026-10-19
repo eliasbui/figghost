@@ -39,6 +39,7 @@ pub mod reply;
 pub mod screen_capture;
 pub mod selection;
 pub mod services;
+pub mod silhouette;
 pub mod shelf_ui;
 pub mod smart_ui;
 pub mod snap_ui;

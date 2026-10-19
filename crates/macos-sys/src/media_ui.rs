@@ -31,6 +31,13 @@ use std::{
 
 const MARGIN: f64 = 24.0;
 const ART: f64 = 116.0;
+/// The height of the page without lyrics: the cover at the left, and the track, its bar and the buttons in a column
+/// beside it. With lyrics the page takes the full height of the notch again.
+const ROOMY_HEIGHT: f64 = 176.0;
+const ROOMY_GAP: f64 = 22.0;
+const ROOMY_SIDE: f64 = 40.0;
+const ROOMY_MAIN: f64 = 52.0;
+const ROOMY_BUTTON_GAP: f64 = 20.0;
 const SIDE_BUTTON: f64 = 48.0;
 const MAIN_BUTTON: f64 = 66.0;
 const BUTTON_GAP: f64 = 30.0;
@@ -209,6 +216,8 @@ pub struct MediaView {
     plain_scroll: Retained<NSScrollView>,
     plain_text: Retained<NSTextView>,
     compact: Cell<bool>,
+    /// The height of the page with lyrics: what the notch gives a page of the default size.
+    full_height: f64,
     shown: RefCell<Shown>,
     /// A fingerprint of what the lyrics area shows, so that being told the same thing again does no work.
     drawn: Cell<Option<u64>>,
@@ -259,14 +268,8 @@ fn clock(seconds: u64) -> String {
     }
 }
 
-/// The frames of the time played, the bar and the time left: under the status line in the roomy layout, and in
-/// the text column beside the small cover when lyrics take the middle of the page.
-fn progress_frames(width: f64, top: f64, compact: bool) -> [NSRect; 3] {
-    let (left, right, middle) = if compact {
-        (MARGIN + ART_SMALL + 14.0, width - MARGIN, top - 100.0)
-    } else {
-        (MARGIN + 40.0, width - MARGIN - 40.0, top - 240.0)
-    };
+/// The frames of the time played, the bar and the time left, between `left` and `right`, centred on `middle`.
+fn progress_frames(left: f64, right: f64, middle: f64) -> [NSRect; 3] {
     let rect =
         |x: f64, w: f64, h: f64| NSRect::new(NSPoint::new(x, middle - h / 2.0), NSSize::new(w, h));
     [
@@ -278,6 +281,56 @@ fn progress_frames(width: f64, top: f64, compact: bool) -> [NSRect; 3] {
         ),
         rect(right - TIME_WIDTH, TIME_WIDTH, TIME_HEIGHT),
     ]
+}
+
+/// Where everything on the page goes.
+struct Frames {
+    art: NSRect,
+    title: NSRect,
+    artist: NSRect,
+    status: NSRect,
+    times: [NSRect; 3],
+    previous: NSRect,
+    play: NSRect,
+    next: NSRect,
+}
+
+/// The frames for a page of this size: the cover beside a column of text, bar and buttons, or, when lyrics take the
+/// middle of the page, the small cover with its text at the top and the buttons at the bottom edge.
+fn frames(width: f64, height: f64, compact: bool) -> Frames {
+    let rect = |x: f64, y: f64, w: f64, h: f64| NSRect::new(NSPoint::new(x, y), NSSize::new(w, h));
+    let round = |x: f64, y: f64, side: f64| rect(x - side / 2.0, y - side / 2.0, side, side);
+    if compact {
+        let text_x = MARGIN + ART_SMALL + 14.0;
+        let text_w = width - text_x - MARGIN;
+        let side = MAIN_BUTTON / 2.0 + BUTTON_GAP + SIDE_BUTTON / 2.0;
+        let middle = CONTROLS_Y_WITH_LYRICS;
+        Frames {
+            art: rect(MARGIN, height - 20.0 - ART_SMALL, ART_SMALL, ART_SMALL),
+            title: rect(text_x, height - 48.0, text_w, 26.0),
+            artist: rect(text_x, height - 68.0, text_w, 20.0),
+            status: rect(text_x, height - 84.0, text_w, 16.0),
+            times: progress_frames(text_x, width - MARGIN, height - 100.0),
+            previous: round(width / 2.0 - side, middle, SIDE_BUTTON),
+            play: round(width / 2.0, middle, MAIN_BUTTON),
+            next: round(width / 2.0 + side, middle, SIDE_BUTTON),
+        }
+    } else {
+        let x = MARGIN + ART + ROOMY_GAP;
+        let w = width - x - MARGIN;
+        let side = ROOMY_MAIN / 2.0 + ROOMY_BUTTON_GAP + ROOMY_SIDE / 2.0;
+        let (centre, buttons) = (x + w / 2.0, 50.0);
+        Frames {
+            art: rect(MARGIN, 40.0, ART, ART),
+            title: rect(x, height - 36.0, w, 26.0),
+            artist: rect(x, height - 56.0, w, 20.0),
+            status: rect(x, height - 72.0, w, 16.0),
+            times: progress_frames(x, width - MARGIN, height - 84.0),
+            previous: round(centre - side, buttons, ROOMY_SIDE),
+            play: round(centre, buttons, ROOMY_MAIN),
+            next: round(centre + side, buttons, ROOMY_SIDE),
+        }
+    }
 }
 
 /// A label that may wrap onto a second line instead of being cut.
@@ -337,51 +390,26 @@ fn round(
 impl MediaView {
     pub fn new(mtm: MainThreadMarker, frame: NSRect, callbacks: MediaCallbacks) -> Rc<Self> {
         let texts = labels::get();
-        let root = PageRoot::new(mtm, frame, &texts.media_hint);
-        let (width, top) = (frame.size.width, frame.size.height);
+        // The page is as tall as the notch lets it be only while it shows lyrics; without them it is the short one.
+        let full_height = frame.size.height;
+        let width = frame.size.width;
+        let short = NSRect::new(frame.origin, NSSize::new(width, ROOMY_HEIGHT));
+        let root = PageRoot::new(mtm, short, &texts.media_hint);
         let callbacks = Rc::new(callbacks);
+        let f = frames(width, ROOMY_HEIGHT, false);
 
-        let art = ArtCard::new(
-            mtm,
-            NSRect::new(
-                NSPoint::new((width - ART) / 2.0, top - 22.0 - ART),
-                NSSize::new(ART, ART),
-            ),
-        );
+        let art = ArtCard::new(mtm, f.art);
         root.addSubview(&art);
 
-        let row = |y: f64, height: f64| {
-            NSRect::new(
-                NSPoint::new(MARGIN, y),
-                NSSize::new(width - 2.0 * MARGIN, height),
-            )
-        };
-        let title = label(
-            mtm,
-            19.0,
-            Weight::Semibold,
-            style::TEXT,
-            row(top - 176.0, 26.0),
-        );
-        let artist = label(
-            mtm,
-            14.0,
-            Weight::Regular,
-            style::TEXT_SECONDARY,
-            row(top - 200.0, 20.0),
-        );
-        let status = label(
-            mtm,
-            11.0,
-            Weight::Medium,
-            style::TEXT_TERTIARY,
-            row(top - 220.0, 16.0),
-        );
-        root.addSubview(&title);
-        root.addSubview(&artist);
-        root.addSubview(&status);
+        let title = label(mtm, 19.0, Weight::Semibold, style::TEXT, f.title);
+        let artist = label(mtm, 14.0, Weight::Regular, style::TEXT_SECONDARY, f.artist);
+        let status = label(mtm, 11.0, Weight::Medium, style::TEXT_TERTIARY, f.status);
+        for field in [&title, &artist, &status] {
+            field.setAlignment(NSTextAlignment::Left);
+            root.addSubview(field);
+        }
 
-        let [elapsed_frame, bar_frame, remaining_frame] = progress_frames(width, top, false);
+        let [elapsed_frame, bar_frame, remaining_frame] = f.times;
         let time = |frame: NSRect, alignment: NSTextAlignment| {
             let field = label(mtm, 10.5, Weight::Medium, style::TEXT_TERTIARY, frame);
             field.setFont(Some(&style::digits(10.5, Weight::Medium)));
@@ -390,36 +418,40 @@ impl MediaView {
             field.setHidden(true);
             field
         };
-        let elapsed = time(elapsed_frame, NSTextAlignment::Right);
-        let remaining = time(remaining_frame, NSTextAlignment::Left);
+        let elapsed = time(elapsed_frame, NSTextAlignment::Left);
+        let remaining = time(remaining_frame, NSTextAlignment::Right);
         let bar = ProgressBar::new(mtm, bar_frame);
         bar.setHidden(true);
         root.addSubview(&elapsed);
         root.addSubview(&bar);
         root.addSubview(&remaining);
 
-        let middle = NSPoint::new(width / 2.0, top - 292.0);
-        let side = MAIN_BUTTON / 2.0 + BUTTON_GAP + SIDE_BUTTON / 2.0;
+        let centre = |r: NSRect| {
+            NSPoint::new(
+                r.origin.x + r.size.width / 2.0,
+                r.origin.y + r.size.height / 2.0,
+            )
+        };
         let previous = round(
             mtm,
-            NSPoint::new(middle.x - side, middle.y),
-            SIDE_BUTTON,
+            centre(f.previous),
+            f.previous.size.width,
             false,
             "backward.fill",
             &texts.media_previous,
         );
         let play = round(
             mtm,
-            middle,
-            MAIN_BUTTON,
+            centre(f.play),
+            f.play.size.width,
             true,
             "play.fill",
             &texts.media_play_pause,
         );
         let next = round(
             mtm,
-            NSPoint::new(middle.x + side, middle.y),
-            SIDE_BUTTON,
+            centre(f.next),
+            f.next.size.width,
             false,
             "forward.fill",
             &texts.media_next,
@@ -496,6 +528,7 @@ impl MediaView {
             plain_scroll,
             plain_text,
             compact: Cell::new(false),
+            full_height,
             shown: RefCell::default(),
             drawn: Cell::new(None),
             slide: Rc::default(),
@@ -546,68 +579,34 @@ impl MediaView {
         )
     }
 
-    /// Moves the track and the controls between the roomy layout and the one that leaves space for lyrics.
+    /// Moves the track and the controls between the short layout and the one that leaves space for lyrics. The page
+    /// changes height with it, and the notch follows.
     fn set_compact(&self, compact: bool) {
         if self.compact.replace(compact) == compact {
             return;
         }
-        let (width, top) = {
-            let size = self.root.frame().size;
-            (size.width, size.height)
-        };
-        let rect =
-            |x: f64, y: f64, w: f64, h: f64| NSRect::new(NSPoint::new(x, y), NSSize::new(w, h));
-        if compact {
-            let text_x = MARGIN + ART_SMALL + 14.0;
-            let text_w = width - text_x - MARGIN;
-            self.art
-                .setFrame(rect(MARGIN, top - 20.0 - ART_SMALL, ART_SMALL, ART_SMALL));
-            self.title.setFrame(rect(text_x, top - 48.0, text_w, 26.0));
-            self.artist.setFrame(rect(text_x, top - 68.0, text_w, 20.0));
-            self.status.setFrame(rect(text_x, top - 84.0, text_w, 16.0));
+        let width = self.root.frame().size.width;
+        let height = if compact {
+            self.full_height
         } else {
-            let row = |y: f64, h: f64| rect(MARGIN, y, width - 2.0 * MARGIN, h);
-            self.art
-                .setFrame(rect((width - ART) / 2.0, top - 22.0 - ART, ART, ART));
-            self.title.setFrame(row(top - 176.0, 26.0));
-            self.artist.setFrame(row(top - 200.0, 20.0));
-            self.status.setFrame(row(top - 220.0, 16.0));
-        }
-        let alignment = if compact {
-            NSTextAlignment::Left
-        } else {
-            NSTextAlignment::Center
+            ROOMY_HEIGHT
         };
-        for field in [&self.title, &self.artist, &self.status] {
-            field.setAlignment(alignment);
-        }
-        // Centred, the times hug the bar; beside the small cover they line up with the text above and the margin.
-        let [elapsed, bar, remaining] = progress_frames(width, top, compact);
+        self.root.setFrameSize(NSSize::new(width, height));
+        let f = frames(width, height, compact);
+        self.art.setFrame(f.art);
+        self.title.setFrame(f.title);
+        self.artist.setFrame(f.artist);
+        self.status.setFrame(f.status);
+        let [elapsed, bar, remaining] = f.times;
         self.elapsed.setFrame(elapsed);
         self.bar.setFrame(bar);
         self.remaining.setFrame(remaining);
-        self.elapsed.setAlignment(if compact {
-            NSTextAlignment::Left
-        } else {
-            NSTextAlignment::Right
-        });
-        self.remaining.setAlignment(if compact {
-            NSTextAlignment::Right
-        } else {
-            NSTextAlignment::Left
-        });
-        let middle = if compact {
-            CONTROLS_Y_WITH_LYRICS
-        } else {
-            top - 292.0
-        };
-        let side = MAIN_BUTTON / 2.0 + BUTTON_GAP + SIDE_BUTTON / 2.0;
-        for (button, x, size) in [
-            (&self.previous, width / 2.0 - side, SIDE_BUTTON),
-            (&self.play, width / 2.0, MAIN_BUTTON),
-            (&self.next, width / 2.0 + side, SIDE_BUTTON),
+        for (button, frame) in [
+            (&self.previous, f.previous),
+            (&self.play, f.play),
+            (&self.next, f.next),
         ] {
-            button.setFrame(rect(x - size / 2.0, middle - size / 2.0, size, size));
+            button.setFrame(frame);
         }
     }
 
@@ -895,6 +894,7 @@ impl MediaView {
             on_hide: Box::new(on_hide),
             on_key: Box::new(move |key| keys.handle_key(key)),
             accepts_files: false,
+            size: None,
         }
     }
 }
@@ -935,14 +935,45 @@ mod tests {
     }
 
     #[test]
-    fn the_progress_row_stays_inside_the_page() {
-        for compact in [false, true] {
-            let [elapsed, bar, remaining] = progress_frames(500.0, 396.0, compact);
+    fn everything_on_the_page_stays_inside_it_in_both_layouts() {
+        // The short page, and the full one that lyrics need.
+        for (compact, height) in [(false, ROOMY_HEIGHT), (true, 398.0)] {
+            let f = frames(500.0, height, compact);
+            let [elapsed, bar, remaining] = f.times;
             assert!(elapsed.origin.x >= MARGIN);
             assert!(remaining.origin.x + remaining.size.width <= 500.0 - MARGIN);
             assert!(elapsed.origin.x + elapsed.size.width < bar.origin.x);
             assert!(bar.origin.x + bar.size.width < remaining.origin.x);
             assert!(bar.size.width > 100.0);
+            for (name, r) in [
+                ("art", f.art),
+                ("title", f.title),
+                ("artist", f.artist),
+                ("status", f.status),
+                ("elapsed", elapsed),
+                ("bar", bar),
+                ("remaining", remaining),
+                ("previous", f.previous),
+                ("play", f.play),
+                ("next", f.next),
+            ] {
+                assert!(
+                    r.origin.x >= 0.0
+                        && r.origin.y >= 0.0
+                        && r.origin.x + r.size.width <= 500.0
+                        && r.origin.y + r.size.height <= height,
+                    "{name} leaves the page (compact {compact}): {r:?}"
+                );
+            }
         }
+    }
+
+    #[test]
+    fn the_short_page_puts_the_text_beside_the_cover_and_the_buttons_under_the_bar() {
+        let f = frames(500.0, ROOMY_HEIGHT, false);
+        assert!(f.title.origin.x >= f.art.origin.x + f.art.size.width);
+        let [_, bar, _] = f.times;
+        assert!(f.play.origin.y + f.play.size.height < bar.origin.y);
+        assert!(bar.origin.y + bar.size.height < f.status.origin.y);
     }
 }

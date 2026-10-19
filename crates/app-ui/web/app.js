@@ -23,14 +23,15 @@ function h(tag, attrs, ...kids) {
   return el;
 }
 
-// Glyphs are SF Symbols the app draws as white PNGs (window.__symbols, from settings/page.rs), used as a mask so
-// they take the text colour. Two older names are still used by the features.
-const SYMBOL_ALIASES = { close: 'xmark', refresh: 'arrow.clockwise' };
+// Glyphs are Lucide icons (ISC licence, lucide.dev), drawn as a mask so they take the text colour.
+const LUCIDE = {"settings":"<path d=\"M12.22 2h-.44a2 2 0 0 0-2 2v.18a2 2 0 0 1-1 1.73l-.43.25a2 2 0 0 1-2 0l-.15-.08a2 2 0 0 0-2.73.73l-.22.38a2 2 0 0 0 .73 2.73l.15.1a2 2 0 0 1 1 1.72v.51a2 2 0 0 1-1 1.74l-.15.09a2 2 0 0 0-.73 2.73l.22.38a2 2 0 0 0 2.73.73l.15-.08a2 2 0 0 1 2 0l.43.25a2 2 0 0 1 1 1.73V20a2 2 0 0 0 2 2h.44a2 2 0 0 0 2-2v-.18a2 2 0 0 1 1-1.73l.43-.25a2 2 0 0 1 2 0l.15.08a2 2 0 0 0 2.73-.73l.22-.39a2 2 0 0 0-.73-2.73l-.15-.08a2 2 0 0 1-1-1.74v-.5a2 2 0 0 1 1-1.74l.15-.09a2 2 0 0 0 .73-2.73l-.22-.38a2 2 0 0 0-2.73-.73l-.15.08a2 2 0 0 1-2 0l-.43-.25a2 2 0 0 1-1-1.73V4a2 2 0 0 0-2-2z\" /> <circle cx=\"12\" cy=\"12\" r=\"3\" />","mouse":"<rect x=\"5\" y=\"2\" width=\"14\" height=\"20\" rx=\"7\" /> <path d=\"M12 6v4\" />","clipboard-list":"<rect width=\"8\" height=\"4\" x=\"8\" y=\"2\" rx=\"1\" ry=\"1\" /> <path d=\"M16 4h2a2 2 0 0 1 2 2v14a2 2 0 0 1-2 2H6a2 2 0 0 1-2-2V6a2 2 0 0 1 2-2h2\" /> <path d=\"M12 11h4\" /> <path d=\"M12 16h4\" /> <path d=\"M8 11h.01\" /> <path d=\"M8 16h.01\" />","panel-top":"<rect width=\"18\" height=\"18\" x=\"3\" y=\"3\" rx=\"2\" /> <path d=\"M3 9h18\" />","square-terminal":"<path d=\"m7 11 2-2-2-2\" /> <path d=\"M11 13h4\" /> <rect width=\"18\" height=\"18\" x=\"3\" y=\"3\" rx=\"2\" ry=\"2\" />","columns-2":"<rect width=\"18\" height=\"18\" x=\"3\" y=\"3\" rx=\"2\" /> <path d=\"M12 3v18\" />","info":"<circle cx=\"12\" cy=\"12\" r=\"10\" /> <path d=\"M12 16v-4\" /> <path d=\"M12 8h.01\" />","calendar-days":"<path d=\"M8 2v4\" /> <path d=\"M16 2v4\" /> <rect width=\"18\" height=\"18\" x=\"3\" y=\"4\" rx=\"2\" /> <path d=\"M3 10h18\" /> <path d=\"M8 14h.01\" /> <path d=\"M12 14h.01\" /> <path d=\"M16 14h.01\" /> <path d=\"M8 18h.01\" /> <path d=\"M12 18h.01\" /> <path d=\"M16 18h.01\" />","camera":"<path d=\"M14.5 4h-5L7 7H4a2 2 0 0 0-2 2v9a2 2 0 0 0 2 2h16a2 2 0 0 0 2-2V9a2 2 0 0 0-2-2h-3l-2.5-3z\" /> <circle cx=\"12\" cy=\"13\" r=\"3\" />","text-search":"<path d=\"M21 6H3\" /> <path d=\"M10 12H3\" /> <path d=\"M10 18H3\" /> <circle cx=\"17\" cy=\"15\" r=\"3\" /> <path d=\"m21 19-1.9-1.9\" />","pipette":"<path d=\"m2 22 1-1h3l9-9\" /> <path d=\"M3 21v-3l9-9\" /> <path d=\"m15 6 3.4-3.4a2.1 2.1 0 1 1 3 3L18 9l.4.4a2.1 2.1 0 1 1-3 3l-3.8-3.8a2.1 2.1 0 1 1 3-3l.4.4Z\" />","sparkles":"<path d=\"M9.937 15.5A2 2 0 0 0 8.5 14.063l-6.135-1.582a.5.5 0 0 1 0-.962L8.5 9.936A2 2 0 0 0 9.937 8.5l1.582-6.135a.5.5 0 0 1 .963 0L14.063 8.5A2 2 0 0 0 15.5 9.937l6.135 1.581a.5.5 0 0 1 0 .964L15.5 14.063a2 2 0 0 0-1.437 1.437l-1.582 6.135a.5.5 0 0 1-.963 0z\" /> <path d=\"M20 3v4\" /> <path d=\"M22 5h-4\" /> <path d=\"M4 17v2\" /> <path d=\"M5 18H3\" />","chevron-down":"<path d=\"m6 9 6 6 6-6\" />","chevron-up":"<path d=\"m18 15-6-6-6 6\" />","x":"<path d=\"M18 6 6 18\" /> <path d=\"m6 6 12 12\" />","folder":"<path d=\"M20 20a2 2 0 0 0 2-2V8a2 2 0 0 0-2-2h-7.9a2 2 0 0 1-1.69-.9L9.6 3.9A2 2 0 0 0 7.93 3H4a2 2 0 0 0-2 2v13a2 2 0 0 0 2 2Z\" />","search":"<circle cx=\"11\" cy=\"11\" r=\"8\" /> <path d=\"m21 21-4.3-4.3\" />","plus":"<path d=\"M5 12h14\" /> <path d=\"M12 5v14\" />","power":"<path d=\"M12 2v10\" /> <path d=\"M18.4 6.6a9 9 0 1 1-12.77.04\" />","refresh-cw":"<path d=\"M3 12a9 9 0 0 1 9-9 9.75 9.75 0 0 1 6.74 2.74L21 8\" /> <path d=\"M21 3v5h-5\" /> <path d=\"M21 12a9 9 0 0 1-9 9 9.75 9.75 0 0 1-6.74-2.74L3 16\" /> <path d=\"M8 16H3v5\" />","trash-2":"<path d=\"M3 6h18\" /> <path d=\"M19 6v14c0 1-1 2-2 2H7c-1 0-2-1-2-2V6\" /> <path d=\"M8 6V4c0-1 1-2 2-2h4c1 0 2 1 2 2v2\" /> <line x1=\"10\" x2=\"10\" y1=\"11\" y2=\"17\" /> <line x1=\"14\" x2=\"14\" y1=\"11\" y2=\"17\" />"};
+const GLYPHS = {"gearshape.fill":"settings","computermouse.fill":"mouse","doc.on.clipboard.fill":"clipboard-list","rectangle.topthird.inset.filled":"panel-top","terminal.fill":"square-terminal","rectangle.split.2x1.fill":"columns-2","info.circle.fill":"info","calendar":"calendar-days","camera.viewfinder":"camera","text.magnifyingglass":"text-search","eyedropper.halffull":"pipette","sparkles":"sparkles","chevron.down":"chevron-down","chevron.up":"chevron-up","xmark":"x","close":"x","folder":"folder","magnifyingglass":"search","plus":"plus","power":"power","refresh":"refresh-cw","trash":"trash-2"};
 const missingSymbols = new Set();
 function icon(name, cls) {
-  const src = (window.__symbols || {})[SYMBOL_ALIASES[name] || name];
-  if (!src) missingSymbols.add(name);
-  return h('span', { class: 'glyph' + (cls ? ' ' + cls : ''), 'aria-hidden': 'true', style: src ? `--glyph:url("${src}")` : 'visibility:hidden' });
+  const body = LUCIDE[GLYPHS[name]];
+  if (!body) missingSymbols.add(name);
+  const svg = body && `<svg xmlns='http://www.w3.org/2000/svg' width='24' height='24' viewBox='0 0 24 24' fill='none' stroke='black' stroke-width='1.9' stroke-linecap='round' stroke-linejoin='round'>${body}</svg>`;
+  return h('span', { class: 'glyph' + (cls ? ' ' + cls : ''), 'aria-hidden': 'true', style: svg ? `--glyph:url("data:image/svg+xml,${encodeURIComponent(svg)}")` : 'visibility:hidden' });
 }
 /** The app's own icon (window.__appIcon, drawn from Figghost.icns). */
 function appIcon(cls) { return h('img', { class: cls, src: window.__appIcon, alt: '' }); }
@@ -64,7 +65,7 @@ const I18N = {
     'sec.agents.answer': 'Answering', 'agents.wait.title': 'Wait for an answer', 'agents.wait.desc': 'A command waits this long on the notch. Without an answer the agent asks in its own terminal, as usual.', 'agents.wait.n': '{n} seconds',
     'agents.sound.title': 'Play a sound', 'agents.sound.desc': 'When a command needs an answer or an agent finishes.',
     'agents.peek.title': 'Show the notch when an agent finishes', 'agents.peek.desc': 'The notch opens for a few seconds and closes by itself, unless the pointer is on it.',
-    'sec.agents.limits': 'Usage limits', 'agents.usage.title': 'Claude Code limits', 'agents.usage.desc': 'Claude Code reports how much of its five-hour and weekly limits is used to its status line. Turning this on runs Figghost there first and then your own status line, so it looks the same. Codex limits are read from its session logs and need nothing.',
+    'sec.agents.limits': 'Usage limits', 'agents.usage.title': 'Claude Code limits', 'agents.usage.desc': 'Claude Code reports how much of its five-hour and weekly limits is used to its status line. Turning this on runs Figghost there first and then your own status line, so it looks the same. Codex limits are read from its session logs and need nothing. The refresh button on the Agents tab also asks the Codex program installed on this Mac for its current limits: Codex contacts OpenAI itself, as it does whenever you use it, and Figghost sends nothing and never reads the Codex login.',
     'agents.usage.on': 'Turn on', 'agents.usage.off': 'Turn off', 'agents.usage.waiting': 'Waiting for the next message from Claude Code.', 'agents.usage.ok': 'On', 'agents.usage.none': 'Off',
     'sec.agents.note': 'Good to know', 'agents.note.title': 'Other apps that answer permission requests', 'agents.note.body': 'If another app, such as OneNotch, also answers these requests, both ask and the first answer wins. Turn one of them off.',
     'tab.agents': 'Agents', 'tab.agents.desc': 'Claude Code and Codex: the command waiting for you, the sessions that are running and what is left of their limits.',
@@ -118,7 +119,7 @@ const I18N = {
     'tab.focus': 'Focus', 'tab.focus.desc': 'A countdown for work sessions: 15, 25, 45 or 60 minutes. The notch opens and a sound plays when time is up.',
     'sec.volume': 'Volume', 'vol.title': 'Volume indicator in the notch', 'vol.desc': 'Replaces the system volume display. Needs Accessibility. Shift + Option moves in finer steps.',
     'vol.style.title': 'Indicator style', 'vol.style.desc': 'How the volume panel looks while the keys are pressed.',
-    'vol.style.notch': 'Notch', 'vol.style.glass': 'Liquid Glass', 'vol.style.corner': 'Corner capsule', 'vol.style.bar': 'Level bar',
+    'vol.style.notch': 'Notch', 'vol.style.glass': 'Liquid Glass', 'vol.style.corner': 'Corner capsule', 'vol.style.bar': 'Level bar', 'vol.style.island': 'Floating pill', 'vol.style.side': 'Side slider', 'vol.style.tile': 'Large tile',
     'shelf.count': 'Files on the shelf', 'shelf.clear': 'Clear shelf', 'shelf.clear.desc': 'Removes the references only. Your files are not touched.',
     'sec.shelf': 'Shelf',
 
@@ -163,7 +164,7 @@ const I18N = {
     'sec.agents.answer': 'Trả lời', 'agents.wait.title': 'Thời gian chờ câu trả lời', 'agents.wait.desc': 'Một lệnh chờ chừng này trên notch. Không có câu trả lời thì tác tử hỏi trong terminal của nó như bình thường.', 'agents.wait.n': '{n} giây',
     'agents.sound.title': 'Phát âm thanh', 'agents.sound.desc': 'Khi một lệnh cần câu trả lời hoặc tác tử làm xong.',
     'agents.peek.title': 'Hiện notch khi tác tử làm xong', 'agents.peek.desc': 'Notch mở vài giây rồi tự đóng, trừ khi con trỏ đang ở trên nó.',
-    'sec.agents.limits': 'Hạn mức sử dụng', 'agents.usage.title': 'Hạn mức Claude Code', 'agents.usage.desc': 'Claude Code báo mức đã dùng của hạn mức năm giờ và hạn mức tuần vào dòng trạng thái của nó. Bật mục này thì Figghost chạy ở đó trước rồi mới đến dòng trạng thái của bạn, nên giao diện vẫn như cũ. Hạn mức Codex đọc từ nhật ký phiên của nó, không cần cài gì.',
+    'sec.agents.limits': 'Hạn mức sử dụng', 'agents.usage.title': 'Hạn mức Claude Code', 'agents.usage.desc': 'Claude Code báo mức đã dùng của hạn mức năm giờ và hạn mức tuần vào dòng trạng thái của nó. Bật mục này thì Figghost chạy ở đó trước rồi mới đến dòng trạng thái của bạn, nên giao diện vẫn như cũ. Hạn mức Codex đọc từ nhật ký phiên của nó, không cần cài gì. Nút làm mới trên tab Tác tử còn nhờ chương trình Codex cài trên máy này báo hạn mức hiện tại: Codex tự liên hệ OpenAI như mỗi lần bạn dùng nó, còn Figghost không gửi gì và không đọc thông tin đăng nhập của Codex.',
     'agents.usage.on': 'Bật', 'agents.usage.off': 'Tắt', 'agents.usage.waiting': 'Đang chờ tin nhắn tiếp theo từ Claude Code.', 'agents.usage.ok': 'Đang bật', 'agents.usage.none': 'Đang tắt',
     'sec.agents.note': 'Cần biết', 'agents.note.title': 'Ứng dụng khác cũng trả lời yêu cầu cấp quyền', 'agents.note.body': 'Nếu một ứng dụng khác, như OneNotch, cũng trả lời các yêu cầu này thì cả hai cùng hỏi và câu trả lời đầu tiên được dùng. Hãy tắt một trong hai.',
     'tab.agents': 'Tác tử', 'tab.agents.desc': 'Claude Code và Codex: lệnh đang chờ bạn, các phiên đang chạy và hạn mức còn lại.',
@@ -217,7 +218,7 @@ const I18N = {
     'tab.focus': 'Tập trung', 'tab.focus.desc': 'Đồng hồ đếm ngược cho phiên làm việc: 15, 25, 45 hoặc 60 phút. Notch tự mở và có âm báo khi hết giờ.',
     'sec.volume': 'Âm lượng', 'vol.title': 'Chỉ báo âm lượng trong notch', 'vol.desc': 'Thay màn hình âm lượng của hệ thống. Cần quyền Trợ năng. Shift + Option để chỉnh từng bước nhỏ.',
     'vol.style.title': 'Kiểu chỉ báo', 'vol.style.desc': 'Bảng âm lượng trông thế nào trong lúc nhấn phím.',
-    'vol.style.notch': 'Notch', 'vol.style.glass': 'Liquid Glass', 'vol.style.corner': 'Viên góc phải', 'vol.style.bar': 'Thanh mức',
+    'vol.style.notch': 'Notch', 'vol.style.glass': 'Liquid Glass', 'vol.style.corner': 'Viên góc phải', 'vol.style.bar': 'Thanh mức', 'vol.style.island': 'Viên nổi giữa', 'vol.style.side': 'Thanh dọc bên phải', 'vol.style.tile': 'Ô lớn giữa màn hình',
     'shelf.count': 'Tệp trên khay', 'shelf.clear': 'Dọn khay', 'shelf.clear.desc': 'Chỉ xóa phần tham chiếu. Tệp của bạn không bị động tới.',
     'sec.shelf': 'Khay tệp',
 
@@ -743,8 +744,19 @@ function pageGeneral() {
     button(t('access.open'), () => send({ t: 'action', name: 'open_accessibility' }), { small: true }),
   ]);
 
+  const featureTile = (page, path) => {
+    const el = h('section', { class: 'card feat' },
+      h('div', { class: 'feat-top' }, h('span', { class: 'feat-badge' }, icon(PAGES.find((p) => p.id === page).icon)), switchEl(path, t('nav.' + page))),
+      h('div', { class: 'feat-name', text: t('nav.' + page) }));
+    reg(() => el.classList.toggle('off', !get(path)));
+    return el;
+  };
+
   return [
     hero,
+    h('div', { class: 'tiles-grid' },
+      featureTile('scroll', 'mouse.smooth'), featureTile('notch', 'notch.enabled'),
+      featureTile('agents', 'agents.enabled'), featureTile('tiling', 'tiling.enabled')),
     sectionTitle(t('sec.startup')),
     card(
       loginRow,
@@ -1195,7 +1207,7 @@ function pageNotch() {
       toggleRow('notch.volume_hud', t('vol.title'), t('vol.desc')),
       selectRow({
         path: 'notch.hud', title: t('vol.style.title'), desc: t('vol.style.desc'), when: () => S.notch.volume_hud,
-        options: () => ['notch', 'glass', 'corner', 'bar'].map((v) => ({ value: v, label: t('vol.style.' + v) })),
+        options: () => ['notch', 'glass', 'corner', 'bar', 'island', 'side', 'tile'].map((v) => ({ value: v, label: t('vol.style.' + v) })),
       })),
   ];
 }
@@ -1412,45 +1424,6 @@ function accessPill() {
   return el;
 }
 
-/** The field that finds a page by name, the way the sidebar of System Settings has one. Every page stays in
-    the list; only the ones that do not match are put away, and the highlight follows the list. */
-function pageSearch() {
-  const input = h('input', { type: 'search', autocomplete: 'off', spellcheck: 'false', placeholder: t('side.search'), 'aria-label': t('side.search') });
-  const clear = h('button', { class: 'search-clear', 'aria-label': t('side.clear'), onclick: () => { input.value = ''; apply(); input.focus(); } }, icon('xmark'));
-  clear.style.display = 'none';
-  const el = h('div', { class: 'search' }, icon('magnifyingglass'), input, clear);
-  const apply = () => {
-    const query = input.value.trim().toLowerCase();
-    clear.style.display = input.value ? '' : 'none';
-    let shown = 0;
-    for (const item of document.querySelectorAll('.nav-item')) {
-      const found = !query || item.textContent.toLowerCase().includes(query);
-      item.hidden = !found;
-      if (found) shown++;
-    }
-    for (const sep of document.querySelectorAll('.nav-sep')) {
-      sep.hidden = !!query;
-    }
-    const none = $('#nav .nav-empty');
-    if (none) none.hidden = shown > 0;
-    moveThumb();
-  };
-  input.addEventListener('input', apply);
-  input.addEventListener('keydown', (event) => {
-    if (event.key !== 'Escape') return;
-    // Escape clears the field rather than closing anything else.
-    event.stopPropagation();
-    input.value = '';
-    apply();
-  });
-  reg(() => {
-    input.placeholder = t('side.search');
-    input.setAttribute('aria-label', t('side.search'));
-    clear.setAttribute('aria-label', t('side.clear'));
-  });
-  return el;
-}
-
 function renderNavItems() {
   const groupOf = (id) => {
     if (id === 'general') return 1;
@@ -1468,7 +1441,7 @@ function renderNavItems() {
       elements.push(h('div', { class: 'nav-sep', 'aria-hidden': 'true' }));
     }
     lastGroup = g;
-    elements.push(h('button', { class: 'nav-item', 'data-page': p.id, onclick: () => go(p.id) },
+    elements.push(h('button', { class: 'nav-item', 'data-page': p.id, 'data-name': t('nav.' + p.id), onclick: () => go(p.id) },
       h('span', { class: 'nav-icon' }, icon(p.icon)),
       h('span', { class: 'nav-label', text: t('nav.' + p.id) })));
   }
@@ -1481,11 +1454,8 @@ function buildShell() {
     h('div', { id: 'app' },
       h('aside', { id: 'sidebar', class: 'glass' },
         h('div', { class: 'dragzone', 'data-drag': '' }),
-        h('div', { class: 'side-head' }, pageSearch()),
         h('nav', { id: 'nav', 'aria-label': 'Figghost' },
-          h('div', { class: 'nav-thumb', 'aria-hidden': 'true' }),
-          ...renderNavItems(),
-          h('div', { class: 'nav-empty', hidden: true, text: t('side.none') })),
+          ...renderNavItems()),
         h('div', { class: 'side-foot' }, accessPill())),
       h('main', { id: 'main' },
         h('div', { class: 'dragzone', 'data-drag': '' }),
@@ -1493,38 +1463,6 @@ function buildShell() {
         h('div', { id: 'scroller' }))),
     h('div', { id: 'toast', 'aria-live': 'polite' }),
     h('div', { id: 'modal' }));
-  litGlass();
-  moveThumb();
-}
-
-/** The chosen page is one pill that glides to the row the user picked, so the eye follows the change of page. */
-function moveThumb() {
-  const nav = $('#nav');
-  const thumb = nav && nav.querySelector('.nav-thumb');
-  if (!thumb) return;
-  const item = nav.querySelector('.nav-item[aria-current="page"]');
-  if (!item || item.hidden) { thumb.style.opacity = '0'; return; }
-  if (!thumb.dataset.placed) {
-    // The first placement is where the pill already is; only later changes travel.
-    thumb.style.transition = 'none';
-    requestAnimationFrame(() => { thumb.style.transition = ''; });
-    thumb.dataset.placed = '1';
-  }
-  thumb.style.height = item.offsetHeight + 'px';
-  thumb.style.transform = 'translateY(' + item.offsetTop + 'px)';
-  thumb.style.opacity = '1';
-}
-
-/** The highlight the pointer carries over the sidebar, as Liquid Glass does. */
-function litGlass() {
-  const glass = $('#sidebar');
-  if (!glass) return;
-  glass.classList.add('lit');
-  glass.addEventListener('pointermove', (event) => {
-    const rect = glass.getBoundingClientRect();
-    glass.style.setProperty('--mx', (event.clientX - rect.left) + 'px');
-    glass.style.setProperty('--my', (event.clientY - rect.top) + 'px');
-  });
 }
 
 function go(id) {
@@ -1539,13 +1477,9 @@ function go(id) {
   const scroller = $('#scroller');
   pageSyncs = scoped(() => scroller.replaceChildren(h('div', { class: 'page' }, [].concat(page.build(), slotsFor(page.id)))));
   scroller.scrollTop = 0;
-  // The parts of the page come up one after another, so the change of page reads as a movement.
-  const built = scroller.querySelector('.page');
-  if (built) [...built.children].forEach((el, i) => el.style.setProperty('--i', String(Math.min(i, 10))));
   for (const item of document.querySelectorAll('.nav-item')) {
     if (item.dataset.page === current) item.setAttribute('aria-current', 'page'); else item.removeAttribute('aria-current');
   }
-  moveThumb();
   send({ t: 'page', id: current });
 }
 
@@ -1595,6 +1529,7 @@ window.__fig = {
       case 'icons': onIcons(message.icons); break;
       case 'curve': onCurve(message); break;
       case 'update': onUpdate(message); break;
+      case 'go': go(message.page); break;
     }
   },
 };
@@ -1788,20 +1723,6 @@ window.__selftest = function () {
     auto.click();
     expect(sent.some((m) => m.t === 'set' && m.path === 'update.auto' && m.value === true), 'the switch is sent: ' + JSON.stringify(sent));
 
-    // The field in the sidebar keeps the pages whose name matches, and puts them all back when it is cleared.
-    const navItems = () => [...document.querySelectorAll('.nav-item')];
-    const field = $('.search input');
-    field.value = 'clip';
-    field.dispatchEvent(new Event('input'));
-    const shown = navItems().filter((item) => !item.hidden);
-    expect(shown.length === 1 && shown[0].dataset.page === 'clipboard', 'the field keeps the pages that match: ' + shown.length);
-    field.value = 'zzz';
-    field.dispatchEvent(new Event('input'));
-    expect(navItems().every((item) => item.hidden) && !$('#nav .nav-empty').hidden, 'a search that matches nothing says so');
-    field.value = '';
-    field.dispatchEvent(new Event('input'));
-    expect(navItems().every((item) => !item.hidden) && $('#nav .nav-empty').hidden, 'clearing the field shows every page');
-
     // Each feature's own checks (web/features/*.js).
     for (const p of PLUGINS) if (p.selftest) p.selftest({ expect, go, sent, S, h, $ });
   } catch (error) {
@@ -1819,5 +1740,3 @@ function setLang(code) {
 }
 
 send({ t: 'ready' });
-// The pill follows the chosen row; a resize moves the rows, so it has to be placed again.
-window.addEventListener('resize', () => moveThumb());

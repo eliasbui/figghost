@@ -181,6 +181,10 @@ impl Shell {
         let on_reopen = Rc::clone(&settings);
         let reopen = app::on_reopen(mtm, move || on_reopen.show());
         let status = Rc::new(menu::build(&ctx, &settings));
+        // The three dots of the notch show the menu of the menu bar item.
+        if let Some(notch) = ctx.clipboard.as_ref().and_then(|c| c.notch.as_ref()) {
+            notch.set_orb_menu(status.menu());
+        }
         status.set_visible(ctx.config.borrow().menu_icon);
         {
             let status = Rc::clone(&status);

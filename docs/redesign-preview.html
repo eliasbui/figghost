@@ -1,0 +1,326 @@
+<!doctype html>
+<html lang="en">
+<head>
+<meta charset="utf-8">
+<meta name="viewport" content="width=device-width, initial-scale=1">
+<title>Figghost - Redesign preview</title>
+<style>
+/* Design bản duyệt: cửa sổ Settings kiểu macOS Tahoe. Sidebar kính nổi, nội dung nền đặc, điều khiển dạng viên thuốc. */
+:root {
+  color-scheme: light;
+  --font: -apple-system, BlinkMacSystemFont, "SF Pro Text", "SF Pro Display", Inter, system-ui, sans-serif;
+  --tint: #0a7aff;
+  --good: #30b350; --warn: #ff9500; --bad: #ff3b30;
+  --desk-a: #c7d7ff; --desk-b: #f3d1ff; --desk-c: #ffe2c7;
+  --win: #f5f5f7;
+  --side: rgba(255,255,255,.62);
+  --side-edge: rgba(255,255,255,.8);
+  --card: #ffffff;
+  --card-edge: rgba(0,0,0,.06);
+  --sep: rgba(0,0,0,.07);
+  --text: #1d1d1f; --text-2: #6e6e73; --text-3: #a1a1a6;
+  --fill: rgba(0,0,0,.05); --fill-2: rgba(0,0,0,.035);
+  --track: rgba(120,120,128,.24);
+  --seg-thumb: #ffffff;
+  --win-shadow: 0 0 0 .5px rgba(0,0,0,.25), 0 30px 80px -10px rgba(0,0,0,.35), 0 8px 24px rgba(0,0,0,.12);
+}
+[data-theme="dark"] {
+  color-scheme: dark;
+  --tint: #0a84ff;
+  --good: #32d74b;
+  --desk-a: #1b2250; --desk-b: #3a1f55; --desk-c: #1a2b3d;
+  --win: #1e1e20;
+  --side: rgba(48,48,54,.58);
+  --side-edge: rgba(255,255,255,.1);
+  --card: #2a2a2d;
+  --card-edge: rgba(255,255,255,.07);
+  --sep: rgba(255,255,255,.08);
+  --text: #f5f5f7; --text-2: #a1a1a8; --text-3: #6e6e75;
+  --fill: rgba(255,255,255,.09); --fill-2: rgba(255,255,255,.05);
+  --track: rgba(120,120,128,.4);
+  --seg-thumb: #6a6a70;
+  --win-shadow: 0 0 0 .5px rgba(255,255,255,.18), 0 30px 80px -10px rgba(0,0,0,.7);
+}
+* { box-sizing: border-box; }
+html, body { margin: 0; height: 100%; }
+body {
+  font: 13px/1.4 var(--font); color: var(--text); -webkit-font-smoothing: antialiased;
+  background: radial-gradient(60% 70% at 15% 20%, var(--desk-a), transparent 70%),
+              radial-gradient(60% 70% at 85% 30%, var(--desk-b), transparent 70%),
+              radial-gradient(70% 80% at 50% 100%, var(--desk-c), transparent 70%), var(--win);
+  display: grid; place-items: center; padding: 24px;
+}
+button, input, select { font: inherit; color: inherit; }
+button { cursor: default; }
+:focus-visible { outline: 2px solid var(--tint); outline-offset: 2px; }
+.ic { width: 16px; height: 16px; fill: none; stroke: currentColor; stroke-width: 1.8; stroke-linecap: round; stroke-linejoin: round; flex: none; }
+
+/* Window */
+.window {
+  width: min(1040px, 100%); height: min(720px, calc(100vh - 48px)); display: flex;
+  border-radius: 20px; background: var(--win); box-shadow: var(--win-shadow); overflow: hidden; position: relative;
+}
+.lights { position: absolute; left: 22px; top: 20px; display: flex; gap: 8px; z-index: 5; }
+.lights i { width: 12px; height: 12px; border-radius: 50%; box-shadow: inset 0 0 0 .5px rgba(0,0,0,.2); }
+.lights i:nth-child(1) { background: #ff5f57; } .lights i:nth-child(2) { background: #febc2e; } .lights i:nth-child(3) { background: #28c840; }
+
+/* Sidebar: floating glass panel */
+.side {
+  position: relative; z-index: 2; flex: none; width: 248px; margin: 8px; padding: 52px 10px 10px;
+  display: flex; flex-direction: column; min-height: 0; border-radius: 14px;
+  background: var(--side); -webkit-backdrop-filter: blur(30px) saturate(1.8); backdrop-filter: blur(30px) saturate(1.8);
+  box-shadow: inset 0 0 0 .5px var(--side-edge), 0 1px 3px rgba(0,0,0,.08);
+}
+.search { display: flex; align-items: center; gap: 7px; height: 32px; padding: 0 12px; border-radius: 999px; background: var(--fill); color: var(--text-2); margin-bottom: 12px; }
+.search:focus-within { box-shadow: 0 0 0 3px color-mix(in srgb, var(--tint) 30%, transparent); }
+.search input { flex: 1; min-width: 0; border: 0; background: none; outline: none; }
+.search input::placeholder { color: var(--text-3); }
+.nav { flex: 1; min-height: 0; overflow-y: auto; display: flex; flex-direction: column; gap: 2px; scrollbar-width: none; }
+.nav-group { margin: 12px 10px 4px; font-size: 11px; font-weight: 600; color: var(--text-3); letter-spacing: .02em; }
+.nav-group:first-child { margin-top: 0; }
+.nav button {
+  display: flex; align-items: center; gap: 10px; height: 36px; padding: 0 8px; border: 0; border-radius: 999px; background: none; text-align: left; font-weight: 450;
+  transition: background .15s;
+}
+.nav button:hover { background: var(--fill); }
+.nav button[aria-current="page"] { background: var(--tint); color: #fff; font-weight: 550; box-shadow: 0 2px 8px color-mix(in srgb, var(--tint) 45%, transparent); }
+.nav button[hidden] { display: none; }
+.tile { display: grid; place-items: center; width: 24px; height: 24px; border-radius: 7px; color: #fff; background: var(--c); box-shadow: inset 0 0 0 .5px rgba(0,0,0,.12); }
+.tile .ic { width: 14px; height: 14px; }
+.status { display: flex; align-items: center; gap: 8px; margin-top: 10px; padding: 0 14px; height: 32px; border-radius: 999px; background: var(--fill-2); color: var(--text-2); font-size: 12px; }
+.dot { width: 7px; height: 7px; border-radius: 50%; background: var(--good); box-shadow: 0 0 6px var(--good); }
+
+/* Content */
+.main { flex: 1; min-width: 0; display: flex; flex-direction: column; }
+.head { padding: 26px 40px 10px; }
+.head h1 { margin: 0; font-size: 24px; font-weight: 700; letter-spacing: -.025em; }
+.head p { margin: 3px 0 0; color: var(--text-2); }
+.scroll { flex: 1; min-height: 0; overflow-y: auto; padding: 0 40px 40px; }
+.page { max-width: 640px; margin: 0 auto; display: none; flex-direction: column; gap: 6px; animation: in .25s cubic-bezier(.22,1,.36,1); }
+.page.on { display: flex; }
+@keyframes in { from { opacity: 0; transform: translateY(6px); } }
+h2.sec { margin: 22px 14px 4px; font-size: 12px; font-weight: 600; color: var(--text-2); letter-spacing: .01em; }
+.card { background: var(--card); border-radius: 14px; box-shadow: 0 0 0 .5px var(--card-edge), 0 1px 2px rgba(0,0,0,.04); }
+.row { position: relative; display: flex; align-items: center; gap: 16px; min-height: 52px; padding: 11px 16px; }
+.row + .row::before { content: ""; position: absolute; left: 16px; right: 16px; top: 0; border-top: .5px solid var(--sep); }
+.row .t { flex: 1; min-width: 0; }
+.row .t b { display: block; font-weight: 500; }
+.row .t span { display: block; margin-top: 1px; color: var(--text-2); font-size: 12px; }
+.row .val { color: var(--text-2); font-variant-numeric: tabular-nums; }
+.row.off { opacity: .45; pointer-events: none; }
+
+/* Hero */
+.hero { display: flex; align-items: center; gap: 18px; padding: 20px; }
+.logo { width: 64px; height: 64px; border-radius: 16px; flex: none; display: grid; place-items: center; color: #fff;
+  background: linear-gradient(145deg, #8b7bff, #5b4bf0); box-shadow: 0 6px 16px -4px rgba(91,75,240,.5), inset 0 0 0 .5px rgba(255,255,255,.3); }
+.logo svg { width: 34px; height: 34px; fill: #fff; }
+.hero h3 { margin: 0; font-size: 19px; font-weight: 650; letter-spacing: -.02em; }
+.hero p { margin: 2px 0 0; color: var(--text-2); }
+.chips { display: flex; gap: 6px; margin-top: 10px; }
+.chip { display: inline-flex; align-items: center; gap: 6px; height: 22px; padding: 0 10px; border-radius: 999px; background: var(--fill); font-size: 11.5px; color: var(--text-2); }
+
+/* Controls */
+.switch { position: relative; flex: none; width: 42px; height: 26px; padding: 0; border: 0; border-radius: 999px; background: var(--track); transition: background .2s; }
+.switch::after { content: ""; position: absolute; top: 2px; left: 2px; width: 22px; height: 22px; border-radius: 50%; background: #fff; box-shadow: 0 2px 4px rgba(0,0,0,.25); transition: transform .25s cubic-bezier(.28,1.35,.48,1); }
+.switch[aria-checked="true"] { background: var(--good); }
+.switch[aria-checked="true"]::after { transform: translateX(16px); }
+.seg { position: relative; display: inline-grid; grid-auto-flow: column; grid-auto-columns: 1fr; padding: 2px; border-radius: 999px; background: var(--fill); }
+.seg i { position: absolute; top: 2px; bottom: 2px; left: 2px; width: calc((100% - 4px) / var(--n)); border-radius: 999px; background: var(--seg-thumb); box-shadow: 0 1px 3px rgba(0,0,0,.18); transform: translateX(calc(var(--i) * 100%)); transition: transform .25s cubic-bezier(.28,1.2,.48,1); }
+.seg button { position: relative; z-index: 1; min-width: 64px; height: 24px; padding: 0 12px; border: 0; border-radius: 999px; background: none; color: var(--text-2); font-size: 12px; }
+.seg button[aria-checked="true"] { color: var(--text); font-weight: 550; }
+.btn { display: inline-flex; align-items: center; gap: 6px; height: 28px; padding: 0 14px; border: 0; border-radius: 999px; background: var(--fill); font-size: 12.5px; font-weight: 500; transition: filter .15s, transform .15s; }
+.btn:active { transform: scale(.97); filter: brightness(.94); }
+.btn.primary { background: var(--tint); color: #fff; }
+.btn.danger { color: var(--bad); }
+select.pick { -webkit-appearance: none; appearance: none; height: 28px; padding: 0 28px 0 14px; border: 0; border-radius: 999px; background: var(--fill) url("data:image/svg+xml;utf8,<svg xmlns='http://www.w3.org/2000/svg' width='8' height='12' fill='none' stroke='%238e8e93' stroke-width='1.5' stroke-linecap='round' stroke-linejoin='round'><path d='M1.5 4L4 1.5L6.5 4M1.5 8L4 10.5L6.5 8'/></svg>") no-repeat right 11px center; font-size: 12.5px; }
+input[type=range] { -webkit-appearance: none; appearance: none; width: 200px; height: 20px; background: none; --p: 50%; }
+input[type=range]::-webkit-slider-runnable-track { height: 5px; border-radius: 999px; background: linear-gradient(90deg, var(--tint) var(--p), var(--track) var(--p)); }
+input[type=range]::-webkit-slider-thumb { -webkit-appearance: none; width: 20px; height: 20px; margin-top: -7.5px; border-radius: 50%; background: #fff; box-shadow: 0 1px 4px rgba(0,0,0,.3); }
+kbd { display: inline-grid; place-items: center; min-width: 22px; height: 22px; padding: 0 6px; border-radius: 6px; background: var(--fill); font: 500 12px var(--font); }
+.keys { display: inline-flex; gap: 3px; }
+.banner { display: flex; align-items: center; gap: 12px; padding: 12px 16px; border-radius: 14px; background: color-mix(in srgb, var(--warn) 14%, var(--card)); box-shadow: inset 0 0 0 .5px color-mix(in srgb, var(--warn) 40%, transparent); }
+.banner .t { flex: 1; }
+
+/* Clipboard list */
+.clip { display: flex; align-items: center; gap: 12px; padding: 10px 16px; position: relative; }
+.clip + .clip::before { content: ""; position: absolute; left: 16px; right: 16px; top: 0; border-top: .5px solid var(--sep); }
+.clip .k { width: 30px; height: 30px; border-radius: 8px; display: grid; place-items: center; background: var(--fill); color: var(--text-2); }
+.clip .t { flex: 1; min-width: 0; } .clip .t b { display: block; font-weight: 500; white-space: nowrap; overflow: hidden; text-overflow: ellipsis; } .clip .t span { color: var(--text-2); font-size: 12px; }
+
+/* Notch preview */
+.stage { position: relative; height: 170px; overflow: hidden; border-radius: 14px; background: radial-gradient(70% 90% at 20% 20%, #5b6cff, transparent 60%), radial-gradient(60% 90% at 85% 80%, #ff6bb5, transparent 60%), #14142b; }
+.stage .bar { position: absolute; inset: 0 0 auto; height: 22px; background: rgba(255,255,255,.14); }
+.notch { position: absolute; left: 50%; top: 0; width: 150px; height: 22px; transform: translateX(-50%); background: #000; border-radius: 0 0 14px 14px; overflow: hidden; color: #fff; transition: width .5s cubic-bezier(.28,1.2,.48,1), height .5s cubic-bezier(.28,1.2,.48,1), border-radius .5s; }
+.stage:hover .notch { width: 340px; height: 126px; border-radius: 0 0 24px 24px; }
+.notch div { position: absolute; inset: 34px 18px auto; opacity: 0; transition: opacity .3s .1s; display: flex; flex-direction: column; gap: 6px; align-items: center; font-size: 12px; }
+.stage:hover .notch div { opacity: 1; }
+.notch .tabs { display: flex; gap: 4px; padding: 3px; border-radius: 999px; background: rgba(255,255,255,.14); }
+.notch .tabs span { padding: 2px 11px; border-radius: 999px; } .notch .tabs span:first-child { background: rgba(255,255,255,.28); }
+.stage small { position: absolute; bottom: 10px; width: 100%; text-align: center; color: rgba(255,255,255,.8); }
+.soon { padding: 40px 20px; text-align: center; color: var(--text-2); }
+.soon .tile { width: 48px; height: 48px; border-radius: 13px; margin: 0 auto 12px; } .soon .tile .ic { width: 26px; height: 26px; }
+.theme { position: fixed; right: 18px; top: 14px; z-index: 20; }
+@media (prefers-reduced-motion: reduce) { * { animation: none !important; transition: none !important; } }
+</style>
+</head>
+<body>
+<svg width="0" height="0" style="position:absolute" aria-hidden="true">
+  <symbol id="i-gear" viewBox="0 0 24 24"><circle cx="12" cy="12" r="3"/><path d="M12 2.5v3M12 18.5v3M2.5 12h3M18.5 12h3M5.3 5.3l2.1 2.1M16.6 16.6l2.1 2.1M18.7 5.3l-2.1 2.1M7.4 16.6l-2.1 2.1"/></symbol>
+  <symbol id="i-mouse" viewBox="0 0 24 24"><rect x="6.5" y="3" width="11" height="18" rx="5.5"/><path d="M12 7v4"/></symbol>
+  <symbol id="i-clip" viewBox="0 0 24 24"><rect x="5" y="4.5" width="14" height="16.5" rx="3"/><path d="M9 4.5V3.5h6v1M9 11h6M9 15h4"/></symbol>
+  <symbol id="i-snap" viewBox="0 0 24 24"><rect x="3.5" y="4.5" width="17" height="15" rx="3"/><path d="M12 4.5v15"/></symbol>
+  <symbol id="i-notch" viewBox="0 0 24 24"><rect x="3" y="5" width="18" height="14" rx="3"/><path d="M9 5v3.5h6V5"/></symbol>
+  <symbol id="i-spark" viewBox="0 0 24 24"><path d="M12 3l1.8 5.2L19 10l-5.2 1.8L12 17l-1.8-5.2L5 10l5.2-1.8z"/><path d="M19 16v4M17 18h4"/></symbol>
+  <symbol id="i-cal" viewBox="0 0 24 24"><rect x="4" y="5.5" width="16" height="15" rx="3"/><path d="M4 10h16M8.5 3.5v4M15.5 3.5v4"/></symbol>
+  <symbol id="i-scan" viewBox="0 0 24 24"><path d="M4 8V6a2 2 0 012-2h2M16 4h2a2 2 0 012 2v2M20 16v2a2 2 0 01-2 2h-2M8 20H6a2 2 0 01-2-2v-2"/><circle cx="12" cy="12" r="3"/></symbol>
+  <symbol id="i-cam" viewBox="0 0 24 24"><path d="M4 8.5A2.5 2.5 0 016.5 6H8l1.5-2h5L16 6h1.5A2.5 2.5 0 0120 8.5v8a2.5 2.5 0 01-2.5 2.5h-11A2.5 2.5 0 014 16.5z"/><circle cx="12" cy="12.5" r="3.2"/></symbol>
+  <symbol id="i-pick" viewBox="0 0 24 24"><path d="M15 4l5 5-3 1-1-1-7 7v3H5v-3l7-7-1-1z"/></symbol>
+  <symbol id="i-info" viewBox="0 0 24 24"><circle cx="12" cy="12" r="8.5"/><path d="M12 11v5M12 8v.01"/></symbol>
+  <symbol id="i-search" viewBox="0 0 24 24"><circle cx="11" cy="11" r="6.5"/><path d="M16 16l4 4"/></symbol>
+  <symbol id="i-text" viewBox="0 0 24 24"><path d="M5 7h14M5 12h14M5 17h9"/></symbol>
+  <symbol id="i-warn" viewBox="0 0 24 24"><path d="M12 4l9 16H3z"/><path d="M12 10v4M12 17v.01"/></symbol>
+</svg>
+
+<div class="theme seg" id="theme" style="--n:3;--i:0" role="radiogroup" aria-label="Preview theme">
+  <i></i><button role="radio" aria-checked="true" data-v="auto">Auto</button><button role="radio" aria-checked="false" data-v="light">Light</button><button role="radio" aria-checked="false" data-v="dark">Dark</button>
+</div>
+
+<div class="window" role="application" aria-label="Figghost settings">
+  <div class="lights"><i></i><i></i><i></i></div>
+  <aside class="side">
+    <label class="search"><svg class="ic"><use href="#i-search"/></svg><input id="q" placeholder="Search" aria-label="Search settings"></label>
+    <nav class="nav" id="nav"></nav>
+    <div class="status"><span class="dot"></span>Accessibility on</div>
+  </aside>
+  <section class="main">
+    <header class="head"><h1 id="title"></h1><p id="sub"></p></header>
+    <div class="scroll" id="scroll">
+
+      <div class="page" data-p="general">
+        <div class="card hero">
+          <div class="logo"><svg viewBox="0 0 24 24"><path d="M12 2.5c-4.4 0-7.5 3.2-7.5 7.6v9.2c0 .9 1 1.4 1.7.8l1.4-1.2 1.6 1.4c.5.4 1.2.4 1.6 0l1.2-1.1 1.2 1.1c.5.4 1.2.4 1.6 0l1.6-1.4 1.4 1.2c.7.6 1.7.1 1.7-.8v-9.2c0-4.4-3.1-7.6-7.5-7.6zM9.3 10.2a1.3 1.8 0 110 3.6 1.3 1.8 0 010-3.6zm5.4 0a1.3 1.8 0 110 3.6 1.3 1.8 0 010-3.6z"/></svg></div>
+          <div><h3>Figghost</h3><p>Smooth scrolling, clipboard history and a notch toolbox in one quiet menu bar app.</p>
+            <div class="chips"><span class="chip">Version 0.4.0</span><span class="chip"><span class="dot"></span>Accessibility on</span></div></div>
+        </div>
+        <h2 class="sec">Startup</h2>
+        <div class="card">
+          <div class="row"><div class="t"><b>Launch at login</b><span>Start Figghost when you log in. The window stays closed; use the menu bar icon.</span></div><button class="switch" role="switch" aria-checked="true" aria-label="Launch at login"></button></div>
+          <div class="row"><div class="t"><b>Open this window at start</b><span>Show settings each time you open the app yourself. Never at login.</span></div><button class="switch" role="switch" aria-checked="true" aria-label="Open this window at start"></button></div>
+          <div class="row"><div class="t"><b>Show the icon in the menu bar</b><span>Without it, open Figghost again from Finder or Spotlight.</span></div><button class="switch" role="switch" aria-checked="true" aria-label="Show the icon in the menu bar"></button></div>
+        </div>
+        <h2 class="sec">Appearance</h2>
+        <div class="card">
+          <div class="row"><div class="t"><b>Settings window</b><span>Light, dark, or as the system is.</span></div>
+            <div class="seg" style="--n:3;--i:0" role="radiogroup" id="appearance"><i></i><button role="radio" aria-checked="true" data-v="auto">Automatic</button><button role="radio" aria-checked="false" data-v="light">Light</button><button role="radio" aria-checked="false" data-v="dark">Dark</button></div></div>
+          <div class="row"><div class="t"><b>Language</b><span>This window changes at once. Menus and the notch change after a restart.</span></div>
+            <div class="seg" style="--n:3;--i:1" role="radiogroup"><i></i><button role="radio" aria-checked="false">Automatic</button><button role="radio" aria-checked="true">English</button><button role="radio" aria-checked="false">Tiếng Việt</button></div></div>
+        </div>
+        <h2 class="sec">Permissions</h2>
+        <div class="card">
+          <div class="row"><div class="t"><b>Accessibility</b><span>Needed to smooth scrolling and snap windows.</span></div><span class="chip"><span class="dot"></span>Granted</span><button class="btn">Open System Settings</button></div>
+          <div class="row"><div class="t"><b>Screen Recording</b><span>Needed for screenshots and the colour picker.</span></div><span class="chip"><span class="dot" style="background:var(--warn);box-shadow:none"></span>Not granted</span><button class="btn primary">Allow</button></div>
+        </div>
+      </div>
+
+      <div class="page" data-p="scroll">
+        <div class="card"><div class="row"><div class="t"><b>Smooth scrolling</b><span>Eases wheel steps into a continuous glide.</span></div><button class="switch" role="switch" aria-checked="true" aria-label="Smooth scrolling"></button></div></div>
+        <h2 class="sec">Feel</h2>
+        <div class="card">
+          <div class="row"><div class="t"><b>Speed</b><span>How far one wheel step travels.</span></div><input type="range" min="0" max="100" value="62" style="--p:62%"><span class="val" style="width:44px;text-align:right">62%</span></div>
+          <div class="row"><div class="t"><b>Smoothness</b><span>Longer glide, softer stop.</span></div><input type="range" min="0" max="100" value="40" style="--p:40%"><span class="val" style="width:44px;text-align:right">40%</span></div>
+          <div class="row"><div class="t"><b>Direction</b><span>Reverse the mouse wheel only; the trackpad is never touched.</span></div>
+            <div class="seg" style="--n:2;--i:0" role="radiogroup"><i></i><button role="radio" aria-checked="true">Natural</button><button role="radio" aria-checked="false">Reversed</button></div></div>
+        </div>
+        <h2 class="sec">Shortcut</h2>
+        <div class="card"><div class="row"><div class="t"><b>Pause smoothing</b><span>Hold to scroll with the raw wheel.</span></div><span class="keys"><kbd>⌥</kbd><kbd>⇧</kbd></span></div></div>
+      </div>
+
+      <div class="page" data-p="clipboard">
+        <div class="card">
+          <div class="row"><div class="t"><b>Clipboard history</b><span>Keep what you copy and paste it back from the menu bar.</span></div><button class="switch" role="switch" aria-checked="true" aria-label="Clipboard history"></button></div>
+          <div class="row"><div class="t"><b>Open history</b><span>Anywhere, with one shortcut.</span></div><span class="keys"><kbd>⌘</kbd><kbd>⇧</kbd><kbd>V</kbd></span></div>
+          <div class="row"><div class="t"><b>Items to keep</b><span>Older items drop off the end.</span></div><select class="pick"><option>50</option><option selected>100</option><option>500</option></select></div>
+        </div>
+        <h2 class="sec">Recent</h2>
+        <div class="card">
+          <div class="clip"><div class="k"><svg class="ic"><use href="#i-text"/></svg></div><div class="t"><b>Meeting notes for the design review on Thursday</b><span>Text · Notes · 2 min ago</span></div><button class="btn">Pin</button></div>
+          <div class="clip"><div class="k"><svg class="ic"><use href="#i-text"/></svg></div><div class="t"><b>https://example.com/spec/release-0.4</b><span>Link · Safari · 14 min ago</span></div><button class="btn">Pin</button></div>
+        </div>
+        <h2 class="sec">Protection</h2>
+        <div class="card"><div class="row"><div class="t"><b>Skip sensitive data</b><span>Passwords and card numbers are never stored.</span></div><button class="switch" role="switch" aria-checked="true" aria-label="Skip sensitive data"></button></div></div>
+      </div>
+
+      <div class="page" data-p="notch">
+        <div class="stage"><div class="bar"></div><div class="notch"><div><span class="tabs"><span>Media</span><span>Shelf</span><span>Clipboard</span></span><span>Pointing here opens the notch</span></div></div><small>Hover to preview</small></div>
+        <h2 class="sec">Behaviour</h2>
+        <div class="card">
+          <div class="row"><div class="t"><b>Notch toolbox</b><span>Shelf, media, clipboard and window snapping at the top of the screen.</span></div><button class="switch" role="switch" aria-checked="true" aria-label="Notch toolbox"></button></div>
+          <div class="row"><div class="t"><b>Material</b><span>How the open notch looks.</span></div>
+            <div class="seg" style="--n:4;--i:0" role="radiogroup"><i></i><button role="radio" aria-checked="true">Glass</button><button role="radio" aria-checked="false">Clear</button><button role="radio" aria-checked="false">Ink</button><button role="radio" aria-checked="false">Black</button></div></div>
+          <div class="row"><div class="t"><b>Open on</b><span>Hover or click.</span></div><select class="pick"><option>Hover</option><option>Click</option></select></div>
+        </div>
+      </div>
+
+      <div class="page" data-p="soon">
+        <div class="card soon"><div class="tile" id="soonTile"><svg class="ic"><use id="soonUse" href="#i-gear"/></svg></div><b id="soonName"></b><p style="margin:4px 0 0">This page keeps the same layout: a card per group, one row per setting.</p></div>
+      </div>
+
+    </div>
+  </section>
+</div>
+
+<script>
+const PAGES = [
+  ['General','gear','#8e8e93','Startup, language and permissions.','general'],
+  ['Scrolling','mouse','#0a84ff','Smooth wheel scrolling and its feel.','scroll'],
+  ['Clipboard','clip','#ff9500','History, pinned boards and protection.','clipboard'],
+  ['Window snapping','snap','#32ade6','Snap windows by dragging onto the notch.'],
+  null,
+  ['Notch','notch','#2c2c2e','A toolbox that lives at the top of the screen.','notch'],
+  ['AI agents','spark','#5e5ce6','Watch your coding agents from the notch.'],
+  ['Calendar','cal','#ff6b2c','Events, reminders and meeting alerts.'],
+  null,
+  ['Smart Select','scan','#12a594','Select and act on text anywhere.'],
+  ['Capture','cam','#ff3b30','Screenshots and recordings.'],
+  ['Colour picker','pick','#ff2d55','Pick any colour on screen.'],
+  null,
+  ['About','info','#8e8e93','Version and credits.']
+];
+const $ = s => document.querySelector(s), $$ = s => [...document.querySelectorAll(s)];
+const nav = $('#nav'); let cur = 'General';
+function build(filter = '') {
+  nav.textContent = '';
+  PAGES.forEach(p => {
+    if (!p) { if (!filter) { const g = document.createElement('div'); g.style.height = '10px'; nav.append(g); } return; }
+    if (filter && !p[0].toLowerCase().includes(filter)) return;
+    const b = document.createElement('button');
+    b.innerHTML = `<span class="tile" style="--c:${p[2]}"><svg class="ic"><use href="#i-${p[1]}"/></svg></span><span>${p[0]}</span>`;
+    if (p[0] === cur) b.setAttribute('aria-current', 'page');
+    b.onclick = () => go(p); nav.append(b);
+  });
+}
+function go(p) {
+  cur = p[0]; $('#title').textContent = p[0]; $('#sub').textContent = p[3];
+  const id = p[4] || 'soon';
+  $$('.page').forEach(e => e.classList.toggle('on', e.dataset.p === id));
+  if (id === 'soon') { $('#soonName').textContent = p[0]; $('#soonTile').style.setProperty('--c', p[2]); $('#soonUse').setAttribute('href', '#i-' + p[1]); }
+  $('#scroll').scrollTop = 0; build($('#q').value.trim().toLowerCase());
+}
+$('#q').oninput = e => build(e.target.value.trim().toLowerCase());
+document.addEventListener('click', e => {
+  const sw = e.target.closest('.switch'); if (sw) sw.setAttribute('aria-checked', sw.getAttribute('aria-checked') !== 'true');
+  const b = e.target.closest('.seg button'); if (!b) return;
+  const seg = b.parentElement, bs = [...seg.querySelectorAll('button')];
+  bs.forEach(x => x.setAttribute('aria-checked', x === b)); seg.style.setProperty('--i', bs.indexOf(b));
+  if (seg.id === 'appearance' || seg.id === 'theme') setTheme(b.dataset.v);
+});
+function setTheme(v) {
+  const dark = v === 'dark' || (v === 'auto' && matchMedia('(prefers-color-scheme: dark)').matches);
+  document.documentElement.dataset.theme = dark ? 'dark' : 'light';
+  ['#appearance', '#theme'].forEach(s => { const seg = $(s), bs = [...seg.querySelectorAll('button')]; bs.forEach(x => x.setAttribute('aria-checked', x.dataset.v === v)); seg.style.setProperty('--i', bs.findIndex(x => x.dataset.v === v)); });
+}
+$$('input[type=range]').forEach(r => r.oninput = () => { r.style.setProperty('--p', r.value + '%'); const o = r.parentElement.querySelector('.val'); if (o) o.textContent = r.value + '%'; });
+setTheme('auto'); go(PAGES[0]);
+</script>
+</body>
+</html>

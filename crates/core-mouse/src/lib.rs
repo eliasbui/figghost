@@ -322,12 +322,13 @@ pub struct Engine {
 impl Engine {
     pub fn start(control: Arc<Control>) -> Result<Self, Error> {
         Self::start_with(control, |f| {
-            let phase = match f.phase {
-                Phase::Began => ScrollPhase::Began,
-                Phase::Changed => ScrollPhase::Changed,
-                Phase::Ended => ScrollPhase::Ended,
-            };
-            post_scroll(f.dx, f.dy, phase);
+            // Posted as a wheel, not a gesture. Browsers latch a gesture to the scroller it began over until it
+            // ends (Chromium's MouseWheelPhaseHandler), and a glide that keeps being fed never ends, so a list the
+            // pointer moves onto never scrolls. A phaseless wheel is re-targeted once the pointer moves 10 px, as
+            // with Mos, which posts its frames the same way. The end frame carries no distance: nothing to post.
+            if f.phase != Phase::Ended {
+                post_scroll(f.dx, f.dy, ScrollPhase::None);
+            }
         })
     }
 

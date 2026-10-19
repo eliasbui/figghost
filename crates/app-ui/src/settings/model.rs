@@ -552,7 +552,7 @@ fn set(config: &mut Config, path: &str, value: &Value) -> Outcome {
             Ok(Effect::Notch)
         }
         "notch.hud" => {
-            config.notch.hud = one_of(value, &["notch", "glass", "corner", "bar"])?;
+            config.notch.hud = one_of(value, &["notch", "glass", "corner", "bar", "island", "side", "tile"])?;
             Ok(Effect::Hud)
         }
         "notch.motion" => {

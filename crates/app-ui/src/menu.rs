@@ -11,6 +11,9 @@ use macos_sys::{
 };
 use std::{cell::RefCell, fs, rc::Rc, sync::Arc};
 
+/// The panel the menu bar item opens; it lays the entries of the menu out by what they are.
+const TRAY_PAGE: &str = include_str!("../web/tray.html");
+
 type ChangeSettings = Rc<dyn Fn(&dyn Fn(&mut Settings))>;
 
 /// The SF Symbol of each entry of the menu, named in one place so that a test can ask the system for every
@@ -244,10 +247,11 @@ pub fn build(ctx: &AppContext, settings: &Rc<SettingsFeature>) -> StatusMenu {
         entries.push(Entry::Separator);
         entries.extend(extra);
     }
+    entries.push(Entry::Separator);
     entries.push(Entry::Item(
         Item::new(text.menu_quit(), move || app::quit(mtm)).symbol(symbols::QUIT),
     ));
-    StatusMenu::new(mtm, "Figghost", entries)
+    StatusMenu::new(mtm, "Figghost", entries, TRAY_PAGE)
 }
 
 #[cfg(test)]

@@ -103,7 +103,7 @@ fn main() {
 
         let shelf = ShelfView::new(
             mtm,
-            notch.page_frame(),
+            notch.page_area(660.0, 150.0),
             ShelfCallbacks {
                 on_drop: Box::new(|_| {}),
                 on_remove: Box::new(|_| {}),
@@ -179,6 +179,7 @@ fn main() {
             notch.page_frame(),
             AgentsCallbacks {
                 on_decide: Box::new(|_, _| {}),
+                on_refresh: Box::new(|| {}),
             },
         );
         notch.add_page(agents.page(|| {}, || {}));
@@ -247,6 +248,8 @@ fn main() {
                 sessions,
                 usage_heading: "Usage limits".into(),
                 usage,
+                refresh_label: Some("Refresh usage limits (Cmd+R)".into()),
+                refreshing: false,
                 tokens_heading: "Tokens and cost, at API prices".into(),
                 tokens: vec![
                     TokensData {
@@ -292,7 +295,16 @@ fn main() {
             save("agents_approval", 4);
             view.show(mtm, &display(None, "", sessions.clone(), usage.clone()));
             save("agents_overview", 4);
-            view.show(mtm, &display(None, "", Vec::new(), Vec::new()));
+            let mut busy = display(None, "", sessions.clone(), usage.clone());
+            busy.refreshing = true;
+            busy.usage_heading = "Usage limits  -  Codex limits unavailable".into();
+            view.show(mtm, &busy);
+            save("agents_refreshing", 4);
+            view.show(mtm, &display(None, "", sessions.clone(), Vec::new()));
+            save("agents_no_usage", 4);
+            let mut empty = display(None, "", Vec::new(), Vec::new());
+            empty.refresh_label = None;
+            view.show(mtm, &empty);
             save("agents_empty", 4);
             process::exit(0);
         });

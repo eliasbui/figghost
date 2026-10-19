@@ -158,6 +158,16 @@ pub fn usage_row(
     }
 }
 
+/// The heading of the usage section, which also says how the last refresh went.
+fn usage_heading(language: Language, refresh: Refresh, now: i64) -> String {
+    let note = match refresh {
+        Refresh::Idle | Refresh::Running => return language.agents_usage().to_owned(),
+        Refresh::Done(at) => language.agents_updated(&ago(language, now, at)),
+        Refresh::Failed => language.agents_refresh_failed().to_owned(),
+    };
+    format!("{}  -  {note}", language.agents_usage())
+}
+
 /// What one agent used today and in the last seven days, for the settings page.
 #[derive(Debug, Clone, PartialEq)]
 pub struct Spend {
@@ -221,7 +231,31 @@ fn start_counter(user_home: PathBuf) -> Option<mpsc::Sender<(i64, i64)>> {
 struct UsageCache {
     claude: Option<Limits>,
     codex: Option<Limits>,
+    /// What Codex's server said when the refresh button last asked. It is newer than the logs until they catch up.
+    codex_live: Option<Limits>,
     read_at_ms: i64,
+}
+
+impl UsageCache {
+    /// Codex's limits from whichever source measured them last: its logs, or the answer of its server.
+    fn codex_latest(&self) -> Option<&Limits> {
+        [&self.codex, &self.codex_live]
+            .into_iter()
+            .flatten()
+            .max_by_key(|limits| limits.observed_ms)
+    }
+}
+
+/// How the last press of the refresh button went; the heading of the usage section says so.
+#[derive(Debug, Clone, Copy, Default, PartialEq, Eq)]
+enum Refresh {
+    #[default]
+    Idle,
+    Running,
+    /// Done at this time, in milliseconds since 1970.
+    Done(i64),
+    /// Codex was asked and did not give its limits.
+    Failed,
 }
 
 /// What the settings page shows about one agent.
@@ -366,6 +400,7 @@ pub struct AgentsFeature {
     server: RefCell<Option<Server>>,
     ticker: RefCell<Option<app::Timer>>,
     limits: RefCell<UsageCache>,
+    refresh: Cell<Refresh>,
     visible: Cell<bool>,
     /// The notch was closed when something here opened it, so it may be closed again when that is over.
     opened_by_us: Cell<bool>,
@@ -394,7 +429,7 @@ impl AgentsFeature {
             std::env::var_os("HOME"),
         );
         let feature = Rc::new_cyclic(|me: &Weak<AgentsFeature>| {
-            let decider = me.clone();
+            let (decider, refresher) = (me.clone(), me.clone());
             let view = AgentsView::new(
                 mtm,
                 notch.page_frame(),
@@ -402,6 +437,11 @@ impl AgentsFeature {
                     on_decide: Box::new(move |id, allow| {
                         if let Some(feature) = decider.upgrade() {
                             feature.decide(id, allow);
+                        }
+                    }),
+                    on_refresh: Box::new(move || {
+                        if let Some(feature) = refresher.upgrade() {
+                            feature.refresh_limits();
                         }
                     }),
                 },
@@ -421,6 +461,7 @@ impl AgentsFeature {
                 server: RefCell::default(),
                 ticker: RefCell::default(),
                 limits: RefCell::default(),
+                refresh: Cell::default(),
                 visible: Cell::new(false),
                 opened_by_us: Cell::new(false),
                 live: Cell::new(true),
@@ -609,6 +650,7 @@ impl AgentsFeature {
             (
                 "a waiting question",
                 Some(Activity {
+                    detail: None,
                     left: terminal(Tone::Orange),
                     right: Ear::Symbol {
                         name: "hand.raised.fill",
@@ -633,6 +675,7 @@ impl AgentsFeature {
             (
                 what,
                 Some(Activity {
+                    detail: None,
                     left: Ear::Symbol {
                         name: symbol,
                         tone,
@@ -667,6 +710,7 @@ impl AgentsFeature {
             (
                 "a working agent",
                 Some(Activity {
+                    detail: None,
                     left: terminal(Tone::Blue),
                     right,
                     page,
@@ -821,11 +865,61 @@ impl AgentsFeature {
         cache.codex = usage::codex_limits(&self.files.user_home.join(".codex/sessions"));
     }
 
+    /// The refresh button: reads the limits again at once, and asks Codex for them as its server has them, which is
+    /// newer than its session logs. Claude Code cannot be asked, so its numbers are as new as its last status line.
+    fn refresh_limits(&self) {
+        if self.refresh.get() == Refresh::Running {
+            return;
+        }
+        self.limits.borrow_mut().read_at_ms = 0;
+        let Some(codex) = usage::find_codex(&self.files.user_home) else {
+            self.refresh.set(Refresh::Done(now_ms()));
+            self.render();
+            return;
+        };
+        self.refresh.set(Refresh::Running);
+        let home = self.files.user_home.clone();
+        let started = std::thread::Builder::new()
+            .name("fig-agent-limits".into())
+            .spawn(move || {
+                macos_sys::qos::utility();
+                let answer = usage::codex_limits_live(&codex, &home, now_ms(), usage::LIVE_TIMEOUT);
+                app::on_main(move || {
+                    let feature = FEATURE.with(|slot| slot.borrow().upgrade());
+                    if let Some(feature) = feature {
+                        feature.took_live_limits(answer);
+                    }
+                });
+            });
+        if started.is_err() {
+            self.refresh.set(Refresh::Failed);
+        }
+        self.render();
+    }
+
+    fn took_live_limits(&self, answer: Result<Limits, String>) {
+        match answer {
+            Ok(limits) => {
+                trace::log("agents: Codex limits refreshed");
+                self.limits.borrow_mut().codex_live = Some(limits);
+                self.refresh.set(Refresh::Done(now_ms()));
+            }
+            Err(e) => {
+                trace::log(&format!("agents: Codex limits: {e}"));
+                self.refresh.set(Refresh::Failed);
+            }
+        }
+        self.render();
+    }
+
     fn usage_rows(&self, language: Language, now: i64) -> Vec<UsageData> {
         self.refresh_usage(now);
         let cache = self.limits.borrow();
         let mut rows = Vec::new();
-        for (agent, limits) in [(Agent::Claude, &cache.claude), (Agent::Codex, &cache.codex)] {
+        for (agent, limits) in [
+            (Agent::Claude, cache.claude.as_ref()),
+            (Agent::Codex, cache.codex_latest()),
+        ] {
             let Some(limits) = limits else {
                 continue;
             };
@@ -860,6 +954,10 @@ impl AgentsFeature {
             )
         };
         let usage = self.usage_rows(language, now);
+        // With no numbers yet the button stays when Codex can be asked: that is how the first ones come.
+        let refresh_label = (!usage.is_empty()
+            || usage::find_codex(&self.files.user_home).is_some())
+        .then(|| language.agents_refresh().to_owned());
         self.view.show(
             self.mtm,
             &AgentsDisplay {
@@ -867,8 +965,10 @@ impl AgentsFeature {
                 more_waiting,
                 sessions_heading: language.agents_sessions().to_owned(),
                 sessions,
-                usage_heading: language.agents_usage().to_owned(),
+                usage_heading: usage_heading(language, self.refresh.get(), now),
                 usage,
+                refresh_label,
+                refreshing: self.refresh.get() == Refresh::Running,
                 tokens_heading: language.agents_tokens().to_owned(),
                 tokens: self.token_rows(language),
                 empty_title: language.agents_empty_title().to_owned(),
@@ -1061,6 +1161,51 @@ mod tests {
             window_minutes: Some(300),
             resets_at,
         }
+    }
+
+    fn limits_at(used: f64, observed_ms: i64) -> Limits {
+        Limits {
+            primary: Some(limit(used, None)),
+            secondary: None,
+            observed_ms,
+            plan: None,
+        }
+    }
+
+    #[test]
+    fn what_the_server_said_stands_until_the_logs_are_newer() {
+        let mut cache = UsageCache::default();
+        assert!(cache.codex_latest().is_none());
+        cache.codex = Some(limits_at(10.0, 1_000));
+        assert_eq!(cache.codex_latest().unwrap().observed_ms, 1_000);
+        // The server's answer is newer than the logs, and the logs being read again every few seconds must not
+        // put the older numbers back.
+        cache.codex_live = Some(limits_at(20.0, 2_000));
+        assert_eq!(cache.codex_latest().unwrap().observed_ms, 2_000);
+        // Once Codex has worked since, its log is the newest.
+        cache.codex = Some(limits_at(30.0, 3_000));
+        assert_eq!(cache.codex_latest().unwrap().observed_ms, 3_000);
+        cache.codex = None;
+        assert_eq!(cache.codex_latest().unwrap().observed_ms, 2_000);
+    }
+
+    #[test]
+    fn the_heading_says_how_the_last_refresh_went() {
+        let (en, vi) = (Language::English, Language::Vietnamese);
+        assert_eq!(usage_heading(en, Refresh::Idle, 0), "Usage limits");
+        assert_eq!(usage_heading(en, Refresh::Running, 0), "Usage limits");
+        assert_eq!(
+            usage_heading(en, Refresh::Done(1_000), 1_000 + 120_000),
+            "Usage limits  -  updated 2 minutes ago"
+        );
+        assert_eq!(
+            usage_heading(en, Refresh::Failed, 0),
+            "Usage limits  -  Codex limits unavailable"
+        );
+        assert_eq!(
+            usage_heading(vi, Refresh::Done(0), 0),
+            "Hạn mức sử dụng  -  cập nhật vừa xong"
+        );
     }
 
     #[test]

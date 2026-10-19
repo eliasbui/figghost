@@ -1,5 +1,6 @@
 //! Checks that every page of the notch lands inside the window once it is open, including pages added
-//! while the notch was still collapsed, and that the strip of page icons has one icon per page. Exits with
+//! while the notch was still collapsed, that the strip of page icons has one icon per page and sits at the right of
+//! the header with the three dots at its left, and that the shape is the size of the page it shows. Exits with
 //! status 1 on a failure.
 //! `cargo run -p macos-sys --example layout_check`
 
@@ -7,7 +8,7 @@ use macos_sys::{
     MainThreadMarker, app,
     focus_ui::{FocusCallbacks, FocusView},
     media_ui::{MediaCallbacks, MediaView},
-    notch::{EXPANDED_SIZE, Notch, NotchGeometry},
+    notch::{Notch, NotchGeometry},
     shelf_ui::{ShelfCallbacks, ShelfView},
     ui::AppCallbacks,
 };
@@ -16,7 +17,7 @@ use objc2_foundation::{NSPoint, NSRect, NSSize};
 use std::{process, rc::Rc};
 
 /// Prints a line per problem and returns how many there were.
-fn inspect(mtm: MainThreadMarker) -> usize {
+fn inspect(mtm: MainThreadMarker, open: NSSize) -> usize {
     let mut failures = 0;
     let mut fail = |message: String| {
         println!("FAIL: {message}");
@@ -24,11 +25,8 @@ fn inspect(mtm: MainThreadMarker) -> usize {
     };
     let app = NSApplication::sharedApplication(mtm);
     let windows = app.windows();
-    // The open notch's window is at least as wide as the open shape (wider by the room for its shadow).
-    let Some(window) = windows
-        .iter()
-        .find(|w| w.frame().size.width >= EXPANDED_SIZE.width)
-    else {
+    // The open notch's window is at least as wide as the open shape (wider by the room for the fillets).
+    let Some(window) = windows.iter().find(|w| w.frame().size.width >= open.width) else {
         println!("FAIL: no window of the expanded size");
         return 1;
     };
@@ -52,29 +50,36 @@ fn inspect(mtm: MainThreadMarker) -> usize {
         println!("FAIL: no open shape holds the pages");
         return 1;
     };
-    if surface.frame().size != EXPANDED_SIZE {
+    let shape = surface.frame().size;
+    if shape != open {
         fail(format!(
-            "the open shape is {:?}, expected the expanded size",
-            surface.frame().size
+            "the open shape is {shape:?}, expected the size of its page {open:?}"
         ));
     }
     let Some(container) = content_of(&surface) else {
         println!("FAIL: the shape has no content container");
         return 1;
     };
+    // The content is as large as the largest page, centred on the shape and against its top.
     let frame = container.frame();
-    if (frame.origin.x, frame.origin.y) != (0.0, 0.0) {
+    let expected = (
+        (shape.width - frame.size.width) / 2.0,
+        shape.height - frame.size.height,
+    );
+    if (frame.origin.x - expected.0).abs() > 0.5 || (frame.origin.y - expected.1).abs() > 0.5 {
         fail(format!(
-            "the container sits at ({}, {}), expected (0, 0)",
+            "the container sits at ({}, {}), expected {expected:?}",
             frame.origin.x, frame.origin.y
         ));
     }
+    // Where the shape's left edge is in the content.
+    let left = (frame.size.width - shape.width) / 2.0;
     for (i, view) in container.subviews().iter().enumerate() {
         let f = view.frame();
         let inside = f.origin.x >= 0.0
             && f.origin.y >= 0.0
-            && f.origin.x + f.size.width <= EXPANDED_SIZE.width + 0.5
-            && f.origin.y + f.size.height <= EXPANDED_SIZE.height + 0.5;
+            && f.origin.x + f.size.width <= frame.size.width + 0.5
+            && f.origin.y + f.size.height <= frame.size.height + 0.5;
         let name = view.class().name().to_string_lossy().into_owned();
         println!(
             "  {i}: {name} ({}, {}, {}, {}) hidden={}",
@@ -88,7 +93,7 @@ fn inspect(mtm: MainThreadMarker) -> usize {
             fail(format!("subview {i} ({name}) lies outside the window"));
         }
         if name.contains("PageSwitcher") {
-            // One icon per page (clipboard, shelf, media, focus), at the left, below the top edge.
+            // One icon per page (clipboard, shelf, media, focus), at the right edge of the shape.
             let expected = macos_sys::switcher::width_for(4);
             if (f.size.width - expected).abs() > 0.5 {
                 fail(format!(
@@ -96,12 +101,18 @@ fn inspect(mtm: MainThreadMarker) -> usize {
                     f.size.width
                 ));
             }
-            if f.origin.x > 40.0 {
+            let gap = left + shape.width - (f.origin.x + f.size.width);
+            if !(8.0..=24.0).contains(&gap) {
                 fail(format!(
-                    "the page strip starts at {}, expected near the left edge",
-                    f.origin.x
+                    "the page strip ends {gap} short of the shape's right edge, expected about 16"
                 ));
             }
+        }
+        if name.contains("NotchOrb") && !(8.0..=24.0).contains(&(f.origin.x - left)) {
+            fail(format!(
+                "the three dots start {} from the shape's left edge, expected about 16",
+                f.origin.x - left
+            ));
         }
     }
     failures
@@ -162,8 +173,9 @@ fn main() {
 
         let opener = Rc::clone(&notch);
         app::after(0.3, move || opener.open());
+        let sized = Rc::clone(&notch);
         app::after(1.5, move || {
-            let failures = inspect(mtm);
+            let failures = inspect(mtm, sized.open_size());
             println!(
                 "{}",
                 if failures == 0 {

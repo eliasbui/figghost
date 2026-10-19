@@ -7,7 +7,7 @@ use crate::{config::NotchConfig, media::MediaFeature};
 use macos_sys::{
     app,
     audio_meter::{self, Meter},
-    notch::{Activity, Ear, Levels, Notch, artwork_tint},
+    notch::{Activity, Detail, Ear, Levels, Notch, artwork_tint},
     now_playing::Sample,
     style::Tone,
 };
@@ -25,6 +25,8 @@ const PAUSE_GRACE_SECONDS: f64 = 3.0;
 const PLAIN_BARS: [f64; 3] = [0.98, 0.98, 1.0];
 /// One band per bar of the closed notch.
 const BANDS: usize = 4;
+/// How long the notch shows the name of a track that just started, under its ears.
+const PEEK_SECONDS: f64 = 3.6;
 
 pub struct LiveMedia {
     notch: Weak<Notch>,
@@ -36,6 +38,10 @@ pub struct LiveMedia {
     tint: RefCell<Option<(u64, [f64; 3])>>,
     /// Bumped by every change, so a pause that ended does not take the activity away later.
     serial: Cell<u64>,
+    /// The title and artist of the track the notch last saw, so a new one is told from the same one again.
+    last: RefCell<Option<(String, String)>>,
+    /// The name of the track on show under the ears, until `PEEK_SECONDS` have passed.
+    peek: RefCell<Option<Detail>>,
     /// Listens to what the Mac plays, only while music plays: a running meter keeps the Mac and a Bluetooth output
     /// awake. Shared with the bars, which read it while they are drawn.
     meter: Rc<RefCell<Option<Meter>>>,
@@ -54,6 +60,8 @@ impl LiveMedia {
             listen: Cell::new(config.waveform == "live"),
             tint: RefCell::new(None),
             serial: Cell::new(0),
+            last: RefCell::new(media.current().map(|s| (s.track.title, s.track.artist))),
+            peek: RefCell::new(None),
             meter: Rc::default(),
             meter_failed: Cell::new(false),
             started: Instant::now(),
@@ -109,6 +117,31 @@ impl LiveMedia {
         };
         self.listen_if_wanted();
         let track = &sample.track;
+        // A track that is new, and has a name, is shown for a moment: the notch tells what has begun.
+        let key = (track.title.clone(), track.artist.clone());
+        if self.last.borrow().as_ref() != Some(&key) {
+            *self.last.borrow_mut() = Some(key.clone());
+            if !track.title.is_empty() {
+                *self.peek.borrow_mut() = Some(Detail {
+                    title: track.title.clone(),
+                    subtitle: if track.artist.is_empty() {
+                        track.app_name.clone()
+                    } else {
+                        track.artist.clone()
+                    },
+                });
+                let (weak, peeked) = (self.me.clone(), key);
+                app::after(PEEK_SECONDS, move || {
+                    if let Some(live) = weak.upgrade()
+                        && live.last.borrow().as_ref() == Some(&peeked)
+                    {
+                        live.peek.borrow_mut().take();
+                        let current = live.media.upgrade().and_then(|m| m.current());
+                        live.update(current.as_ref());
+                    }
+                });
+            }
+        }
         let left = match &track.artwork {
             Some(art) => Ear::Artwork {
                 id: art.id,
@@ -125,6 +158,7 @@ impl LiveMedia {
         notch.set_activity(
             SLOT,
             Some(Activity {
+                detail: self.peek.borrow().clone(),
                 left,
                 right: Ear::Bars {
                     levels: self.levels(),

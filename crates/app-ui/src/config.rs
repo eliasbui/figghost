@@ -91,7 +91,8 @@ pub struct NotchConfig {
     /// A global shortcut that opens or closes the notch; empty for none.
     pub shortcut: String,
     /// The look of the volume indicator: `notch` (black, under the cutout), `glass` (the same shape in Liquid
-    /// Glass), `corner` (a capsule in the corner) or `bar` (the level filling the shape).
+    /// Glass), `corner` (a capsule in the corner), `bar` (the level filling the shape), `island` (a capsule at the
+    /// middle of the top), `side` (a slider on the right edge) or `tile` (a large tile low on the screen).
     pub hud: String,
 }
 
@@ -192,7 +193,7 @@ impl From<serde_json::Value> for NotchConfig {
             live_agents: flag("live_agents", d.live_agents),
             waveform: word(&v["waveform"], &["live", "animated"], &d.waveform),
             shortcut: v["shortcut"].as_str().unwrap_or("").trim().to_owned(),
-            hud: word(&v["hud"], &["notch", "glass", "corner", "bar"], &d.hud),
+            hud: word(&v["hud"], &["notch", "glass", "corner", "bar", "island", "side", "tile"], &d.hud),
         }
     }
 }
@@ -817,6 +818,9 @@ mod tests {
             ("glass", HudStyle::Glass),
             ("corner", HudStyle::Corner),
             ("bar", HudStyle::Bar),
+            ("island", HudStyle::Island),
+            ("side", HudStyle::Side),
+            ("tile", HudStyle::Tile),
         ] {
             notch.hud = word.into();
             assert_eq!(notch.hud_style(), style, "{word}");

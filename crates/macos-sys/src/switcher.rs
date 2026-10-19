@@ -5,11 +5,13 @@ use crate::style::{self, Control, TEXT_SECONDARY, black, white};
 use objc2::{
     AnyThread, DefinedClass, MainThreadMarker, MainThreadOnly, Message, define_class, msg_send,
     rc::{Retained, Weak},
-    sel,
     runtime::AnyObject,
+    sel,
 };
 use objc2_app_kit::{NSEvent, NSScreen, NSTrackingArea, NSTrackingAreaOptions, NSView};
-use objc2_foundation::{NSObject, NSObjectProtocol, NSPoint, NSRect, NSRunLoop, NSRunLoopCommonModes, NSSize, NSString};
+use objc2_foundation::{
+    NSObject, NSObjectProtocol, NSPoint, NSRect, NSRunLoop, NSRunLoopCommonModes, NSSize, NSString,
+};
 use objc2_quartz_core::CADisplayLink;
 use std::{
     cell::{Cell, RefCell},
@@ -217,7 +219,8 @@ impl PageSwitcher {
             .window()
             .and_then(|window| window.screen())
             .or_else(|| NSScreen::mainScreen(mtm));
-        let Some(screen) = screen.filter(|s| s.respondsToSelector(sel!(displayLinkWithTarget:selector:)))
+        let Some(screen) =
+            screen.filter(|s| s.respondsToSelector(sel!(displayLinkWithTarget:selector:)))
         else {
             self.ivars().shown.set(self.ivars().selected.get() as f64);
             self.setNeedsDisplay(true);
@@ -226,10 +229,7 @@ impl PageSwitcher {
         let target = Glide::new(mtm, Weak::from_retained(&self.retain()));
         // SAFETY: the target answers `tick:`, taking the display link, which is what the selector names.
         let link = unsafe {
-            screen.displayLinkWithTarget_selector(
-                AsRef::<AnyObject>::as_ref(&target),
-                sel!(tick:),
-            )
+            screen.displayLinkWithTarget_selector(AsRef::<AnyObject>::as_ref(&target), sel!(tick:))
         };
         // SAFETY: the main run loop, in the common modes so frames also come while the pointer is held down.
         unsafe { link.addToRunLoop_forMode(&NSRunLoop::mainRunLoop(), NSRunLoopCommonModes) };
@@ -303,6 +303,128 @@ impl PageSwitcher {
                 );
                 style::fill_circle(dot, &style::Tone::Orange.color());
             }
+        }
+    }
+}
+
+/// The capsule with three dots at the left of the header: a menu for the things that are not a page. Hovering it
+/// spreads the dots and lifts the capsule, pressing it hands the click to its owner, which shows the menu.
+pub const ORB_WIDTH: f64 = 46.0;
+
+type OrbClick = Rc<dyn Fn(&NSView, &NSEvent)>;
+
+pub struct OrbIvars {
+    hovered: Cell<bool>,
+    pressed: Cell<bool>,
+    on_click: RefCell<Option<OrbClick>>,
+}
+
+define_class!(
+    // SAFETY: NSView allows subclassing; the ivars are only touched on the main thread and need no Drop.
+    #[unsafe(super(NSView))]
+    #[thread_kind = MainThreadOnly]
+    #[name = "FigNotchOrb"]
+    #[ivars = OrbIvars]
+    pub struct NotchOrb;
+
+    impl NotchOrb {
+        #[unsafe(method(acceptsFirstMouse:))]
+        fn accepts_first_mouse(&self, _event: Option<&NSEvent>) -> bool {
+            true
+        }
+
+        #[unsafe(method(drawRect:))]
+        fn draw_rect(&self, _dirty: NSRect) {
+            self.paint();
+        }
+
+        #[unsafe(method(mouseEntered:))]
+        fn mouse_entered(&self, _event: &NSEvent) {
+            self.ivars().hovered.set(true);
+            self.setNeedsDisplay(true);
+        }
+
+        #[unsafe(method(mouseExited:))]
+        fn mouse_exited(&self, _event: &NSEvent) {
+            self.ivars().hovered.set(false);
+            self.setNeedsDisplay(true);
+        }
+
+        #[unsafe(method(mouseDown:))]
+        fn mouse_down(&self, event: &NSEvent) {
+            self.ivars().pressed.set(true);
+            self.setNeedsDisplay(true);
+            let click = self.ivars().on_click.borrow().clone();
+            if let Some(click) = click {
+                // The menu runs its own event loop, so the press is over by the time this returns.
+                click(self, event);
+            }
+            self.ivars().pressed.set(false);
+            self.ivars().hovered.set(false);
+            self.setNeedsDisplay(true);
+        }
+    }
+
+    unsafe impl NSObjectProtocol for NotchOrb {}
+);
+
+impl NotchOrb {
+    pub fn new(mtm: MainThreadMarker, origin: NSPoint) -> Retained<Self> {
+        let ivars = OrbIvars {
+            hovered: Cell::new(false),
+            pressed: Cell::new(false),
+            on_click: RefCell::new(None),
+        };
+        let frame = NSRect::new(origin, NSSize::new(ORB_WIDTH, HEIGHT));
+        // SAFETY: designated initializer with valid arguments on the main thread.
+        let this: Retained<Self> =
+            unsafe { msg_send![super(mtm.alloc::<Self>().set_ivars(ivars)), initWithFrame: frame] };
+        // SAFETY: valid options and owner; InVisibleRect ignores the (empty) rect.
+        let area = unsafe {
+            NSTrackingArea::initWithRect_options_owner_userInfo(
+                NSTrackingArea::alloc(),
+                NSRect::ZERO,
+                NSTrackingAreaOptions::MouseEnteredAndExited
+                    | NSTrackingAreaOptions::ActiveAlways
+                    | NSTrackingAreaOptions::InVisibleRect,
+                Some(&this),
+                None,
+            )
+        };
+        this.addTrackingArea(&area);
+        this
+    }
+
+    pub fn set_on_click(&self, f: impl Fn(&NSView, &NSEvent) + 'static) {
+        *self.ivars().on_click.borrow_mut() = Some(Rc::new(f));
+    }
+
+    fn paint(&self) {
+        let bounds = self.bounds();
+        let (hovered, pressed) = (self.ivars().hovered.get(), self.ivars().pressed.get());
+        let state = if pressed {
+            Control::Pressed
+        } else if hovered {
+            Control::Hover
+        } else {
+            Control::Rest
+        };
+        style::well(bounds, HEIGHT / 2.0);
+        if hovered || pressed {
+            style::control(bounds, HEIGHT / 2.0, state);
+        }
+        let (dot, gap) = (4.0, if hovered { 7.5 } else { 6.5 });
+        let span = 3.0 * dot + 2.0 * gap;
+        let ink = white(if hovered { 0.92 } else { TEXT_SECONDARY });
+        for i in 0..3 {
+            let x = bounds.size.width / 2.0 - span / 2.0 + f64::from(i) * (dot + gap);
+            style::fill_circle(
+                NSRect::new(
+                    NSPoint::new(x, bounds.size.height / 2.0 - dot / 2.0),
+                    NSSize::new(dot, dot),
+                ),
+                &ink,
+            );
         }
     }
 }

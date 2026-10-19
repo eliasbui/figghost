@@ -17,6 +17,8 @@ const FLAG_COMMAND: u64 = 0x0010_0000;
 
 #[derive(Debug, Clone, Copy, PartialEq, Eq)]
 pub enum ScrollPhase {
+    /// A precise wheel rather than a trackpad gesture: apps hit-test it again as the pointer moves.
+    None = 0,
     Began = 1,
     Changed = 2,
     Ended = 4,

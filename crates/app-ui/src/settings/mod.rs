@@ -50,6 +50,19 @@ fn with_feature(f: impl FnOnce(&SettingsFeature)) {
     });
 }
 
+/// Opens the settings window on a page, for entries of the menu bar item.
+pub fn show_page(id: &str) {
+    with_feature(|this| {
+        this.show();
+        *this.pending_page.borrow_mut() = Some(id.to_owned());
+        // A window that was already open takes it at once; a new one takes it when it says it is ready.
+        if this.last_state.borrow().is_empty() {
+            return;
+        }
+        this.go_pending();
+    });
+}
+
 pub struct SettingsFeature {
     ctx: Rc<AppContext>,
     me: Weak<SettingsFeature>,
@@ -60,6 +73,8 @@ pub struct SettingsFeature {
     last_state: RefCell<String>,
     /// Shows or hides the menu bar icon; set once the menu exists.
     menu_icon: RefCell<Option<ShowIcon>>,
+    /// A page asked for before the window's script was ready to take it.
+    pending_page: RefCell<Option<String>>,
 }
 
 impl SettingsFeature {
@@ -73,6 +88,7 @@ impl SettingsFeature {
             icons: RefCell::default(),
             last_state: RefCell::default(),
             menu_icon: RefCell::default(),
+            pending_page: RefCell::default(),
         });
         FEATURE.with(|slot| *slot.borrow_mut() = Rc::downgrade(&feature));
         // The About page follows the update, which goes on whether or not this window is open.
@@ -239,6 +255,12 @@ impl SettingsFeature {
         }
     }
 
+    fn go_pending(&self) {
+        if let Some(page) = self.pending_page.borrow_mut().take() {
+            self.post(&json!({ "t": "go", "page": page }));
+        }
+    }
+
     /// Sends the state to the page; `force` sends it even when it has not changed since the last time.
     fn push_state(&self, force: bool) {
         if self.window.borrow().is_none() {
@@ -266,6 +288,7 @@ impl SettingsFeature {
             Message::Ready => {
                 self.push_state(true);
                 self.post(&self.ctx.update.status());
+                self.go_pending();
             }
             Message::JsError { message, line } => {
                 eprintln!("settings page: {message} (line {line})");

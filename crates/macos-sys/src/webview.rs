@@ -13,8 +13,8 @@ use objc2::{
 use objc2_app_kit::{
     NSAppearance, NSAppearanceCustomization, NSAppearanceNameAqua, NSAppearanceNameDarkAqua,
     NSApplication, NSAutoresizingMaskOptions, NSBackingStoreType, NSBitmapImageFileType,
-    NSBitmapImageRep, NSColor, NSEventType, NSGlassEffectView, NSGlassEffectViewStyle, NSImage,
-    NSView, NSVisualEffectBlendingMode, NSVisualEffectMaterial, NSVisualEffectState,
+    NSBitmapImageRep, NSColor, NSEvent, NSEventMask, NSEventType, NSGlassEffectView, NSGlassEffectViewStyle,
+    NSImage, NSPanel, NSScreen, NSStatusWindowLevel, NSView, NSVisualEffectBlendingMode, NSVisualEffectMaterial, NSVisualEffectState,
     NSVisualEffectView, NSWindow, NSWindowDelegate, NSWindowStyleMask, NSWindowTitleVisibility,
     NSWorkspace,
 };
@@ -27,7 +27,11 @@ use objc2_web_kit::{
     WKScriptMessage, WKScriptMessageHandler, WKSnapshotConfiguration, WKUserContentController,
     WKUserScript, WKUserScriptInjectionTime, WKWebView, WKWebViewConfiguration, WKWebsiteDataStore,
 };
-use std::{cell::RefCell, ptr::NonNull, rc::Rc};
+use std::{
+    cell::{Cell, RefCell},
+    ptr::NonNull,
+    rc::Rc,
+};
 
 /// The page's own address. A real origin lets WebKit report script errors in full (an opaque one masks
 /// them as "Script error."), and the reserved `.invalid` domain can never resolve, so nothing can leave.
@@ -318,11 +322,12 @@ pub(crate) fn png_of(image: &NSImage) -> Option<Vec<u8>> {
 fn glass_background(
     mtm: MainThreadMarker,
     frame: NSRect,
+    radius: f64,
 ) -> (Retained<NSView>, Option<Retained<NSGlassEffectView>>) {
     if AnyClass::get(c"NSGlassEffectView").is_some() {
         let glass = NSGlassEffectView::initWithFrame(mtm.alloc(), frame);
         glass.setStyle(NSGlassEffectViewStyle::Regular);
-        glass.setCornerRadius(0.0);
+        glass.setCornerRadius(radius);
         let view: Retained<NSView> = Retained::into_super(Retained::clone(&glass));
         return (view, Some(glass));
     }
@@ -330,6 +335,13 @@ fn glass_background(
     effect.setMaterial(NSVisualEffectMaterial::UnderWindowBackground);
     effect.setBlendingMode(NSVisualEffectBlendingMode::BehindWindow);
     effect.setState(NSVisualEffectState::Active);
+    if radius > 0.0 {
+        effect.setWantsLayer(true);
+        if let Some(layer) = effect.layer() {
+            layer.setCornerRadius(radius);
+            layer.setMasksToBounds(true);
+        }
+    }
     (Retained::into_super(effect), None)
 }
 
@@ -494,7 +506,7 @@ impl WebWindow {
             },
         );
 
-        let (background, glass) = glass_background(mtm, frame);
+        let (background, glass) = glass_background(mtm, frame, 0.0);
         window.setContentView(Some(&background));
         match glass {
             Some(glass) => glass.setContentView(Some(&host.view)),
@@ -562,5 +574,166 @@ impl Drop for WebWindow {
         self.window.close();
         self.window.setContentView(None);
         let _ = &self.delegate;
+    }
+}
+
+/// The width of the panel under the menu bar item; its height follows the page.
+const TRAY_WIDTH: f64 = 348.0;
+const TRAY_RADIUS: f64 = 28.0;
+/// The gap between the menu bar and the panel, and between the panel and the edge of the screen.
+const TRAY_GAP: f64 = 6.0;
+const TRAY_MARGIN: f64 = 8.0;
+const KEY_ESCAPE: u16 = 53;
+
+/// A borderless glass panel with a web view, shown under a menu bar item. It never takes the focus from the
+/// app in front, and goes away on a click anywhere else or on Escape.
+pub struct TrayPanel {
+    pub host: WebHost,
+    panel: Retained<NSPanel>,
+    monitors: RefCell<Vec<Retained<objc2::runtime::AnyObject>>>,
+    shown: Cell<bool>,
+}
+
+impl TrayPanel {
+    pub fn new(
+        mtm: MainThreadMarker,
+        html: &str,
+        on_message: impl Fn(String) + 'static,
+    ) -> Rc<Self> {
+        let frame = NSRect::new(NSPoint::ZERO, NSSize::new(TRAY_WIDTH, 400.0));
+        let panel = crate::capture_ui::panel(mtm, frame, NSStatusWindowLevel);
+        let host = WebHost::new(mtm, frame, html, on_message, |_| {}, |_| {});
+        let (background, glass) = glass_background(mtm, frame, TRAY_RADIUS);
+        panel.setContentView(Some(&background));
+        match glass {
+            Some(glass) => glass.setContentView(Some(&host.view)),
+            None => background.addSubview(&host.view),
+        }
+        host.view.setFrame(background.bounds());
+        Rc::new(Self {
+            host,
+            panel,
+            monitors: RefCell::new(Vec::new()),
+            shown: Cell::new(false),
+        })
+    }
+
+    pub fn is_visible(&self) -> bool {
+        self.shown.get() && self.panel.isVisible()
+    }
+
+    /// Resizes to `height` points, keeping the top edge where it is.
+    pub fn set_height(&self, height: f64) {
+        let f = self.panel.frame();
+        let top = f.origin.y + f.size.height;
+        let frame = NSRect::new(
+            NSPoint::new(f.origin.x, top - height),
+            NSSize::new(TRAY_WIDTH, height),
+        );
+        self.panel.setFrame_display(frame, true);
+    }
+
+    /// Shows the panel under `anchor` (the menu bar item's window, in screen coordinates). A press in the
+    /// window numbered `keep` does not close it: that is the item itself, which closes the panel by its own
+    /// click.
+    pub fn show_under(&self, mtm: MainThreadMarker, anchor: NSRect, keep: isize) {
+        let mid = NSPoint::new(anchor.origin.x + anchor.size.width / 2.0, anchor.origin.y);
+        let screen = NSScreen::screens(mtm)
+            .iter()
+            .find(|s| {
+                let f = s.frame();
+                mid.x >= f.origin.x
+                    && mid.x <= f.origin.x + f.size.width
+                    && mid.y >= f.origin.y
+                    && mid.y <= f.origin.y + f.size.height + 1.0
+            })
+            .or_else(|| NSScreen::mainScreen(mtm));
+        let height = self.panel.frame().size.height;
+        let mut x = mid.x - TRAY_WIDTH / 2.0;
+        if let Some(screen) = screen {
+            let v = screen.visibleFrame();
+            x = x.clamp(
+                v.origin.x + TRAY_MARGIN,
+                (v.origin.x + v.size.width - TRAY_WIDTH - TRAY_MARGIN).max(v.origin.x),
+            );
+        }
+        let frame = NSRect::new(
+            NSPoint::new(x, anchor.origin.y - TRAY_GAP - height),
+            NSSize::new(TRAY_WIDTH, height),
+        );
+        self.panel.setFrame_display(frame, true);
+        self.panel.orderFrontRegardless();
+        self.shown.set(true);
+        self.watch(mtm, keep);
+    }
+
+    pub fn hide(&self) {
+        self.unwatch();
+        self.shown.set(false);
+        self.panel.orderOut(None);
+    }
+
+    /// Closes the panel on a press outside it (in any app) or on Escape.
+    fn watch(&self, mtm: MainThreadMarker, keep: isize) {
+        self.unwatch();
+        let panel = Weak::from_retained(&self.panel);
+        let own = self.panel.windowNumber();
+        let close = {
+            let panel = panel.clone();
+            move || {
+                if let Some(panel) = panel.load() {
+                    panel.orderOut(None);
+                }
+            }
+        };
+        let mask = NSEventMask::LeftMouseDown
+            | NSEventMask::RightMouseDown
+            | NSEventMask::OtherMouseDown
+            | NSEventMask::KeyDown;
+        let outside = {
+            let close = close.clone();
+            RcBlock::new(move |event: NonNull<NSEvent>| {
+                // SAFETY: AppKit passes a live event for the duration of the call.
+                let event = unsafe { event.as_ref() };
+                if event.r#type() != NSEventType::KeyDown || event.keyCode() == KEY_ESCAPE {
+                    close();
+                }
+            })
+        };
+        let inside = RcBlock::new(move |event: NonNull<NSEvent>| -> *mut NSEvent {
+            // SAFETY: AppKit passes a live event for the duration of the call.
+            let e = unsafe { event.as_ref() };
+            let number = e.windowNumber();
+            let key = e.r#type() == NSEventType::KeyDown;
+            if (!key && number != own && number != keep) || (key && e.keyCode() == KEY_ESCAPE) {
+                close();
+            }
+            event.as_ptr()
+        });
+        let mut tokens = self.monitors.borrow_mut();
+        if let Some(token) = NSEvent::addGlobalMonitorForEventsMatchingMask_handler(mask, &outside) {
+            tokens.push(token);
+        }
+        // SAFETY: the block returns the event it was given, which AppKit then delivers as usual.
+        if let Some(token) = unsafe { NSEvent::addLocalMonitorForEventsMatchingMask_handler(mask, &inside) } {
+            tokens.push(token);
+        }
+        let _ = mtm;
+    }
+
+    fn unwatch(&self) {
+        for token in self.monitors.borrow_mut().drain(..) {
+            // SAFETY: each token came from an add...Monitor call and is removed once.
+            unsafe { NSEvent::removeMonitor(&token) };
+        }
+    }
+}
+
+impl Drop for TrayPanel {
+    fn drop(&mut self) {
+        self.unwatch();
+        self.host.detach();
+        self.panel.setContentView(None);
+        self.panel.close();
     }
 }

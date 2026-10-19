@@ -1,0 +1,116 @@
+<!doctype html>
+<html lang="en"><head><meta charset="utf-8"><meta name="viewport" content="width=device-width, initial-scale=1">
+<title>Figghost - Tray popover preview</title>
+<style>
+:root {
+  color-scheme: light;
+  --font: -apple-system, BlinkMacSystemFont, "SF Pro Text", Inter, system-ui, sans-serif;
+  --tint: #2f7bff;
+  --desk: linear-gradient(135deg, #cfd6e6, #eef0f6 50%, #d9deec);
+  --glass: linear-gradient(150deg, rgba(255,255,255,.66), rgba(255,255,255,.34));
+  --inner: linear-gradient(150deg, rgba(255,255,255,.6), rgba(255,255,255,.22));
+  --edge: rgba(255,255,255,.85); --hi: rgba(255,255,255,.95); --glow: rgba(255,255,255,.4);
+  --shadow: 0 24px 60px -16px rgba(30,40,90,.45), 0 4px 14px rgba(30,40,90,.12);
+  --text: #16161d; --text-2: #636370; --text-3: #9c9ca8;
+  --fill: rgba(30,30,60,.07); --track: rgba(120,120,140,.28); --bar: rgba(255,255,255,.55);
+}
+[data-theme="dark"] {
+  color-scheme: dark; --tint: #5c9bff;
+  --desk: linear-gradient(135deg, #14161d, #232634 50%, #12141b);
+  --glass: linear-gradient(150deg, rgba(70,72,86,.7), rgba(40,42,54,.6));
+  --inner: linear-gradient(150deg, rgba(255,255,255,.12), rgba(255,255,255,.04));
+  --edge: rgba(255,255,255,.22); --hi: rgba(255,255,255,.5); --glow: rgba(255,255,255,.08);
+  --shadow: 0 24px 60px -12px rgba(0,0,0,.8);
+  --text: #f4f4fa; --text-2: #a8a8ba; --text-3: #6c6c80;
+  --fill: rgba(255,255,255,.1); --track: rgba(255,255,255,.22); --bar: rgba(30,32,42,.6);
+}
+* { box-sizing: border-box; }
+html, body { margin: 0; height: 100%; }
+body { font: 13px/1.35 var(--font); color: var(--text); -webkit-font-smoothing: antialiased; background: var(--desk); overflow: hidden; }
+button { font: inherit; color: inherit; cursor: default; }
+:focus-visible { outline: 2px solid var(--tint); outline-offset: 2px; }
+.ic { width: 18px; height: 18px; fill: none; stroke: currentColor; stroke-width: 1.8; stroke-linecap: round; stroke-linejoin: round; flex: none; }
+.menubar { position: fixed; inset: 0 0 auto; height: 28px; display: flex; align-items: center; justify-content: flex-end; gap: 14px; padding: 0 14px; background: var(--bar); -webkit-backdrop-filter: blur(20px); backdrop-filter: blur(20px); font-size: 13px; font-weight: 500; }
+.menubar .trayicon { display: grid; place-items: center; width: 28px; height: 20px; border-radius: 6px; background: var(--fill); }
+.menubar .trayicon svg { width: 15px; height: 15px; fill: currentColor; }
+.pop { position: fixed; top: 36px; right: 14px; width: 348px; padding: 12px; display: flex; flex-direction: column; gap: 10px; border-radius: 28px; background: var(--glass); -webkit-backdrop-filter: blur(34px) saturate(1.9); backdrop-filter: blur(34px) saturate(1.9); box-shadow: inset 0 0 0 .5px var(--edge), inset 0 1.5px 0 var(--hi), inset 0 -16px 30px -10px var(--glow), var(--shadow); }
+.head { display: flex; align-items: center; gap: 12px; padding: 4px 4px 2px; }
+.logo { width: 40px; height: 40px; border-radius: 12px; display: grid; place-items: center; background: linear-gradient(145deg, #8b7bff, #5b4bf0); box-shadow: inset 0 0 0 .5px rgba(255,255,255,.35); }
+.logo svg { width: 24px; height: 24px; fill: #fff; }
+.head .t { flex: 1; min-width: 0; } .head b { display: block; font-size: 15px; font-weight: 650; letter-spacing: -.01em; }
+.head .t span { display: flex; align-items: center; gap: 6px; color: var(--text-2); font-size: 12px; }
+.dot { width: 7px; height: 7px; border-radius: 50%; background: var(--tint); }
+.icon-btn { display: grid; place-items: center; width: 34px; height: 34px; border: 0; border-radius: 50%; background: var(--fill); color: var(--text-2); box-shadow: inset 0 0 0 .5px var(--edge), inset 0 1px 0 var(--hi); }
+.icon-btn:hover { color: var(--text); }
+.card { border-radius: 20px; background: var(--inner); box-shadow: inset 0 0 0 .5px var(--edge), inset 0 1px 0 var(--hi); overflow: hidden; }
+.lab { margin: 2px 8px -4px; font-size: 11px; font-weight: 600; color: var(--text-3); letter-spacing: .04em; text-transform: uppercase; }
+.row { display: flex; align-items: center; gap: 12px; padding: 9px 14px; min-height: 46px; }
+.row + .row { border-top: .5px solid var(--track); }
+.ri { display: grid; place-items: center; width: 30px; height: 30px; border-radius: 50%; background: var(--fill); color: var(--text-2); flex: none; }
+.ri .ic { width: 16px; height: 16px; }
+.rt { flex: 1; min-width: 0; } .rt b { display: block; font-weight: 500; white-space: nowrap; overflow: hidden; text-overflow: ellipsis; }
+.rt span { color: var(--text-2); font-size: 11.5px; }
+.switch { position: relative; width: 40px; height: 24px; padding: 0; border: 0; border-radius: 999px; background: var(--track); transition: background .12s; flex: none; }
+.switch::after { content: ""; position: absolute; top: 2px; left: 2px; width: 20px; height: 20px; border-radius: 50%; background: #fff; box-shadow: 0 1.5px 4px rgba(0,0,0,.3); transition: transform .12s ease-out; }
+.switch[aria-checked="true"] { background: var(--tint); } .switch[aria-checked="true"]::after { transform: translateX(16px); }
+.grid { display: grid; grid-template-columns: repeat(4, 1fr); gap: 6px; padding: 8px; }
+.tile { display: flex; flex-direction: column; align-items: center; gap: 6px; padding: 10px 2px 8px; border: 0; border-radius: 16px; background: none; color: var(--text-2); font-size: 11.5px; transition: background .12s, color .12s; }
+.tile:hover { background: var(--fill); color: var(--text); }
+.tile .ic { width: 22px; height: 22px; }
+.tile.on { background: var(--tint); color: #fff; }
+.clip { display: flex; align-items: center; gap: 8px; padding: 8px 8px 8px 14px; }
+.clip .rt { flex: 1; }
+kbd { display: inline-grid; place-items: center; min-width: 20px; height: 20px; padding: 0 5px; border-radius: 6px; background: var(--fill); font: 600 11px var(--font); }
+.btn { height: 28px; padding: 0 13px; border: 0; border-radius: 999px; background: var(--fill); font-size: 12.5px; font-weight: 550; box-shadow: inset 0 0 0 .5px var(--edge), inset 0 1px 0 var(--hi); }
+.btn:active { opacity: .7; } .btn.danger { color: #d4443a; }
+.foot { display: flex; align-items: center; gap: 6px; padding: 2px 2px 0; }
+.foot .btn { display: inline-flex; align-items: center; gap: 6px; } .foot .btn .ic { width: 15px; height: 15px; }
+.foot .sp { flex: 1; }
+.theme { position: fixed; left: 18px; top: 44px; display: inline-flex; gap: 2px; padding: 3px; border-radius: 999px; background: var(--fill); }
+.theme button { height: 26px; padding: 0 12px; border: 0; border-radius: 999px; background: none; color: var(--text-2); font-size: 12.5px; }
+.theme button[aria-checked="true"] { background: var(--text); color: var(--desk-fg, #fff); }
+[data-theme="dark"] .theme button[aria-checked="true"] { color: #111; }
+.note { position: fixed; left: 18px; bottom: 18px; max-width: 360px; color: var(--text-2); font-size: 12.5px; }
+@media (prefers-reduced-motion: reduce) { * { transition: none !important; } }
+</style></head><body>
+<svg width="0" height="0" style="position:absolute" aria-hidden="true"><symbol id="i-square-dashed" viewBox="0 0 24 24"><path d="M5 3a2 2 0 0 0-2 2" /> <path d="M19 3a2 2 0 0 1 2 2" /> <path d="M21 19a2 2 0 0 1-2 2" /> <path d="M5 21a2 2 0 0 1-2-2" /> <path d="M9 3h1" /> <path d="M9 21h1" /> <path d="M14 3h1" /> <path d="M14 21h1" /> <path d="M3 9v1" /> <path d="M21 9v1" /> <path d="M3 14v1" /> <path d="M21 14v1" /></symbol><symbol id="i-app-window" viewBox="0 0 24 24"><rect x="2" y="4" width="20" height="16" rx="2" /> <path d="M10 4v4" /> <path d="M2 8h20" /> <path d="M6 4v4" /></symbol><symbol id="i-monitor" viewBox="0 0 24 24"><rect width="20" height="14" x="2" y="3" rx="2" /> <line x1="8" x2="16" y1="21" y2="21" /> <line x1="12" x2="12" y1="17" y2="21" /></symbol><symbol id="i-circle-dot" viewBox="0 0 24 24"><circle cx="12" cy="12" r="10" /> <circle cx="12" cy="12" r="1" /></symbol><symbol id="i-scan-text" viewBox="0 0 24 24"><path d="M3 7V5a2 2 0 0 1 2-2h2" /> <path d="M17 3h2a2 2 0 0 1 2 2v2" /> <path d="M21 17v2a2 2 0 0 1-2 2h-2" /> <path d="M7 21H5a2 2 0 0 1-2-2v-2" /> <path d="M7 8h8" /> <path d="M7 12h10" /> <path d="M7 16h6" /></symbol><symbol id="i-pipette" viewBox="0 0 24 24"><path d="m2 22 1-1h3l9-9" /> <path d="M3 21v-3l9-9" /> <path d="m15 6 3.4-3.4a2.1 2.1 0 1 1 3 3L18 9l.4.4a2.1 2.1 0 1 1-3 3l-3.8-3.8a2.1 2.1 0 1 1 3-3l.4.4Z" /></symbol><symbol id="i-text-search" viewBox="0 0 24 24"><path d="M21 6H3" /> <path d="M10 12H3" /> <path d="M10 18H3" /> <circle cx="17" cy="15" r="3" /> <path d="m21 19-1.9-1.9" /></symbol><symbol id="i-layers" viewBox="0 0 24 24"><path d="M12.83 2.18a2 2 0 0 0-1.66 0L2.6 6.08a1 1 0 0 0 0 1.83l8.58 3.91a2 2 0 0 0 1.66 0l8.58-3.9a1 1 0 0 0 0-1.83z" /> <path d="M2 12a1 1 0 0 0 .58.91l8.6 3.91a2 2 0 0 0 1.65 0l8.58-3.9A1 1 0 0 0 22 12" /> <path d="M2 17a1 1 0 0 0 .58.91l8.6 3.91a2 2 0 0 0 1.65 0l8.58-3.9A1 1 0 0 0 22 17" /></symbol><symbol id="i-clipboard-list" viewBox="0 0 24 24"><rect width="8" height="4" x="8" y="2" rx="1" ry="1" /> <path d="M16 4h2a2 2 0 0 1 2 2v14a2 2 0 0 1-2 2H6a2 2 0 0 1-2-2V6a2 2 0 0 1 2-2h2" /> <path d="M12 11h4" /> <path d="M12 16h4" /> <path d="M8 11h.01" /> <path d="M8 16h.01" /></symbol><symbol id="i-trash-2" viewBox="0 0 24 24"><path d="M3 6h18" /> <path d="M19 6v14c0 1-1 2-2 2H7c-1 0-2-1-2-2V6" /> <path d="M8 6V4c0-1 1-2 2-2h4c1 0 2 1 2 2v2" /> <line x1="10" x2="10" y1="11" y2="17" /> <line x1="14" x2="14" y1="11" y2="17" /></symbol><symbol id="i-settings" viewBox="0 0 24 24"><path d="M12.22 2h-.44a2 2 0 0 0-2 2v.18a2 2 0 0 1-1 1.73l-.43.25a2 2 0 0 1-2 0l-.15-.08a2 2 0 0 0-2.73.73l-.22.38a2 2 0 0 0 .73 2.73l.15.1a2 2 0 0 1 1 1.72v.51a2 2 0 0 1-1 1.74l-.15.09a2 2 0 0 0-.73 2.73l.22.38a2 2 0 0 0 2.73.73l.15-.08a2 2 0 0 1 2 0l.43.25a2 2 0 0 1 1 1.73V20a2 2 0 0 0 2 2h.44a2 2 0 0 0 2-2v-.18a2 2 0 0 1 1-1.73l.43-.25a2 2 0 0 1 2 0l.15.08a2 2 0 0 0 2.73-.73l.22-.39a2 2 0 0 0-.73-2.73l-.15-.08a2 2 0 0 1-1-1.74v-.5a2 2 0 0 1 1-1.74l.15-.09a2 2 0 0 0 .73-2.73l-.22-.38a2 2 0 0 0-2.73-.73l-.15.08a2 2 0 0 1-2 0l-.43-.25a2 2 0 0 1-1-1.73V4a2 2 0 0 0-2-2z" /> <circle cx="12" cy="12" r="3" /></symbol><symbol id="i-folder" viewBox="0 0 24 24"><path d="M20 20a2 2 0 0 0 2-2V8a2 2 0 0 0-2-2h-7.9a2 2 0 0 1-1.69-.9L9.6 3.9A2 2 0 0 0 7.93 3H4a2 2 0 0 0-2 2v13a2 2 0 0 0 2 2Z" /></symbol><symbol id="i-power" viewBox="0 0 24 24"><path d="M12 2v10" /> <path d="M18.4 6.6a9 9 0 1 1-12.77.04" /></symbol><symbol id="i-log-out" viewBox="0 0 24 24"><path d="M9 21H5a2 2 0 0 1-2-2V5a2 2 0 0 1 2-2h4" /> <polyline points="16 17 21 12 16 7" /> <line x1="21" x2="9" y1="12" y2="12" /></symbol><symbol id="i-mouse" viewBox="0 0 24 24"><rect x="5" y="2" width="14" height="20" rx="7" /> <path d="M12 6v4" /></symbol><symbol id="i-arrow-up-down" viewBox="0 0 24 24"><path d="m21 16-4 4-4-4" /> <path d="M17 20V4" /> <path d="m3 8 4-4 4 4" /> <path d="M7 4v16" /></symbol><symbol id="i-volume-2" viewBox="0 0 24 24"><path d="M11 4.702a.705.705 0 0 0-1.203-.498L6.413 7.587A1.4 1.4 0 0 1 5.416 8H3a1 1 0 0 0-1 1v6a1 1 0 0 0 1 1h2.416a1.4 1.4 0 0 1 .997.413l3.383 3.384A.705.705 0 0 0 11 19.298z" /> <path d="M16 9a5 5 0 0 1 0 6" /> <path d="M19.364 18.364a9 9 0 0 0 0-12.728" /></symbol><symbol id="i-timer" viewBox="0 0 24 24"><line x1="10" x2="14" y1="2" y2="2" /> <line x1="12" x2="15" y1="14" y2="11" /> <circle cx="12" cy="14" r="8" /></symbol><symbol id="i-image" viewBox="0 0 24 24"><rect width="18" height="18" x="3" y="3" rx="2" ry="2" /> <circle cx="9" cy="9" r="2" /> <path d="m21 15-3.086-3.086a2 2 0 0 0-2.828 0L6 21" /></symbol><symbol id="i-video" viewBox="0 0 24 24"><path d="m16 13 5.223 3.482a.5.5 0 0 0 .777-.416V7.87a.5.5 0 0 0-.752-.432L16 10.5" /> <rect x="2" y="6" width="14" height="12" rx="2" /></symbol></svg>
+<div class="menubar"><span>Wi-Fi</span><span>Mon 9:41</span><span class="trayicon" title="Figghost"><svg viewBox="0 0 24 24"><path d="M12 2.5c-4.4 0-7.5 3.2-7.5 7.6v9.2c0 .9 1 1.4 1.7.8l1.4-1.2 1.6 1.4c.5.4 1.2.4 1.6 0l1.2-1.1 1.2 1.1c.5.4 1.2.4 1.6 0l1.6-1.4 1.4 1.2c.7.6 1.7.1 1.7-.8v-9.2c0-4.4-3.1-7.6-7.5-7.6zM9.3 10.2a1.3 1.8 0 110 3.6 1.3 1.8 0 010-3.6zm5.4 0a1.3 1.8 0 110 3.6 1.3 1.8 0 010-3.6z"/></svg></span></div>
+<div class="theme" id="theme"><button role="radio" aria-checked="true" data-v="light">Light</button><button role="radio" aria-checked="false" data-v="dark">Dark</button></div>
+<p class="note">Preview of the menu bar popover that would replace the plain menu. Every entry of the current menu is here.</p>
+
+<div class="pop" role="dialog" aria-label="Figghost">
+  <div class="head"><div class="logo"><svg viewBox="0 0 24 24"><path d="M12 2.5c-4.4 0-7.5 3.2-7.5 7.6v9.2c0 .9 1 1.4 1.7.8l1.4-1.2 1.6 1.4c.5.4 1.2.4 1.6 0l1.2-1.1 1.2 1.1c.5.4 1.2.4 1.6 0l1.6-1.4 1.4 1.2c.7.6 1.7.1 1.7-.8v-9.2c0-4.4-3.1-7.6-7.5-7.6zM9.3 10.2a1.3 1.8 0 110 3.6 1.3 1.8 0 010-3.6zm5.4 0a1.3 1.8 0 110 3.6 1.3 1.8 0 010-3.6z"/></svg></div>
+    <div class="t"><b>Figghost</b><span><i class="dot"></i>Accessibility on</span></div>
+    <button class="icon-btn" aria-label="Open settings"><svg class="ic"><use href="#i-settings"/></svg></button></div>
+
+  <p class="lab">Scrolling</p>
+  <div class="card">
+    <div class="row"><span class="ri"><svg class="ic"><use href="#i-mouse"/></svg></span><div class="rt"><b>Smooth scrolling</b></div><button class="switch" role="switch" aria-checked="true" aria-label="Smooth scrolling"></button></div>
+    <div class="row"><span class="ri"><svg class="ic"><use href="#i-arrow-up-down"/></svg></span><div class="rt"><b>Reverse direction</b></div><button class="switch" role="switch" aria-checked="false" aria-label="Reverse direction"></button></div>
+    <div class="row"><span class="ri"><svg class="ic"><use href="#i-app-window"/></svg></span><div class="rt"><b>Smooth in Safari</b></div><button class="switch" role="switch" aria-checked="true" aria-label="Smooth in Safari"></button></div>
+    <div class="row"><span class="ri"><svg class="ic"><use href="#i-volume-2"/></svg></span><div class="rt"><b>Volume indicator</b></div><button class="switch" role="switch" aria-checked="true" aria-label="Volume indicator"></button></div>
+  </div>
+
+  <p class="lab">Capture</p>
+  <div class="card"><div class="grid">
+    <button class="tile"><svg class="ic"><use href="#i-square-dashed"/></svg><span>Area</span></button><button class="tile"><svg class="ic"><use href="#i-app-window"/></svg><span>Window</span></button><button class="tile"><svg class="ic"><use href="#i-monitor"/></svg><span>Screen</span></button><button class="tile"><svg class="ic"><use href="#i-circle-dot"/></svg><span>Record</span></button>
+    <button class="tile"><svg class="ic"><use href="#i-scan-text"/></svg><span>Text</span></button><button class="tile"><svg class="ic"><use href="#i-pipette"/></svg><span>Colour</span></button><button class="tile"><svg class="ic"><use href="#i-text-search"/></svg><span>Select</span></button><button class="tile"><svg class="ic"><use href="#i-layers"/></svg><span>Stack</span></button>
+  </div></div>
+
+  <p class="lab">Clipboard</p>
+  <div class="card"><div class="clip"><span class="ri"><svg class="ic"><use href="#i-clipboard-list"/></svg></span><div class="rt"><b>History</b><span><kbd>⌘</kbd> <kbd>⇧</kbd> <kbd>V</kbd></span></div><button class="btn">Open</button><button class="btn danger">Clear</button></div></div>
+
+  <div class="foot">
+    <button class="btn"><svg class="ic"><use href="#i-folder"/></svg>Config</button>
+    <button class="btn" id="login" aria-pressed="true"><svg class="ic"><use href="#i-power"/></svg>Login: on</button>
+    <span class="sp"></span>
+    <button class="btn"><svg class="ic"><use href="#i-log-out"/></svg>Quit</button>
+  </div>
+</div>
+<script>
+document.addEventListener('click', e => {
+  const sw = e.target.closest('.switch'); if (sw) sw.setAttribute('aria-checked', sw.getAttribute('aria-checked') !== 'true');
+  const l = e.target.closest('#login'); if (l) { const on = l.getAttribute('aria-pressed') !== 'true'; l.setAttribute('aria-pressed', on); l.lastChild.textContent = on ? 'Login: on' : 'Login: off'; }
+  const b = e.target.closest('#theme button'); if (b) { document.documentElement.dataset.theme = b.dataset.v; document.querySelectorAll('#theme button').forEach(x => x.setAttribute('aria-checked', x === b)); }
+});
+</script></body></html>

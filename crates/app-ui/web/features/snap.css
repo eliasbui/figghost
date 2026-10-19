@@ -1,6 +1,6 @@
 /* Dragging a window onto the notch to snap it to halves, thirds, quarters or the whole screen. Styles for the page in web/features/snap.js, using the variables at the top of app.css. */
 .snap-body { display: flex; flex-direction: column; gap: 12px; padding: 2px 12px 12px; }
-.snap-stage { display: grid; place-items: start center; padding-bottom: 16px; border-radius: 8px; background: var(--fill-2); box-shadow: inset 0 0 0 0.5px var(--stroke); overflow: hidden; }
+.snap-stage { display: grid; place-items: start center; padding-bottom: 16px; border-radius: 10px; background: var(--fill-2); box-shadow: inset 0 0 0 0.5px var(--stroke); overflow: hidden; }
 /* The shape as the notch draws it: black at the screen edge, slate at the bottom, rounded at the bottom only. Sizes follow core-window's snap::CELL, GAP and PAD. */
 .snap-shape { display: flex; flex-direction: column; gap: 8px; padding: 12px; border-radius: 0 0 22px 22px; background: linear-gradient(180deg, #000 0%, #2b2e33 100%); box-shadow: 0 10px 24px -12px rgba(0, 0, 0, 0.6); }
 .snap-row { display: flex; justify-content: center; gap: 8px; }
@@ -11,7 +11,7 @@
 .snap-cap { max-width: 76px; overflow: hidden; text-overflow: ellipsis; white-space: nowrap; font: 500 11px/15px var(--font); color: rgba(255, 255, 255, 0.72); }
 .snap-picks { display: grid; grid-template-columns: repeat(auto-fill, minmax(150px, 1fr)); gap: 6px; }
 .snap-pick {
-  display: flex; align-items: center; gap: 10px; min-height: 40px; padding: 6px 10px; border: 0; border-radius: 8px;
+  display: flex; align-items: center; gap: 10px; min-height: 40px; padding: 6px 12px; border: 0; border-radius: 10px;
   font: var(--fs-body)/1.25 var(--font); color: var(--text); text-align: left;
   background: var(--field); box-shadow: inset 0 0 0 1px var(--field-edge);
 }

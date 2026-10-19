@@ -619,6 +619,7 @@ impl ShelfView {
             on_hide: Box::new(|| {}),
             on_key: Box::new(move |key| keys.handle_key(key)),
             accepts_files: true,
+            size: None,
         }
     }
 

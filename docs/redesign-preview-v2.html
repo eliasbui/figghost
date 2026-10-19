@@ -1,0 +1,272 @@
+<!doctype html>
+<html lang="en">
+<head>
+<meta charset="utf-8">
+<meta name="viewport" content="width=device-width, initial-scale=1">
+<title>Figghost - Redesign preview v2</title>
+<style>
+/* V2 "Bento": thanh icon hẹp thay sidebar, trang chủ là lưới ô lớn có màu, mỗi tính năng là một ô bật tắt được. */
+:root {
+  color-scheme: light;
+  --font: -apple-system, BlinkMacSystemFont, "SF Pro Display", "SF Pro Text", Inter, system-ui, sans-serif;
+  --tint: #2f7bff; --good: #2f7bff; --warn: #8a8a95;
+  --desk: linear-gradient(135deg, #dfe3ee, #f1f2f6 55%, #e4e7f0);
+  --win: #eef0f6;
+  --aurora-1: rgba(120,150,255,.38); --aurora-2: rgba(170,175,200,.45); --aurora-3: rgba(140,160,210,.3);
+  --tile: linear-gradient(145deg, rgba(255,255,255,.55), rgba(255,255,255,.18)); --tile-edge: rgba(255,255,255,.75); --hi: rgba(255,255,255,.95); --glow: rgba(255,255,255,.35); --tile-shadow: 0 10px 30px -12px rgba(40,40,110,.35);
+  --rail: linear-gradient(180deg, rgba(255,255,255,.5), rgba(255,255,255,.2));
+  --text: #16161d; --text-2: #626270; --text-3: #9c9ca8;
+  --fill: rgba(30,30,60,.06); --track: rgba(120,120,140,.25);
+  --win-shadow: 0 0 0 .5px rgba(0,0,0,.25), 0 30px 80px -10px rgba(30,30,80,.4);
+}
+[data-theme="dark"] {
+  color-scheme: dark;
+  --tint: #5c9bff; --good: #5c9bff;
+  --desk: linear-gradient(135deg, #14161d, #1d1f29 55%, #12141b);
+  --win: #0f1018;
+  --aurora-1: rgba(80,110,230,.3); --aurora-2: rgba(120,125,150,.3); --aurora-3: rgba(90,110,170,.25);
+  --tile: linear-gradient(145deg, rgba(255,255,255,.16), rgba(255,255,255,.04)); --tile-edge: rgba(255,255,255,.22); --hi: rgba(255,255,255,.5); --glow: rgba(255,255,255,.09); --tile-shadow: 0 10px 30px -10px rgba(0,0,0,.65);
+  --rail: linear-gradient(180deg, rgba(255,255,255,.14), rgba(255,255,255,.04));
+  --text: #f4f4fa; --text-2: #a4a4b6; --text-3: #6c6c80;
+  --fill: rgba(255,255,255,.09); --track: rgba(255,255,255,.2);
+  --win-shadow: 0 0 0 .5px rgba(255,255,255,.18), 0 30px 80px -10px rgba(0,0,0,.8);
+}
+* { box-sizing: border-box; }
+html, body { margin: 0; height: 100%; }
+body { font: 13px/1.4 var(--font); color: var(--text); -webkit-font-smoothing: antialiased; background: var(--desk); display: grid; place-items: center; padding: 24px; }
+button, input { font: inherit; color: inherit; }
+button { cursor: default; }
+:focus-visible { outline: 2px solid var(--tint); outline-offset: 2px; }
+.ic { width: 18px; height: 18px; fill: none; stroke: currentColor; stroke-width: 1.6; stroke-linecap: round; stroke-linejoin: round; flex: none; }
+
+.window {
+  --glyph-bg: #fff;
+  position: relative; width: min(1080px, 100%); height: min(720px, calc(100vh - 48px)); display: flex; overflow: hidden; border-radius: 22px; box-shadow: var(--win-shadow);
+  background: radial-gradient(28% 34% at 12% 14%, var(--aurora-1), transparent 70%), radial-gradient(26% 32% at 92% 18%, var(--aurora-2), transparent 70%), radial-gradient(30% 36% at 70% 96%, var(--aurora-3), transparent 70%), radial-gradient(22% 28% at 38% 60%, var(--aurora-2), transparent 70%), var(--win);
+}
+.lights { position: absolute; left: 20px; top: 18px; display: flex; gap: 8px; z-index: 5; }
+.lights i { width: 12px; height: 12px; border-radius: 50%; } .lights i:nth-child(1) { background: #ff5f57; } .lights i:nth-child(2) { background: #febc2e; } .lights i:nth-child(3) { background: #28c840; }
+
+/* Icon rail */
+.rail { flex: none; width: 76px; margin: 8px 0 8px 8px; padding: 50px 0 12px; display: flex; flex-direction: column; align-items: center; gap: 6px; border-radius: 28px; background: var(--rail); -webkit-backdrop-filter: blur(30px) saturate(1.9); backdrop-filter: blur(30px) saturate(1.9); box-shadow: inset 0 0 0 .5px var(--tile-edge), inset 0 1px 0 var(--hi), inset 0 -10px 24px var(--glow), 0 10px 30px -12px rgba(30,30,90,.4); }
+.rail button { position: relative; display: grid; place-items: center; width: 46px; height: 46px; border: 0; border-radius: 50%; background: none; color: var(--text-2); transition: background .12s, color .12s; }
+.rail button:hover { background: var(--fill); color: var(--text); }
+.rail button[aria-current="page"] { color: var(--text); background: var(--fill); box-shadow: inset 0 0 0 .5px var(--tile-edge), inset 0 1.5px 0 var(--hi), inset 0 -6px 10px var(--glow); }
+.rail button .ic { width: 21px; height: 21px; }
+.rail .gap { flex: 1; }
+.rail button::after { content: attr(data-name); position: absolute; left: 58px; top: 50%; transform: translateY(-50%); padding: 4px 10px; border-radius: 999px; background: var(--text); color: var(--win); font-size: 12px; white-space: nowrap; opacity: 0; pointer-events: none; transition: opacity .12s; z-index: 9; }
+.rail button:hover::after { opacity: 1; }
+
+/* Content */
+.main { flex: 1; min-width: 0; display: flex; flex-direction: column; }
+.head { display: flex; align-items: flex-end; justify-content: space-between; gap: 16px; padding: 30px 36px 14px; }
+.head h1 { margin: 0; font-size: 32px; line-height: 1.05; font-weight: 750; letter-spacing: -.035em; }
+.head p { margin: 6px 0 0; color: var(--text-2); font-size: 14px; }
+.scroll { flex: 1; min-height: 0; overflow-y: auto; padding: 4px 36px 36px; }
+.page { display: none; }
+.page.on { display: block; }
+.grid { display: grid; grid-template-columns: repeat(6, 1fr); gap: 12px; }
+.t { position: relative; padding: 20px; border-radius: 30px; background: var(--tile); -webkit-backdrop-filter: blur(28px) saturate(1.9); backdrop-filter: blur(28px) saturate(1.9); box-shadow: inset 0 0 0 .5px var(--tile-edge), inset 0 1.5px 0 var(--hi), inset 0 -14px 28px -8px var(--glow), var(--tile-shadow); overflow: hidden; min-width: 0; }
+.t::before { content: ""; position: absolute; left: 8%; right: 8%; top: 0; height: 42%; border-radius: 0 0 50% 50% / 0 0 100% 100%; background: linear-gradient(180deg, var(--glow), transparent); opacity: .7; pointer-events: none; }
+.t > * { position: relative; }
+.s2 { grid-column: span 2; } .s3 { grid-column: span 3; } .s4 { grid-column: span 4; } .s6 { grid-column: span 6; }
+.t h3 { margin: 0; font-size: 15px; font-weight: 650; letter-spacing: -.01em; }
+.t p { margin: 3px 0 0; color: var(--text-2); font-size: 12.5px; line-height: 1.4; }
+.lab { font-size: 11.5px; font-weight: 600; color: var(--text-3); letter-spacing: .04em; text-transform: uppercase; margin: 0 0 10px; }
+
+/* Hero tile */
+.hero { display: flex; align-items: center; gap: 18px; color: #fff; background: linear-gradient(135deg, color-mix(in srgb, var(--tint) 70%, transparent), color-mix(in srgb, var(--tint) 38%, transparent)); box-shadow: inset 0 0 0 .5px rgba(255,255,255,.5), inset 0 1.5px 0 rgba(255,255,255,.7), inset 0 -16px 30px -10px rgba(255,255,255,.25), 0 18px 44px -14px color-mix(in srgb, var(--tint) 60%, transparent); }
+.hero::after { content: ""; position: absolute; right: -40px; top: -60px; width: 220px; height: 220px; border-radius: 50%; background: rgba(255,255,255,.14); }
+.hero .logo { width: 72px; height: 72px; border-radius: 20px; flex: none; display: grid; place-items: center; background: rgba(255,255,255,.2); box-shadow: inset 0 0 0 .5px rgba(255,255,255,.4); z-index: 1; }
+.hero .logo svg { width: 40px; height: 40px; fill: #fff; }
+.hero h3 { font-size: 24px; font-weight: 750; letter-spacing: -.03em; }
+.hero p { color: rgba(255,255,255,.85); max-width: 40ch; }
+.hero .z { z-index: 1; }
+.pill { box-shadow: inset 0 0 0 .5px rgba(255,255,255,.35), inset 0 1px 0 rgba(255,255,255,.3); display: inline-flex; align-items: center; gap: 6px; height: 24px; padding: 0 11px; margin: 10px 6px 0 0; border-radius: 999px; background: rgba(255,255,255,.2); font-size: 11.5px; font-weight: 500; }
+.dot { width: 7px; height: 7px; border-radius: 50%; background: var(--good); box-shadow: 0 0 6px var(--good); }
+.hero .dot { background: #fff; box-shadow: 0 0 6px #fff; }
+
+/* Feature tiles */
+.feat { display: flex; flex-direction: column; gap: 14px; min-height: 164px; cursor: default; }
+.feat .top { display: flex; align-items: center; justify-content: space-between; }
+.badge { display: grid; place-items: center; width: 46px; height: 46px; border-radius: 50%; color: var(--text); background: var(--fill); box-shadow: inset 0 0 0 .5px var(--tile-edge), inset 0 1.5px 0 var(--hi), inset 0 -7px 12px var(--glow); }
+.badge .ic { width: 23px; height: 23px; }
+.feat .meta { margin-top: auto; }
+.feat .t-off { opacity: .5; }
+.feat[data-on="false"] .badge { color: var(--text-3); }
+.feat[data-on="false"] .meta { opacity: .55; }
+
+/* Controls */
+.switch { position: relative; width: 46px; height: 28px; padding: 0; border: 0; border-radius: 999px; background: var(--track); transition: background .12s; flex: none; }
+.switch::after { content: ""; position: absolute; top: 3px; left: 3px; width: 22px; height: 22px; border-radius: 50%; background: #fff; box-shadow: 0 2px 5px rgba(0,0,0,.3); transition: transform .12s ease-out; }
+.switch[aria-checked="true"] { background: var(--tint); box-shadow: inset 0 1px 0 rgba(255,255,255,.4); } .switch[aria-checked="true"]::after { transform: translateX(18px); }
+.seg { position: relative; display: inline-grid; grid-auto-flow: column; grid-auto-columns: 1fr; padding: 3px; border-radius: 999px; background: var(--fill); box-shadow: inset 0 1px 2px rgba(0,0,0,.08), inset 0 0 0 .5px var(--tile-edge); }
+.seg i { position: absolute; top: 3px; bottom: 3px; left: 3px; width: calc((100% - 6px) / var(--n)); border-radius: 999px; background: var(--text); box-shadow: 0 2px 8px rgba(0,0,0,.25), inset 0 1px 0 rgba(255,255,255,.25); transform: translateX(calc(var(--i) * 100%)); transition: transform .12s ease-out; }
+.seg button { position: relative; z-index: 1; min-width: 68px; height: 26px; padding: 0 12px; border: 0; border-radius: 999px; background: none; color: var(--text-2); font-size: 12.5px; transition: color .12s; }
+.seg button[aria-checked="true"] { color: var(--win); font-weight: 600; }
+.btn { display: inline-flex; align-items: center; gap: 6px; height: 30px; padding: 0 16px; border: 0; border-radius: 999px; background: var(--fill); box-shadow: inset 0 0 0 .5px var(--tile-edge), inset 0 1px 0 var(--hi); font-size: 12.5px; font-weight: 550; }
+.btn.primary { background: var(--text); color: var(--win); }
+.btn:active { opacity: .7; }
+kbd { display: inline-grid; place-items: center; min-width: 26px; height: 26px; padding: 0 7px; border-radius: 8px; background: var(--fill); box-shadow: inset 0 -1.5px 0 var(--track); font: 600 12.5px var(--font); }
+.keys { display: inline-flex; gap: 4px; }
+
+/* Big slider tile */
+.big { display: flex; align-items: baseline; gap: 6px; font-size: 52px; font-weight: 750; letter-spacing: -.04em; font-variant-numeric: tabular-nums; line-height: 1; }
+.big small { font-size: 16px; font-weight: 600; color: var(--text-3); letter-spacing: 0; }
+input[type=range] { -webkit-appearance: none; appearance: none; width: 100%; height: 28px; margin: 14px 0 0; background: none; --p: 50%; --c: var(--tint); }
+input[type=range]::-webkit-slider-runnable-track { height: 12px; border-radius: 999px; background: linear-gradient(90deg, var(--c) var(--p), var(--track) var(--p)); }
+input[type=range]::-webkit-slider-thumb { -webkit-appearance: none; width: 28px; height: 28px; margin-top: -8px; border-radius: 50%; background: #fff; box-shadow: 0 2px 8px rgba(0,0,0,.3); }
+.row { display: flex; align-items: center; gap: 14px; justify-content: space-between; padding: 12px 0; }
+.row + .row { border-top: .5px solid var(--track); }
+.row b { font-weight: 550; display: block; } .row span.d { color: var(--text-2); font-size: 12px; }
+
+/* Clipboard list */
+.item { display: flex; align-items: center; gap: 10px; padding: 9px 12px; border-radius: 20px; background: var(--fill); box-shadow: inset 0 0 0 .5px var(--tile-edge); }
+.item + .item { margin-top: 6px; }
+.item b { flex: 1; min-width: 0; font-weight: 500; white-space: nowrap; overflow: hidden; text-overflow: ellipsis; }
+.item span { color: var(--text-3); font-size: 11.5px; }
+
+/* Notch preview */
+.stage { position: relative; height: 150px; margin: 12px -18px -18px; overflow: hidden; background: radial-gradient(70% 100% at 20% 0%, #5b6cff, transparent 60%), radial-gradient(60% 100% at 90% 100%, #ff6bb5, transparent 60%), #11112a; }
+.stage .bar { position: absolute; inset: 0 0 auto; height: 20px; background: rgba(255,255,255,.14); }
+.notch { position: absolute; left: 50%; top: 0; width: 130px; height: 20px; transform: translateX(-50%); background: #000; border-radius: 0 0 14px 14px; overflow: hidden; color: #fff; transition: width .18s ease-out, height .18s ease-out, border-radius .18s; }
+.t:hover .notch { width: 270px; height: 104px; border-radius: 0 0 24px 24px; }
+.notch div { position: absolute; inset: 30px 14px auto; display: flex; justify-content: center; gap: 4px; opacity: 0; transition: opacity .12s; font-size: 11.5px; }
+.t:hover .notch div { opacity: 1; }
+.notch span { padding: 2px 10px; border-radius: 999px; background: rgba(255,255,255,.14); } .notch span:first-child { background: rgba(255,255,255,.3); }
+.soon { display: grid; place-items: center; min-height: 360px; text-align: center; }
+.soon .badge { width: 72px; height: 72px; border-radius: 22px; margin: 0 auto 14px; } .soon .badge .ic { width: 34px; height: 34px; }
+.theme { position: fixed; right: 18px; top: 14px; z-index: 20; }
+@media (prefers-reduced-motion: reduce) { * { animation: none !important; transition: none !important; } }
+</style>
+</head>
+<body>
+<svg width="0" height="0" style="position:absolute" aria-hidden="true">
+  <symbol id="i-home" viewBox="0 0 24 24"><rect fill="currentColor" fill-opacity=".28" stroke="none" x="3.5" y="3.5" width="7.5" height="7.5" rx="2.4"/><rect x="3.5" y="3.5" width="7.5" height="7.5" rx="2.4"/><rect x="13" y="3.5" width="7.5" height="7.5" rx="2.4"/><rect x="3.5" y="13" width="7.5" height="7.5" rx="2.4"/><rect x="13" y="13" width="7.5" height="7.5" rx="2.4"/></symbol>
+  <symbol id="i-mouse" viewBox="0 0 24 24"><rect fill="currentColor" fill-opacity=".28" stroke="none" x="6" y="2.8" width="12" height="18.4" rx="6"/><rect x="6" y="2.8" width="12" height="18.4" rx="6"/><path d="M12 7v3.4"/></symbol>
+  <symbol id="i-clip" viewBox="0 0 24 24"><rect fill="currentColor" fill-opacity=".28" stroke="none" x="4.8" y="4.5" width="14.4" height="16.7" rx="3.2"/><rect x="4.8" y="4.5" width="14.4" height="16.7" rx="3.2"/><rect x="8.6" y="2.6" width="6.8" height="3.8" rx="1.6" fill="currentColor" fill-opacity=".5"/><path d="M8.6 11.2h6.8M8.6 15.2h4.2"/></symbol>
+  <symbol id="i-snap" viewBox="0 0 24 24"><rect fill="currentColor" fill-opacity=".28" stroke="none" x="3.5" y="4.5" width="8.5" height="15" rx="2.6"/><rect x="3.5" y="4.5" width="17" height="15" rx="3.2"/><path d="M12 4.5v15"/></symbol>
+  <symbol id="i-notch" viewBox="0 0 24 24"><rect x="3" y="4.5" width="18" height="15" rx="3.6"/><path fill="currentColor" fill-opacity=".28" stroke="none" d="M8.8 4.5h6.4v2.2a1.8 1.8 0 01-1.8 1.8h-2.8a1.8 1.8 0 01-1.8-1.8z"/><path d="M8.8 4.5h6.4v2.2a1.8 1.8 0 01-1.8 1.8h-2.8a1.8 1.8 0 01-1.8-1.8z"/></symbol>
+  <symbol id="i-spark" viewBox="0 0 24 24"><path fill="currentColor" fill-opacity=".28" stroke="none" d="M10.5 3.5l1.9 5.6 5.6 1.9-5.6 1.9-1.9 5.6-1.9-5.6L3 11l5.6-1.9z"/><path d="M10.5 3.5l1.9 5.6 5.6 1.9-5.6 1.9-1.9 5.6-1.9-5.6L3 11l5.6-1.9z"/><path d="M18.5 3.5v3.4M16.8 5.2h3.4M18 15.5v3.4M16.3 17.2h3.4"/></symbol>
+  <symbol id="i-cal" viewBox="0 0 24 24"><rect fill="currentColor" fill-opacity=".28" stroke="none" x="3.5" y="5" width="17" height="15.5" rx="3.4"/><rect x="3.5" y="5" width="17" height="15.5" rx="3.4"/><path d="M3.5 10h17M8 2.8v3.6M16 2.8v3.6"/><circle cx="8.5" cy="14.2" r=".9" fill="currentColor" stroke="none"/><circle cx="12" cy="14.2" r=".9" fill="currentColor" stroke="none"/><circle cx="15.5" cy="14.2" r=".9" fill="currentColor" stroke="none"/></symbol>
+  <symbol id="i-cam" viewBox="0 0 24 24"><path fill="currentColor" fill-opacity=".28" stroke="none" d="M3.5 9a3 3 0 013-3h1.6l1.2-1.8c.3-.4.7-.6 1.2-.6h3c.5 0 .9.2 1.2.6L16 6h1.5a3 3 0 013 3v8a3 3 0 01-3 3h-11a3 3 0 01-3-3z"/><path d="M3.5 9a3 3 0 013-3h1.6l1.2-1.8c.3-.4.7-.6 1.2-.6h3c.5 0 .9.2 1.2.6L16 6h1.5a3 3 0 013 3v8a3 3 0 01-3 3h-11a3 3 0 01-3-3z"/><circle cx="12" cy="12.8" r="3.4"/></symbol>
+  <symbol id="i-gear" viewBox="0 0 24 24"><path d="M4 7h9M18 7h2M4 17h2M11 17h9"/><circle fill="currentColor" fill-opacity=".28" stroke="none" cx="15.5" cy="7" r="2.6"/><circle cx="15.5" cy="7" r="2.6"/><circle fill="currentColor" fill-opacity=".28" stroke="none" cx="8.5" cy="17" r="2.6"/><circle cx="8.5" cy="17" r="2.6"/></symbol>
+</svg>
+
+<div class="theme seg" id="theme" style="--n:3;--i:0"><i></i><button role="radio" aria-checked="true" data-v="auto">Auto</button><button role="radio" aria-checked="false" data-v="light">Light</button><button role="radio" aria-checked="false" data-v="dark">Dark</button></div>
+
+<div class="window">
+  <div class="lights"><i></i><i></i><i></i></div>
+  <nav class="rail" id="rail" aria-label="Settings"></nav>
+  <section class="main">
+    <header class="head"><div><h1 id="title"></h1><p id="sub"></p></div></header>
+    <div class="scroll" id="scroll">
+
+      <div class="page" data-p="home"><div class="grid">
+        <div class="t hero s4">
+          <div class="logo"><svg viewBox="0 0 24 24"><path d="M12 2.5c-4.4 0-7.5 3.2-7.5 7.6v9.2c0 .9 1 1.4 1.7.8l1.4-1.2 1.6 1.4c.5.4 1.2.4 1.6 0l1.2-1.1 1.2 1.1c.5.4 1.2.4 1.6 0l1.6-1.4 1.4 1.2c.7.6 1.7.1 1.7-.8v-9.2c0-4.4-3.1-7.6-7.5-7.6zM9.3 10.2a1.3 1.8 0 110 3.6 1.3 1.8 0 010-3.6zm5.4 0a1.3 1.8 0 110 3.6 1.3 1.8 0 010-3.6z"/></svg></div>
+          <div class="z"><h3>Figghost</h3><p>Smooth scrolling, clipboard history and a notch toolbox in one quiet menu bar app.</p><span class="pill">Version 0.4.0</span><span class="pill"><span class="dot"></span>Accessibility on</span></div>
+        </div>
+        <div class="t s2"><p class="lab">Startup</p>
+          <div class="row"><b>Launch at login</b><button class="switch" role="switch" aria-checked="true" aria-label="Launch at login"></button></div>
+          <div class="row"><b>Menu bar icon</b><button class="switch" role="switch" aria-checked="true" aria-label="Menu bar icon"></button></div>
+        </div>
+
+        <div class="t feat s2" data-on="true" style="--c:#0a84ff"><div class="top"><span class="badge"><svg class="ic"><use href="#i-mouse"/></svg></span><button class="switch" role="switch" aria-checked="true" aria-label="Scrolling"></button></div><div class="meta"><h3>Scrolling</h3><p>Smooth wheel, speed 62%</p></div></div>
+        <div class="t feat s2" data-on="true" style="--c:#ff9500"><div class="top"><span class="badge"><svg class="ic"><use href="#i-clip"/></svg></span><button class="switch" role="switch" aria-checked="true" aria-label="Clipboard"></button></div><div class="meta"><h3>Clipboard</h3><p>100 items kept, protected</p></div></div>
+        <div class="t feat s2" data-on="true" style="--c:#32ade6"><div class="top"><span class="badge"><svg class="ic"><use href="#i-snap"/></svg></span><button class="switch" role="switch" aria-checked="true" aria-label="Window snapping"></button></div><div class="meta"><h3>Window snapping</h3><p>Drag a window onto the notch</p></div></div>
+        <div class="t feat s2" data-on="false" style="--c:#5e5ce6"><div class="top"><span class="badge"><svg class="ic"><use href="#i-spark"/></svg></span><button class="switch" role="switch" aria-checked="false" aria-label="AI agents"></button></div><div class="meta"><h3>AI agents</h3><p>Off. Watch agents from the notch</p></div></div>
+        <div class="t feat s2" data-on="true" style="--c:#ff6b2c"><div class="top"><span class="badge"><svg class="ic"><use href="#i-cal"/></svg></span><button class="switch" role="switch" aria-checked="true" aria-label="Calendar"></button></div><div class="meta"><h3>Calendar</h3><p>Next: Design review, 10:30</p></div></div>
+        <div class="t feat s2" data-on="true" style="--c:#ff3b30"><div class="top"><span class="badge"><svg class="ic"><use href="#i-cam"/></svg></span><button class="switch" role="switch" aria-checked="true" aria-label="Capture"></button></div><div class="meta"><h3>Capture</h3><p>Screenshots and recordings</p></div></div>
+
+        <div class="t s3"><p class="lab">Permissions</p>
+          <div class="row"><div><b>Accessibility</b><span class="d">Smooth scrolling and snapping</span></div><span class="pill" style="background:var(--fill);margin:0"><span class="dot"></span>Granted</span></div>
+          <div class="row"><div><b>Screen Recording</b><span class="d">Screenshots and colour picker</span></div><button class="btn primary">Allow</button></div>
+        </div>
+        <div class="t s3"><p class="lab">Appearance</p>
+          <div class="row"><b>Window</b><div class="seg" id="appearance" style="--n:3;--i:0"><i></i><button role="radio" aria-checked="true" data-v="auto">Auto</button><button role="radio" aria-checked="false" data-v="light">Light</button><button role="radio" aria-checked="false" data-v="dark">Dark</button></div></div>
+          <div class="row"><b>Language</b><div class="seg" style="--n:2;--i:0"><i></i><button role="radio" aria-checked="true">English</button><button role="radio" aria-checked="false">Tiếng Việt</button></div></div>
+        </div>
+      </div></div>
+
+      <div class="page" data-p="scroll"><div class="grid">
+        <div class="t s4" style="--c:#0a84ff"><p class="lab">Speed</p><div class="big"><span id="spv">62</span><small>%</small></div><input type="range" min="0" max="100" value="62" style="--p:62%;--c:var(--tint)" data-out="spv"><p>How far one wheel step travels.</p></div>
+        <div class="t s2"><p class="lab">Smooth scrolling</p><div style="display:flex;justify-content:space-between;align-items:center;margin-top:6px"><h3>On</h3><button class="switch" role="switch" aria-checked="true" aria-label="Smooth scrolling"></button></div><p>Eases wheel steps into a continuous glide.</p></div>
+        <div class="t s3"><p class="lab">Smoothness</p><div class="big"><span id="smv">40</span><small>%</small></div><input type="range" min="0" max="100" value="40" style="--p:40%;--c:var(--tint)" data-out="smv"></div>
+        <div class="t s3"><p class="lab">Direction</p><div class="seg" style="--n:2;--i:0;margin-top:6px"><i></i><button role="radio" aria-checked="true">Natural</button><button role="radio" aria-checked="false">Reversed</button></div><p style="margin-top:12px">Reverses the mouse wheel only. The trackpad is never touched.</p>
+          <div class="row" style="margin-top:6px"><b>Pause smoothing</b><span class="keys"><kbd>⌥</kbd><kbd>⇧</kbd></span></div></div>
+      </div></div>
+
+      <div class="page" data-p="notch"><div class="grid">
+        <div class="t s6" style="padding-bottom:0"><h3>Preview</h3><p>Point at the stage to open the notch.</p><div class="stage"><div class="bar"></div><div class="notch"><div><span>Media</span><span>Shelf</span><span>Clipboard</span></div></div></div></div>
+        <div class="t s3"><p class="lab">Material</p><div class="seg" style="--n:4;--i:0"><i></i><button role="radio" aria-checked="true">Glass</button><button role="radio" aria-checked="false">Clear</button><button role="radio" aria-checked="false">Ink</button><button role="radio" aria-checked="false">Black</button></div></div>
+        <div class="t s3"><p class="lab">Open on</p><div class="seg" style="--n:2;--i:0"><i></i><button role="radio" aria-checked="true">Hover</button><button role="radio" aria-checked="false">Click</button></div></div>
+      </div></div>
+
+      <div class="page" data-p="clipboard"><div class="grid">
+        <div class="t s2"><p class="lab">History</p><div class="big"><span>100</span><small>items</small></div><p>Older items drop off the end.</p></div>
+        <div class="t s4"><p class="lab">Recent</p>
+          <div class="item"><b>Meeting notes for the design review on Thursday</b><span>2 min</span><button class="btn">Pin</button></div>
+          <div class="item"><b>https://example.com/spec/release-0.4</b><span>14 min</span><button class="btn">Pin</button></div>
+          <div class="item"><b>#5b5bf0</b><span>1 h</span><button class="btn">Pin</button></div></div>
+        <div class="t s3"><p class="lab">Open history</p><span class="keys"><kbd>⌘</kbd><kbd>⇧</kbd><kbd>V</kbd></span></div>
+        <div class="t s3"><div class="row" style="padding:0"><div><b>Skip sensitive data</b><span class="d">Passwords and card numbers are never stored</span></div><button class="switch" role="switch" aria-checked="true" aria-label="Skip sensitive data"></button></div></div>
+      </div></div>
+
+      <div class="page" data-p="soon"><div class="t soon"><div><span class="badge" id="soonBadge"><svg class="ic"><use id="soonUse" href="#i-gear"/></svg></span><h3 id="soonName" style="font-size:20px"></h3><p>Same system: one bento tile per group of settings.</p></div></div></div>
+
+    </div>
+  </section>
+</div>
+
+<script>
+const PAGES = [
+  ['Overview','home','#6a5cff','A quiet menu bar app. Everything at a glance.','home'],
+  ['Scrolling','mouse','#0a84ff','Smooth wheel scrolling and how it feels.','scroll'],
+  ['Clipboard','clip','#ff9500','History, pinned boards and protection.','clipboard'],
+  ['Notch','notch','#3a3a42','A toolbox at the top of your screen.','notch'],
+  ['Window snapping','snap','#32ade6','Snap windows by dragging onto the notch.'],
+  ['AI agents','spark','#5e5ce6','Watch your coding agents from the notch.'],
+  ['Calendar','cal','#ff6b2c','Events, reminders and meeting alerts.'],
+  ['Capture','cam','#ff3b30','Screenshots and recordings.'],
+  'gap',
+  ['General','gear','#8e8e93','Startup, language and permissions.','home']
+];
+const $ = s => document.querySelector(s), $$ = s => [...document.querySelectorAll(s)];
+const rail = $('#rail'); let cur = 'Overview';
+function build() {
+  rail.textContent = '';
+  PAGES.forEach(p => {
+    if (p === 'gap') { const g = document.createElement('div'); g.className = 'gap'; rail.append(g); return; }
+    const b = document.createElement('button');
+    b.dataset.name = p[0]; b.setAttribute('aria-label', p[0]); b.style.setProperty('--c', p[2]);
+    b.innerHTML = `<svg class="ic"><use href="#i-${p[1]}"/></svg>`;
+    if (p[0] === cur) b.setAttribute('aria-current', 'page');
+    b.onclick = () => go(p); rail.append(b);
+  });
+}
+function go(p) {
+  cur = p[0]; $('#title').textContent = p[0]; $('#sub').textContent = p[3];
+  const id = p[4] || 'soon';
+  $$('.page').forEach(e => e.classList.toggle('on', e.dataset.p === id));
+  if (id === 'soon') { $('#soonName').textContent = p[0]; $('#soonBadge').style.setProperty('--c', p[2]); $('#soonUse').setAttribute('href', '#i-' + p[1]); }
+  $('#scroll').scrollTop = 0; build();
+}
+document.addEventListener('click', e => {
+  const sw = e.target.closest('.switch');
+  if (sw) { const on = sw.getAttribute('aria-checked') !== 'true'; sw.setAttribute('aria-checked', on); const f = sw.closest('.feat'); if (f) f.dataset.on = on; }
+  const b = e.target.closest('.seg button'); if (!b) return;
+  const seg = b.parentElement, bs = [...seg.querySelectorAll('button')];
+  bs.forEach(x => x.setAttribute('aria-checked', x === b)); seg.style.setProperty('--i', bs.indexOf(b));
+  if (seg.id === 'appearance' || seg.id === 'theme') setTheme(b.dataset.v);
+});
+function setTheme(v) {
+  const dark = v === 'dark' || (v === 'auto' && matchMedia('(prefers-color-scheme: dark)').matches);
+  document.documentElement.dataset.theme = dark ? 'dark' : 'light';
+  ['#appearance', '#theme'].forEach(s => { const seg = $(s), bs = [...seg.querySelectorAll('button')]; bs.forEach(x => x.setAttribute('aria-checked', x.dataset.v === v)); seg.style.setProperty('--i', bs.findIndex(x => x.dataset.v === v)); });
+}
+$$('input[type=range]').forEach(r => r.oninput = () => { r.style.setProperty('--p', r.value + '%'); $('#' + r.dataset.out).textContent = r.value; });
+setTheme('auto'); go(PAGES[0]);
+</script>
+</body>
+</html>

@@ -22,6 +22,9 @@ fn main() {
             (HudStyle::Glass, "glass"),
             (HudStyle::Corner, "corner"),
             (HudStyle::Bar, "bar"),
+            (HudStyle::Island, "island"),
+            (HudStyle::Side, "side"),
+            (HudStyle::Tile, "tile"),
         ] {
             for (level, muted, suffix) in [
                 (0.62, false, ""),

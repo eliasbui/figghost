@@ -6,18 +6,20 @@ use block2::RcBlock;
 use objc2::{
     DefinedClass, MainThreadMarker, MainThreadOnly, define_class, msg_send,
     rc::Retained,
-    runtime::{Bool, ProtocolObject},
+    runtime::{AnyObject, Bool, ProtocolObject},
     sel,
 };
 use objc2_app_kit::{
-    NSAccessibility, NSBezierPath, NSColor, NSControlStateValueOff, NSControlStateValueOn, NSImage,
+    NSAccessibility, NSApplication, NSBezierPath, NSColor, NSEventMask, NSEventType, NSControlStateValueOff, NSControlStateValueOn, NSImage,
     NSMenu, NSMenuDelegate, NSMenuItem, NSStatusBar, NSStatusItem, NSVariableStatusItemLength,
     NSWindingRule,
 };
 use objc2_foundation::{
     NSAffineTransform, NSObject, NSObjectProtocol, NSPoint, NSRect, NSSize, NSString,
 };
-use std::rc::Rc;
+use crate::webview::TrayPanel;
+use serde_json::{Value, json};
+use std::{cell::RefCell, rc::Rc};
 
 type Predicate = Box<dyn Fn() -> bool>;
 
@@ -131,6 +133,36 @@ impl MenuDelegate {
     fn new(mtm: MainThreadMarker, on_open: impl Fn() + 'static) -> Retained<Self> {
         let this = mtm.alloc::<Self>().set_ivars(DelegateIvars {
             on_open: Box::new(on_open),
+        });
+        // SAFETY: NSObject's designated initializer.
+        unsafe { msg_send![super(this), init] }
+    }
+}
+
+pub struct ClickIvars {
+    on_click: Box<dyn Fn()>,
+}
+
+define_class!(
+    // SAFETY: NSObject allows subclassing; the ivars are only touched on the main thread and need no Drop.
+    #[unsafe(super(NSObject))]
+    #[thread_kind = MainThreadOnly]
+    #[name = "FigStatusClick"]
+    #[ivars = ClickIvars]
+    struct ClickTarget;
+
+    impl ClickTarget {
+        #[unsafe(method(clicked:))]
+        fn clicked(&self, _sender: &AnyObject) {
+            (self.ivars().on_click)();
+        }
+    }
+);
+
+impl ClickTarget {
+    fn new(mtm: MainThreadMarker, on_click: impl Fn() + 'static) -> Retained<Self> {
+        let this = mtm.alloc::<Self>().set_ivars(ClickIvars {
+            on_click: Box::new(on_click),
         });
         // SAFETY: NSObject's designated initializer.
         unsafe { msg_send![super(this), init] }
@@ -303,13 +335,17 @@ pub struct StatusMenu {
     _menu: Retained<NSMenu>,
     _targets: Vec<Retained<MenuTarget>>,
     _delegate: Retained<MenuDelegate>,
+    _click: Retained<ClickTarget>,
+    _tray: Rc<TrayPanel>,
 }
 
 impl StatusMenu {
-    /// The item shows the ghost; `label` is what it is called for assistive technology and in its tooltip.
-    pub fn new(mtm: MainThreadMarker, label: &str, entries: Vec<Entry>) -> Self {
+    /// The item shows the ghost; `label` is what it is called for assistive technology and in its tooltip. A
+    /// click opens the panel that `tray_html` draws from the entries; a right click opens the plain menu.
+    pub fn new(mtm: MainThreadMarker, label: &str, entries: Vec<Entry>, tray_html: &str) -> Self {
         let item = NSStatusBar::systemStatusBar().statusItemWithLength(NSVariableStatusItemLength);
-        if let Some(button) = item.button(mtm) {
+        let button = item.button(mtm);
+        if let Some(button) = &button {
             button.setImage(Some(&ghost_icon()));
             button.setToolTip(Some(&NSString::from_str(label)));
             button.setAccessibilityLabel(Some(&NSString::from_str(label)));
@@ -318,40 +354,153 @@ impl StatusMenu {
         let mut pairs: Vec<(Retained<NSMenuItem>, Rc<Item>)> = Vec::new();
         let mut submenus = Submenus::new();
         let menu = fill(mtm, entries, &mut targets, &mut pairs, &mut submenus);
+        let pairs = Rc::new(pairs);
 
-        let refresh = move || {
-            for (menu_item, spec) in &pairs {
-                menu_item.setTitle(&NSString::from_str(&(spec.title)()));
-                if let Some(checked) = &spec.checked {
-                    menu_item.setState(if checked() {
-                        NSControlStateValueOn
-                    } else {
-                        NSControlStateValueOff
-                    });
+        let refresh = {
+            let pairs = Rc::clone(&pairs);
+            move || {
+                for (menu_item, spec) in pairs.iter() {
+                    menu_item.setTitle(&NSString::from_str(&(spec.title)()));
+                    if let Some(checked) = &spec.checked {
+                        menu_item.setState(if checked() {
+                            NSControlStateValueOn
+                        } else {
+                            NSControlStateValueOff
+                        });
+                    }
+                    if let Some(visible) = &spec.visible {
+                        menu_item.setHidden(!visible());
+                    }
                 }
-                if let Some(visible) = &spec.visible {
-                    menu_item.setHidden(!visible());
+                // Inner submenus come first, so an outer one sees them already hidden or shown.
+                for (item, submenu) in &submenus {
+                    let empty = submenu
+                        .itemArray()
+                        .iter()
+                        .all(|i| i.isHidden() || i.isSeparatorItem());
+                    item.setHidden(empty);
                 }
-            }
-            // Inner submenus come first, so an outer one sees them already hidden or shown.
-            for (item, submenu) in &submenus {
-                let empty = submenu
-                    .itemArray()
-                    .iter()
-                    .all(|i| i.isHidden() || i.isSeparatorItem());
-                item.setHidden(empty);
             }
         };
         refresh();
         let delegate = MenuDelegate::new(mtm, refresh);
         menu.setDelegate(Some(ProtocolObject::from_ref(&*delegate)));
-        item.setMenu(Some(&menu));
+
+        // The panel is told every entry as it is now, each time it opens and after a switch is flipped.
+        let tray_cell: Rc<RefCell<Option<Rc<TrayPanel>>>> = Rc::default();
+        let post_state = {
+            let (pairs, cell) = (Rc::clone(&pairs), Rc::clone(&tray_cell));
+            Rc::new(move || {
+                let Some(tray) = cell.borrow().clone() else {
+                    return;
+                };
+                let items: Vec<Value> = pairs
+                    .iter()
+                    .enumerate()
+                    .map(|(id, (_, spec))| {
+                        json!({
+                            "id": id,
+                            "title": (spec.title)(),
+                            "symbol": spec.symbol,
+                            "checked": spec.checked.as_ref().map(|c| c()),
+                            "visible": spec.visible.as_ref().is_none_or(|v| v()),
+                        })
+                    })
+                    .collect();
+                tray.host.post(&json!({ "t": "state", "items": items }).to_string());
+            })
+        };
+        let on_message = {
+            let (pairs, cell, post_state) =
+                (Rc::clone(&pairs), Rc::clone(&tray_cell), Rc::clone(&post_state));
+            move |text: String| {
+                let Ok(message) = serde_json::from_str::<Value>(&text) else {
+                    return;
+                };
+                let Some(tray) = cell.borrow().clone() else {
+                    return;
+                };
+                match message["t"].as_str() {
+                    Some("ready") => post_state(),
+                    Some("size") => {
+                        if let Some(height) = message["h"].as_f64() {
+                            tray.set_height(height);
+                        }
+                    }
+                    Some("run") => {
+                        let Some((_, spec)) = message["id"]
+                            .as_u64()
+                            .and_then(|id| pairs.get(id as usize))
+                        else {
+                            return;
+                        };
+                        if message["keep"].as_bool() == Some(true) {
+                            (spec.action)();
+                            post_state();
+                        } else {
+                            // The action runs after the panel is gone, so a capture never shows it.
+                            tray.hide();
+                            (spec.action)();
+                        }
+                    }
+                    _ => {}
+                }
+            }
+        };
+        let tray = TrayPanel::new(mtm, tray_html, on_message);
+        *tray_cell.borrow_mut() = Some(Rc::clone(&tray));
+
+        let click = {
+            let (item, menu, tray, button) = (
+                item.clone(),
+                menu.clone(),
+                Rc::clone(&tray),
+                button.clone(),
+            );
+            ClickTarget::new(mtm, move || {
+                let Some(button) = &button else {
+                    return;
+                };
+                let right = NSApplication::sharedApplication(mtm)
+                    .currentEvent()
+                    .is_some_and(|e| e.r#type() == NSEventType::RightMouseUp);
+                if right {
+                    tray.hide();
+                    // A menu set only for this click, so that the left click is free for the panel.
+                    item.setMenu(Some(&menu));
+                    // SAFETY: a plain click on a button of ours; with the menu set, it only opens the menu.
+                    unsafe { button.performClick(None) };
+                    item.setMenu(None);
+                } else if tray.is_visible() {
+                    tray.hide();
+                } else if let Some(window) = button.window() {
+                    post_state();
+                    tray.show_under(mtm, window.frame(), window.windowNumber());
+                }
+            })
+        };
+        if let Some(button) = &button {
+            // SAFETY: `clicked:` is implemented by ClickTarget with the (id) signature AppKit expects, and the
+            // target is kept alive in the returned value.
+            unsafe {
+                button.setTarget(Some(&click));
+                button.setAction(Some(sel!(clicked:)));
+            }
+            button.sendActionOn(NSEventMask::LeftMouseUp | NSEventMask::RightMouseUp);
+        }
         Self {
             item,
             _menu: menu,
             _targets: targets,
             _delegate: delegate,
+            _click: click,
+            _tray: tray,
         }
+    }
+
+    /// The menu itself, for another place to show: the three dots of the notch.
+    pub fn menu(&self) -> Retained<NSMenu> {
+        self._menu.clone()
     }
 
     /// Shows the icon in the menu bar or takes it out; the menu and the item's place are kept. The system

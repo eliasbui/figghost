@@ -47,11 +47,25 @@ const CHIP_GAP: f64 = 6.0;
 /// What a hidden row shows in place of its text: dots, always the same count so the length is not given away.
 const HIDDEN_TEXT: &str = "\u{2022}\u{2022}\u{2022}\u{2022}\u{2022}\u{2022}\u{2022}\u{2022}\u{2022}\u{2022}\u{2022}\u{2022}";
 
-/// How the rows look: the flat list of the cursor popup, or the cards of the notch.
+/// A card of the strip: its width, the gap between two, and the room around the first and last.
+const TILE_WIDTH: f64 = 132.0;
+const TILE_GAP: f64 = 10.0;
+const TILE_MARGIN: f64 = 12.0;
+/// The room above and below the cards inside the scrolling area.
+const TILE_INSET: f64 = 4.0;
+const TILE_RADIUS: f64 = 16.0;
+/// How many cards a Page Up or Page Down moves over.
+const STRIP_PAGE: isize = 4;
+/// Where the search field of the strip starts: after the three dots of the notch's header.
+const STRIP_SEARCH_X: f64 = 70.0;
+
+/// How the rows look: the flat list of the cursor popup, the vertical cards of the notch, or the notch's strip of
+/// cards that scrolls sideways.
 #[derive(Debug, Clone, Copy, PartialEq, Eq)]
 pub enum ListStyle {
     Plain,
     Cards,
+    Strip,
 }
 
 /// The words in a search that are filters (`@link`) and the one filter a chip stands for.
@@ -134,6 +148,8 @@ struct ListState {
     marks: HashMap<i64, Mark>,
     selected: usize,
     min_height: f64,
+    /// The width of the area the strip scrolls in; the strip is never narrower.
+    min_width: f64,
     empty_text: String,
 }
 
@@ -173,6 +189,27 @@ define_class!(
         #[unsafe(method(drawRect:))]
         fn draw_rect(&self, dirty: NSRect) {
             self.paint(dirty);
+        }
+
+        // The wheel of a mouse only turns up and down: over the strip it moves the cards sideways.
+        #[unsafe(method(scrollWheel:))]
+        fn scroll_wheel(&self, event: &NSEvent) {
+            let (dx, dy) = (event.scrollingDeltaX(), event.scrollingDeltaY());
+            if self.is_strip()
+                && dy.abs() > dx.abs()
+                && let Some(scroll) = self.enclosingScrollView()
+            {
+                let lines = if event.hasPreciseScrollingDeltas() { 1.0 } else { 12.0 };
+                let clip = scroll.contentView();
+                let mut origin = clip.bounds().origin;
+                let most = (self.frame().size.width - clip.bounds().size.width).max(0.0);
+                origin.x = (origin.x - dy * lines).clamp(0.0, most);
+                clip.scrollToPoint(origin);
+                scroll.reflectScrolledClipView(&clip);
+                return;
+            }
+            // SAFETY: forwards the same selector and argument to the superclass.
+            let _: () = unsafe { msg_send![super(self), scrollWheel: event] };
         }
 
         #[unsafe(method(mouseMoved:))]
@@ -218,6 +255,7 @@ impl ListView {
                 marks: HashMap::new(),
                 selected: 0,
                 min_height: frame.size.height,
+                min_width: frame.size.width,
                 empty_text: String::new(),
             }),
             thumbs: RefCell::new(HashMap::new()),
@@ -228,7 +266,9 @@ impl ListView {
         // SAFETY: designated initializer with valid arguments on the main thread.
         let this: Retained<Self> =
             unsafe { msg_send![super(mtm.alloc::<Self>().set_ivars(ivars)), initWithFrame: frame] };
-        this.setAutoresizingMask(NSAutoresizingMaskOptions::ViewWidthSizable);
+        if style != ListStyle::Strip {
+            this.setAutoresizingMask(NSAutoresizingMaskOptions::ViewWidthSizable);
+        }
         // Hover selection works while the app is inactive, which a non-activating panel always is.
         // SAFETY: valid options and owner; InVisibleRect ignores the (empty) rect.
         let area = unsafe {
@@ -249,7 +289,40 @@ impl ListView {
     fn row_height(&self) -> f64 {
         match self.ivars().style {
             ListStyle::Plain => ROW_HEIGHT,
-            ListStyle::Cards => CARD_ROW_HEIGHT,
+            ListStyle::Cards | ListStyle::Strip => CARD_ROW_HEIGHT,
+        }
+    }
+
+    pub fn is_strip(&self) -> bool {
+        self.ivars().style == ListStyle::Strip
+    }
+
+    /// How many rows Page Up and Page Down move over.
+    fn page(&self) -> isize {
+        if self.is_strip() {
+            STRIP_PAGE
+        } else {
+            PAGE_ROWS
+        }
+    }
+
+    /// The distance from one card of the strip to the next.
+    fn tile_step() -> f64 {
+        TILE_WIDTH + TILE_GAP
+    }
+
+    /// The size of the document: as many rows as there are (down, or across for the strip), and at least what the
+    /// scrolling area shows.
+    fn document_size(&self, rows: usize, min_width: f64, min_height: f64, width: f64) -> NSSize {
+        if self.is_strip() {
+            let across = if rows == 0 {
+                0.0
+            } else {
+                2.0 * TILE_MARGIN + rows as f64 * Self::tile_step() - TILE_GAP
+            };
+            NSSize::new(across.max(min_width), min_height)
+        } else {
+            NSSize::new(width, (rows as f64 * self.row_height()).max(min_height))
         }
     }
 
@@ -267,8 +340,8 @@ impl ListView {
         let width = self.frame().size.width;
         {
             let mut state = self.ivars().state.borrow_mut();
-            let height = (rows.len() as f64 * self.row_height()).max(state.min_height);
-            self.setFrameSize(NSSize::new(width, height));
+            let size = self.document_size(rows.len(), state.min_width, state.min_height, width);
+            self.setFrameSize(size);
             state.rows = rows;
             state.marks = marks;
             state.selected = 0;
@@ -278,16 +351,17 @@ impl ListView {
         self.setNeedsDisplay(true);
     }
 
-    fn set_min_height(&self, height: f64) {
-        let rows = {
+    /// Tells the list how big the area it scrolls in is: the strip is as wide as that, or wider.
+    pub fn set_viewport(&self, width: f64, height: f64) {
+        let (rows, min_width) = {
             let mut state = self.ivars().state.borrow_mut();
             state.min_height = height;
-            state.rows.len()
+            if self.is_strip() {
+                state.min_width = width;
+            }
+            (state.rows.len(), state.min_width)
         };
-        let size = NSSize::new(
-            self.frame().size.width,
-            (rows as f64 * self.row_height()).max(height),
-        );
+        let size = self.document_size(rows, min_width, height, self.frame().size.width);
         self.setFrameSize(size);
         self.setNeedsDisplay(true);
     }
@@ -334,6 +408,10 @@ impl ListView {
             .iter()
             .find(|r| r.pin_key == Some(letter))
             .map(|r| r.id)
+    }
+
+    pub fn id_at(&self, index: usize) -> Option<i64> {
+        self.ivars().state.borrow().rows.get(index).map(|r| r.id)
     }
 
     pub fn selected_id(&self) -> Option<i64> {
@@ -387,10 +465,17 @@ impl ListView {
             state.selected = row;
         }
         if reveal {
-            let rect = NSRect::new(
-                NSPoint::new(0.0, row as f64 * self.row_height()),
-                NSSize::new(self.bounds().size.width, self.row_height()),
-            );
+            let rect = if self.is_strip() {
+                NSRect::new(
+                    NSPoint::new(TILE_MARGIN + row as f64 * Self::tile_step() - TILE_GAP, 0.0),
+                    NSSize::new(TILE_WIDTH + 2.0 * TILE_GAP, self.bounds().size.height),
+                )
+            } else {
+                NSRect::new(
+                    NSPoint::new(0.0, row as f64 * self.row_height()),
+                    NSSize::new(self.bounds().size.width, self.row_height()),
+                )
+            };
             self.scrollRectToVisible(rect);
         }
         self.setNeedsDisplay(true);
@@ -398,6 +483,19 @@ impl ListView {
 
     fn row_at(&self, event: &NSEvent) -> Option<usize> {
         let point = self.convertPoint_fromView(event.locationInWindow(), None);
+        if self.is_strip() {
+            let across = point.x - TILE_MARGIN;
+            if across < 0.0 || point.y < 0.0 {
+                return None;
+            }
+            // The gap between two cards belongs to neither.
+            let (row, within) = (
+                (across / Self::tile_step()) as usize,
+                across % Self::tile_step(),
+            );
+            return (within <= TILE_WIDTH && row < self.ivars().state.borrow().rows.len())
+                .then_some(row);
+        }
         if point.y < 0.0 {
             return None;
         }
@@ -430,7 +528,7 @@ impl ListView {
                 true,
             );
             let mut y = state.min_height / 2.0 - 10.0;
-            if self.ivars().style == ListStyle::Cards {
+            if self.ivars().style != ListStyle::Plain {
                 let centre = NSPoint::new(width / 2.0, state.min_height / 2.0 - 14.0);
                 style::draw_symbol("doc.on.clipboard", centre, 30.0, &style::white(0.32));
                 y += 30.0;
@@ -439,10 +537,21 @@ impl ListView {
             draw_text(&state.empty_text, rect, &attrs);
             return;
         }
-        let height = self.row_height();
-        let first = (dirty.origin.y / height).floor().max(0.0) as usize;
-        let last =
-            (((dirty.origin.y + dirty.size.height) / height).ceil() as usize).min(state.rows.len());
+        let (first, last) = if self.is_strip() {
+            let step = Self::tile_step();
+            (
+                ((dirty.origin.x - TILE_MARGIN) / step).floor().max(0.0) as usize,
+                ((((dirty.origin.x + dirty.size.width - TILE_MARGIN) / step).ceil()) as usize)
+                    .min(state.rows.len()),
+            )
+        } else {
+            let height = self.row_height();
+            (
+                (dirty.origin.y / height).floor().max(0.0) as usize,
+                (((dirty.origin.y + dirty.size.height) / height).ceil() as usize)
+                    .min(state.rows.len()),
+            )
+        };
         for index in first..last {
             let row = &state.rows[index];
             let mark = state.marks.get(&row.id).copied().unwrap_or_default();
@@ -454,6 +563,151 @@ impl ListView {
         match self.ivars().style {
             ListStyle::Plain => self.paint_plain_row(row, mark, index, selected, width),
             ListStyle::Cards => self.paint_card(row, mark, index, selected, width),
+            ListStyle::Strip => self.paint_tile(row, mark, index, selected),
+        }
+    }
+
+    /// One card of the strip: a picture or the first lines of the text, who copied it and when under it, and a pin
+    /// or the letter that pastes it.
+    fn paint_tile(&self, row: &Row, mark: Mark, index: usize, selected: bool) {
+        let card = NSRect::new(
+            NSPoint::new(TILE_MARGIN + index as f64 * Self::tile_step(), TILE_INSET),
+            NSSize::new(TILE_WIDTH, self.bounds().size.height - 2.0 * TILE_INSET),
+        );
+        if selected {
+            style::card_selected(card, TILE_RADIUS, &Tone::Blue);
+        } else {
+            style::card(card, TILE_RADIUS);
+        }
+        let pad = 10.0;
+        let inner = card.size.width - 2.0 * pad;
+        let footer_top = card.origin.y + card.size.height - 25.0;
+        let ink = |alpha: f64, selected_alpha: f64| {
+            style::white(if selected { selected_alpha } else { alpha })
+        };
+
+        // The footer: a lock for a secret, who and when, and at the right a pin or the letter that pastes it.
+        let mut left = card.origin.x + pad;
+        if mark.sensitive {
+            style::draw_symbol(
+                "lock.fill",
+                NSPoint::new(left + 4.0, footer_top + 7.0),
+                9.0,
+                &ink(0.6, 0.85),
+            );
+            left += 13.0;
+        }
+        let mut right = card.origin.x + card.size.width - pad;
+        if let Some(letter) = row.pin_key {
+            let chip = NSRect::new(
+                NSPoint::new(right - 30.0, footer_top - 1.0),
+                NSSize::new(30.0, 16.0),
+            );
+            style::control(chip, 8.0, style::Control::Rest);
+            draw_text(
+                &format!("\u{2318}{}", letter.to_ascii_uppercase()),
+                NSRect::new(
+                    NSPoint::new(chip.origin.x, chip.origin.y + 1.5),
+                    NSSize::new(30.0, 13.0),
+                ),
+                &text_attributes(
+                    // SAFETY: extern static weight constant.
+                    &NSFont::monospacedSystemFontOfSize_weight(10.0, unsafe { NSFontWeightMedium }),
+                    &ink(0.7, 0.9),
+                    Fit::Clip,
+                    true,
+                ),
+            );
+            right -= 34.0;
+        } else if row.pinned {
+            style::draw_symbol(
+                "pin.fill",
+                NSPoint::new(right - 5.0, footer_top + 7.0),
+                9.0,
+                &Tone::Orange.color(),
+            );
+            right -= 14.0;
+        }
+        draw_text(
+            &row.subtitle,
+            NSRect::new(
+                NSPoint::new(left, footer_top),
+                NSSize::new((right - left).max(10.0), 14.0),
+            ),
+            &text_attributes(
+                &style::font(10.0, Weight::Regular),
+                &ink(0.5, 0.78),
+                Fit::Tail,
+                false,
+            ),
+        );
+
+        // The body: a picture with its name under it, or the text.
+        let top = card.origin.y + pad;
+        let bottom = footer_top - 6.0;
+        let picture = row
+            .thumb
+            .as_ref()
+            .filter(|_| !mark.hidden)
+            .and_then(|p| self.thumbnail(p));
+        if let Some(image) = picture {
+            let height = ((bottom - top) * 0.74).floor();
+            let dst = NSRect::new(
+                NSPoint::new(card.origin.x + pad, top),
+                NSSize::new(inner, height),
+            );
+            let natural = image.size();
+            // The picture fills its frame and loses what overflows, like a cover.
+            let scale = (dst.size.width / natural.width.max(1.0))
+                .max(dst.size.height / natural.height.max(1.0));
+            let (sw, sh) = (dst.size.width / scale, dst.size.height / scale);
+            let source = NSRect::new(
+                NSPoint::new((natural.width - sw) / 2.0, (natural.height - sh) / 2.0),
+                NSSize::new(sw, sh),
+            );
+            NSGraphicsContext::saveGraphicsState_class();
+            NSBezierPath::bezierPathWithRoundedRect_xRadius_yRadius(dst, 10.0, 10.0).addClip();
+            // Flipped view: plain drawInRect would render the image upside down.
+            // SAFETY: called from drawRect: with a valid graphics context.
+            unsafe {
+                image.drawInRect_fromRect_operation_fraction_respectFlipped_hints(
+                    dst,
+                    source,
+                    NSCompositingOperation::SourceOver,
+                    1.0,
+                    true,
+                    None,
+                );
+            }
+            NSGraphicsContext::restoreGraphicsState_class();
+            draw_text(
+                &row.title,
+                NSRect::new(
+                    NSPoint::new(dst.origin.x, dst.origin.y + height + 4.0),
+                    NSSize::new(inner, (bottom - top - height - 4.0).max(12.0)),
+                ),
+                &text_attributes(
+                    &style::font(10.5, Weight::Medium),
+                    &ink(0.85, 1.0),
+                    Fit::Tail,
+                    false,
+                ),
+            );
+        } else {
+            let font = if row.mono && !mark.hidden {
+                NSFont::userFixedPitchFontOfSize(11.0)
+                    .unwrap_or_else(|| NSFont::systemFontOfSize(12.0))
+            } else {
+                style::font(12.0, Weight::Medium)
+            };
+            draw_text(
+                if mark.hidden { HIDDEN_TEXT } else { &row.title },
+                NSRect::new(
+                    NSPoint::new(card.origin.x + pad, top),
+                    NSSize::new(inner, bottom - top),
+                ),
+                &text_attributes(&font, &ink(0.92, 1.0), Fit::Words, false),
+            );
         }
     }
 
@@ -640,9 +894,11 @@ impl ListView {
         } else {
             NSFont::systemFontOfSize(13.0)
         };
+        // Command+1..9 paste the first nine rows; a pinned row shows its own letter instead.
         let key_label = row
             .pin_key
-            .map(|c| format!("\u{2318}{}", c.to_ascii_uppercase()));
+            .map(|c| format!("\u{2318}{}", c.to_ascii_uppercase()))
+            .or_else(|| (index < 9).then(|| format!("\u{2318}{}", index + 1)));
         if let Some(label) = &key_label {
             let color = if selected {
                 NSColor::colorWithWhite_alpha(1.0, 0.8)
@@ -856,7 +1112,8 @@ impl ClipView {
             NSPoint::new(0.0, FOOTER_HEIGHT),
             NSSize::new(self.geometry.size.width, list_height),
         ));
-        self.list.set_min_height(list_height);
+        self.list
+            .set_viewport(self.geometry.size.width, list_height);
     }
 
     /// The board after `current` in the order they are shown; after the last comes none.
@@ -981,8 +1238,8 @@ pub fn handle_key(view: &ClipView, callbacks: &Callbacks, key: Key) -> bool {
     match key {
         Key::Up => view.list.move_selection(-1),
         Key::Down => view.list.move_selection(1),
-        Key::PageUp => view.list.move_selection(-PAGE_ROWS),
-        Key::PageDown => view.list.move_selection(PAGE_ROWS),
+        Key::PageUp => view.list.move_selection(-view.list.page()),
+        Key::PageDown => view.list.move_selection(view.list.page()),
         Key::Escape => (callbacks.on_close)(view),
         Key::Enter | Key::EnterAlt => {
             let mode = if key == Key::EnterAlt {
@@ -1019,8 +1276,22 @@ pub fn handle_key(view: &ClipView, callbacks: &Callbacks, key: Key) -> bool {
                 (callbacks.on_delete)(view, id);
             }
         }
-        // Caret movement belongs to the search field; tab switching belongs to the notch.
-        Key::Left | Key::Right | Key::Tab(_) => return false,
+        // The notch takes Command+digit for its pages before a key reaches here, so this is the popup's.
+        Key::Tab(n) => {
+            let Some(id) = view.list.id_at(usize::from(n).saturating_sub(1)) else {
+                return false;
+            };
+            view.activate_row(id, Activate::Normal);
+        }
+        // Along the strip the arrows move from card to card while there is nothing typed to move a caret in.
+        Key::Left if view.list.is_strip() && view.query().is_empty() => {
+            view.list.move_selection(-1)
+        }
+        Key::Right if view.list.is_strip() && view.query().is_empty() => {
+            view.list.move_selection(1)
+        }
+        // Caret movement belongs to the search field.
+        Key::Left | Key::Right => return false,
     }
     true
 }
@@ -1059,17 +1330,34 @@ impl ClipUi {
     ) -> Self {
         let callbacks = Rc::new(callbacks);
         let frame = NSRect::new(NSPoint::ZERO, size);
-        let root = PageRoot::new(mtm, frame, &labels::get().clipboard_hint);
+        let hint = if list_style == ListStyle::Strip {
+            &labels::get().clipboard_hint_strip
+        } else {
+            &labels::get().clipboard_hint
+        };
+        let root = PageRoot::new(mtm, frame, hint);
 
-        let search_top = size.height - top_inset - MARGIN;
-        let search = NSSearchField::initWithFrame(
-            mtm.alloc(),
+        let strip = list_style == ListStyle::Strip;
+        // The strip's search field shares the header row of the notch: after the three dots, before the page icons.
+        let search_top = if strip {
+            size.height - top_inset - 2.0
+        } else {
+            size.height - top_inset - MARGIN
+        };
+        let search_frame = if strip {
+            let tools = 16.0 + crate::switcher::width_for(8) + 8.0;
+            NSRect::new(
+                NSPoint::new(STRIP_SEARCH_X, search_top - SEARCH_HEIGHT),
+                NSSize::new(size.width - STRIP_SEARCH_X - tools, SEARCH_HEIGHT),
+            )
+        } else {
             NSRect::new(
                 NSPoint::new(MARGIN, search_top - SEARCH_HEIGHT),
                 NSSize::new(size.width - 2.0 * MARGIN, SEARCH_HEIGHT),
-            ),
-        );
-        let placeholder = if list_style == ListStyle::Cards {
+            )
+        };
+        let search = NSSearchField::initWithFrame(mtm.alloc(), search_frame);
+        let placeholder = if list_style != ListStyle::Plain {
             &labels::get().search_placeholder_short
         } else {
             &labels::get().search_placeholder
@@ -1077,7 +1365,7 @@ impl ClipUi {
         search.setPlaceholderString(Some(&NSString::from_str(placeholder)));
         search.setFocusRingType(NSFocusRingType::None);
 
-        let cards = list_style == ListStyle::Cards;
+        let cards = list_style != ListStyle::Plain;
         let chips: Vec<Chip> = if cards {
             let t = labels::get();
             [
@@ -1106,7 +1394,10 @@ impl ClipUi {
         };
 
         let scroll = NSScrollView::initWithFrame(mtm.alloc(), NSRect::ZERO);
-        scroll.setHasVerticalScroller(true);
+        scroll.setHasVerticalScroller(!strip);
+        // The strip has no scroller: with the legacy ones (a mouse is connected) it would take a strip of the cards'
+        // height. It still scrolls, with a trackpad, the wheel (see `scrollWheel:`) and the arrow keys.
+        scroll.setHasHorizontalScroller(false);
         scroll.setAutohidesScrollers(true);
         scroll.setScrollerStyle(NSScrollerStyle::Overlay);
         scroll.setDrawsBackground(false);

@@ -24,6 +24,8 @@ const HEADING_HEIGHT: f64 = 22.0;
 const USAGE_ROW: f64 = 26.0;
 const TOKENS_ROW: f64 = 22.0;
 const BUTTON_HEIGHT: f64 = 32.0;
+/// The round button at the end of the usage heading.
+const REFRESH_SIZE: f64 = 24.0;
 /// A command is shown over this many lines; the card is as tall as it needs for them.
 const COMMAND_LINES: usize = 3;
 const COMMAND_LINE_HEIGHT: f64 = 16.0;
@@ -79,6 +81,10 @@ pub struct AgentsDisplay {
     pub sessions: Vec<SessionData>,
     pub usage_heading: String,
     pub usage: Vec<UsageData>,
+    /// The name of the button that reads the usage limits again, which is also its tooltip; `None` leaves it out.
+    pub refresh_label: Option<String>,
+    /// A refresh is under way, so the button is off until it ends.
+    pub refreshing: bool,
     pub tokens_heading: String,
     pub tokens: Vec<TokensData>,
     pub empty_title: String,
@@ -88,6 +94,8 @@ pub struct AgentsDisplay {
 pub struct AgentsCallbacks {
     /// An answer for the command with this id: true to allow it.
     pub on_decide: Box<dyn Fn(u64, bool)>,
+    /// The usage limits are to be read again.
+    pub on_refresh: Box<dyn Fn()>,
 }
 
 fn attrs(
@@ -548,10 +556,12 @@ impl AgentsView {
             }
         }
 
-        let usage_height = if display.usage.is_empty() {
-            0.0
-        } else {
+        // The section is there for its button too: with nothing read yet, a refresh is how the first numbers come.
+        let usage_shown = !display.usage.is_empty() || display.refresh_label.is_some();
+        let usage_height = if usage_shown {
             HEADING_HEIGHT + display.usage.len() as f64 * USAGE_ROW + 8.0
+        } else {
+            0.0
         } + if display.tokens.is_empty() {
             0.0
         } else {
@@ -584,27 +594,49 @@ impl AgentsView {
                 cursor += rows as f64 * ROW_HEIGHT + 8.0;
             }
         }
-        if !display.usage.is_empty() {
+        if usage_shown {
             let heading = self.heading(mtm, &display.usage_heading, cursor);
             self.root.addSubview(&heading);
             added.push(heading);
-            cursor += HEADING_HEIGHT;
-            let bars = {
-                let this = mtm.alloc::<UsageBars>().set_ivars(UsageIvars {
-                    rows: RefCell::new(display.usage.clone()),
-                });
-                let height = display.usage.len() as f64 * USAGE_ROW;
-                let frame = NSRect::new(
-                    NSPoint::new(MARGIN + 2.0, top - cursor - height),
-                    NSSize::new(inner - 4.0, height),
+            if let Some(label) = &display.refresh_label {
+                let button = TouchButton::new(
+                    mtm,
+                    NSRect::new(
+                        NSPoint::new(
+                            width - MARGIN - 2.0 - REFRESH_SIZE,
+                            top - cursor - HEADING_HEIGHT + (HEADING_HEIGHT - REFRESH_SIZE) / 2.0,
+                        ),
+                        NSSize::new(REFRESH_SIZE, REFRESH_SIZE),
+                    ),
+                    Look::Round { filled: false },
                 );
-                // SAFETY: designated initializer with valid arguments on the main thread.
-                let bars: Retained<UsageBars> =
-                    unsafe { msg_send![super(this), initWithFrame: frame] };
-                bars
-            };
-            self.root.addSubview(&bars);
-            added.push(Retained::into_super(bars));
+                button.set_symbol("arrow.clockwise");
+                button.set_title(label);
+                button.set_enabled(!display.refreshing);
+                let shared = Rc::clone(&self.callbacks);
+                button.set_on_click(move || (shared.on_refresh)());
+                self.root.addSubview(&button);
+                added.push(Retained::into_super(button));
+            }
+            cursor += HEADING_HEIGHT;
+            if !display.usage.is_empty() {
+                let bars = {
+                    let this = mtm.alloc::<UsageBars>().set_ivars(UsageIvars {
+                        rows: RefCell::new(display.usage.clone()),
+                    });
+                    let height = display.usage.len() as f64 * USAGE_ROW;
+                    let frame = NSRect::new(
+                        NSPoint::new(MARGIN + 2.0, top - cursor - height),
+                        NSSize::new(inner - 4.0, height),
+                    );
+                    // SAFETY: designated initializer with valid arguments on the main thread.
+                    let bars: Retained<UsageBars> =
+                        unsafe { msg_send![super(this), initWithFrame: frame] };
+                    bars
+                };
+                self.root.addSubview(&bars);
+                added.push(Retained::into_super(bars));
+            }
             cursor += display.usage.len() as f64 * USAGE_ROW + 8.0;
         }
         if !display.tokens.is_empty() {
@@ -651,8 +683,13 @@ impl AgentsView {
         *self.dynamic.borrow_mut() = added;
     }
 
-    /// Returns true when the key was consumed: Enter allows the command in line, Option+Delete denies it.
+    /// Returns true when the key was consumed: Enter allows the command in line, Option+Delete denies it, and
+    /// Command+R reads the usage limits again.
     pub fn handle_key(&self, key: Key) -> bool {
+        if key == Key::Shortcut('r') {
+            (self.callbacks.on_refresh)();
+            return true;
+        }
         let Some(id) = self.first.get() else {
             return false;
         };
@@ -680,6 +717,7 @@ impl AgentsView {
             on_hide: Box::new(on_hide),
             on_key: Box::new(move |key| keys.handle_key(key)),
             accepts_files: false,
+            size: None,
         }
     }
 }

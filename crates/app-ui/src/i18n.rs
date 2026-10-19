@@ -272,6 +272,29 @@ impl Language {
         }
     }
 
+    /// The refresh button of the usage section, with its key.
+    pub fn agents_refresh(self) -> &'static str {
+        match self {
+            Language::English => "Refresh usage limits (Cmd+R)",
+            Language::Vietnamese => "Làm mới hạn mức sử dụng (Cmd+R)",
+        }
+    }
+
+    /// After a refresh, beside the heading: "updated just now".
+    pub fn agents_updated(self, age: &str) -> String {
+        match self {
+            Language::English => format!("updated {age}"),
+            Language::Vietnamese => format!("cập nhật {age}"),
+        }
+    }
+
+    pub fn agents_refresh_failed(self) -> &'static str {
+        match self {
+            Language::English => "Codex limits unavailable",
+            Language::Vietnamese => "Không lấy được hạn mức Codex",
+        }
+    }
+
     pub fn agents_tokens(self) -> &'static str {
         match self {
             Language::English => "Tokens and cost at API prices",
@@ -530,7 +553,8 @@ impl Language {
                 shelf_tab: "Khay".into(),
                 search_placeholder: "Tìm kiếm  (@image @link @code @file @pin)".into(),
                 search_placeholder_short: "Tìm kiếm".into(),
-                clipboard_hint: "Enter: dán    Opt+P: ghim    Opt+Xoá: xoá    Esc: đóng".into(),
+                clipboard_hint: "Enter: dán    Cmd+1-9: dán dòng    Opt+P: ghim    Opt+Xoá: xoá    Esc: đóng".into(),
+                clipboard_hint_strip: "Enter: dán    Trái và Phải: duyệt    Opt+P: ghim    Opt+Xoá: xoá    Esc: đóng".into(),
                 chip_all: "Tất cả".into(),
                 chip_pinned: "Đã ghim".into(),
                 chip_links: "Liên kết".into(),
@@ -720,6 +744,9 @@ mod tests {
                 language.agents_more_waiting(2),
                 language.agents_sessions().to_owned(),
                 language.agents_usage().to_owned(),
+                language.agents_refresh().to_owned(),
+                language.agents_updated("just now"),
+                language.agents_refresh_failed().to_owned(),
                 language.agents_state(State::Waiting).to_owned(),
                 language.agents_state(State::Working).to_owned(),
                 language.agents_state(State::Failed).to_owned(),
@@ -769,6 +796,7 @@ mod tests {
                 &labels.search_placeholder,
                 &labels.search_placeholder_short,
                 &labels.clipboard_hint,
+                &labels.clipboard_hint_strip,
                 &labels.chip_all,
                 &labels.chip_pinned,
                 &labels.chip_links,
@@ -829,6 +857,10 @@ mod tests {
         assert_ne!(en.pinned(), vi.pinned());
         assert_ne!(en.labels().shelf_hint, vi.labels().shelf_hint);
         assert_ne!(en.labels().clipboard_hint, vi.labels().clipboard_hint);
+        assert_ne!(
+            en.labels().clipboard_hint_strip,
+            vi.labels().clipboard_hint_strip
+        );
         assert_ne!(en.labels().shelf_tab, vi.labels().shelf_tab);
         assert_ne!(en.labels().media_idle, vi.labels().media_idle);
         assert_ne!(en.labels().media_play_pause, vi.labels().media_play_pause);

@@ -7,7 +7,7 @@
 
 use macos_sys::{
     MainThreadMarker, app,
-    notch::{EXPANDED_SIZE, Notch, NotchGeometry, Style},
+    notch::{Notch, NotchGeometry, Style},
     style::PANEL_RADIUS,
     ui::AppCallbacks,
 };
@@ -100,6 +100,7 @@ fn main() {
         app::after(2.4, move || {
             drop(sampler);
             let samples = log.borrow();
+            let open_height = check_notch.open_size().height;
             let mut failures = Vec::new();
             let rest = samples.first().map_or(0.0, |s| s.2);
             let height_at = |ms: u128| {
@@ -134,13 +135,13 @@ fn main() {
             if rest > 32.5 {
                 failures.push("the notch did not start at its resting height");
             }
-            if (opened - EXPANDED_SIZE.height).abs() > 0.5 {
+            if (opened - open_height).abs() > 0.5 {
                 failures.push("the notch did not settle at the open height");
             }
-            if !(EXPANDED_SIZE.height..=EXPANDED_SIZE.height * 1.08).contains(&peak) {
+            if !(open_height..=open_height * 1.08).contains(&peak) {
                 failures.push("the spring should overshoot a little, and only a little");
             }
-            if height_at(250) >= EXPANDED_SIZE.height * 0.9 || height_at(250) <= rest + 20.0 {
+            if height_at(250) >= open_height * 0.9 || height_at(250) <= rest + 20.0 {
                 failures.push("the motion is not spread over time");
             }
             if (closed - rest).abs() > 0.5 {

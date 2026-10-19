@@ -24,6 +24,10 @@ use std::{
     rc::Rc,
 };
 
+/// The area of the shelf page below the header: a row of tiles, and a second one when it fits.
+const SHELF_WIDTH: f64 = 660.0;
+const SHELF_HEIGHT: f64 = 150.0;
+
 const LIMIT: usize = 60;
 
 #[derive(Debug, Clone, PartialEq, Serialize, Deserialize)]
@@ -191,7 +195,7 @@ impl ShelfFeature {
             }
         };
 
-        let view = ShelfView::new(mtm, notch.page_frame(), callbacks);
+        let view = ShelfView::new(mtm, notch.page_area(SHELF_WIDTH, SHELF_HEIGHT), callbacks);
         *view_slot.borrow_mut() = Some(Rc::clone(&view));
         let on_show = Rc::clone(&refresh);
         notch.add_page(view.page(move || on_show()));

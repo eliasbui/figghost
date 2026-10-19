@@ -3,8 +3,12 @@
 //! cards. Nothing of Mole is bundled or linked; without `mo` the page says how to install it.
 
 use super::AttachEnv;
+mod strings;
 use crate::settings::model::Fault;
-use macos_sys::workspace;
+use macos_sys::{
+    status_item::{Entry, Item},
+    workspace,
+};
 use serde_json::{Value, json};
 use std::{
     path::PathBuf,
@@ -69,6 +73,36 @@ impl Feature {
             "analyze": inner.analyze,
             "history": inner.history,
         })
+    }
+
+    /// A submenu of quick actions for the menu bar item. Each one starts the task and shows its page, where
+    /// the result appears; only previews and the health reading are here, since a real run asks first.
+    pub fn menu_entries(this: &Rc<Self>) -> Vec<Entry> {
+        let text = crate::i18n::current().mole_menu();
+        let quick = |title: &'static str, symbol: &'static str, action: &'static str| {
+            let this = Rc::clone(this);
+            Entry::Item(
+                Item::new(title, move || {
+                    if !action.is_empty() {
+                        let _ = this.action(action);
+                    }
+                    crate::settings::show_page("mole");
+                })
+                .symbol(symbol),
+            )
+        };
+        vec![Entry::Submenu {
+            title: text[0].to_owned(),
+            symbol: Some("sparkles"),
+            entries: vec![
+                quick(text[1], "trash", "mole_clean_preview"),
+                quick(text[2], "arrow.clockwise", "mole_optimize_preview"),
+                quick(text[3], "folder", "mole_purge_preview"),
+                quick(text[4], "waveform.path.ecg", "mole_status"),
+                Entry::Separator,
+                quick(text[5], "sparkles", ""),
+            ],
+        }]
     }
 
     /// A button of the page; `None` when the name is not this feature's. A name may carry one argument after

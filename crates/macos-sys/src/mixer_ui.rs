@@ -750,6 +750,7 @@ impl MixerView {
             on_hide: Box::new(on_hide),
             on_key: Box::new(|_: Key| false),
             accepts_files: false,
+            size: None,
         }
     }
 }

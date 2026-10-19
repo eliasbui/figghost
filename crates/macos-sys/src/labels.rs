@@ -12,6 +12,8 @@ pub struct Labels {
     pub search_placeholder_short: String,
     /// Keyboard hints along the bottom of the clipboard page.
     pub clipboard_hint: String,
+    /// The hint under the notch's strip of cards, where the arrows move from card to card.
+    pub clipboard_hint_strip: String,
     /// The filter chips above the clipboard list.
     pub chip_all: String,
     pub chip_pinned: String,
@@ -72,7 +74,8 @@ impl Default for Labels {
             shelf_tab: "Shelf".into(),
             search_placeholder: "Search  (@image @link @code @file @pin)".into(),
             search_placeholder_short: "Search".into(),
-            clipboard_hint: "Enter: paste    Opt+P: pin    Opt+Delete: delete    Esc: close".into(),
+            clipboard_hint: "Enter: paste    Cmd+1-9: paste row    Opt+P: pin    Opt+Delete: delete    Esc: close".into(),
+            clipboard_hint_strip: "Enter: paste    Left and Right: browse    Opt+P: pin    Opt+Delete: delete    Esc: close".into(),
             chip_all: "All".into(),
             chip_pinned: "Pinned".into(),
             chip_links: "Links".into(),

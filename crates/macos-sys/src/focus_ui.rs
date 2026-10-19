@@ -277,6 +277,7 @@ impl FocusView {
             on_hide: Box::new(on_hide),
             on_key: Box::new(move |key| keys.handle_key(key)),
             accepts_files: false,
+            size: None,
         }
     }
 }

@@ -1,3 +1,2 @@
 /* Screenshots and recordings: the page in web/features/capture.js uses the shared styles of app.css and only
    brings the colour of its icon. */
-.nav-item[data-page="capture"] { --tile: #ff3b30; }

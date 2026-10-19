@@ -321,6 +321,9 @@ impl Features {
         if let Some(f) = &self.wheel {
             entries.extend(wheel::Feature::menu_entries(f));
         }
+        if let Some(f) = &self.mole {
+            entries.extend(mole::Feature::menu_entries(f));
+        }
         entries
     }
 }

@@ -42,6 +42,17 @@ const CORNER_READOUT_X: f64 = 138.0;
 const CORNER_READOUT_WIDTH: f64 = 36.0;
 /// Room between the floating capsule and the corner of the screen.
 const CORNER_MARGIN: f64 = 12.0;
+/// The floating pill centred under the menu bar: the capsule's layout, a little wider.
+const ISLAND_SIZE: NSSize = NSSize::new(200.0, 36.0);
+/// The vertical slider on the right edge: the level fills a column from the speaker at its foot.
+const SIDE_SIZE: NSSize = NSSize::new(48.0, 212.0);
+const SIDE_MARGIN: f64 = 16.0;
+const SIDE_TRACK_Y: f64 = 54.0;
+const SIDE_TRACK_HEIGHT: f64 = 116.0;
+/// The big tile in the lower middle of the screen, with the level as a row of segments.
+const TILE_SIZE: NSSize = NSSize::new(184.0, 184.0);
+const TILE_FLOOR: f64 = 120.0;
+const TILE_SEGMENTS: usize = 16;
 
 /// How the volume indicator looks.
 #[derive(Debug, Clone, Copy, PartialEq, Eq)]
@@ -54,6 +65,12 @@ pub enum HudStyle {
     Corner,
     /// The same hang, with the level itself filling the shape from the left: it reads as a meter.
     Bar,
+    /// The capsule's layout floating at the middle of the top, like an island.
+    Island,
+    /// A tall slim slider on the right edge of the screen.
+    Side,
+    /// A large square tile low on the screen: a big speaker and the level as a row of segments.
+    Tile,
 }
 
 impl HudStyle {
@@ -63,6 +80,9 @@ impl HudStyle {
             "glass" => Self::Glass,
             "corner" => Self::Corner,
             "bar" => Self::Bar,
+            "island" => Self::Island,
+            "side" => Self::Side,
+            "tile" => Self::Tile,
             _ => Self::Notch,
         }
     }
@@ -71,7 +91,8 @@ impl HudStyle {
     fn glass(self) -> Option<(NSGlassEffectViewStyle, Retained<NSColor>)> {
         let size = match self {
             Self::Glass => (NSGlassEffectViewStyle::Regular, 0.5),
-            Self::Corner => (NSGlassEffectViewStyle::Clear, 0.34),
+            Self::Corner | Self::Island => (NSGlassEffectViewStyle::Clear, 0.34),
+            Self::Side | Self::Tile => (NSGlassEffectViewStyle::Regular, 0.42),
             _ => return None,
         };
         Some((size.0, style::black(size.1)))
@@ -84,13 +105,21 @@ impl HudStyle {
 
     /// Whether the shape hangs from the top edge, which hides its top corners above the screen.
     fn hangs(self) -> bool {
-        !matches!(self, Self::Corner)
+        !matches!(self, Self::Corner | Self::Island | Self::Side | Self::Tile)
+    }
+
+    /// Whether the content is the capsule's layout (speaker, a short track and the number in a row).
+    fn compact(self) -> bool {
+        matches!(self, Self::Corner | Self::Island)
     }
 
     /// The size of the panel.
     fn size(self, top_inset: f64) -> NSSize {
         match self {
             Self::Corner => CORNER_SIZE,
+            Self::Island => ISLAND_SIZE,
+            Self::Side => SIDE_SIZE,
+            Self::Tile => TILE_SIZE,
             _ => NSSize::new(WIDTH, top_inset + ROW_HEIGHT),
         }
     }
@@ -98,7 +127,9 @@ impl HudStyle {
     /// The corner radius of the glass, which a capsule knows only once it has a height.
     fn radius(self, height: f64) -> f64 {
         match self {
-            Self::Corner => height / 2.0,
+            Self::Corner | Self::Island => height / 2.0,
+            Self::Side => SIDE_SIZE.width / 2.0,
+            Self::Tile => 36.0,
             _ => CORNER_RADIUS,
         }
     }
@@ -168,6 +199,67 @@ fn draw_speaker(left: f64, middle: f64, level: f64, muted: bool) {
     }
 }
 
+/// The slider on the right edge: the number on top, the column that the level fills from below, the speaker at
+/// the foot.
+fn draw_side(size: NSSize, level: f64, muted: bool) {
+    let x = (size.width - TRACK_HEIGHT) / 2.0;
+    let track = NSRect::new(
+        NSPoint::new(x, SIDE_TRACK_Y),
+        NSSize::new(TRACK_HEIGHT, SIDE_TRACK_HEIGHT),
+    );
+    NSColor::colorWithWhite_alpha(1.0, 0.25).setFill();
+    rounded(track, TRACK_HEIGHT / 2.0).fill();
+    let shown = if muted { 0.0 } else { level };
+    if shown > 0.0 {
+        let fill = NSRect::new(
+            track.origin,
+            NSSize::new(TRACK_HEIGHT, (SIDE_TRACK_HEIGHT * shown).max(TRACK_HEIGHT)),
+        );
+        NSColor::whiteColor().setFill();
+        rounded(fill, TRACK_HEIGHT / 2.0).fill();
+    }
+    draw_speaker(size.width / 2.0 - 11.0, 28.0, level, muted);
+    if !muted {
+        // SAFETY: extern static weight constant.
+        let font = NSFont::monospacedDigitSystemFontOfSize_weight(12.0, unsafe { NSFontWeightMedium });
+        let attrs = text_attributes(&font, &NSColor::whiteColor(), Fit::Clip, true);
+        draw_text(
+            &format!("{:.0}", level * 100.0),
+            NSRect::new(
+                NSPoint::new(0.0, SIDE_TRACK_Y + SIDE_TRACK_HEIGHT + 14.0),
+                NSSize::new(size.width, 17.0),
+            ),
+            &attrs,
+        );
+    }
+}
+
+/// The tile: the speaker drawn large, and under it the level as a row of segments.
+fn draw_tile(size: NSSize, level: f64, muted: bool) {
+    NSGraphicsContext::saveGraphicsState_class();
+    let place = objc2_foundation::NSAffineTransform::transform();
+    place.translateXBy_yBy(size.width / 2.0, size.height * 0.58);
+    place.scaleBy(3.4);
+    {
+        use objc2_app_kit::NSAffineTransformNSAppKitAdditions as _;
+        place.concat();
+    }
+    draw_speaker(-11.0, 0.0, level, muted);
+    NSGraphicsContext::restoreGraphicsState_class();
+
+    let gap = 2.0;
+    let width = (size.width - 48.0 - gap * (TILE_SEGMENTS as f64 - 1.0)) / TILE_SEGMENTS as f64;
+    let lit = if muted { 0 } else { (level * TILE_SEGMENTS as f64).round() as usize };
+    for i in 0..TILE_SEGMENTS {
+        let segment = NSRect::new(
+            NSPoint::new(24.0 + i as f64 * (width + gap), 26.0),
+            NSSize::new(width, 7.0),
+        );
+        NSColor::colorWithWhite_alpha(1.0, if i < lit { 1.0 } else { 0.25 }).setFill();
+        rounded(segment, 1.5).fill();
+    }
+}
+
 define_class!(
     // SAFETY: NSView allows subclassing; the ivars are only touched on the main thread and need no Drop.
     #[unsafe(super(NSView))]
@@ -215,8 +307,16 @@ define_class!(
                 }
             }
 
+            if style == HudStyle::Side {
+                draw_side(bounds.size, level, muted);
+                return;
+            }
+            if style == HudStyle::Tile {
+                draw_tile(bounds.size, level, muted);
+                return;
+            }
             let middle = bounds.size.height / 2.0;
-            let compact = style == HudStyle::Corner;
+            let compact = style.compact();
             let (icon_x, track_x, track_width, readout_x, readout_width) = if compact {
                 (
                     CORNER_ICON_X,
@@ -374,7 +474,7 @@ impl Hud {
     }
 
     fn dress(&self, style: HudStyle) {
-        let size = self.view.frame().size;
+        let size = style.size(0.0);
         // The glass is as tall as the shape, which for the hanging styles overshoots the top edge by the corner
         // radius so its top corners stay off the screen, as the view's own shape does.
         let overshoot = if style.hangs() {
@@ -444,6 +544,36 @@ fn frame_for(geometry: &NotchGeometry, style: HudStyle, size: NSSize) -> NSRect 
     }
     let screen = geometry.screen;
     let top = geometry.top_inset().max(24.0) + CORNER_MARGIN;
+    match style {
+        HudStyle::Island => {
+            return NSRect::new(
+                NSPoint::new(
+                    screen.origin.x + (screen.size.width - size.width) / 2.0,
+                    screen.origin.y + screen.size.height - top - size.height,
+                ),
+                size,
+            );
+        }
+        HudStyle::Side => {
+            return NSRect::new(
+                NSPoint::new(
+                    screen.origin.x + screen.size.width - size.width - SIDE_MARGIN,
+                    screen.origin.y + (screen.size.height - size.height) / 2.0,
+                ),
+                size,
+            );
+        }
+        HudStyle::Tile => {
+            return NSRect::new(
+                NSPoint::new(
+                    screen.origin.x + (screen.size.width - size.width) / 2.0,
+                    screen.origin.y + TILE_FLOOR,
+                ),
+                size,
+            );
+        }
+        _ => {}
+    }
     NSRect::new(
         NSPoint::new(
             screen.origin.x + screen.size.width - size.width - CORNER_MARGIN,
@@ -469,6 +599,9 @@ impl Hud {
     /// drawn with the black shape standing in for it; the layout and the ink are what this checks.
     pub fn snapshot_png(&self, style: HudStyle, level: f32, muted: bool) -> Option<Vec<u8>> {
         self.set_style(style);
+        // The panel sizes its content, so it takes the size of the style as `show` would give it.
+        self.panel
+            .setFrame_display(NSRect::new(NSPoint::ZERO, style.size(0.0)), false);
         self.view.ivars().level.set(f64::from(level));
         self.view.ivars().muted.set(muted);
         self.view.ivars().backdrop.set(true);
@@ -526,5 +659,19 @@ mod tests {
         assert!(HudStyle::Notch.glass().is_none() && HudStyle::Bar.glass().is_none());
         assert!(HudStyle::Notch.paints_shape() && HudStyle::Bar.paints_shape());
         assert!(!HudStyle::Glass.paints_shape() && !HudStyle::Corner.paints_shape());
+        // The new ones float: the island is centred under the menu bar, the side slider is on the right edge at
+        // mid height, and the tile is centred above the bottom.
+        let island = frame_for(&geometry, HudStyle::Island, HudStyle::Island.size(0.0));
+        assert_eq!(island.origin.x + island.size.width / 2.0, 720.0);
+        assert!(island.origin.y + island.size.height <= 900.0 - 24.0);
+        let side = frame_for(&geometry, HudStyle::Side, HudStyle::Side.size(0.0));
+        assert_eq!(side.origin.x + side.size.width, 1440.0 - SIDE_MARGIN);
+        assert_eq!(side.origin.y + side.size.height / 2.0, 450.0);
+        let tile = frame_for(&geometry, HudStyle::Tile, HudStyle::Tile.size(0.0));
+        assert_eq!(tile.origin.x + tile.size.width / 2.0, 720.0);
+        assert!(!HudStyle::Island.hangs() && !HudStyle::Side.hangs() && !HudStyle::Tile.hangs());
+        for word in ["island", "side", "tile"] {
+            assert!(HudStyle::named(word).glass().is_some(), "{word}");
+        }
     }
 }
