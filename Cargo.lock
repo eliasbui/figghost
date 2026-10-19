@@ -4,7 +4,7 @@ version = 4
 
 [[package]]
 name = "app-ui"
-version = "1.4.0"
+version = "1.4.1"
 dependencies = [
  "core-agents",
  "core-audio-fx",
@@ -62,7 +62,7 @@ checksum = "4e7648175b45a9a48536d676f68d918270699102aa8dab5496df06904c914600"
 
 [[package]]
 name = "core-agents"
-version = "1.4.0"
+version = "1.4.1"
 dependencies = [
  "serde",
  "serde_json",
@@ -70,19 +70,19 @@ dependencies = [
 
 [[package]]
 name = "core-audio-fx"
-version = "1.4.0"
+version = "1.4.1"
 
 [[package]]
 name = "core-calendar"
-version = "1.4.0"
+version = "1.4.1"
 
 [[package]]
 name = "core-capture"
-version = "1.4.0"
+version = "1.4.1"
 
 [[package]]
 name = "core-clipboard"
-version = "1.4.0"
+version = "1.4.1"
 dependencies = [
  "rusqlite",
 ]
@@ -105,14 +105,14 @@ checksum = "773648b94d0e5d620f64f280777445740e61fe701025087ec8b57f45c791888b"
 
 [[package]]
 name = "core-lyrics"
-version = "1.4.0"
+version = "1.4.1"
 dependencies = [
  "serde_json",
 ]
 
 [[package]]
 name = "core-mouse"
-version = "1.4.0"
+version = "1.4.1"
 dependencies = [
  "macos-sys",
  "serde",
@@ -121,14 +121,14 @@ dependencies = [
 
 [[package]]
 name = "core-smart"
-version = "1.4.0"
+version = "1.4.1"
 dependencies = [
  "serde_json",
 ]
 
 [[package]]
 name = "core-window"
-version = "1.4.0"
+version = "1.4.1"
 
 [[package]]
 name = "dispatch2"
@@ -243,7 +243,7 @@ dependencies = [
 
 [[package]]
 name = "macos-sys"
-version = "1.4.0"
+version = "1.4.1"
 dependencies = [
  "block2",
  "core-calendar",
@@ -278,7 +278,7 @@ checksum = "cf8baf1c55e62ffcace7a9f06f4bd9cd3f0c4beb022d3b367256b91b87513d98"
 
 [[package]]
 name = "nowplaying-adapter"
-version = "1.4.0"
+version = "1.4.1"
 dependencies = [
  "block2",
  "dispatch2",
