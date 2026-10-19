@@ -277,7 +277,8 @@ impl Feature {
         }
         let place = place.expect("a place was chosen above");
         self.place.set(Some(place));
-        let panel = self.panel.borrow().clone().unwrap_or_else(|| {
+        let existing = self.panel.borrow().clone();
+        let panel = existing.unwrap_or_else(|| {
             let (message, moved) = (self.me.clone(), self.me.clone());
             let panel = WidgetPanel::new(
                 self.mtm,
@@ -470,3 +471,21 @@ impl Feature {
         Some(Ok(()))
     }
 }
+
+#[cfg(test)]
+mod tests {
+    use super::*;
+
+    #[test]
+    fn panel_slot_lazy_initialization_does_not_double_borrow() {
+        let slot: RefCell<Option<String>> = RefCell::default();
+        let existing = slot.borrow().clone();
+        let val = existing.unwrap_or_else(|| {
+            *slot.borrow_mut() = Some("ready".into());
+            "ready".into()
+        });
+        assert_eq!(val, "ready");
+        assert_eq!(*slot.borrow(), Some("ready".into()));
+    }
+}
+
