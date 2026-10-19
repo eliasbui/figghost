@@ -343,6 +343,7 @@ fn notch_state(config: &Config, env: &Env) -> Value {
         "shelf_count": env.shelf_count,
         "material": n.material,
         "hud": n.hud,
+        "hud_position": n.hud_position,
         "shadow": n.shadow,
         "motion": n.motion,
         "open_on_hover": n.open_on_hover,
@@ -571,10 +572,11 @@ fn set(config: &mut Config, path: &str, value: &Value) -> Outcome {
             Ok(Effect::Notch)
         }
         "notch.hud" => {
-            config.notch.hud = one_of(
-                value,
-                &["notch", "glass", "corner", "bar", "island", "side", "tile"],
-            )?;
+            config.notch.hud = one_of(value, &["notch", "glass", "corner", "bar", "island", "side", "tile", "ring", "equalizer", "wide"])?;
+            Ok(Effect::Hud)
+        }
+        "notch.hud_position" => {
+            config.notch.hud_position = one_of(value, &["auto", "top-left", "top", "top-right", "left", "center", "right", "bottom-left", "bottom", "bottom-right"])?;
             Ok(Effect::Hud)
         }
         "notch.motion" => {
@@ -1515,6 +1517,7 @@ mod tests {
             "translate",
             "pin",
             "cursor",
+            "musicwidget",
         ] {
             assert!(state[id].is_object(), "{id} is missing from the state");
             assert!(state[id]["enabled"].is_boolean(), "{id} has no switch");

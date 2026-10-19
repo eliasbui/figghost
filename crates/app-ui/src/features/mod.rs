@@ -17,6 +17,7 @@ pub mod cursor;
 pub mod lyrics;
 pub mod mascot;
 pub mod menubar;
+pub mod musicwidget;
 pub mod mole;
 pub mod pin;
 pub mod smart;
@@ -60,6 +61,7 @@ pub struct Features {
     pub translate: Option<Rc<translate::Feature>>,
     pub pin: Option<Rc<pin::Feature>>,
     pub cursor: Option<Rc<cursor::Feature>>,
+    pub musicwidget: Option<Rc<musicwidget::Feature>>,
 }
 
 impl Features {
@@ -81,6 +83,7 @@ impl Features {
             translate: translate::attach(env),
             pin: pin::attach(env),
             cursor: cursor::attach(env),
+            musicwidget: musicwidget::attach(env),
         }
     }
 
@@ -128,6 +131,9 @@ impl Features {
         }
         if let Some(f) = &self.cursor {
             out.insert("cursor", f.runtime());
+        }
+        if let Some(f) = &self.musicwidget {
+            out.insert("musicwidget", f.runtime());
         }
         out
     }
@@ -187,6 +193,10 @@ impl Features {
                 .cursor
                 .as_ref()
                 .map_or(Ok(()), |f| f.configure(&config.cursor)),
+            "musicwidget" => self
+                .musicwidget
+                .as_ref()
+                .map_or(Ok(()), |f| f.configure(&config.musicwidget)),
             _ => Ok(()),
         }
     }
@@ -332,6 +342,11 @@ impl Features {
         {
             return Some(result);
         }
+        if let Some(f) = &self.musicwidget
+            && let Some(result) = f.action(name, &mut config.musicwidget)
+        {
+            return Some(result);
+        }
         if let Some(f) = &self.cursor
             && let Some(result) = f.action(name, &mut config.cursor)
         {
@@ -451,6 +466,13 @@ pub fn state(
         cursor::settings::state(&config.cursor, runtime.get("cursor").unwrap_or(&none)),
     );
     root.insert(
+        "musicwidget".into(),
+        musicwidget::settings::state(
+            &config.musicwidget,
+            runtime.get("musicwidget").unwrap_or(&none),
+        ),
+    );
+    root.insert(
         "mole".into(),
         mole::settings::state(runtime.get("mole").unwrap_or(&none)),
     );
@@ -494,6 +516,8 @@ pub fn set(config: &mut Config, path: &str, value: &Value) -> Option<Result<&'st
         "cursor" => {
             cursor::settings::set(&mut config.cursor, rest, value).map(|r| r.map(|()| "cursor"))
         }
+        "musicwidget" => musicwidget::settings::set(&mut config.musicwidget, rest, value)
+            .map(|r| r.map(|()| "musicwidget")),
         _ => None,
     }
 }

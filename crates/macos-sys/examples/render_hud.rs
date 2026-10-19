@@ -25,6 +25,9 @@ fn main() {
             (HudStyle::Island, "island"),
             (HudStyle::Side, "side"),
             (HudStyle::Tile, "tile"),
+            (HudStyle::Ring, "ring"),
+            (HudStyle::Equalizer, "equalizer"),
+            (HudStyle::Wide, "wide"),
         ] {
             for (level, muted, suffix) in [
                 (0.62, false, ""),

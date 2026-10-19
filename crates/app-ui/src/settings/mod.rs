@@ -350,6 +350,11 @@ impl SettingsFeature {
             }),
             Effect::Hud => {
                 self.ctx.volume_hud.set_style(config.notch.hud_style());
+                self.ctx
+                    .volume_hud
+                    .set_position(config.notch.hud_position());
+                // Showing it as it is now is how the choice is seen.
+                self.ctx.volume_hud.preview();
                 Ok(())
             }
             Effect::History => {
@@ -493,6 +498,7 @@ impl SettingsFeature {
                     clipboard.history.clear_unpinned();
                 }
             }
+            "hud_preview" => self.ctx.volume_hud.preview(),
             "clear_shelf" => {
                 if let Some(shelf) = &self.ctx.shelf {
                     shelf.clear();

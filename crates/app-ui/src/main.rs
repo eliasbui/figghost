@@ -183,6 +183,7 @@ impl Shell {
             audio.engine.soft_volume(),
             config.borrow().notch.hud_style(),
         ));
+        volume_hud.set_position(config.borrow().notch.hud_position());
         if config.borrow().volume_hud {
             volume_hud.enable_when_possible();
         }

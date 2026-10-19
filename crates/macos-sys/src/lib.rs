@@ -61,6 +61,7 @@ pub mod volume;
 pub mod webview;
 pub mod wheel_ui;
 pub mod widgets;
+pub mod widget_panel;
 pub mod window;
 pub mod workspace;
 

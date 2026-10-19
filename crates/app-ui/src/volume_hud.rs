@@ -9,7 +9,7 @@ use crate::{audio::SoftVolume, trace};
 use macos_sys::{
     MainThreadMarker, app,
     event_tap::{EventTap, EventView, TapError, Verdict, mask},
-    hud::{self, Hud, HudStyle},
+    hud::{self, Hud, HudPosition, HudStyle},
     system_keys::{SYSTEM_DEFINED, SystemKey},
     volume::{self, Volume},
 };
@@ -57,6 +57,19 @@ impl VolumeHud {
     /// The look of the indicator, as chosen in the settings.
     pub fn set_style(&self, style: HudStyle) {
         self._hud.set_style(style);
+    }
+
+    pub fn set_position(&self, position: HudPosition) {
+        self._hud.set_position(position);
+    }
+
+    /// Shows the indicator with the volume as it is, so a style or a place can be judged without a key press.
+    pub fn preview(&self) {
+        let now = volume::read().unwrap_or(Volume {
+            level: 0.5,
+            muted: false,
+        });
+        self._hud.show(now.level, now.muted);
     }
 
     fn wanted(&self) -> bool {

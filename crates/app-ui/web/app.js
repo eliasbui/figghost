@@ -128,7 +128,11 @@ const I18N = {
     'tab.focus': 'Focus', 'tab.focus.desc': 'A countdown for work sessions: 15, 25, 45 or 60 minutes. The notch opens and a sound plays when time is up.',
     'sec.volume': 'Volume', 'vol.title': 'Volume indicator in the notch', 'vol.desc': 'Replaces the system volume display. Needs Accessibility. Shift + Option moves in finer steps.',
     'vol.style.title': 'Indicator style', 'vol.style.desc': 'How the volume panel looks while the keys are pressed.',
-    'vol.style.notch': 'Notch', 'vol.style.glass': 'Liquid Glass', 'vol.style.corner': 'Corner capsule', 'vol.style.bar': 'Level bar', 'vol.style.island': 'Floating pill', 'vol.style.side': 'Side slider', 'vol.style.tile': 'Large tile',
+    'vol.style.notch': 'Notch', 'vol.style.glass': 'Liquid Glass', 'vol.style.corner': 'Corner capsule', 'vol.style.bar': 'Level bar', 'vol.style.island': 'Floating pill', 'vol.style.side': 'Side slider', 'vol.style.tile': 'Large tile', 'vol.style.ring': 'Glass dial', 'vol.style.equalizer': 'Equalizer', 'vol.style.wide': 'Wide slab',
+    'vol.style.notch.desc': 'Black, hangs from the notch.', 'vol.style.glass.desc': 'The same hang, in Liquid Glass.', 'vol.style.corner.desc': 'A small glass capsule.', 'vol.style.bar.desc': 'The level fills the notch shape.', 'vol.style.island.desc': 'A glass pill that floats.', 'vol.style.side.desc': 'A tall slim glass slider.', 'vol.style.tile.desc': 'A big speaker and segments.', 'vol.style.ring.desc': 'A round glass dial with a ring.', 'vol.style.equalizer.desc': 'Bars that light up as it grows.', 'vol.style.wide.desc': 'A long thin glass capsule.',
+    'vol.place.title': 'Where it shows', 'vol.place.desc': 'For the floating styles; the ones that hang stay under the notch.', 'vol.place.auto': 'Automatic',
+    'vol.place.top-left': 'Top left', 'vol.place.top': 'Top', 'vol.place.top-right': 'Top right', 'vol.place.left': 'Left', 'vol.place.center': 'Center', 'vol.place.right': 'Right', 'vol.place.bottom-left': 'Bottom left', 'vol.place.bottom': 'Bottom', 'vol.place.bottom-right': 'Bottom right',
+    'vol.preview': 'Preview', 'vol.preview.title': 'Try it', 'vol.preview.desc': 'Shows the indicator now with the style and place you chose.',
     'shelf.count': 'Files on the shelf', 'shelf.clear': 'Clear shelf', 'shelf.clear.desc': 'Removes the references only. Your files are not touched.',
     'sec.shelf': 'Shelf',
 
@@ -238,7 +242,11 @@ const I18N = {
     'tab.focus': 'Tập trung', 'tab.focus.desc': 'Đồng hồ đếm ngược cho phiên làm việc: 15, 25, 45 hoặc 60 phút. Notch tự mở và có âm báo khi hết giờ.',
     'sec.volume': 'Âm lượng', 'vol.title': 'Chỉ báo âm lượng trong notch', 'vol.desc': 'Thay màn hình âm lượng của hệ thống. Cần quyền Trợ năng. Shift + Option để chỉnh từng bước nhỏ.',
     'vol.style.title': 'Kiểu chỉ báo', 'vol.style.desc': 'Bảng âm lượng trông thế nào trong lúc nhấn phím.',
-    'vol.style.notch': 'Notch', 'vol.style.glass': 'Liquid Glass', 'vol.style.corner': 'Viên góc phải', 'vol.style.bar': 'Thanh mức', 'vol.style.island': 'Viên nổi giữa', 'vol.style.side': 'Thanh dọc bên phải', 'vol.style.tile': 'Ô lớn giữa màn hình',
+    'vol.style.notch': 'Notch', 'vol.style.glass': 'Liquid Glass', 'vol.style.corner': 'Viên góc phải', 'vol.style.bar': 'Thanh mức', 'vol.style.island': 'Viên nổi giữa', 'vol.style.side': 'Thanh dọc bên phải', 'vol.style.tile': 'Ô lớn giữa màn hình', 'vol.style.ring': 'Vòng kính tròn', 'vol.style.equalizer': 'Thanh cân bằng', 'vol.style.wide': 'Thanh dài',
+    'vol.style.notch.desc': 'Màu đen, treo dưới notch.', 'vol.style.glass.desc': 'Cùng dáng treo, bằng Liquid Glass.', 'vol.style.corner.desc': 'Viên kính nhỏ gọn.', 'vol.style.bar.desc': 'Mức âm lượng lấp đầy hình notch.', 'vol.style.island.desc': 'Viên kính nổi.', 'vol.style.side.desc': 'Thanh trượt kính mảnh, dựng đứng.', 'vol.style.tile.desc': 'Loa lớn và các vạch mức.', 'vol.style.ring.desc': 'Vòng kính tròn có vành tiến độ.', 'vol.style.equalizer.desc': 'Các cột sáng dần khi to lên.', 'vol.style.wide.desc': 'Viên kính dài và mảnh.',
+    'vol.place.title': 'Vị trí hiển thị', 'vol.place.desc': 'Dùng cho các kiểu nổi; kiểu treo vẫn nằm dưới notch.', 'vol.place.auto': 'Tự động',
+    'vol.place.top-left': 'Trên trái', 'vol.place.top': 'Trên giữa', 'vol.place.top-right': 'Trên phải', 'vol.place.left': 'Giữa trái', 'vol.place.center': 'Chính giữa', 'vol.place.right': 'Giữa phải', 'vol.place.bottom-left': 'Dưới trái', 'vol.place.bottom': 'Dưới giữa', 'vol.place.bottom-right': 'Dưới phải',
+    'vol.preview': 'Xem thử', 'vol.preview.title': 'Thử ngay', 'vol.preview.desc': 'Hiện chỉ báo ngay với kiểu và vị trí đã chọn.',
     'shelf.count': 'Tệp trên khay', 'shelf.clear': 'Dọn khay', 'shelf.clear.desc': 'Chỉ xóa phần tham chiếu. Tệp của bạn không bị động tới.',
     'sec.shelf': 'Khay tệp',
 
@@ -1283,6 +1291,57 @@ function notchStyleSection(on) {
   return [sectionTitle(t('sec.notch.style')), wrap];
 }
 
+// The look and the place of the volume indicator: a card for each style and a small screen to pick the place on.
+const HUD_STYLES = ['notch', 'glass', 'corner', 'bar', 'island', 'side', 'tile', 'ring', 'equalizer', 'wide'];
+const HUD_PLACES = ['top-left', 'top', 'top-right', 'left', 'center', 'right', 'bottom-left', 'bottom', 'bottom-right'];
+// The styles that hang from the notch stay under it, so a place means nothing for them.
+const HUD_HANGING = ['notch', 'glass', 'bar'];
+
+function hudRows() {
+  const floating = () => S.notch.volume_hud && !HUD_HANGING.includes(S.notch.hud);
+  const grid = h('div', { class: 'hud-places', role: 'group', 'aria-label': t('vol.place.title') });
+  const places = HUD_PLACES.map((p) => {
+    const b = h('button', { class: 'hud-place', type: 'button', 'aria-pressed': 'false', onclick: () => change('notch.hud_position', p) });
+    grid.append(b);
+    return [p, b];
+  });
+  const auto = button(t('vol.place.auto'), () => change('notch.hud_position', 'auto'), { small: true });
+  reg(() => {
+    for (const [p, b] of places) {
+      b.setAttribute('aria-pressed', String(S.notch.hud_position === p));
+      b.setAttribute('aria-label', t('vol.place.' + p));
+      b.title = t('vol.place.' + p);
+    }
+    auto.textContent = t('vol.place.auto');
+    auto.classList.toggle('on', S.notch.hud_position === 'auto');
+  });
+  const test = button(t('vol.preview'), () => send({ t: 'action', name: 'hud_preview' }), { small: true });
+  reg(() => { test.textContent = t('vol.preview'); });
+  return [
+    row(t('vol.place.title'), t('vol.place.desc'), h('div', { class: 'hud-place-box' }, grid, auto), { when: floating }),
+    row(t('vol.preview.title'), t('vol.preview.desc'), test, { when: () => S.notch.volume_hud }),
+  ];
+}
+
+function hudStyleSection() {
+  const cards = h('div', { class: 'style-cards hud-cards', role: 'group', 'aria-label': t('vol.style.title') });
+  for (const id of HUD_STYLES) {
+    const name = h('span', { class: 'sc-name' });
+    const desc = h('span', { class: 'sc-desc' });
+    const el = h('button', { class: 'style-card', type: 'button', 'aria-pressed': 'false', onclick: () => change('notch.hud', id) },
+      h('span', { class: 'sc-art hud-art hud-' + id, 'aria-hidden': 'true' }, h('i')), name, desc);
+    reg(() => {
+      el.setAttribute('aria-pressed', String(S.notch.hud === id));
+      name.textContent = t('vol.style.' + id);
+      desc.textContent = t('vol.style.' + id + '.desc');
+    });
+    cards.append(el);
+  }
+  const wrap = h('div', { class: 'style-wrap' }, cards);
+  reg(() => wrap.classList.toggle('disabled', !S.notch.volume_hud));
+  return [sectionTitle(t('vol.style.title')), wrap];
+}
+
 function pageNotch() {
   const shelfCount = h('span', { class: 'row-title' });
   reg(() => { shelfCount.textContent = String(S.notch.shelf_count); });
@@ -1343,11 +1402,9 @@ function pageNotch() {
       row(t('shelf.clear'), t('shelf.clear.desc'), button(t('shelf.clear'), () => send({ t: 'action', name: 'clear_shelf' }), { icon: 'trash', small: true }))),
     sectionTitle(t('sec.volume')),
     card(
-      toggleRow('notch.volume_hud', t('vol.title'), t('vol.desc')),
-      selectRow({
-        path: 'notch.hud', title: t('vol.style.title'), desc: t('vol.style.desc'), when: () => S.notch.volume_hud,
-        options: () => ['notch', 'glass', 'corner', 'bar', 'island', 'side', 'tile'].map((v) => ({ value: v, label: t('vol.style.' + v) })),
-      })),
+      toggleRow('notch.volume_hud', t('vol.title'), t('vol.desc'))),
+    ...hudStyleSection(),
+    card(...hudRows()),
   ];
 }
 
@@ -2017,9 +2074,7 @@ window.__selftest = function () {
     S.notch.volume_hud = true;
     runSyncs();
     sent.length = 0;
-    const hud = [...document.querySelectorAll('select.pick')].find((s) => s.getAttribute('aria-label') === t('vol.style.title'));
-    hud.value = 'bar';
-    hud.dispatchEvent(new Event('change'));
+    [...document.querySelectorAll('.hud-cards .style-card')][3].click();
     expect(sent.some((m) => m.t === 'set' && m.path === 'notch.hud' && m.value === 'bar'), 'the indicator style is sent: ' + JSON.stringify(sent));
     S.notch.pages = [{ id: 'clipboard', title: 'Clipboard', on: true }, { id: 'media', title: 'Media', on: true }, { id: 'sound', title: 'Sound', on: false }];
     runSyncs();

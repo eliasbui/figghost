@@ -51,8 +51,17 @@ const SIDE_TRACK_Y: f64 = 54.0;
 const SIDE_TRACK_HEIGHT: f64 = 116.0;
 /// The big tile in the lower middle of the screen, with the level as a row of segments.
 const TILE_SIZE: NSSize = NSSize::new(184.0, 184.0);
-const TILE_FLOOR: f64 = 120.0;
 const TILE_SEGMENTS: usize = 16;
+/// The round dial: a ring that fills clockwise around the speaker.
+const RING_SIZE: NSSize = NSSize::new(132.0, 132.0);
+const RING_WIDTH: f64 = 7.0;
+/// The equalizer: a staircase of bars that light up from the left.
+const EQ_SIZE: NSSize = NSSize::new(216.0, 72.0);
+const EQ_BARS: usize = 14;
+/// The wide slab: the capsule's layout stretched over a long track.
+const WIDE_SIZE: NSSize = NSSize::new(420.0, 34.0);
+/// Room between a floating indicator at the bottom of the screen and the edge, which clears the Dock.
+const BOTTOM_FLOOR: f64 = 96.0;
 
 /// How the volume indicator looks.
 #[derive(Debug, Clone, Copy, PartialEq, Eq)]
@@ -71,6 +80,68 @@ pub enum HudStyle {
     Side,
     /// A large square tile low on the screen: a big speaker and the level as a row of segments.
     Tile,
+    /// A round dial in Liquid Glass: the level is a ring that fills clockwise around the speaker.
+    Ring,
+    /// A glass slab of bars that light up from the left like a level meter.
+    Equalizer,
+    /// A long thin glass capsule with a long track.
+    Wide,
+}
+
+/// Where a floating indicator goes on the screen: one of nine places, or the place its style has by itself.
+#[derive(Debug, Clone, Copy, PartialEq, Eq, Default)]
+pub enum HudPosition {
+    #[default]
+    Auto,
+    TopLeft,
+    Top,
+    TopRight,
+    Left,
+    Center,
+    Right,
+    BottomLeft,
+    Bottom,
+    BottomRight,
+}
+
+impl HudPosition {
+    /// The place a settings word names.
+    pub fn named(word: &str) -> Self {
+        match word {
+            "top-left" => Self::TopLeft,
+            "top" => Self::Top,
+            "top-right" => Self::TopRight,
+            "left" => Self::Left,
+            "center" => Self::Center,
+            "right" => Self::Right,
+            "bottom-left" => Self::BottomLeft,
+            "bottom" => Self::Bottom,
+            "bottom-right" => Self::BottomRight,
+            _ => Self::Auto,
+        }
+    }
+
+    /// Column and row, each -1, 0 or 1 from the left and from the top; `Auto` is the style's own place.
+    fn cell(self, style: HudStyle) -> (i8, i8) {
+        match self {
+            Self::Auto => match style {
+                HudStyle::Corner => (1, -1),
+                HudStyle::Island => (0, -1),
+                HudStyle::Side => (1, 0),
+                HudStyle::Ring => (0, 0),
+                _ => (0, 1),
+            },
+            Self::TopLeft => (-1, -1),
+            Self::Top => (0, -1),
+            Self::TopRight => (1, -1),
+            Self::Left => (-1, 0),
+            Self::Center => (0, 0),
+            Self::Right => (1, 0),
+            Self::BottomLeft => (-1, 1),
+            Self::Bottom => (0, 1),
+            Self::BottomRight => (1, 1),
+        }
+    }
 }
 
 impl HudStyle {
@@ -83,6 +154,9 @@ impl HudStyle {
             "island" => Self::Island,
             "side" => Self::Side,
             "tile" => Self::Tile,
+            "ring" => Self::Ring,
+            "equalizer" => Self::Equalizer,
+            "wide" => Self::Wide,
             _ => Self::Notch,
         }
     }
@@ -92,7 +166,10 @@ impl HudStyle {
         let size = match self {
             Self::Glass => (NSGlassEffectViewStyle::Regular, 0.5),
             Self::Corner | Self::Island => (NSGlassEffectViewStyle::Clear, 0.34),
-            Self::Side | Self::Tile => (NSGlassEffectViewStyle::Regular, 0.42),
+            Self::Side | Self::Tile | Self::Ring | Self::Equalizer => {
+                (NSGlassEffectViewStyle::Regular, 0.42)
+            }
+            Self::Wide => (NSGlassEffectViewStyle::Clear, 0.34),
             _ => return None,
         };
         Some((size.0, style::black(size.1)))
@@ -105,12 +182,33 @@ impl HudStyle {
 
     /// Whether the shape hangs from the top edge, which hides its top corners above the screen.
     fn hangs(self) -> bool {
-        !matches!(self, Self::Corner | Self::Island | Self::Side | Self::Tile)
+        !self.floats()
     }
 
-    /// Whether the content is the capsule's layout (speaker, a short track and the number in a row).
+    /// Whether the style floats free of the top edge, and so can be put anywhere on the screen.
+    pub fn floats(self) -> bool {
+        !matches!(self, Self::Notch | Self::Glass | Self::Bar)
+    }
+
+    /// Whether the content is the capsule's layout (speaker, a track and the number in a row).
     fn compact(self) -> bool {
-        matches!(self, Self::Corner | Self::Island)
+        matches!(self, Self::Corner | Self::Island | Self::Wide)
+    }
+
+    /// Where the speaker, the track and the number sit in a capsule layout: x of each and the widths of the
+    /// track and of the number.
+    fn row_layout(self) -> (f64, f64, f64, f64, f64) {
+        match self {
+            Self::Wide => (16.0, 48.0, 306.0, 364.0, 40.0),
+            Self::Corner | Self::Island => (
+                CORNER_ICON_X,
+                CORNER_TRACK_X,
+                CORNER_TRACK_WIDTH,
+                CORNER_READOUT_X,
+                CORNER_READOUT_WIDTH,
+            ),
+            _ => (ICON_X, TRACK_X, TRACK_WIDTH, READOUT_X, READOUT_WIDTH),
+        }
     }
 
     /// The size of the panel.
@@ -120,6 +218,9 @@ impl HudStyle {
             Self::Island => ISLAND_SIZE,
             Self::Side => SIDE_SIZE,
             Self::Tile => TILE_SIZE,
+            Self::Ring => RING_SIZE,
+            Self::Equalizer => EQ_SIZE,
+            Self::Wide => WIDE_SIZE,
             _ => NSSize::new(WIDTH, top_inset + ROW_HEIGHT),
         }
     }
@@ -127,9 +228,11 @@ impl HudStyle {
     /// The corner radius of the glass, which a capsule knows only once it has a height.
     fn radius(self, height: f64) -> f64 {
         match self {
-            Self::Corner | Self::Island => height / 2.0,
+            Self::Corner | Self::Island | Self::Wide => height / 2.0,
             Self::Side => SIDE_SIZE.width / 2.0,
             Self::Tile => 36.0,
+            Self::Ring => RING_SIZE.width / 2.0,
+            Self::Equalizer => 26.0,
             _ => CORNER_RADIUS,
         }
     }
@@ -265,6 +368,88 @@ fn draw_tile(size: NSSize, level: f64, muted: bool) {
     }
 }
 
+/// The speaker drawn `scale` times as large, centred on `at`.
+fn draw_speaker_scaled(at: NSPoint, scale: f64, level: f64, muted: bool) {
+    NSGraphicsContext::saveGraphicsState_class();
+    let place = objc2_foundation::NSAffineTransform::transform();
+    place.translateXBy_yBy(at.x, at.y);
+    place.scaleBy(scale);
+    {
+        use objc2_app_kit::NSAffineTransformNSAppKitAdditions as _;
+        place.concat();
+    }
+    draw_speaker(-11.0, 0.0, level, muted);
+    NSGraphicsContext::restoreGraphicsState_class();
+}
+
+fn draw_number(level: f64, size: f64, area: NSRect) {
+    // SAFETY: extern static weight constant.
+    let font =
+        NSFont::monospacedDigitSystemFontOfSize_weight(size, unsafe { NSFontWeightMedium });
+    let attrs = text_attributes(&font, &NSColor::whiteColor(), Fit::Clip, true);
+    draw_text(&format!("{:.0}", level * 100.0), area, &attrs);
+}
+
+/// The dial: the ring is the level, filling clockwise from the top; the speaker and the number sit inside.
+fn draw_ring(size: NSSize, level: f64, muted: bool) {
+    let centre = NSPoint::new(size.width / 2.0, size.height / 2.0);
+    let radius = size.width / 2.0 - 14.0;
+    let ring = |from: f64, to: f64, white: f64| {
+        let path = NSBezierPath::bezierPath();
+        path.appendBezierPathWithArcWithCenter_radius_startAngle_endAngle_clockwise(
+            centre, radius, from, to, true,
+        );
+        path.setLineWidth(RING_WIDTH);
+        path.setLineCapStyle(NSLineCapStyle::Round);
+        NSColor::colorWithWhite_alpha(1.0, white).setStroke();
+        path.stroke();
+    };
+    ring(90.0, -270.0, 0.25);
+    let shown = if muted { 0.0 } else { level.min(0.999) };
+    if shown > 0.0 {
+        ring(90.0, 90.0 - 360.0 * shown, 1.0);
+    }
+    draw_speaker_scaled(
+        NSPoint::new(centre.x, centre.y + 6.0),
+        1.5,
+        level,
+        muted,
+    );
+    if !muted {
+        draw_number(
+            level,
+            12.0,
+            NSRect::new(
+                NSPoint::new(0.0, centre.y - 30.0),
+                NSSize::new(size.width, 17.0),
+            ),
+        );
+    }
+}
+
+/// The meter: a staircase of bars, the speaker at its foot, the bars lit up to the level.
+fn draw_equalizer(size: NSSize, level: f64, muted: bool) {
+    draw_speaker(16.0, size.height / 2.0, level, muted);
+    let left = 52.0;
+    let gap = 3.0;
+    let width = (size.width - left - 18.0 - gap * (EQ_BARS as f64 - 1.0)) / EQ_BARS as f64;
+    let lit = if muted {
+        0
+    } else {
+        (level * EQ_BARS as f64).round() as usize
+    };
+    for i in 0..EQ_BARS {
+        let rise = i as f64 / (EQ_BARS as f64 - 1.0);
+        let height = 10.0 + rise * (size.height - 34.0);
+        let bar = NSRect::new(
+            NSPoint::new(left + i as f64 * (width + gap), 16.0),
+            NSSize::new(width, height),
+        );
+        NSColor::colorWithWhite_alpha(1.0, if i < lit { 1.0 } else { 0.25 }).setFill();
+        rounded(bar, width / 2.0).fill();
+    }
+}
+
 define_class!(
     // SAFETY: NSView allows subclassing; the ivars are only touched on the main thread and need no Drop.
     #[unsafe(super(NSView))]
@@ -320,19 +505,17 @@ define_class!(
                 draw_tile(bounds.size, level, muted);
                 return;
             }
+            if style == HudStyle::Ring {
+                draw_ring(bounds.size, level, muted);
+                return;
+            }
+            if style == HudStyle::Equalizer {
+                draw_equalizer(bounds.size, level, muted);
+                return;
+            }
             let middle = bounds.size.height / 2.0;
             let compact = style.compact();
-            let (icon_x, track_x, track_width, readout_x, readout_width) = if compact {
-                (
-                    CORNER_ICON_X,
-                    CORNER_TRACK_X,
-                    CORNER_TRACK_WIDTH,
-                    CORNER_READOUT_X,
-                    CORNER_READOUT_WIDTH,
-                )
-            } else {
-                (ICON_X, TRACK_X, TRACK_WIDTH, READOUT_X, READOUT_WIDTH)
-            };
+            let (icon_x, track_x, track_width, readout_x, readout_width) = style.row_layout();
             draw_speaker(icon_x, middle, level, muted);
 
             // The meter style has already drawn the level; the others get the thin track.
@@ -438,6 +621,7 @@ pub struct Hud {
     /// The glass the content sits on, for the styles that are glass.
     bed: RefCell<Option<Retained<NSGlassEffectView>>>,
     style: Cell<HudStyle>,
+    position: Cell<HudPosition>,
     /// Bumped by every show, so an older hide timer never closes a newer indicator.
     generation: Cell<u64>,
 }
@@ -461,6 +645,7 @@ impl Hud {
             view,
             bed: RefCell::default(),
             style: Cell::new(style),
+            position: Cell::new(HudPosition::Auto),
             generation: Cell::new(0),
         });
         hud.dress(style);
@@ -476,6 +661,11 @@ impl Hud {
         }
         self.view.ivars().style.set(style);
         self.dress(style);
+    }
+
+    /// Where a floating style goes; the styles that hang from the notch stay where they are.
+    pub fn set_position(&self, position: HudPosition) {
+        self.position.set(position);
     }
 
     fn dress(&self, style: HudStyle) {
@@ -535,7 +725,7 @@ impl Hud {
         let style = self.style.get();
         let size = style.size(geometry.top_inset());
         self.panel
-            .setFrame_display(frame_for(&geometry, style, size), true);
+            .setFrame_display(frame_for(&geometry, style, self.position.get(), size), true);
         self.panel.orderFrontRegardless();
 
         let generation = self.generation.get() + 1;
@@ -551,51 +741,31 @@ impl Hud {
     }
 }
 
-/// Where the panel goes: the styles that hang sit under the cutout at the top edge of the screen, and the
-/// capsule floats in the corner, below the menu bar.
-fn frame_for(geometry: &NotchGeometry, style: HudStyle, size: NSSize) -> NSRect {
+/// Where the panel goes: the styles that hang sit under the cutout at the top edge of the screen, and the ones
+/// that float go to the place the user chose, or to the one their style has by itself.
+fn frame_for(geometry: &NotchGeometry, style: HudStyle, position: HudPosition, size: NSSize) -> NSRect {
     if style.hangs() {
         return geometry.frame(size.width, size.height);
     }
     let screen = geometry.screen;
+    let margin = if style == HudStyle::Side {
+        SIDE_MARGIN
+    } else {
+        CORNER_MARGIN
+    };
     let top = geometry.top_inset().max(24.0) + CORNER_MARGIN;
-    match style {
-        HudStyle::Island => {
-            return NSRect::new(
-                NSPoint::new(
-                    screen.origin.x + (screen.size.width - size.width) / 2.0,
-                    screen.origin.y + screen.size.height - top - size.height,
-                ),
-                size,
-            );
-        }
-        HudStyle::Side => {
-            return NSRect::new(
-                NSPoint::new(
-                    screen.origin.x + screen.size.width - size.width - SIDE_MARGIN,
-                    screen.origin.y + (screen.size.height - size.height) / 2.0,
-                ),
-                size,
-            );
-        }
-        HudStyle::Tile => {
-            return NSRect::new(
-                NSPoint::new(
-                    screen.origin.x + (screen.size.width - size.width) / 2.0,
-                    screen.origin.y + TILE_FLOOR,
-                ),
-                size,
-            );
-        }
-        _ => {}
-    }
-    NSRect::new(
-        NSPoint::new(
-            screen.origin.x + screen.size.width - size.width - CORNER_MARGIN,
-            screen.origin.y + screen.size.height - top - size.height,
-        ),
-        size,
-    )
+    let (column, row) = position.cell(style);
+    let x = match column {
+        -1 => screen.origin.x + margin,
+        0 => screen.origin.x + (screen.size.width - size.width) / 2.0,
+        _ => screen.origin.x + screen.size.width - size.width - margin,
+    };
+    let y = match row {
+        -1 => screen.origin.y + screen.size.height - top - size.height,
+        0 => screen.origin.y + (screen.size.height - size.height) / 2.0,
+        _ => screen.origin.y + BOTTOM_FLOOR,
+    };
+    NSRect::new(NSPoint::new(x, y), size)
 }
 
 /// Shows the indicator for a new volume from any thread, such as the event tap's.
@@ -655,7 +825,7 @@ mod tests {
         };
         for style in [HudStyle::Notch, HudStyle::Glass, HudStyle::Bar] {
             let size = style.size(geometry.top_inset());
-            let frame = frame_for(&geometry, style, size);
+            let frame = frame_for(&geometry, style, HudPosition::Auto, size);
             // Centred on the screen and joined to its top edge.
             assert_eq!(frame.origin.x + size.width / 2.0, 720.0, "{style:?}");
             assert_eq!(frame.origin.y + size.height, 900.0, "{style:?}");
@@ -663,7 +833,7 @@ mod tests {
             assert!(frame.origin.y >= geometry.notch.height, "{style:?}");
         }
         let size = HudStyle::Corner.size(geometry.top_inset());
-        let frame = frame_for(&geometry, HudStyle::Corner, size);
+        let frame = frame_for(&geometry, HudStyle::Corner, HudPosition::Auto, size);
         // In from the right edge, below the menu bar: floating, joined to no edge.
         assert_eq!(frame.origin.x + size.width, 1440.0 - CORNER_MARGIN);
         assert!(frame.origin.y + size.height <= 900.0 - 24.0);
@@ -676,17 +846,44 @@ mod tests {
         assert!(!HudStyle::Glass.paints_shape() && !HudStyle::Corner.paints_shape());
         // The new ones float: the island is centred under the menu bar, the side slider is on the right edge at
         // mid height, and the tile is centred above the bottom.
-        let island = frame_for(&geometry, HudStyle::Island, HudStyle::Island.size(0.0));
+        let island = frame_for(&geometry, HudStyle::Island, HudPosition::Auto, HudStyle::Island.size(0.0));
         assert_eq!(island.origin.x + island.size.width / 2.0, 720.0);
         assert!(island.origin.y + island.size.height <= 900.0 - 24.0);
-        let side = frame_for(&geometry, HudStyle::Side, HudStyle::Side.size(0.0));
+        let side = frame_for(&geometry, HudStyle::Side, HudPosition::Auto, HudStyle::Side.size(0.0));
         assert_eq!(side.origin.x + side.size.width, 1440.0 - SIDE_MARGIN);
         assert_eq!(side.origin.y + side.size.height / 2.0, 450.0);
-        let tile = frame_for(&geometry, HudStyle::Tile, HudStyle::Tile.size(0.0));
+        let tile = frame_for(&geometry, HudStyle::Tile, HudPosition::Auto, HudStyle::Tile.size(0.0));
         assert_eq!(tile.origin.x + tile.size.width / 2.0, 720.0);
         assert!(!HudStyle::Island.hangs() && !HudStyle::Side.hangs() && !HudStyle::Tile.hangs());
-        for word in ["island", "side", "tile"] {
+        for word in ["island", "side", "tile", "ring", "equalizer", "wide"] {
             assert!(HudStyle::named(word).glass().is_some(), "{word}");
+            assert!(HudStyle::named(word).floats(), "{word}");
         }
+    }
+
+    #[test]
+    fn a_chosen_place_moves_a_floating_style_and_leaves_a_hanging_one_alone() {
+        let geometry = NotchGeometry {
+            screen: NSRect::new(NSPoint::new(0.0, 0.0), NSSize::new(1440.0, 900.0)),
+            notch: NSSize::new(200.0, 32.0),
+            hardware: true,
+        };
+        let ring = HudStyle::Ring.size(0.0);
+        let at = |word: &str| frame_for(&geometry, HudStyle::Ring, HudPosition::named(word), ring);
+        // By itself the dial is in the middle of the screen.
+        assert_eq!(frame_for(&geometry, HudStyle::Ring, HudPosition::Auto, ring), at("center"));
+        let left = at("bottom-left");
+        assert_eq!((left.origin.x, left.origin.y), (CORNER_MARGIN, BOTTOM_FLOOR));
+        let right = at("top-right");
+        assert_eq!(right.origin.x + ring.width, 1440.0 - CORNER_MARGIN);
+        assert!(right.origin.y + ring.height <= 900.0 - 24.0);
+        assert_eq!(at("left").origin.y + ring.height / 2.0, 450.0);
+        // The hang from the notch does not move.
+        let notch = HudStyle::Notch.size(geometry.top_inset());
+        assert_eq!(
+            frame_for(&geometry, HudStyle::Notch, HudPosition::BottomLeft, notch),
+            frame_for(&geometry, HudStyle::Notch, HudPosition::Auto, notch)
+        );
+        assert_eq!(HudPosition::named("nowhere"), HudPosition::Auto);
     }
 }

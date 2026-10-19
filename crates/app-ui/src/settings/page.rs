@@ -19,6 +19,7 @@ const FEATURE_SCRIPTS: &[&str] = &[
     include_str!("../../web/features/snap.js"),
     include_str!("../../web/features/pin.js"),
     include_str!("../../web/features/cursor.js"),
+    include_str!("../../web/features/musicwidget.js"),
     include_str!("../../web/features/menubar.js"),
     include_str!("../../web/features/stack.js"),
     include_str!("../../web/features/mascot.js"),
@@ -35,6 +36,7 @@ const FEATURE_STYLES: &[&str] = &[
     include_str!("../../web/features/snap.css"),
     include_str!("../../web/features/pin.css"),
     include_str!("../../web/features/cursor.css"),
+    include_str!("../../web/features/musicwidget.css"),
     include_str!("../../web/features/menubar.css"),
     include_str!("../../web/features/stack.css"),
     include_str!("../../web/features/mascot.css"),
@@ -67,6 +69,10 @@ const FEATURE_FIXTURES: &[(&str, &str)] = &[
     (
         "cursor",
         include_str!("../../web/features/cursor.fixture.json"),
+    ),
+    (
+        "musicwidget",
+        include_str!("../../web/features/musicwidget.fixture.json"),
     ),
     (
         "menubar",
@@ -105,6 +111,7 @@ const SYMBOLS: &[&str] = &[
     "character.bubble",
     "pin",
     "cursorarrow.rays",
+    "music.note",
     "camera.viewfinder",
     "eyedropper.halffull",
     "calendar",

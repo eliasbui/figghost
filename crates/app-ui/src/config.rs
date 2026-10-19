@@ -99,8 +99,11 @@ pub struct NotchConfig {
     pub shortcut: String,
     /// The look of the volume indicator: `notch` (black, under the cutout), `glass` (the same shape in Liquid
     /// Glass), `corner` (a capsule in the corner), `bar` (the level filling the shape), `island` (a capsule at the
-    /// middle of the top), `side` (a slider on the right edge) or `tile` (a large tile low on the screen).
+    /// middle of the top), `side` (a slider on the right edge), `tile` (a large tile low on the screen), `ring`
+    /// (a round dial), `equalizer` (bars that light up) or `wide` (a long thin capsule).
     pub hud: String,
+    /// Where a floating indicator goes: `auto` (the place of its style) or one of the nine places of the screen.
+    pub hud_position: String,
 }
 
 impl Default for NotchConfig {
@@ -128,6 +131,7 @@ impl Default for NotchConfig {
             waveform: "live".into(),
             shortcut: String::new(),
             hud: "notch".into(),
+            hud_position: "auto".into(),
         }
     }
 }
@@ -222,8 +226,13 @@ impl From<serde_json::Value> for NotchConfig {
             shortcut: v["shortcut"].as_str().unwrap_or("").trim().to_owned(),
             hud: word(
                 &v["hud"],
-                &["notch", "glass", "corner", "bar", "island", "side", "tile"],
+                &["notch", "glass", "corner", "bar", "island", "side", "tile", "ring", "equalizer", "wide"],
                 &d.hud,
+            ),
+            hud_position: word(
+                &v["hud_position"],
+                &["auto", "top-left", "top", "top-right", "left", "center", "right", "bottom-left", "bottom", "bottom-right"],
+                &d.hud_position,
             ),
         }
     }
@@ -275,6 +284,10 @@ impl NotchConfig {
             },
             pages: self.pages.clone(),
         }
+    }
+
+    pub fn hud_position(&self) -> macos_sys::hud::HudPosition {
+        macos_sys::hud::HudPosition::named(&self.hud_position)
     }
 
     /// What the volume indicator needs to know.
@@ -372,6 +385,7 @@ pub struct Config {
     pub translate: crate::features::translate::Config,
     pub pin: crate::features::pin::Config,
     pub cursor: crate::features::cursor::Config,
+    pub musicwidget: crate::features::musicwidget::Config,
     /// Replace the system volume indicator with one in the notch. Needs Accessibility access.
     pub volume_hud: bool,
     /// Unpinned items kept in history.
@@ -414,6 +428,7 @@ impl Default for Config {
             translate: crate::features::translate::Config::default(),
             pin: crate::features::pin::Config::default(),
             cursor: crate::features::cursor::Config::default(),
+            musicwidget: crate::features::musicwidget::Config::default(),
             volume_hud: false,
             history_limit: 500,
             ignored_apps: Vec::new(),
@@ -938,6 +953,9 @@ mod tests {
             ("island", HudStyle::Island),
             ("side", HudStyle::Side),
             ("tile", HudStyle::Tile),
+            ("ring", HudStyle::Ring),
+            ("equalizer", HudStyle::Equalizer),
+            ("wide", HudStyle::Wide),
         ] {
             notch.hud = word.into();
             assert_eq!(notch.hud_style(), style, "{word}");
@@ -947,6 +965,10 @@ mod tests {
         notch.hud = "bolt".into();
         assert_eq!(notch.style().material, Material::Glass);
         assert_eq!(notch.hud_style(), HudStyle::Notch);
+        notch.hud_position = "bottom-left".into();
+        assert_eq!(notch.hud_position(), macos_sys::hud::HudPosition::BottomLeft);
+        notch.hud_position = "somewhere".into();
+        assert_eq!(notch.hud_position(), macos_sys::hud::HudPosition::Auto);
     }
 
     #[test]

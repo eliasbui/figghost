@@ -1,0 +1,175 @@
+<!doctype html>
+<html lang="en">
+<head>
+<meta charset="utf-8">
+<meta http-equiv="Content-Security-Policy" content="default-src 'none'; style-src 'unsafe-inline'; script-src 'unsafe-inline'; img-src data:">
+<title>Figghost</title>
+<style>
+:root { --font: -apple-system, BlinkMacSystemFont, "SF Pro Text", system-ui, sans-serif; --ink: #fff; --ink-2: rgba(255,255,255,.66); --ink-3: rgba(255,255,255,.36); --track: rgba(255,255,255,.26); --r: 26px; }
+* { box-sizing: border-box; }
+html, body { margin: 0; height: 100%; background: transparent; }
+body { position: relative; overflow: hidden; border-radius: var(--r); font: 13px/1.3 var(--font); color: var(--ink); -webkit-font-smoothing: antialiased; -webkit-user-select: none; user-select: none; cursor: default; }
+button { font: inherit; color: inherit; border: 0; background: none; padding: 0; cursor: default; }
+#grip { position: absolute; right: 4px; bottom: 4px; z-index: 3; width: 18px; height: 18px; cursor: nwse-resize; opacity: 0; transition: opacity .15s; background: linear-gradient(135deg, transparent 52%, var(--ink-3) 52%, var(--ink-3) 60%, transparent 60%, transparent 72%, var(--ink-3) 72%, var(--ink-3) 80%, transparent 80%); }
+body:hover #grip { opacity: 1; }
+/* The blurred cover behind everything: light that takes the colour of the music. */
+#amb { position: absolute; inset: -30px; z-index: 0; background-size: cover; background-position: center; filter: blur(34px) saturate(1.7); opacity: 0; transition: opacity .6s; pointer-events: none; }
+body.ambient #amb { opacity: .55; }
+#root { position: relative; z-index: 1; width: 100%; height: 100%; padding: 14px; display: flex; pointer-events: none; }
+#root > * { pointer-events: auto; }
+.art { position: relative; flex: none; aspect-ratio: 1; border-radius: 14px; overflow: hidden; background: rgba(255,255,255,.14) center / cover no-repeat; box-shadow: 0 6px 18px rgba(0,0,0,.28), inset 0 0 0 .5px rgba(255,255,255,.22); display: grid; place-items: center; color: var(--ink-3); }
+.art svg { width: 34%; height: 34%; }
+.title { font-weight: 650; font-size: 15px; letter-spacing: -.01em; white-space: nowrap; overflow: hidden; text-overflow: ellipsis; }
+.sub { color: var(--ink-2); font-size: 12px; white-space: nowrap; overflow: hidden; text-overflow: ellipsis; }
+.txt { min-width: 0; }
+.ctl { display: flex; align-items: center; gap: 4px; }
+.b { display: grid; place-items: center; width: 34px; height: 34px; border-radius: 50%; color: var(--ink); transition: background .12s, transform .12s; }
+.b:hover { background: rgba(255,255,255,.16); }
+.b:active { transform: scale(.9); }
+.b svg { width: 18px; height: 18px; fill: currentColor; }
+.b.play { width: 42px; height: 42px; background: rgba(255,255,255,.2); }
+.b.play:hover { background: rgba(255,255,255,.3); }
+.b.play svg { width: 22px; height: 22px; }
+.bar { position: relative; height: 18px; display: flex; align-items: center; }
+.bar i { display: block; width: 100%; height: 4px; border-radius: 2px; background: var(--track); overflow: hidden; }
+.bar i b { display: block; height: 100%; width: 0; border-radius: 2px; background: #fff; }
+.bar:hover i { height: 6px; }
+.times { display: flex; justify-content: space-between; font-size: 10.5px; color: var(--ink-3); font-variant-numeric: tabular-nums; margin-top: -1px; }
+.pause-only, .play-only { display: none; }
+body.playing .pause-only { display: block; } body:not(.playing) .play-only { display: block; }
+.empty { margin: auto; text-align: center; color: var(--ink-2); }
+
+/* card: the cover on the left, the song and the controls on the right */
+body.s-card #root { gap: 14px; align-items: center; }
+body.s-card .art { height: 100%; max-height: 104px; }
+body.s-card .main { flex: 1; min-width: 0; display: flex; flex-direction: column; justify-content: center; gap: 2px; }
+body.s-card .ctl { margin: 2px 0 0 -6px; }
+body.s-card .bar, body.s-card .times { width: 100%; }
+
+/* cover: a large picture, the words laid over its foot */
+body.s-cover #root { padding: 0; }
+body.s-cover .art { width: 100%; height: 100%; aspect-ratio: auto; border-radius: var(--r); box-shadow: none; }
+body.s-cover .over { position: absolute; left: 0; right: 0; bottom: 0; padding: 40px 16px 12px; background: linear-gradient(transparent, rgba(0,0,0,.62)); border-radius: 0 0 var(--r) var(--r); display: flex; flex-direction: column; gap: 2px; }
+body.s-cover .ctl { justify-content: center; opacity: 0; transform: translateY(6px); transition: opacity .18s, transform .18s; margin-top: 2px; }
+body.s-cover:hover .ctl { opacity: 1; transform: none; }
+body.s-cover .bar { margin-top: 4px; }
+body.s-cover .times { display: none; }
+
+/* bar: one slim row */
+body.s-bar #root { padding: 8px 14px 8px 8px; gap: 10px; align-items: center; }
+body.s-bar .art { height: 100%; border-radius: 50%; }
+body.s-bar .txt { flex: 1; }
+body.s-bar .title { font-size: 13px; }
+body.s-bar .b { width: 30px; height: 30px; } body.s-bar .b.play { width: 34px; height: 34px; }
+body.s-bar .bar, body.s-bar .times { display: none; }
+body.s-bar .ring { display: block; }
+
+/* vinyl: a record that turns while the music plays */
+body.s-vinyl #root { flex-direction: column; align-items: center; gap: 10px; padding: 18px 16px 14px; }
+body.s-vinyl .art { width: 62%; height: auto; border-radius: 50%; box-shadow: 0 10px 26px rgba(0,0,0,.4), inset 0 0 0 .5px rgba(255,255,255,.2); animation: spin 9s linear infinite; animation-play-state: paused; }
+body.s-vinyl.playing .art { animation-play-state: running; }
+body.s-vinyl .art::after { content: ""; position: absolute; left: 50%; top: 50%; width: 16%; height: 16%; transform: translate(-50%, -50%); border-radius: 50%; background: #0c0c10; box-shadow: 0 0 0 3px rgba(255,255,255,.16); }
+body.s-vinyl .txt { text-align: center; width: 100%; }
+body.s-vinyl .bar, body.s-vinyl .times { width: 100%; }
+body.s-vinyl .ctl { margin-top: auto; }
+@keyframes spin { to { transform: rotate(360deg); } }
+
+/* minimal: the song and one button */
+body.s-minimal #root { align-items: center; gap: 12px; padding: 12px 16px; }
+body.s-minimal .art, body.s-minimal .bar, body.s-minimal .times, body.s-minimal .ctl .skip { display: none; }
+body.s-minimal .txt { flex: 1; }
+body.s-minimal .title { font-size: 16px; }
+@media (prefers-reduced-motion: reduce) { * { animation: none !important; transition: none !important; } }
+</style>
+</head>
+<body class="s-card">
+<div id="amb"></div>
+<div id="root"></div>
+<div id="grip" aria-hidden="true"></div>
+<script>
+const $ = (s) => document.querySelector(s);
+function send(m) { window.fig.send(m); }
+const ICON = {
+  prev: '<svg viewBox="0 0 24 24"><path d="M6 5h2v14H6zM20 5v14L9.5 12z"/></svg>',
+  next: '<svg viewBox="0 0 24 24"><path d="M16 5h2v14h-2zM4 5v14l10.5-7z"/></svg>',
+  play: '<svg class="play-only" viewBox="0 0 24 24"><path d="M7 4.5v15L20 12z"/></svg>',
+  pause: '<svg class="pause-only" viewBox="0 0 24 24"><path d="M6 4h4v16H6zM14 4h4v16h-4z"/></svg>',
+  note: '<svg viewBox="0 0 24 24" fill="currentColor"><path d="M9 3v11.3A3.5 3.5 0 1 0 11 17.5V8h7V3z"/></svg>',
+};
+function h(tag, cls, ...kids) { const el = document.createElement(tag); if (cls) el.className = cls; for (const k of kids.flat()) if (k != null) el.append(k); return el; }
+function btn(cls, html, name, label) { const b = h('button', 'b ' + cls); b.innerHTML = html; b.setAttribute('aria-label', label); b.onclick = () => send({ t: 'cmd', name }); return b; }
+const clock = (ms) => { const s = Math.max(0, Math.floor(ms / 1000)); return Math.floor(s / 60) + ':' + String(s % 60).padStart(2, '0'); };
+
+let st = { style: 'card', ambient: true, labels: {} }, tr = null, art = null, at = 0, els = {};
+
+function build() {
+  const root = $('#root');
+  document.body.className = 's-' + st.style + (st.ambient ? ' ambient' : '') + (tr && tr.playing ? ' playing' : '');
+  if (!tr) { root.replaceChildren(h('div', 'empty', st.labels.idle || 'Nothing is playing')); els = {}; return; }
+  const cover = h('div', 'art'); cover.innerHTML = ICON.note;
+  const title = h('div', 'title'), artist = h('div', 'sub');
+  const txt = h('div', 'txt', title, artist);
+  const fill = h('b'), bar = h('div', 'bar', h('i', '', fill));
+  bar.onclick = (e) => { if (!tr || !tr.dur) return; const r = bar.getBoundingClientRect(); send({ t: 'seek', ms: Math.round(tr.dur * Math.min(1, Math.max(0, (e.clientX - r.left) / r.width))) }); };
+  const left = h('span'), right = h('span'), times = h('div', 'times', left, right);
+  const skip = (b) => { b.classList.add('skip'); return b; };
+  const play = btn('play', ICON.play + ICON.pause, 'play', st.labels.play || 'Play or pause');
+  const ctl = h('div', 'ctl', skip(btn('', ICON.prev, 'prev', st.labels.prev || 'Previous')), play, skip(btn('', ICON.next, 'next', st.labels.next || 'Next')));
+  els = { cover, title, artist, fill, left, right };
+  if (st.style === 'cover') root.replaceChildren(cover, h('div', 'over', txt, bar, ctl));
+  else if (st.style === 'bar') root.replaceChildren(cover, txt, ctl);
+  else if (st.style === 'minimal') root.replaceChildren(txt, ctl);
+  else if (st.style === 'vinyl') root.replaceChildren(cover, txt, bar, times, ctl);
+  else root.replaceChildren(cover, h('div', 'main', txt, bar, times, ctl));
+  paint();
+}
+
+function paint() {
+  if (!tr || !els.title) return;
+  els.title.textContent = tr.title || '';
+  els.artist.textContent = [tr.artist, tr.album].filter(Boolean).join(' - ') || tr.app || '';
+  if (art) { els.cover.style.backgroundImage = `url("${art}")`; els.cover.innerHTML = ''; $('#amb').style.backgroundImage = `url("${art}")`; }
+  else { els.cover.style.backgroundImage = ''; els.cover.innerHTML = ICON.note; $('#amb').style.backgroundImage = ''; }
+  tick();
+}
+
+function tick() {
+  if (!tr || !els.fill) return;
+  const now = tr.pos + (tr.playing ? Date.now() - at : 0);
+  const shown = tr.dur ? Math.min(now, tr.dur) : now;
+  els.fill.style.width = (tr.dur ? (100 * shown / tr.dur) : 0) + '%';
+  els.left.textContent = clock(shown);
+  els.right.textContent = tr.dur ? clock(tr.dur) : '';
+}
+setInterval(tick, 250);
+
+// A press on the empty part of the widget moves it.
+document.addEventListener('mousedown', (e) => { if (!e.target.closest('button, .bar, #grip')) window.fig.drag(); });
+
+// The grip in the corner resizes it: the screen's own coordinates keep steady while the window moves under the pointer.
+const grip = $('#grip');
+let pull = null, queued = false;
+grip.addEventListener('pointerdown', (e) => { grip.setPointerCapture(e.pointerId); pull = { x: e.screenX, y: e.screenY, w: window.innerWidth, h: window.innerHeight }; e.preventDefault(); });
+grip.addEventListener('pointermove', (e) => {
+  if (!pull || queued) return;
+  queued = true;
+  requestAnimationFrame(() => { queued = false; if (pull) send({ t: 'grip', w: pull.w + e.screenX - pull.x, h: pull.h + e.screenY - pull.y }); });
+});
+grip.addEventListener('pointerup', () => { pull = null; });
+
+window.__fig = { recv(m) {
+  if (m.t !== 'state') return;
+  const same = m.style === st.style && !!m.ambient === !!st.ambient && (!!m.track === !!tr);
+  st = { style: m.style, ambient: m.ambient, labels: m.labels || st.labels };
+  if (m.radius) document.documentElement.style.setProperty('--r', m.radius + 'px');
+  tr = m.track;
+  at = Date.now();
+  if ('art' in m) art = m.art;
+  if (!tr) art = null;
+  if (!same) build();
+  else { document.body.classList.toggle('playing', !!(tr && tr.playing)); paint(); }
+} };
+window.addEventListener('DOMContentLoaded', () => { build(); send({ t: 'ready' }); });
+</script>
+</body>
+</html>
