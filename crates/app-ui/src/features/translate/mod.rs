@@ -22,6 +22,7 @@ use macos_sys::{
     pasteboard::{Pasteboard, Write},
     permissions,
     status_item::{Entry, Item},
+    notch::Material,
     translate_ui::TranslatePopup,
 };
 use serde::{Deserialize, Serialize};
@@ -44,6 +45,8 @@ pub struct Config {
     pub shortcut: String,
     /// `auto` is the language of the app when there is a translation into it, else English.
     pub translate_to: String,
+    /// The glass of the window: `glass`, `clear`, `ink` or `accent`.
+    pub material: String,
 }
 
 impl Default for Config {
@@ -52,6 +55,7 @@ impl Default for Config {
             enabled: false,
             shortcut: DEFAULT_SHORTCUT.into(),
             translate_to: "auto".into(),
+            material: "glass".into(),
         }
     }
 }
@@ -66,6 +70,9 @@ impl Config {
         if self.translate_to != "auto" && !translate::is_supported(&self.translate_to) {
             self.translate_to = defaults.translate_to;
         }
+        if material_of(&self.material).is_none() {
+            self.material = defaults.material;
+        }
         self
     }
 
@@ -79,6 +86,16 @@ impl Config {
             "en"
         }
     }
+}
+
+pub(crate) fn material_of(name: &str) -> Option<Material> {
+    Some(match name {
+        "glass" => Material::Glass,
+        "clear" => Material::ClearGlass,
+        "ink" => Material::Ink,
+        "accent" => Material::Accent,
+        _ => return None,
+    })
 }
 
 fn language_name(code: &str) -> &'static str {
@@ -185,6 +202,8 @@ impl Feature {
     /// Applies the settings: registers or releases the shortcut.
     pub fn configure(&self, config: &Config) -> Result<(), Fault> {
         *self.config.borrow_mut() = config.clone();
+        self.popup
+            .set_material(material_of(&config.material).unwrap_or(Material::Glass));
         self.hotkey.borrow_mut().take();
         if !config.enabled {
             self.popup.hide();

@@ -12,6 +12,7 @@
     'translate.access.open': 'Open settings',
     'translate.try.title': 'Try it', 'translate.try.desc': 'Translates a sample sentence next to the pointer, without selecting anything.', 'translate.try.button': 'Try it',
     'sec.translate.output': 'Output',
+    'translate.style.title': 'Window style', 'translate.style.desc': 'The glass the translation window is made of.',
     'translate.lang.title': 'Translate into', 'translate.lang.desc': 'The language that translations go into. The language of the text is detected for you. Up to 450 characters at a time.', 'translate.lang.auto': 'Same as the app',
   },
   vi: {
@@ -24,6 +25,7 @@
     'translate.access.open': 'Mở cài đặt',
     'translate.try.title': 'Thử ngay', 'translate.try.desc': 'Dịch một câu mẫu cạnh con trỏ, không cần chọn gì.', 'translate.try.button': 'Thử ngay',
     'sec.translate.output': 'Đầu ra',
+    'translate.style.title': 'Kiểu cửa sổ', 'translate.style.desc': 'Chất liệu kính của cửa sổ bản dịch.',
     'translate.lang.title': 'Dịch sang', 'translate.lang.desc': 'Ngôn ngữ mà bản dịch hướng tới. Ngôn ngữ của văn bản được tự nhận biết. Tối đa 450 ký tự mỗi lần.', 'translate.lang.auto': 'Theo ứng dụng',
   },
   build() {
@@ -42,7 +44,9 @@
         row(t('translate.access.title'), t('translate.access.desc'), h('div', { class: 'row-control' }, accessPill, button(t('translate.access.open'), () => send({ t: 'action', name: 'open_accessibility' }), { small: true }))),
         row(t('translate.try.title'), t('translate.try.desc'), button(t('translate.try.button'), () => send({ t: 'action', name: 'translate_try' }), { small: true }), { when: () => S.translate.enabled })),
       sectionTitle(t('sec.translate.output')),
-      card(row(t('translate.lang.title'), t('translate.lang.desc'), language, { when: () => S.translate.enabled })),
+      card(row(t('translate.lang.title'), t('translate.lang.desc'), language),
+        selectRow({ path: 'translate.material', title: t('translate.style.title'), desc: t('translate.style.desc'),
+          options: () => ['glass', 'clear', 'ink', 'accent'].map((v) => ({ value: v, label: t('notch.material.' + v) })) })),
     ];
   },
   selftest({ expect, go, sent, S }) {

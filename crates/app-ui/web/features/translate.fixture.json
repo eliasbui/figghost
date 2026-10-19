@@ -2,6 +2,7 @@
   "enabled": true,
   "shortcut": "ctrl+opt+cmd+t",
   "translate_to": "auto",
+  "material": "glass",
   "languages": [{ "code": "en", "name": "English" }, { "code": "vi", "name": "Tiếng Việt" }],
   "accessibility": true
 }

@@ -25,7 +25,12 @@ use objc2_app_kit::{
 use objc2_foundation::{
     NSNotification, NSNotificationCenter, NSObjectProtocol, NSPoint, NSRect, NSSize,
 };
-use std::{cell::RefCell, ptr::NonNull, rc::Rc, time::Instant};
+use std::{
+    cell::{Cell, RefCell},
+    ptr::NonNull,
+    rc::Rc,
+    time::Instant,
+};
 
 const WIDTH: f64 = 380.0;
 const PAD: f64 = 20.0;
@@ -288,6 +293,7 @@ pub struct TranslatePopup {
     /// keyboard never learns that the person moved on.
     outside: MonitorSlot,
     timer: Rc<RefCell<Option<Timer>>>,
+    material: Cell<Material>,
 }
 
 impl Drop for TranslatePopup {
@@ -360,6 +366,7 @@ impl TranslatePopup {
             resign,
             outside: Rc::default(),
             timer: Rc::default(),
+            material: Cell::new(Material::Glass),
         };
         this.dress();
         this
@@ -373,7 +380,7 @@ impl TranslatePopup {
         let frame = self.panel.frame();
         let size = NSRect::new(NSPoint::ZERO, frame.size);
         let solid = options.reduce_transparency || options.increase_contrast;
-        let glass = glass_tint(Material::Glass)
+        let glass = glass_tint(self.material.get())
             .filter(|_| !solid && AnyClass::get(c"NSGlassEffectView").is_some());
         if let Some((look, tint)) = glass {
             let glass = NSGlassEffectView::initWithFrame(self.mtm.alloc(), size);
@@ -397,7 +404,7 @@ impl TranslatePopup {
             plain
         } else {
             let effect = NSVisualEffectView::initWithFrame(self.mtm.alloc(), size);
-            effect.setMaterial(vibrancy_of(Material::Ink));
+            effect.setMaterial(vibrancy_of(self.material.get()));
             effect.setBlendingMode(NSVisualEffectBlendingMode::BehindWindow);
             effect.setState(NSVisualEffectState::Active);
             effect.setWantsLayer(true);
@@ -440,6 +447,15 @@ impl TranslatePopup {
             &on_click,
         );
         *self.outside.borrow_mut() = token;
+    }
+
+    /// The glass the window is made of from the next time it opens; a material that is not glass stays Glass.
+    pub fn set_material(&self, material: Material) {
+        self.material.set(if glass_tint(material).is_some() {
+            material
+        } else {
+            Material::Glass
+        });
     }
 
     pub fn is_visible(&self) -> bool {

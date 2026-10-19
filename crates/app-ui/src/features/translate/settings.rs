@@ -19,6 +19,7 @@ pub fn state(config: &Config, runtime: &Value) -> Value {
         "enabled": config.enabled,
         "shortcut": config.shortcut,
         "translate_to": config.translate_to,
+        "material": config.material,
         "languages": languages,
         "accessibility": runtime.get("accessibility").and_then(Value::as_bool).unwrap_or(false),
     })
@@ -37,6 +38,13 @@ pub fn set(config: &mut Config, path: &str, value: &Value) -> Option<Result<(), 
                 Ok(())
             }
             _ => Err(invalid("an unknown language")),
+        },
+        "material" => match value.as_str() {
+            Some(name) if super::material_of(name).is_some() => {
+                config.material = name.to_owned();
+                Ok(())
+            }
+            _ => Err(invalid("an unknown material")),
         },
         _ => return None,
     })
@@ -108,6 +116,7 @@ mod tests {
         let config = Config {
             shortcut: "nonsense".into(),
             translate_to: "klingon".into(),
+            material: "wood".into(),
             ..Config::default()
         }
         .sanitized();

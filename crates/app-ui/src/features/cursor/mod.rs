@@ -10,6 +10,7 @@ use super::{AttachEnv, mascot::Character};
 use crate::{i18n::Language, settings::model::Fault};
 use macos_sys::{
     MainThreadMarker,
+    app::{self, Timer},
     cursor_ui::{self, Frames, Kind},
 };
 use serde::{Deserialize, Serialize};
@@ -17,7 +18,7 @@ use serde_json::{Value, json};
 use std::{
     cell::{Cell, RefCell},
     path::Path,
-    rc::Rc,
+    rc::{Rc, Weak},
 };
 
 pub mod settings;
@@ -29,6 +30,9 @@ pub const SIZE_RANGE: (f64, f64) = (16.0, 96.0);
 pub const SPEED_RANGE: (f64, f64) = (0.25, 3.0);
 /// Where the point that clicks is on a picture of the user's: at its top left, as on an arrow, or in the middle.
 pub const TIPS: [&str; 2] = ["top", "centre"];
+/// The window server drops a registered cursor after a while (about ten seconds, and when the front app or the
+/// display changes), so the cursors are registered again this often while the feature is on.
+const REAPPLY_SECONDS: f64 = 3.0;
 /// A picture file larger than this is refused (the system also refuses very large pictures).
 const MAX_FILE_BYTES: u64 = 16 << 20;
 
@@ -156,17 +160,21 @@ pub struct Feature {
     applied: Cell<bool>,
     /// The file of the `custom` theme could not be read.
     unreadable: Cell<bool>,
+    refresh: RefCell<Option<Timer>>,
+    me: Weak<Feature>,
 }
 
 /// Starts the feature; the cursors are replaced when it is on.
 pub fn attach(env: &AttachEnv) -> Option<Rc<Feature>> {
     let config = env.config.cursor.clone().sanitized();
-    let feature = Rc::new(Feature {
+    let feature = Rc::new_cyclic(|me| Feature {
         mtm: env.mtm,
         config: RefCell::new(Config::default()),
         pictures: RefCell::new(None),
         applied: Cell::new(false),
         unreadable: Cell::new(false),
+        refresh: RefCell::new(None),
+        me: me.clone(),
     });
     if let Err(fault) = feature.configure(&config) {
         eprintln!("cursor: {}", fault.detail);
@@ -199,9 +207,40 @@ impl Feature {
                 cursor_ui::restore();
             }
             self.applied.set(false);
+            self.refresh.take();
             return Ok(());
         }
-        let result = self.picture(config).and_then(|frames| {
+        let result = self.install(config);
+        self.applied.set(result.is_ok());
+        if result.is_err() && was_on {
+            cursor_ui::restore();
+        }
+        if result.is_ok() {
+            self.keep_applied();
+        } else {
+            self.refresh.take();
+        }
+        result
+    }
+
+    /// Registers the cursors again every few seconds, for as long as the feature is on and they were accepted.
+    fn keep_applied(&self) {
+        if self.refresh.borrow().is_some() {
+            return;
+        }
+        let me = self.me.clone();
+        *self.refresh.borrow_mut() = Some(app::every(REAPPLY_SECONDS, move || {
+            if let Some(feature) = me.upgrade() {
+                let config = feature.config.borrow().clone();
+                if config.enabled {
+                    let _ = feature.install(&config);
+                }
+            }
+        }));
+    }
+
+    fn install(&self, config: &Config) -> Result<(), Fault> {
+        self.picture(config).and_then(|frames| {
             let shape = play(&config.theme, &config.tip, frames.len());
             let seconds = |base: f64| base / config.speed;
             let arrow = cursor_ui::apply(
@@ -225,12 +264,7 @@ impl Feature {
             } else {
                 Err(fault("the system refused to change the cursor"))
             }
-        });
-        self.applied.set(result.is_ok());
-        if result.is_err() && was_on {
-            cursor_ui::restore();
-        }
-        result
+        })
     }
 
     /// The pictures the config asks for, decoded now or kept from the last time.
