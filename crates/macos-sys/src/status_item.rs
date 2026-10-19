@@ -227,52 +227,88 @@ fn fill(
 
 /// The size of the menu bar icon in points: 18 is the height the menu bar gives a template image, and the
 /// width keeps the shape of the ghost.
-const ICON_WIDTH: f64 = 13.0;
+/// The size of the menu bar icon in points: 18 is the height the menu bar gives a template image, and the
+/// width keeps the shape of the ghost.
+const ICON_WIDTH: f64 = 16.0;
 const ICON_HEIGHT: f64 = 18.0;
-/// Points per unit of the logo's 24 by 24 box: the ghost, 15 units wide, comes to the 13 points of the icon
-/// and 16 in height, so its sides and its top fall on whole pixels at 1x and 2x.
-const ICON_SCALE: f64 = 13.0 / 15.0;
+/// Points per unit of the 24 by 24 box: the ghost, roughly 16 units wide and 17 tall, scales to fit
+/// cleanly in the menu bar with whole pixel alignment at 1x and 2x.
+const ICON_SCALE: f64 = 14.5 / 17.0;
 /// `NSMenuItemImageVisibilityVisible`.
 const IMAGE_VISIBLE: isize = 1;
 
-/// The ghost of the logo as the settings page draws it, in the units of its 24 by 24 box with y growing
-/// downward. The two eyes are part of the path: the even-odd rule leaves them out of the fill.
+/// The ghost as a template path in a 24 by 24 box with y growing downward. The two eyes are part of
+/// the path: the even-odd rule leaves them out of the fill.
 fn ghost_path() -> Retained<NSBezierPath> {
     let at = NSPoint::new;
     let path = NSBezierPath::bezierPath();
-    path.moveToPoint(at(12.0, 2.5));
-    path.relativeCurveToPoint_controlPoint1_controlPoint2(
-        at(-7.5, 7.3),
-        at(-4.2, 0.0),
-        at(-7.5, 3.2),
+    // Top center of the head dome.
+    path.moveToPoint(at(11.5, 2.5));
+    // Left side of the head dome down to the cheek.
+    path.curveToPoint_controlPoint1_controlPoint2(
+        at(5.0, 9.2),
+        at(8.0, 2.5),
+        at(5.0, 5.8),
     );
-    path.lineToPoint(at(4.5, 20.0));
-    path.relativeCurveToPoint_controlPoint1_controlPoint2(at(1.5, 0.7), at(0.0, 0.8), at(0.9, 1.2));
-    // The wavy hem: four rounded feet with a notch between each two.
-    path.relativeLineToPoint(at(1.6, -1.4));
-    path.relativeLineToPoint(at(1.6, 1.4));
-    path.relativeCurveToPoint_controlPoint1_controlPoint2(at(1.7, 0.0), at(0.5, 0.4), at(1.2, 0.4));
-    path.relativeLineToPoint(at(1.1, -1.0));
-    path.relativeLineToPoint(at(1.1, 1.0));
-    path.relativeCurveToPoint_controlPoint1_controlPoint2(at(1.7, 0.0), at(0.5, 0.4), at(1.2, 0.4));
-    path.relativeLineToPoint(at(1.6, -1.4));
-    path.relativeLineToPoint(at(1.6, 1.4));
-    path.relativeCurveToPoint_controlPoint1_controlPoint2(
-        at(1.5, -0.7),
-        at(0.6, 0.5),
-        at(1.5, 0.1),
+    // Left flank down towards the hem.
+    path.curveToPoint_controlPoint1_controlPoint2(
+        at(5.8, 17.0),
+        at(5.0, 12.0),
+        at(5.5, 14.8),
     );
-    path.lineToPoint(at(19.5, 9.8));
-    path.relativeCurveToPoint_controlPoint1_controlPoint2(
-        at(-7.5, -7.3),
-        at(0.0, -4.1),
-        at(-3.3, -7.3),
+    // First bottom wave (left lobe).
+    path.curveToPoint_controlPoint1_controlPoint2(
+        at(8.0, 19.5),
+        at(6.0, 18.2),
+        at(7.0, 19.5),
+    );
+    path.curveToPoint_controlPoint1_controlPoint2(
+        at(10.2, 17.8),
+        at(9.0, 19.5),
+        at(9.8, 18.5),
+    );
+    // Second bottom wave (center lobe).
+    path.curveToPoint_controlPoint1_controlPoint2(
+        at(12.5, 19.3),
+        at(10.8, 18.8),
+        at(11.8, 19.3),
+    );
+    path.curveToPoint_controlPoint1_controlPoint2(
+        at(14.8, 17.6),
+        at(13.5, 19.3),
+        at(14.2, 18.2),
+    );
+    // Tail wave sweeping up and out to the right.
+    path.curveToPoint_controlPoint1_controlPoint2(
+        at(20.5, 14.5),
+        at(15.5, 18.5),
+        at(18.2, 17.8),
+    );
+    // Rounded tail tip.
+    path.curveToPoint_controlPoint1_controlPoint2(
+        at(19.4, 12.8),
+        at(21.2, 13.8),
+        at(20.4, 12.8),
+    );
+    // Inner tail sweep into the flank.
+    path.curveToPoint_controlPoint1_controlPoint2(
+        at(18.3, 9.2),
+        at(18.6, 11.8),
+        at(18.2, 10.5),
+    );
+    // Right side of dome back to top.
+    path.curveToPoint_controlPoint1_controlPoint2(
+        at(11.5, 2.5),
+        at(18.3, 5.8),
+        at(15.2, 2.5),
     );
     path.closePath();
-    for x in [9.2, 14.8] {
+
+    // Eyes cut out of the ghost shape.
+    for &(x, y, w, h) in &[(7.6, 8.4, 2.6, 3.8), (12.6, 8.4, 2.6, 3.8)] {
         path.appendBezierPathWithOvalInRect(NSRect::new(
-            at(x - 1.5, 10.2 - 1.5),
-            NSSize::new(3.0, 3.0),
+            at(x, y),
+            NSSize::new(w, h),
         ));
     }
     path.setWindingRule(NSWindingRule::EvenOdd);
@@ -285,8 +321,8 @@ pub fn ghost_icon() -> Retained<NSImage> {
     let draw = RcBlock::new(|_: NSRect| {
         let path = ghost_path();
         let place = NSAffineTransform::transform();
-        // The middle of the ghost goes to the middle of the icon and its top to a point below the top edge.
-        place.translateXBy_yBy(ICON_WIDTH / 2.0 - 12.0 * ICON_SCALE, 1.0 - 2.5 * ICON_SCALE);
+        // Center the ghost horizontally and place its top just below the menu bar icon edge.
+        place.translateXBy_yBy(ICON_WIDTH / 2.0 - 12.75 * ICON_SCALE, 1.5 - 2.5 * ICON_SCALE);
         place.scaleBy(ICON_SCALE);
         path.transformUsingAffineTransform(&place);
         NSColor::blackColor().setFill();
@@ -516,14 +552,14 @@ mod tests {
 
     #[test]
     fn the_ghost_is_the_logo_of_the_settings_page() {
-        // 15 units wide from x 4.5, and from y 2.5 down to the feet, which reach about 21.
+        // Roughly 16 units wide from x 5.0, and from y 2.5 down to the hem at 19.5.
         let b = ghost_path().bounds();
         assert!(
-            (b.origin.x - 4.5).abs() < 0.01 && (b.size.width - 15.0).abs() < 0.01,
+            (b.origin.x - 5.0).abs() < 0.01 && (b.size.width - 15.76).abs() < 0.05,
             "{b:?}"
         );
         assert!((b.origin.y - 2.5).abs() < 0.01, "{b:?}");
-        assert!((b.origin.y + b.size.height - 21.0).abs() < 0.1, "{b:?}");
+        assert!((b.origin.y + b.size.height - 19.5).abs() < 0.05, "{b:?}");
     }
 
     #[test]

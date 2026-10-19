@@ -27,10 +27,9 @@ git rev-parse -q --verify "refs/tags/v$VERSION" >/dev/null && fail "v$VERSION is
 gh auth status >/dev/null 2>&1 || fail "log in first: gh auth login"
 CURRENT=$(sed -n '/^\[workspace.package\]/,/^\[/s/^version = "\(.*\)"/\1/p' Cargo.toml)
 PREVIOUS=$(git describe --tags --abbrev=0 2>/dev/null || true)
-ZIP="dist/Figghost-$VERSION.zip"
 
 echo "release $VERSION (Cargo.toml has $CURRENT, last tag ${PREVIOUS:-none})"
-echo "  build dist/Figghost.app and $ZIP, tag v$VERSION, push main and the tag to $REPO,"
+echo "  build Figghost.app in a temporary folder (dist is left alone) and zip it, tag v$VERSION, push main and the tag to $REPO,"
 echo "  create the GitHub release with the zip, and update Casks/figghost.rb in $TAP"
 if [ "${DRY_RUN:-}" = 1 ]; then
     echo "dry run: stopping before any change"
@@ -50,17 +49,18 @@ PY
     git commit -q -m "Release $VERSION" Cargo.toml Cargo.lock
 fi
 
-scripts/bundle.sh
-rm -f "$ZIP"
-ditto -c -k --sequesterRsrc --keepParent dist/Figghost.app "$ZIP"
+# The app is built in a temporary folder and only the zip is kept for the upload, so dist is never touched.
+WORK=$(mktemp -d)
+trap 'rm -rf "$WORK"' EXIT
+ZIP="$WORK/Figghost-$VERSION.zip"
+scripts/bundle.sh "$WORK/build"
+ditto -c -k --sequesterRsrc --keepParent "$WORK/build/Figghost.app" "$ZIP"
 SHA=$(shasum -a 256 "$ZIP" | cut -d ' ' -f 1)
 echo "zip: $ZIP $SHA"
 
 git tag -a "v$VERSION" -m "Figghost $VERSION"
 git push -q origin main "v$VERSION"
 
-WORK=$(mktemp -d)
-trap 'rm -rf "$WORK"' EXIT
 {
     echo "Figghost $VERSION, for Apple silicon Macs with macOS 13 or later."
     echo

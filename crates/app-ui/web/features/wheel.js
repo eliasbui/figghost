@@ -99,7 +99,7 @@
     const picks = slots(wheel);
     reg(() => picks.classList.toggle('dim', !on()));
     body.append(picks);
-    return [sectionTitle(t('wheel.' + wheel + '.title')), body];
+    return [body];
   }
 
   (window.__plugins = window.__plugins || []).push({
