@@ -1,0 +1,6 @@
+{
+  "enabled": true,
+  "formats": { "enabled": true, "key": "shift", "hidden": [] },
+  "tools": { "enabled": true, "key": "command", "hidden": ["quarter"] },
+  "actions": { "enabled": true, "key": "control", "hidden": [] }
+}

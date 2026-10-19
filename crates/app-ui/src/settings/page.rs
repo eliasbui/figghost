@@ -19,6 +19,7 @@ const FEATURE_SCRIPTS: &[&str] = &[
     include_str!("../../web/features/menubar.js"),
     include_str!("../../web/features/stack.js"),
     include_str!("../../web/features/mascot.js"),
+    include_str!("../../web/features/wheel.js"),
     include_str!("../../web/features/mole.js"),
 ];
 const FEATURE_STYLES: &[&str] = &[
@@ -31,6 +32,7 @@ const FEATURE_STYLES: &[&str] = &[
     include_str!("../../web/features/menubar.css"),
     include_str!("../../web/features/stack.css"),
     include_str!("../../web/features/mascot.css"),
+    include_str!("../../web/features/wheel.css"),
     include_str!("../../web/features/mole.css"),
 ];
 const FEATURE_FIXTURES: &[(&str, &str)] = &[
@@ -67,6 +69,10 @@ const FEATURE_FIXTURES: &[(&str, &str)] = &[
         "mascot",
         include_str!("../../web/features/mascot.fixture.json"),
     ),
+    (
+        "wheel",
+        include_str!("../../web/features/wheel.fixture.json"),
+    ),
     ("mole", include_str!("../../web/features/mole.fixture.json")),
 ];
 
@@ -94,6 +100,7 @@ const SYMBOLS: &[&str] = &[
     "power",
     "chevron.up",
     "chevron.down",
+    "chart.pie.fill",
 ];
 /// Symbols are drawn this many points on their longer side, for Retina screens; CSS fits them to their box.
 const SYMBOL_POINTS: f64 = 16.0;

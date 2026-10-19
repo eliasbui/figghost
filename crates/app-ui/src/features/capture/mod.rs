@@ -879,6 +879,37 @@ impl Feature {
         }
     }
 
+    /// Opens an image file in the editor. Done writes the edited picture to a new PNG next to the original, which
+    /// is never touched.
+    pub fn annotate(&self, source: &Path) -> Result<(), String> {
+        let shot = crate::shelf_actions::load_image(source)?;
+        let dir = source.parent().ok_or("the file has no folder")?;
+        let stem = source
+            .file_stem()
+            .ok_or("the file has no name")?
+            .to_string_lossy()
+            .into_owned();
+        let output = crate::shelf_actions::unique_output(dir, &format!("{stem} annotated"), "png");
+        let screen = capture_ui::main_screen_frame(self.mtm);
+        let size = shot.point_size();
+        let place = NSRect::new(
+            NSPoint::new(
+                screen.origin.x + (screen.size.width - size.width).max(0.0) / 2.0,
+                screen.origin.y + (screen.size.height - size.height).max(0.0) / 2.0,
+            ),
+            size,
+        );
+        self.edit(
+            &Rc::new(Taken {
+                shot,
+                screen,
+                place,
+            }),
+            &output,
+        );
+        Ok(())
+    }
+
     /// Opens the editor; Done writes the edited picture over the capture's file.
     fn edit(&self, taken: &Rc<Taken>, path: &Path) {
         let text = i18n::current();

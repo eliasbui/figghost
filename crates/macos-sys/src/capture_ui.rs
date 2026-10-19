@@ -593,6 +593,11 @@ define_class!(
     }
 );
 
+/// The frame of the main screen in Cocoa coordinates, for placing a picture that was not taken on a screen.
+pub fn main_screen_frame(mtm: MainThreadMarker) -> NSRect {
+    NSScreen::mainScreen(mtm).map_or(NSRect::ZERO, |screen| screen.frame())
+}
+
 /// A short notice near the top of the main screen that goes away by itself.
 pub fn toast(mtm: MainThreadMarker, text: &str) {
     let Some(screen) = NSScreen::screens(mtm).firstObject() else {

@@ -9,8 +9,9 @@ use std::{
     io::Write,
     path::{Path, PathBuf},
     process::{Command, Stdio},
+    sync::atomic::{AtomicUsize, Ordering},
     thread,
-    time::{Duration, Instant},
+    time::{Duration, Instant, SystemTime, UNIX_EPOCH},
 };
 
 const JOB_TIMEOUT: Duration = Duration::from_secs(180);
@@ -104,26 +105,95 @@ pub fn available(path: &Path) -> Vec<Action> {
 
 /// `dir/stem.ext`, or `dir/stem 2.ext`, `dir/stem 3.ext`, ... when that name is taken.
 pub fn unique_output(dir: &Path, stem: &str, ext: &str) -> PathBuf {
+    unique_output_avoiding(dir, stem, ext, &[])
+}
+
+/// Like `unique_output`, and also not a name in `taken`: the outputs of jobs of the same batch that have not
+/// run yet. An empty `ext` names a folder, with no dot.
+pub fn unique_output_avoiding(dir: &Path, stem: &str, ext: &str, taken: &[PathBuf]) -> PathBuf {
     let name = |n: u32| {
         let base = if n == 1 {
             stem.to_owned()
         } else {
             format!("{stem} {n}")
         };
-        dir.join(format!("{base}.{ext}"))
+        if ext.is_empty() {
+            dir.join(base)
+        } else {
+            dir.join(format!("{base}.{ext}"))
+        }
     };
     (1..)
         .map(name)
-        .find(|p| !p.exists())
+        .find(|p| !p.exists() && !taken.contains(p))
         .unwrap_or_else(|| name(1))
 }
 
-/// A command that makes one new file.
+/// Work that is done in this process instead of by a command line tool, because macOS has no tool for it.
+#[derive(Debug, PartialEq, Eq)]
+pub enum Native {
+    /// An image at a part of its size, in the same format.
+    Resize { source: PathBuf, size: Size },
+    /// An image without its metadata.
+    StripImageMetadata { source: PathBuf },
+    /// Several PDFs as one.
+    PdfMerge { sources: Vec<PathBuf> },
+    /// One PDF per page, in the folder `output`; the files are named after `stem`.
+    PdfSplit { source: PathBuf, stem: String },
+    /// One picture per page, in the folder `output`; the files are named after `stem`.
+    PdfPages {
+        source: PathBuf,
+        stem: String,
+        format: macos_sys::file_ops::PageImage,
+    },
+    /// A text document printed as a PDF.
+    DocumentToPdf { source: PathBuf },
+}
+
+/// A job that makes one new file or folder: a command, or work done here.
 #[derive(Debug, PartialEq, Eq)]
 pub struct Job {
     program: &'static str,
     args: Vec<OsString>,
     pub output: PathBuf,
+    native: Option<Native>,
+}
+
+impl Job {
+    /// A command line tool run with these arguments (never through a shell) that must write `output`.
+    pub fn command(program: &'static str, args: Vec<OsString>, output: PathBuf) -> Self {
+        Self {
+            program,
+            args,
+            output,
+            native: None,
+        }
+    }
+
+    /// Work done in this process that must write `output`.
+    pub fn native(work: Native, output: PathBuf) -> Self {
+        Self {
+            program: "",
+            args: Vec::new(),
+            output,
+            native: Some(work),
+        }
+    }
+
+    #[cfg(test)]
+    pub fn program(&self) -> &str {
+        self.program
+    }
+
+    #[cfg(test)]
+    pub fn args(&self) -> &[OsString] {
+        &self.args
+    }
+
+    #[cfg(test)]
+    pub fn native_work(&self) -> Option<&Native> {
+        self.native.as_ref()
+    }
 }
 
 /// The command for an action on `source`; `None` for the actions that are not file jobs.
@@ -133,9 +203,9 @@ pub fn job(action: Action, source: &Path) -> Option<Job> {
     let stem = source.file_stem()?.to_string_lossy().into_owned();
     let image = |format: &'static str, ext: &str| {
         let output = unique_output(dir, &stem, ext);
-        Job {
-            program: "/usr/bin/sips",
-            args: vec![
+        Job::command(
+            "/usr/bin/sips",
+            vec![
                 "-s".into(),
                 "format".into(),
                 format.into(),
@@ -144,14 +214,14 @@ pub fn job(action: Action, source: &Path) -> Option<Job> {
                 output.as_os_str().to_owned(),
             ],
             output,
-        }
+        )
     };
     Some(match action {
         Action::Zip => {
             let output = unique_output(dir, &file_name, "zip");
-            Job {
-                program: "/usr/bin/ditto",
-                args: vec![
+            Job::command(
+                "/usr/bin/ditto",
+                vec![
                     "-c".into(),
                     "-k".into(),
                     "--keepParent".into(),
@@ -159,7 +229,7 @@ pub fn job(action: Action, source: &Path) -> Option<Job> {
                     output.as_os_str().to_owned(),
                 ],
                 output,
-            }
+            )
         }
         Action::ToPng => image("png", "png"),
         Action::ToJpeg => image("jpeg", "jpg"),
@@ -181,7 +251,7 @@ pub enum Size {
 }
 
 impl Size {
-    const fn percent(self) -> u32 {
+    pub const fn percent(self) -> u32 {
         match self {
             Size::Half => 50,
             Size::Quarter => 25,
@@ -189,7 +259,7 @@ impl Size {
     }
 
     /// The word the new file is named with.
-    const fn word(self) -> &'static str {
+    pub const fn word(self) -> &'static str {
         match self {
             Size::Half => "half",
             Size::Quarter => "quarter",
@@ -232,8 +302,6 @@ pub fn resize(source: &Path, size: Size) -> Result<PathBuf, String> {
     if !IMAGE_EXTENSIONS.contains(&ext.as_str()) {
         return Err("the file is not an image".into());
     }
-    let (width, height) = image_size(source)?;
-    let (width, height) = scaled(width, height, size.percent());
     let dir = source.parent().ok_or("the file has no folder")?;
     let stem = source
         .file_stem()
@@ -241,10 +309,18 @@ pub fn resize(source: &Path, size: Size) -> Result<PathBuf, String> {
         .to_string_lossy()
         .into_owned();
     let output = unique_output(dir, &format!("{stem} {}", size.word()), &ext);
-    let job = Job {
-        program: "/usr/bin/sips",
+    resize_into(source, size, &output)
+}
+
+/// Writes `source` at the smaller size to `output`, which must be a new name. For the batch jobs of the drag
+/// wheel, which choose the name before the job runs.
+pub fn resize_into(source: &Path, size: Size, output: &Path) -> Result<PathBuf, String> {
+    let (width, height) = image_size(source)?;
+    let (width, height) = scaled(width, height, size.percent());
+    let job = Job::command(
+        "/usr/bin/sips",
         // The order sips wants: height first, then width.
-        args: vec![
+        vec![
             "-z".into(),
             height.to_string().into(),
             width.to_string().into(),
@@ -252,10 +328,9 @@ pub fn resize(source: &Path, size: Size) -> Result<PathBuf, String> {
             "--out".into(),
             output.as_os_str().to_owned(),
         ],
-        output,
-    };
-    run(&job)?;
-    Ok(job.output)
+        output.to_owned(),
+    );
+    run_published(&job)
 }
 
 /// Largest image the shelf decodes itself: background removal and text recognition hold the pixels in
@@ -308,8 +383,7 @@ pub fn make(action: Action, source: &Path) -> Result<PathBuf, String> {
         _ => {}
     }
     let job = job(action, source).ok_or("this action makes no file")?;
-    run(&job)?;
-    Ok(job.output)
+    run_published(&job)
 }
 
 /// The picture of `source`, for the action that reads the image instead of writing a file. The caller is on
@@ -322,33 +396,196 @@ pub fn load_image(source: &Path) -> Result<macos_sys::screen_capture::Shot, Stri
     macos_sys::screen_capture::Shot::from_file(source)
 }
 
-/// Runs the job and waits for it, up to a few minutes. The new file exists when this returns `Ok`.
-pub fn run(job: &Job) -> Result<(), String> {
-    let mut child = Command::new(job.program)
-        .args(&job.args)
+/// Runs a command to its end, up to `JOB_TIMEOUT`, with no input and no output.
+fn run_command(program: &str, args: &[OsString]) -> Result<(), String> {
+    let mut child = Command::new(program)
+        .args(args)
         .stdin(Stdio::null())
         .stdout(Stdio::null())
         .stderr(Stdio::null())
         .spawn()
-        .map_err(|e| format!("cannot start {}: {e}", job.program))?;
+        .map_err(|e| format!("cannot start {program}: {e}"))?;
     let started = Instant::now();
     loop {
         match child.try_wait().map_err(|e| e.to_string())? {
-            Some(status) if status.success() && job.output.exists() => return Ok(()),
-            Some(status) => {
-                // Never leave half a file behind.
-                let _ = std::fs::remove_file(&job.output);
-                return Err(format!("{} failed ({status})", job.program));
-            }
+            Some(status) if status.success() => return Ok(()),
+            Some(status) => return Err(format!("{program} failed ({status})")),
             None if started.elapsed() >= JOB_TIMEOUT => {
                 let _ = child.kill();
                 let _ = child.wait();
-                let _ = std::fs::remove_file(&job.output);
-                return Err(format!("{} took too long", job.program));
+                return Err(format!("{program} took too long"));
             }
             None => thread::sleep(Duration::from_millis(40)),
         }
     }
+}
+
+/// Removes what a failed job left: a file, or the folder of a job that makes one.
+fn remove_output(output: &Path) {
+    if output.is_dir() {
+        let _ = fs::remove_dir_all(output);
+    } else {
+        let _ = fs::remove_file(output);
+    }
+}
+
+fn run_native(work: &Native, output: &Path) -> Result<(), String> {
+    use macos_sys::file_ops as ops;
+    match work {
+        Native::Resize { source, size } => resize_into(source, *size, output).map(|_| ()),
+        Native::StripImageMetadata { source } => ops::strip_image_metadata(source, output),
+        Native::PdfMerge { sources } => ops::pdf_merge(sources, output),
+        Native::PdfSplit { source, stem } => ops::pdf_split(source, output, stem).map(|_| ()),
+        Native::PdfPages {
+            source,
+            stem,
+            format,
+        } => ops::pdf_to_images(source, output, stem, *format).map(|_| ()),
+        Native::DocumentToPdf { source } => document_to_pdf(source, output),
+    }
+}
+
+/// A document of any type `textutil` reads becomes RTF first (reading HTML in this process would need the main
+/// thread), and the RTF is printed to the PDF.
+fn document_to_pdf(source: &Path, output: &Path) -> Result<(), String> {
+    if extension(source) == "rtf" {
+        return macos_sys::file_ops::rtf_to_pdf(source, output);
+    }
+    let middle = output.with_extension("figghost-tmp.rtf");
+    let made = run_command(
+        "/usr/bin/textutil",
+        &[
+            "-convert".into(),
+            "rtf".into(),
+            source.as_os_str().to_owned(),
+            "-output".into(),
+            middle.as_os_str().to_owned(),
+        ],
+    )
+    .and_then(|()| macos_sys::file_ops::rtf_to_pdf(&middle, output));
+    let _ = fs::remove_file(&middle);
+    made
+}
+
+/// A name for the tool to write to, in the folder of the final name and with its extension (`avconvert` reads
+/// the format from it), that nobody else picks: it is hidden and has this process, a counter and the time in it.
+fn staging_path(output: &Path) -> PathBuf {
+    static COUNTER: AtomicUsize = AtomicUsize::new(0);
+    let dir = output.parent().unwrap_or(Path::new("."));
+    let ext = output
+        .extension()
+        .map(|e| e.to_string_lossy().into_owned())
+        .filter(|e| e.len() <= 8 && e.chars().all(|c| c.is_ascii_alphanumeric()));
+    loop {
+        let nanos = SystemTime::now()
+            .duration_since(UNIX_EPOCH)
+            .map_or(0, |d| d.subsec_nanos());
+        let name = format!(
+            ".figghost-{}-{}-{nanos}",
+            std::process::id(),
+            COUNTER.fetch_add(1, Ordering::Relaxed)
+        );
+        let path = match &ext {
+            Some(ext) => dir.join(format!("{name}.{ext}")),
+            None => dir.join(name),
+        };
+        if !path.exists() {
+            return path;
+        }
+    }
+}
+
+/// Moves the finished `staged` file or folder to `wanted`, or to the next free name when `wanted` is taken, and
+/// never replaces anything: a file is linked under the new name and the staged name is then removed (a link
+/// fails when the name exists), a folder is renamed with the exclusive flag. Returns the name it ended up under.
+fn publish(staged: &Path, wanted: &Path) -> Result<PathBuf, String> {
+    let dir = wanted.parent().ok_or("the result has no folder")?;
+    let is_dir = staged.is_dir();
+    let name = wanted
+        .file_name()
+        .ok_or("the result has no name")?
+        .to_string_lossy()
+        .into_owned();
+    // A folder keeps its whole name; for a file the extension stays after the number.
+    let (stem, ext) = if is_dir {
+        (name.clone(), String::new())
+    } else {
+        (
+            wanted
+                .file_stem()
+                .map(|s| s.to_string_lossy().into_owned())
+                .unwrap_or(name.clone()),
+            extension(wanted),
+        )
+    };
+    let mut target = wanted.to_owned();
+    // Someone may take each free name in the meantime, so try again with the next, up to a bound.
+    for _ in 0..1000 {
+        let placed = if is_dir {
+            macos_sys::file_ops::rename_exclusive(staged, &target)
+        } else {
+            match fs::hard_link(staged, &target) {
+                Ok(()) => {
+                    let _ = fs::remove_file(staged);
+                    Ok(())
+                }
+                // A volume without links still has the exclusive rename.
+                Err(e) if e.kind() != std::io::ErrorKind::AlreadyExists => {
+                    macos_sys::file_ops::rename_exclusive(staged, &target)
+                }
+                Err(e) => Err(e),
+            }
+        };
+        match placed {
+            Ok(()) => return Ok(target),
+            Err(e) if e.kind() == std::io::ErrorKind::AlreadyExists => {
+                target = unique_output(dir, &stem, &ext);
+            }
+            Err(e) => return Err(e.to_string()),
+        }
+    }
+    Err("no free file name".into())
+}
+
+/// Runs the job and waits for it, up to a few minutes. The new file or folder exists when this returns `Ok`;
+/// when it fails nothing it started to write is left behind.
+#[allow(dead_code)]
+pub fn run(job: &Job) -> Result<(), String> {
+    run_published(job).map(|_| ())
+}
+
+/// Like `run`, and returns the name the result was published under. The tool writes to a hidden staging name in
+/// the same folder, and only a finished result is moved to the planned name, or to the next free one when that
+/// name was taken in the meantime (the name is chosen when the slot is dropped, and a job can run for minutes).
+/// So nothing that exists is ever replaced, and a failed job leaves no staged file behind.
+pub fn run_published(job: &Job) -> Result<PathBuf, String> {
+    let staged = staging_path(&job.output);
+    let done = match &job.native {
+        Some(work) => run_native(work, &staged),
+        None => {
+            let args: Vec<OsString> = job
+                .args
+                .iter()
+                .map(|arg| {
+                    if arg.as_os_str() == job.output.as_os_str() {
+                        staged.as_os_str().to_owned()
+                    } else {
+                        arg.clone()
+                    }
+                })
+                .collect();
+            run_command(job.program, &args)
+        }
+    };
+    let published = match done {
+        Ok(()) if staged.exists() => publish(&staged, &job.output),
+        Ok(()) => Err("the job made no file".into()),
+        Err(e) => Err(e),
+    };
+    if published.is_err() {
+        remove_output(&staged);
+    }
+    published
 }
 
 #[cfg(test)]
@@ -743,6 +980,143 @@ mod tests {
         fs::write(&fake, "not a picture").unwrap();
         assert!(load_image(&fake).is_err());
         assert!(load_image(&dir.join("gone.png")).is_err());
+        let _ = fs::remove_dir_all(dir);
+    }
+
+    /// What a folder holds, hidden names included, sorted: a staged file left behind would show here.
+    fn listing(dir: &Path) -> Vec<String> {
+        let mut names: Vec<String> = fs::read_dir(dir)
+            .unwrap()
+            .map(|e| e.unwrap().file_name().to_string_lossy().into_owned())
+            .collect();
+        names.sort();
+        names
+    }
+
+    /// The first QA case (B-1): the name is chosen when the slot is dropped, and a file can appear under it
+    /// before the job runs. The job must never replace it.
+    #[test]
+    fn a_name_taken_before_the_job_runs_is_never_overwritten() {
+        let dir = temp_dir();
+        let source = dir.join("pixel.bmp");
+        fs::write(&source, bmp()).unwrap();
+        let planned = job(Action::ToPng, &source).unwrap();
+        assert_eq!(planned.output, dir.join("pixel.png"));
+        fs::write(&planned.output, "precious").unwrap();
+        run(&planned).unwrap();
+        assert_eq!(
+            fs::read_to_string(dir.join("pixel.png")).unwrap(),
+            "precious",
+            "the file that was there is untouched"
+        );
+        // The picture is under the next free name, and nothing else is left in the folder.
+        let made = dir.join("pixel 2.png");
+        assert_eq!(&fs::read(&made).unwrap()[..4], &[0x89, b'P', b'N', b'G']);
+        assert_eq!(listing(&dir), ["pixel 2.png", "pixel.bmp", "pixel.png"]);
+        let _ = fs::remove_dir_all(dir);
+    }
+
+    /// Two drops of the same file while the first job runs plan the same name; both results must survive.
+    #[test]
+    fn two_jobs_planned_before_either_runs_each_keep_their_result() {
+        let dir = temp_dir();
+        let source = dir.join("pixel.bmp");
+        fs::write(&source, bmp()).unwrap();
+        let (first, second) = (
+            job(Action::ToJpeg, &source).unwrap(),
+            job(Action::ToJpeg, &source).unwrap(),
+        );
+        assert_eq!(first.output, second.output, "the plans share a name");
+        run(&first).unwrap();
+        let first_bytes = fs::read(&first.output).unwrap();
+        run(&second).unwrap();
+        assert_eq!(
+            fs::read(&first.output).unwrap(),
+            first_bytes,
+            "the first result is not replaced by the second"
+        );
+        assert_eq!(listing(&dir), ["pixel 2.jpg", "pixel.bmp", "pixel.jpg"]);
+        let _ = fs::remove_dir_all(dir);
+    }
+
+    /// A folder that appears under the planned name (even an empty one, which a plain rename would replace) is
+    /// left alone, and the new folder takes the next name.
+    #[test]
+    fn a_folder_result_never_replaces_a_folder_that_is_already_there() {
+        let dir = temp_dir();
+        let source = dir.join("pixel.bmp");
+        fs::write(&source, bmp()).unwrap();
+        let pdf = job_pdf(&dir, &source);
+        let planned = dir.join("pixel pages");
+        fs::create_dir(&planned).unwrap();
+        let work = Job::native(
+            Native::PdfSplit {
+                source: pdf,
+                stem: "pixel".into(),
+            },
+            planned.clone(),
+        );
+        run(&work).unwrap();
+        assert_eq!(
+            fs::read_dir(&planned).unwrap().count(),
+            0,
+            "the empty folder that was there is still empty"
+        );
+        assert_eq!(
+            fs::read_dir(dir.join("pixel pages 2")).unwrap().count(),
+            1,
+            "the pages are in the next free folder"
+        );
+        let _ = fs::remove_dir_all(dir);
+    }
+
+    fn job_pdf(dir: &Path, source: &Path) -> PathBuf {
+        let made = job(Action::ToPng, source).unwrap();
+        run(&made).unwrap();
+        let pdf = dir.join("one page.pdf");
+        let status = Command::new("/usr/bin/sips")
+            .args(["-s", "format", "pdf"])
+            .arg(&made.output)
+            .arg("--out")
+            .arg(&pdf)
+            .output()
+            .unwrap();
+        assert!(status.status.success());
+        pdf
+    }
+
+    #[test]
+    fn a_failed_job_leaves_no_staged_file_or_folder() {
+        let dir = temp_dir();
+        let fake = dir.join("fake.png");
+        fs::write(&fake, "this is not a picture").unwrap();
+        let converting = job(Action::ToJpeg, &fake).unwrap();
+        assert!(run(&converting).is_err());
+        let not_pdf = dir.join("fake.pdf");
+        fs::write(&not_pdf, "not a pdf").unwrap();
+        let splitting = Job::native(
+            Native::PdfSplit {
+                source: not_pdf,
+                stem: "fake".into(),
+            },
+            dir.join("fake split"),
+        );
+        assert!(run(&splitting).is_err());
+        assert_eq!(listing(&dir), ["fake.pdf", "fake.png"]);
+        let _ = fs::remove_dir_all(dir);
+    }
+
+    #[test]
+    fn the_name_that_was_published_is_the_name_that_is_reported() {
+        let dir = temp_dir();
+        let source = dir.join("pixel.bmp");
+        fs::write(&source, bmp()).unwrap();
+        let (first, second) = (
+            job(Action::ToPng, &source).unwrap(),
+            job(Action::ToPng, &source).unwrap(),
+        );
+        assert_eq!(run_published(&first).unwrap(), dir.join("pixel.png"));
+        assert_eq!(run_published(&second).unwrap(), dir.join("pixel 2.png"));
         let _ = fs::remove_dir_all(dir);
     }
 }

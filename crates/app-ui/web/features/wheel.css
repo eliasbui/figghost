@@ -1,0 +1,13 @@
+/* The drag wheel. Styles for the page in web/features/wheel.js, using the variables at the top of app.css. */
+.wheel-body { display: flex; flex-direction: column; gap: 6px; padding: 0 12px 12px; }
+.wheel-group { margin: 8px 2px 0; font: 600 var(--fs-small, 11.5px)/1.3 var(--font); color: var(--text-2, var(--text)); opacity: 0.7; }
+.wheel-picks { display: grid; grid-template-columns: repeat(auto-fill, minmax(150px, 1fr)); gap: 6px; }
+.wheel-pick {
+  display: flex; align-items: center; gap: 10px; min-height: 36px; padding: 6px 10px; border: 0; border-radius: 8px;
+  font: var(--fs-body)/1.25 var(--font); color: var(--text); text-align: left;
+  background: var(--field); box-shadow: inset 0 0 0 1px var(--field-edge);
+}
+.wheel-pick[aria-pressed="true"] { background: color-mix(in srgb, var(--tint) 12%, var(--field)); box-shadow: inset 0 0 0 2px var(--tint); }
+.wheel-name { min-width: 0; overflow-wrap: anywhere; }
+.wheel-foot { display: flex; align-items: center; justify-content: space-between; gap: 12px; margin-top: 8px; }
+.wheel-foot .row-desc { margin: 0; }

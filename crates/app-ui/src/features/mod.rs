@@ -21,6 +21,7 @@ pub mod smart;
 pub mod snap;
 pub mod stack;
 pub mod vision;
+pub mod wheel;
 
 /// What a feature may need when it starts. Each feature reads the fields it needs.
 #[allow(dead_code)]
@@ -51,14 +52,18 @@ pub struct Features {
     pub menubar: Option<Rc<menubar::Feature>>,
     pub stack: Option<Rc<stack::Feature>>,
     pub mascot: Option<Rc<mascot::Feature>>,
+    pub wheel: Option<Rc<wheel::Feature>>,
     pub mole: Option<Rc<mole::Feature>>,
 }
 
 impl Features {
     pub fn attach(env: &AttachEnv) -> Self {
+        // The wheel opens images in the capture editor, so it is given the capture feature.
+        let capture = capture::attach(env);
         Self {
             smart: smart::attach(env),
-            capture: capture::attach(env),
+            wheel: wheel::attach(env, capture.as_ref()),
+            capture,
             vision: vision::attach(env),
             lyrics: lyrics::attach(env),
             calendar: calendar::attach(env),
@@ -99,6 +104,9 @@ impl Features {
         }
         if let Some(f) = &self.mascot {
             out.insert("mascot", f.runtime());
+        }
+        if let Some(f) = &self.wheel {
+            out.insert("wheel", f.runtime());
         }
         if let Some(f) = &self.mole {
             out.insert("mole", f.runtime());
@@ -145,6 +153,10 @@ impl Features {
                 .mascot
                 .as_ref()
                 .map_or(Ok(()), |f| f.configure(&config.mascot)),
+            "wheel" => self
+                .wheel
+                .as_ref()
+                .map_or(Ok(()), |f| f.configure(&config.wheel)),
             _ => Ok(()),
         }
     }
@@ -178,6 +190,9 @@ impl Features {
         if let Some(f) = &self.mascot {
             f.suspend_hotkeys();
         }
+        if let Some(f) = &self.wheel {
+            f.suspend_hotkeys();
+        }
     }
 
     pub fn resume_hotkeys(&self, config: &Config) {
@@ -207,6 +222,9 @@ impl Features {
         }
         if let Some(f) = &self.mascot {
             f.resume_hotkeys(&config.mascot);
+        }
+        if let Some(f) = &self.wheel {
+            f.resume_hotkeys(&config.wheel);
         }
     }
 
@@ -257,6 +275,11 @@ impl Features {
         {
             return Some(result);
         }
+        if let Some(f) = &self.wheel
+            && let Some(result) = f.action(name, &mut config.wheel)
+        {
+            return Some(result);
+        }
         if let Some(f) = &self.mole
             && let Some(result) = f.action(name)
         {
@@ -294,6 +317,9 @@ impl Features {
         }
         if let Some(f) = &self.mascot {
             entries.extend(mascot::Feature::menu_entries(f));
+        }
+        if let Some(f) = &self.wheel {
+            entries.extend(wheel::Feature::menu_entries(f));
         }
         entries
     }
@@ -343,6 +369,10 @@ pub fn state(
         mascot::settings::state(&config.mascot, runtime.get("mascot").unwrap_or(&none)),
     );
     root.insert(
+        "wheel".into(),
+        wheel::settings::state(&config.wheel, runtime.get("wheel").unwrap_or(&none)),
+    );
+    root.insert(
         "mole".into(),
         mole::settings::state(runtime.get("mole").unwrap_or(&none)),
     );
@@ -377,6 +407,9 @@ pub fn set(config: &mut Config, path: &str, value: &Value) -> Option<Result<&'st
         "mascot" => {
             mascot::settings::set(&mut config.mascot, rest, value).map(|r| r.map(|()| "mascot"))
         }
+        "wheel" => {
+            wheel::settings::set(&mut config.wheel, rest, value).map(|r| r.map(|()| "wheel"))
+        }
         _ => None,
     }
 }
@@ -386,6 +419,7 @@ pub fn shortcut_owner(target: &str) -> Option<&'static str> {
     let head = target.split(':').next()?;
     [
         "smart", "capture", "vision", "lyrics", "calendar", "snap", "menubar", "stack", "mascot",
+        "wheel",
     ]
     .into_iter()
     .find(|id| *id == head)
@@ -403,6 +437,7 @@ pub fn shortcuts(config: &Config) -> Vec<(String, String)> {
     all.extend(menubar::settings::shortcuts(&config.menubar));
     all.extend(stack::settings::shortcuts(&config.stack));
     all.extend(mascot::settings::shortcuts(&config.mascot));
+    all.extend(wheel::settings::shortcuts(&config.wheel));
     all
 }
 
@@ -431,6 +466,8 @@ pub fn set_shortcut(
             .map(|r| r.map(|()| "stack")),
         "mascot" => mascot::settings::set_shortcut(&mut config.mascot, target, value)
             .map(|r| r.map(|()| "mascot")),
+        "wheel" => wheel::settings::set_shortcut(&mut config.wheel, target, value)
+            .map(|r| r.map(|()| "wheel")),
         _ => None,
     }
 }

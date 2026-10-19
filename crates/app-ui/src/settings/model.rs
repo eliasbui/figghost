@@ -1422,7 +1422,7 @@ mod tests {
     fn every_feature_has_its_part_in_the_state_the_page_renders() {
         let state = state(&Config::default(), &env());
         for id in [
-            "smart", "capture", "vision", "lyrics", "calendar", "snap", "menubar", "stack",
+            "smart", "capture", "vision", "lyrics", "calendar", "snap", "menubar", "stack", "wheel",
         ] {
             assert!(state[id].is_object(), "{id} is missing from the state");
             assert!(state[id]["enabled"].is_boolean(), "{id} has no switch");

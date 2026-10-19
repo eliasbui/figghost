@@ -233,6 +233,25 @@ impl ShelfFeature {
         }
     }
 
+    /// Puts files on the shelf, as dropping them on the notch does; returns how many were accepted.
+    pub fn add_files(&self, paths: &[PathBuf]) -> usize {
+        let paths: Vec<String> = paths
+            .iter()
+            .map(|p| p.to_string_lossy().into_owned())
+            .collect();
+        let added = {
+            let mut shelf = self.shelf.borrow_mut();
+            let added = shelf.add(paths.clone(), now_ms());
+            save(&shelf);
+            added
+        };
+        (self.refresh)();
+        if let Some(hook) = &*self.on_added.borrow() {
+            hook(&paths);
+        }
+        added
+    }
+
     /// Told the files that came into the shelf, after they are on the shelf.
     pub fn on_added(&self, hook: impl Fn(&[String]) + 'static) {
         *self.on_added.borrow_mut() = Some(Box::new(hook));
@@ -314,7 +333,7 @@ fn start_job(action: Action, path: &str) {
 }
 
 /// A named pasteboard keeps tests away from the user's real clipboard, as the history does.
-fn pasteboard() -> Pasteboard {
+pub(crate) fn pasteboard() -> Pasteboard {
     match env::var("FIGGHOST_PASTEBOARD") {
         Ok(name) => Pasteboard::named(&name),
         Err(_) => Pasteboard::general(),
@@ -324,7 +343,7 @@ fn pasteboard() -> Pasteboard {
 /// Reads the text of an image: the file is read on a worker thread, the picture is recognised on the main
 /// thread, where the answer comes back, and the text is copied and shown in a toast, as a capture with
 /// text recognition does.
-fn start_text_copy(path: &str) {
+pub(crate) fn start_text_copy(path: &str) {
     let source = PathBuf::from(path);
     std::thread::spawn(move || {
         let shot = shelf_actions::load_image(&source);

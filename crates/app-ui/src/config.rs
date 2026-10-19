@@ -171,7 +171,11 @@ impl From<serde_json::Value> for NotchConfig {
             .to_owned();
         Self {
             enabled: flag("enabled", d.enabled),
-            material: word(&v["material"], &["glass", "clear", "ink", "accent", "black"], &d.material),
+            material: word(
+                &v["material"],
+                &["glass", "clear", "ink", "accent", "black"],
+                &d.material,
+            ),
             shadow: flag("shadow", d.shadow),
             motion: word(&v["motion"], &["spring", "smooth", "none"], &d.motion),
             open_on_hover: flag("open_on_hover", d.open_on_hover),
@@ -323,6 +327,7 @@ pub struct Config {
     pub stack: crate::features::stack::Config,
     pub mascot: crate::features::mascot::Config,
     pub update: crate::update::Config,
+    pub wheel: crate::features::wheel::Config,
     /// Replace the system volume indicator with one in the notch. Needs Accessibility access.
     pub volume_hud: bool,
     /// Unpinned items kept in history.
@@ -359,6 +364,7 @@ impl Default for Config {
             stack: crate::features::stack::Config::default(),
             mascot: crate::features::mascot::Config::default(),
             update: crate::update::Config::default(),
+            wheel: crate::features::wheel::Config::default(),
             volume_hud: false,
             history_limit: 500,
             ignored_apps: Vec::new(),
