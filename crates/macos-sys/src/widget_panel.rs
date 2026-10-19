@@ -32,6 +32,8 @@ pub enum Layer {
     Top,
     /// Above everything, full-screen apps included.
     Always,
+    /// Above everything including lock screen and screen saver.
+    LockScreen,
 }
 
 impl Layer {
@@ -39,6 +41,7 @@ impl Layer {
         match word {
             "desktop" => Self::Desktop,
             "always" => Self::Always,
+            "lockscreen" => Self::LockScreen,
             _ => Self::Top,
         }
     }
@@ -48,6 +51,7 @@ impl Layer {
             Self::Desktop => -1,
             Self::Top => 3,
             Self::Always => 1000,
+            Self::LockScreen => 2147483631,
         }
     }
 }

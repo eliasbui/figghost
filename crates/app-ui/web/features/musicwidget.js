@@ -17,7 +17,7 @@
     'musicwidget.opacity.title': 'Opacity', 'musicwidget.opacity.desc': 'How solid the whole widget is.',
     'sec.musicwidget.place': 'Place and size',
     'musicwidget.layer.title': 'Stays', 'musicwidget.layer.desc': 'Where it floats, in front of or behind your windows.',
-    'musicwidget.layer.desktop': 'On the desktop, under windows', 'musicwidget.layer.top': 'Above windows', 'musicwidget.layer.always': 'Above everything, full screen too',
+    'musicwidget.layer.desktop': 'On the desktop, under windows', 'musicwidget.layer.top': 'Above windows', 'musicwidget.layer.always': 'Above everything, full screen too', 'musicwidget.layer.lockscreen': 'On the lock screen',
     'musicwidget.hide_idle.title': 'Hide when nothing plays', 'musicwidget.hide_idle.desc': 'The widget goes away until music starts. Off keeps it on screen with a note.',
     'musicwidget.width.title': 'Width', 'musicwidget.width.desc': 'You can also pull the corner of the widget.',
     'musicwidget.height.title': 'Height', 'musicwidget.height.desc': 'The slim styles do not need much.',
@@ -39,7 +39,7 @@
     'musicwidget.opacity.title': 'Độ đậm', 'musicwidget.opacity.desc': 'Widget đặc đến đâu.',
     'sec.musicwidget.place': 'Vị trí và kích thước',
     'musicwidget.layer.title': 'Nằm ở', 'musicwidget.layer.desc': 'Nổi phía trước hay phía sau các cửa sổ của bạn.',
-    'musicwidget.layer.desktop': 'Trên màn hình nền, dưới cửa sổ', 'musicwidget.layer.top': 'Trên cửa sổ', 'musicwidget.layer.always': 'Trên mọi thứ, cả toàn màn hình',
+    'musicwidget.layer.desktop': 'Trên màn hình nền, dưới cửa sổ', 'musicwidget.layer.top': 'Trên cửa sổ', 'musicwidget.layer.always': 'Trên mọi thứ, cả toàn màn hình', 'musicwidget.layer.lockscreen': 'Trên màn hình khóa',
     'musicwidget.hide_idle.title': 'Ẩn khi không phát gì', 'musicwidget.hide_idle.desc': 'Widget biến mất cho đến khi nhạc phát. Tắt thì giữ nó trên màn hình kèm một dòng ghi chú.',
     'musicwidget.width.title': 'Chiều rộng', 'musicwidget.width.desc': 'Bạn cũng có thể kéo góc của widget.',
     'musicwidget.height.title': 'Chiều cao', 'musicwidget.height.desc': 'Các kiểu mảnh không cần cao.',
@@ -87,7 +87,7 @@
       card(
         selectRow({
           path: 'musicwidget.layer', title: t('musicwidget.layer.title'), desc: t('musicwidget.layer.desc'), when: on,
-          options: () => ['desktop', 'top', 'always'].map((v) => ({ value: v, label: t('musicwidget.layer.' + v) })),
+          options: () => ['desktop', 'top', 'always', 'lockscreen'].map((v) => ({ value: v, label: t('musicwidget.layer.' + v) })),
         }),
         toggleRow('musicwidget.hide_idle', t('musicwidget.hide_idle.title'), t('musicwidget.hide_idle.desc'), { when: on }),
         size('musicwidget.width', 'musicwidget.width', 180, 700),

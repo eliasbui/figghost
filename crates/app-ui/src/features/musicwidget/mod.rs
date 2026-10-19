@@ -30,7 +30,7 @@ pub mod settings;
 
 pub const STYLES: &[&str] = &["card", "cover", "bar", "vinyl", "minimal"];
 pub const MATERIALS: &[&str] = &["glass", "clear", "dark", "accent"];
-pub const LAYERS: &[&str] = &["desktop", "top", "always"];
+pub const LAYERS: &[&str] = &["desktop", "top", "always", "lockscreen"];
 
 const PAGE: &str = include_str!("../../../web/widget.html");
 const PLACE_FILE: &str = "musicwidget.json";
