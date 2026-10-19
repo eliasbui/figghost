@@ -326,7 +326,10 @@ html.inactive .nav-item[aria-current="page"] {
 
 .page-head {
   flex: none;
-  padding: 44px var(--gutter) 18px;
+  padding: 24px var(--gutter) 14px;
+  display: flex;
+  flex-direction: column;
+  gap: 8px;
 }
 .page-title {
   margin: 0;
@@ -337,11 +340,43 @@ html.inactive .nav-item[aria-current="page"] {
   color: var(--text);
 }
 .page-sub {
-  margin: 4px 0 0;
-  color: var(--text-2);
+  display: none;
+}
+.page-subtabs {
+  margin-top: 2px;
+}
+.subtabs-bar {
+  display: inline-flex;
+  align-items: center;
+  gap: 3px;
+  padding: 3px;
+  background: var(--well);
+  border-radius: 999px;
+  box-shadow: inset 0 0 0 0.5px var(--well-edge);
+  overflow-x: auto;
+  max-width: 100%;
+}
+.subtab {
+  border: 0;
+  background: transparent;
+  padding: 4px 12px;
+  border-radius: 999px;
   font-size: 12px;
-  line-height: 1.45;
-  max-width: 80ch;
+  font-weight: 500;
+  color: var(--text-2);
+  cursor: pointer;
+  white-space: nowrap;
+  transition: all var(--motion-fast);
+}
+.subtab:hover:not(.active) {
+  color: var(--text);
+  background: var(--fill);
+}
+.subtab.active {
+  background: var(--thumb-bg);
+  color: var(--thumb-text);
+  font-weight: 600;
+  box-shadow: 0 1px 2px rgba(0, 0, 0, 0.12), 0 0 0.5px rgba(0, 0, 0, 0.08);
 }
 
 #scroller {
@@ -1404,9 +1439,9 @@ html.inactive .nav-item[aria-current="page"] {
 .found { box-shadow: inset 0 0 0 2px var(--tint); border-radius: 12px; transition: box-shadow 0.4s var(--ease-out); }
 
 /* Pages and headers */
-.page-head { padding: 42px var(--gutter) 16px; }
+.page-head { padding: 24px var(--gutter) 14px; }
 .page-title { font-size: 28px; font-weight: 700; letter-spacing: -0.025em; line-height: 1.1; color: var(--text); }
-.page-sub { font-size: 13px; color: var(--text-2); margin-top: 4px; }
+.page-sub { display: none; }
 .section-title { margin: 22px 14px 7px; font-size: 12.5px; font-weight: 650; letter-spacing: -0.01em; color: var(--text-2); text-transform: none; }
 
 /* Cards: liquid glass */

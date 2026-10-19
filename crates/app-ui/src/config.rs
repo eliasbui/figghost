@@ -753,6 +753,8 @@ mod tests {
         let bindings = tiling.bindings();
         assert_eq!(bindings.len(), Layout::ALL.len() - 1);
         assert!(bindings.contains(&(Layout::Left, "cmd+opt+left".to_owned())));
+        assert!(bindings.contains(&(Layout::Grid1, "cmd+1".to_owned())));
+        assert!(bindings.contains(&(Layout::Grid9, "cmd+9".to_owned())));
         assert!(bindings.iter().all(|(l, _)| *l != Layout::Maximize));
         // Every built-in shortcut must parse, or the feature would silently lose keys.
         for (layout, shortcut) in TilingConfig::default().bindings() {

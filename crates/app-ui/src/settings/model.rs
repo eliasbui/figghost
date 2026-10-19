@@ -973,9 +973,11 @@ mod tests {
         assert_eq!(s["clipboard"]["hotkey"], "cmd+shift+c");
         assert_eq!(s["clipboard"]["count"], 12);
         assert_eq!(s["notch"]["shelf_count"], 3);
-        assert_eq!(s["tiling"]["layouts"].as_array().unwrap().len(), 13);
+        assert_eq!(s["tiling"]["layouts"].as_array().unwrap().len(), 22);
         assert_eq!(s["tiling"]["layouts"][0]["key"], "left");
         assert_eq!(s["tiling"]["layouts"][0]["shortcut"], "ctrl+opt+left");
+        assert_eq!(s["tiling"]["layouts"][13]["key"], "grid_1");
+        assert_eq!(s["tiling"]["layouts"][13]["shortcut"], "cmd+1");
     }
 
     /// Every key path of a JSON document; an array stands for its first element.
@@ -1352,6 +1354,11 @@ mod tests {
         assert_eq!(
             (taken.code, taken.detail.as_str()),
             ("conflict", "tiling:left")
+        );
+        let taken = hotkey(&mut config, "tiling:left", "cmd+1").unwrap_err();
+        assert_eq!(
+            (taken.code, taken.detail.as_str()),
+            ("conflict", "tiling:grid_1")
         );
         let taken = hotkey(&mut config, "clipboard", "ctrl+opt+up").unwrap_err();
         assert_eq!(

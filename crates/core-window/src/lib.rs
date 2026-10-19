@@ -45,10 +45,19 @@ pub enum Layout {
     FirstThird,
     CenterThird,
     LastThird,
+    Grid1,
+    Grid2,
+    Grid3,
+    Grid4,
+    Grid5,
+    Grid6,
+    Grid7,
+    Grid8,
+    Grid9,
 }
 
 impl Layout {
-    pub const ALL: [Layout; 13] = [
+    pub const ALL: [Layout; 22] = [
         Layout::Left,
         Layout::Right,
         Layout::Top,
@@ -62,6 +71,15 @@ impl Layout {
         Layout::FirstThird,
         Layout::CenterThird,
         Layout::LastThird,
+        Layout::Grid1,
+        Layout::Grid2,
+        Layout::Grid3,
+        Layout::Grid4,
+        Layout::Grid5,
+        Layout::Grid6,
+        Layout::Grid7,
+        Layout::Grid8,
+        Layout::Grid9,
     ];
 
     /// Name used in the config file.
@@ -80,6 +98,15 @@ impl Layout {
             Layout::FirstThird => "first_third",
             Layout::CenterThird => "center_third",
             Layout::LastThird => "last_third",
+            Layout::Grid1 => "grid_1",
+            Layout::Grid2 => "grid_2",
+            Layout::Grid3 => "grid_3",
+            Layout::Grid4 => "grid_4",
+            Layout::Grid5 => "grid_5",
+            Layout::Grid6 => "grid_6",
+            Layout::Grid7 => "grid_7",
+            Layout::Grid8 => "grid_8",
+            Layout::Grid9 => "grid_9",
         }
     }
 
@@ -98,6 +125,15 @@ impl Layout {
             Layout::FirstThird => "ctrl+opt+d",
             Layout::CenterThird => "ctrl+opt+f",
             Layout::LastThird => "ctrl+opt+g",
+            Layout::Grid1 => "cmd+1",
+            Layout::Grid2 => "cmd+2",
+            Layout::Grid3 => "cmd+3",
+            Layout::Grid4 => "cmd+4",
+            Layout::Grid5 => "cmd+5",
+            Layout::Grid6 => "cmd+6",
+            Layout::Grid7 => "cmd+7",
+            Layout::Grid8 => "cmd+8",
+            Layout::Grid9 => "cmd+9",
         }
     }
 
@@ -118,6 +154,15 @@ impl Layout {
             Layout::FirstThird => slice(area, (0, 3), (0, 1)),
             Layout::CenterThird => slice(area, (1, 3), (0, 1)),
             Layout::LastThird => slice(area, (2, 3), (0, 1)),
+            Layout::Grid1 => slice(area, (0, 3), (0, 3)),
+            Layout::Grid2 => slice(area, (1, 3), (0, 3)),
+            Layout::Grid3 => slice(area, (2, 3), (0, 3)),
+            Layout::Grid4 => slice(area, (0, 3), (1, 3)),
+            Layout::Grid5 => slice(area, (1, 3), (1, 3)),
+            Layout::Grid6 => slice(area, (2, 3), (1, 3)),
+            Layout::Grid7 => slice(area, (0, 3), (2, 3)),
+            Layout::Grid8 => slice(area, (1, 3), (2, 3)),
+            Layout::Grid9 => slice(area, (2, 3), (2, 3)),
             Layout::Center => {
                 let (cw, ch) = (current.w.min(w), current.h.min(h));
                 Rect::new(
@@ -232,11 +277,35 @@ mod tests {
     }
 
     #[test]
+    fn the_numbered_grid_shortcuts_cover_the_screen_in_reading_order() {
+        let layouts = [
+            Layout::Grid1,
+            Layout::Grid2,
+            Layout::Grid3,
+            Layout::Grid4,
+            Layout::Grid5,
+            Layout::Grid6,
+            Layout::Grid7,
+            Layout::Grid8,
+            Layout::Grid9,
+        ];
+        let cells = layouts.map(place);
+        let edge =
+            |origin: f64, size: f64, index: usize| origin + (size * index as f64 / 3.0).round();
+        for (index, cell) in cells.into_iter().enumerate() {
+            let (col, row) = (index % 3, index / 3);
+            let (x, y) = (edge(AREA.x, AREA.w, col), edge(AREA.y, AREA.h, row));
+            let (right, bottom) = (edge(AREA.x, AREA.w, col + 1), edge(AREA.y, AREA.h, row + 1));
+            assert_eq!(cell, Rect::new(x, y, right - x, bottom - y));
+        }
+    }
+
+    #[test]
     fn every_layout_has_a_unique_key_and_shortcut() {
         let keys: std::collections::HashSet<_> = Layout::ALL.iter().map(|l| l.key()).collect();
         let shortcuts: std::collections::HashSet<_> =
             Layout::ALL.iter().map(|l| l.default_shortcut()).collect();
-        assert_eq!((keys.len(), shortcuts.len()), (13, 13));
+        assert_eq!((keys.len(), shortcuts.len()), (22, 22));
         assert!(Layout::ALL.iter().all(|l| l.place(AREA, WINDOW).w > 0.0));
     }
 

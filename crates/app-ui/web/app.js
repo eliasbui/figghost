@@ -50,6 +50,7 @@ function throttleBy(key, ms, fn) {
 const I18N = {
   en: {
     'side.search': 'Search settings', 'side.clear': 'Clear search', 'side.none': 'No settings found',
+    'cat.general': 'General', 'cat.scroll': 'Mouse & Cursor', 'cat.notch': 'Notch & Island', 'cat.clipboard': 'Clipboard & Tools', 'cat.tiling': 'Window & Keys',
     'nav.general': 'General', 'nav.keys': 'Shortcuts', 'nav.scroll': 'Scrolling', 'nav.clipboard': 'Clipboard', 'nav.notch': 'Notch', 'nav.agents': 'AI agents', 'nav.tiling': 'Window snapping', 'nav.about': 'About',
     'page.general': 'General', 'page.general.sub': 'Startup, language and permissions.',
     'page.keys': 'Shortcuts', 'page.keys.sub': 'The keys Figghost listens to, in one place. Click a shortcut, then press the new keys.',
@@ -137,10 +138,13 @@ const I18N = {
     'shelf.count': 'Files on the shelf', 'shelf.clear': 'Clear shelf', 'shelf.clear.desc': 'Removes the references only. Your files are not touched.',
     'sec.shelf': 'Shelf',
 
-    'tiling.enable.title': 'Window snapping', 'tiling.enable.desc': 'Move and resize the focused window with a shortcut. Needs Accessibility.',
+    'tiling.enable.title': 'Window snapping', 'tiling.enable.desc': 'Move and resize the focused window with a shortcut. Command+1–9 are global and may replace shortcuts in other apps. Needs Accessibility.',
     'tiling.reset': 'Reset shortcuts', 'tiling.none': 'None', 'tiling.clear': 'Clear shortcut',
     'layout.left': 'Left half', 'layout.right': 'Right half', 'layout.top': 'Top half', 'layout.bottom': 'Bottom half', 'layout.top_left': 'Top left', 'layout.top_right': 'Top right', 'layout.bottom_left': 'Bottom left', 'layout.bottom_right': 'Bottom right',
     'layout.maximize': 'Maximize', 'layout.center': 'Center', 'layout.first_third': 'First third', 'layout.center_third': 'Center third', 'layout.last_third': 'Last third',
+    'layout.grid_1': 'Cell 1 · top left', 'layout.grid_2': 'Cell 2 · top middle', 'layout.grid_3': 'Cell 3 · top right',
+    'layout.grid_4': 'Cell 4 · middle left', 'layout.grid_5': 'Cell 5 · center', 'layout.grid_6': 'Cell 6 · middle right',
+    'layout.grid_7': 'Cell 7 · bottom left', 'layout.grid_8': 'Cell 8 · bottom middle', 'layout.grid_9': 'Cell 9 · bottom right',
 
     'about.line': 'Smooth scrolling like Mos, clipboard history like Maccy, a notch toolbox like OneNotch.',
     'about.version': 'Version', 'about.privacy': 'Privacy', 'about.privacy.val': 'Everything stays on this Mac. The only thing Figghost asks the network by itself is whether a new version exists, once a day.', 'about.quit': 'Quit Figghost',
@@ -165,6 +169,7 @@ const I18N = {
   },
   vi: {
     'side.search': 'Tìm chức năng', 'side.clear': 'Xóa tìm kiếm', 'side.none': 'Không có mục nào',
+    'cat.general': 'Cài đặt chung', 'cat.scroll': 'Chuột & Thao tác', 'cat.notch': 'Notch & Tiện ích', 'cat.clipboard': 'Bảng tạm & Công cụ', 'cat.tiling': 'Cửa sổ & Phím tắt',
     'nav.general': 'Chung', 'nav.keys': 'Phím tắt', 'nav.scroll': 'Cuộn chuột', 'nav.clipboard': 'Clipboard', 'nav.notch': 'Notch', 'nav.agents': 'Tác tử AI', 'nav.tiling': 'Chia cửa sổ', 'nav.about': 'Giới thiệu',
     'page.general': 'Chung', 'page.general.sub': 'Khởi động, ngôn ngữ và quyền truy cập.',
     'page.keys': 'Phím tắt', 'page.keys.sub': 'Mọi phím Figghost dùng, gom về một chỗ. Nhấn vào một phím tắt rồi bấm tổ hợp phím mới.',
@@ -252,10 +257,13 @@ const I18N = {
     'shelf.count': 'Tệp trên khay', 'shelf.clear': 'Dọn khay', 'shelf.clear.desc': 'Chỉ xóa phần tham chiếu. Tệp của bạn không bị động tới.',
     'sec.shelf': 'Khay tệp',
 
-    'tiling.enable.title': 'Chia cửa sổ', 'tiling.enable.desc': 'Di chuyển và đổi cỡ cửa sổ đang dùng bằng phím tắt. Cần quyền Trợ năng.',
+    'tiling.enable.title': 'Chia cửa sổ', 'tiling.enable.desc': 'Di chuyển và đổi cỡ cửa sổ đang dùng bằng phím tắt. Command+1–9 là phím toàn hệ thống, có thể thay phím tắt của ứng dụng khác. Cần quyền Trợ năng.',
     'tiling.reset': 'Đặt lại phím tắt', 'tiling.none': 'Chưa có', 'tiling.clear': 'Xóa phím tắt',
     'layout.left': 'Nửa trái', 'layout.right': 'Nửa phải', 'layout.top': 'Nửa trên', 'layout.bottom': 'Nửa dưới', 'layout.top_left': 'Góc trên trái', 'layout.top_right': 'Góc trên phải', 'layout.bottom_left': 'Góc dưới trái', 'layout.bottom_right': 'Góc dưới phải',
     'layout.maximize': 'Phóng to tối đa', 'layout.center': 'Giữa màn hình', 'layout.first_third': 'Một phần ba đầu', 'layout.center_third': 'Một phần ba giữa', 'layout.last_third': 'Một phần ba cuối',
+    'layout.grid_1': 'Ô 1 · trên trái', 'layout.grid_2': 'Ô 2 · trên giữa', 'layout.grid_3': 'Ô 3 · trên phải',
+    'layout.grid_4': 'Ô 4 · giữa trái', 'layout.grid_5': 'Ô 5 · chính giữa', 'layout.grid_6': 'Ô 6 · giữa phải',
+    'layout.grid_7': 'Ô 7 · dưới trái', 'layout.grid_8': 'Ô 8 · dưới giữa', 'layout.grid_9': 'Ô 9 · dưới phải',
 
     'about.line': 'Cuộn mượt như Mos, lịch sử clipboard như Maccy, hộp công cụ notch như OneNotch.',
     'about.version': 'Phiên bản', 'about.privacy': 'Riêng tư', 'about.privacy.val': 'Mọi thứ nằm trên máy Mac này. Thứ duy nhất Figghost tự hỏi qua mạng là đã có bản mới hay chưa, mỗi ngày một lần.', 'about.quit': 'Thoát Figghost',
@@ -1508,6 +1516,9 @@ const LAYOUT_RECTS = {
   left: [0, 0, 0.5, 1], right: [0.5, 0, 0.5, 1], top: [0, 0, 1, 0.5], bottom: [0, 0.5, 1, 0.5],
   top_left: [0, 0, 0.5, 0.5], top_right: [0.5, 0, 0.5, 0.5], bottom_left: [0, 0.5, 0.5, 0.5], bottom_right: [0.5, 0.5, 0.5, 0.5],
   maximize: [0, 0, 1, 1], center: [0.2, 0.18, 0.6, 0.64], first_third: [0, 0, 1 / 3, 1], center_third: [1 / 3, 0, 1 / 3, 1], last_third: [2 / 3, 0, 1 / 3, 1],
+  grid_1: [0, 0, 1 / 3, 1 / 3], grid_2: [1 / 3, 0, 1 / 3, 1 / 3], grid_3: [2 / 3, 0, 1 / 3, 1 / 3],
+  grid_4: [0, 1 / 3, 1 / 3, 1 / 3], grid_5: [1 / 3, 1 / 3, 1 / 3, 1 / 3], grid_6: [2 / 3, 1 / 3, 1 / 3, 1 / 3],
+  grid_7: [0, 2 / 3, 1 / 3, 1 / 3], grid_8: [1 / 3, 2 / 3, 1 / 3, 1 / 3], grid_9: [2 / 3, 2 / 3, 1 / 3, 1 / 3],
 };
 
 function layoutTile(layout) {
@@ -1681,6 +1692,18 @@ function pageAbout() {
   ];
 }
 
+const CATEGORIES = [
+  { id: 'general', icon: 'gearshape.fill', pages: ['general', 'mole', 'about'] },
+  { id: 'scroll', icon: 'computermouse.fill', pages: ['scroll', 'cursor', 'wheel'] },
+  { id: 'notch', icon: 'rectangle.topthird.inset.filled', pages: ['notch', 'calendar', 'agents', 'musicwidget'] },
+  { id: 'clipboard', icon: 'doc.on.clipboard.fill', pages: ['clipboard', 'smart', 'translate', 'capture', 'vision'] },
+  { id: 'tiling', icon: 'rectangle.split.2x1.fill', pages: ['tiling', 'pin', 'keys'] },
+];
+
+function categoryOf(pageId) {
+  return CATEGORIES.find((c) => c.pages.includes(pageId)) || CATEGORIES[0];
+}
+
 const PAGES = [
   { id: 'general', icon: 'gearshape.fill', build: pageGeneral },
   { id: 'keys', icon: 'keyboard', build: pageKeys },
@@ -1698,7 +1721,14 @@ const PLUGINS = window.__plugins || [];
 for (const p of PLUGINS) {
   Object.assign(I18N.en, p.en || {});
   Object.assign(I18N.vi, p.vi || {});
-  if (p.build) PAGES.splice(PAGES.findIndex((x) => x.id === 'tiling'), 0, { id: p.id, icon: p.icon || 'info.circle.fill', build: p.build });
+  if (p.build) {
+    if (!PAGES.some((x) => x.id === p.id)) {
+      PAGES.splice(PAGES.findIndex((x) => x.id === 'tiling'), 0, { id: p.id, icon: p.icon || 'info.circle.fill', build: p.build });
+    }
+    if (!CATEGORIES.some((c) => c.pages.includes(p.id))) {
+      CATEGORIES[CATEGORIES.length - 1].pages.push(p.id);
+    }
+  }
 }
 function slotsFor(pageId) {
   return PLUGINS.flatMap((p) => (p.slots && p.slots[pageId] ? [].concat(p.slots[pageId]()) : []));
@@ -1751,9 +1781,13 @@ function applySearch(query) {
   const index = searchWords.length ? pageTexts() : null;
   let shown = 0;
   for (const item of document.querySelectorAll('.nav-item')) {
-    const text = index ? index.get(item.dataset.page) || '' : '';
-    item.hidden = !!index && !searchWords.every((w) => text.includes(w));
-    if (!item.hidden) shown += 1;
+    const cat = CATEGORIES.find((c) => c.id === item.dataset.page);
+    const match = !index || (cat && cat.pages.some((pid) => {
+      const text = index.get(pid) || '';
+      return searchWords.every((w) => text.includes(w));
+    }));
+    item.hidden = !match;
+    if (match) shown += 1;
   }
   for (const sep of document.querySelectorAll('.nav-sep')) sep.hidden = searchWords.length > 0;
   const empty = $('.nav-empty');
@@ -1781,7 +1815,16 @@ function navSearch() {
       applySearch('');
     } else if (e.key === 'Enter') {
       const first = [...document.querySelectorAll('.nav-item')].find((item) => !item.hidden);
-      if (first) { go(first.dataset.page); reveal(searchWords); }
+      if (first) {
+        const cat = CATEGORIES.find((c) => c.id === first.dataset.page);
+        const index = pageTexts();
+        const hit = (cat ? cat.pages : []).find((pid) => {
+          const text = index.get(pid) || '';
+          return searchWords.every((w) => text.includes(w));
+        }) || (cat ? (cat.lastPage || cat.pages[0]) : first.dataset.page);
+        go(hit);
+        reveal(searchWords);
+      }
     }
   });
   // Command-F finds, as in any Mac window. Bound once: the shell is rebuilt when the language changes.
@@ -1799,27 +1842,41 @@ function navSearch() {
 }
 
 function renderNavItems() {
-  const groupOf = (id) => {
-    if (id === 'general' || id === 'keys') return 1;
-    if (['scroll', 'clipboard', 'tiling', 'pin', 'cursor'].includes(id)) return 2;
-    if (['notch', 'agents', 'calendar'].includes(id)) return 3;
-    if (['smart', 'translate', 'capture', 'vision'].includes(id)) return 4;
-    return 5;
-  };
-  const sorted = [...PAGES].sort((a, b) => groupOf(a.id) - groupOf(b.id));
-  const elements = [];
-  let lastGroup = null;
-  for (const p of sorted) {
-    const g = groupOf(p.id);
-    if (lastGroup !== null && g !== lastGroup) {
-      elements.push(h('div', { class: 'nav-sep', 'aria-hidden': 'true' }));
-    }
-    lastGroup = g;
-    elements.push(h('button', { class: 'nav-item', 'data-page': p.id, 'data-name': t('nav.' + p.id), onclick: () => { go(p.id); reveal(searchWords); } },
-      h('span', { class: 'nav-icon' }, icon(p.icon)),
-      h('span', { class: 'nav-label', text: t('nav.' + p.id) })));
+  return CATEGORIES.map((cat) =>
+    h('button', {
+      class: 'nav-item',
+      'data-page': cat.id,
+      'data-name': t('cat.' + cat.id),
+      onclick: () => {
+        const target = cat.lastPage || cat.pages[0];
+        go(target);
+        reveal(searchWords);
+      },
+    },
+    h('span', { class: 'nav-icon' }, icon(cat.icon)),
+    h('span', { class: 'nav-label', text: t('cat.' + cat.id) }))
+  );
+}
+
+function renderSubtabs(cat, activeId) {
+  const container = $('#subtabs');
+  if (!container) return;
+  if (!cat || cat.pages.length <= 1) {
+    container.replaceChildren();
+    container.hidden = true;
+    return;
   }
-  return elements;
+  container.hidden = false;
+  const pills = cat.pages.map((pid) => {
+    const isCur = pid === activeId;
+    return h('button', {
+      class: 'subtab' + (isCur ? ' active' : ''),
+      'aria-pressed': String(isCur),
+      'aria-label': t('nav.' + pid),
+      onclick: () => go(pid),
+    }, t('nav.' + pid));
+  });
+  container.replaceChildren(h('div', { class: 'subtabs-bar' }, ...pills));
 }
 
 function buildShell() {
@@ -1831,10 +1888,14 @@ function buildShell() {
         navSearch(),
         h('nav', { id: 'nav', 'aria-label': 'Figghost' },
           ...renderNavItems(),
-          h('div', { class: 'nav-empty', hidden: true, text: t('side.none') }))),
+          h('div', { class: 'nav-empty', hidden: true, text: t('side.none') })),
+        accessPill()),
       h('main', { id: 'main' },
         h('div', { class: 'dragzone', 'data-drag': '' }),
-        h('header', { class: 'page-head' }, h('h1', { class: 'page-title', id: 'title' }), h('p', { class: 'page-sub', id: 'subtitle' })),
+        h('header', { class: 'page-head' },
+          h('h1', { class: 'page-title', id: 'title' }),
+          h('div', { id: 'subtabs', class: 'page-subtabs' }),
+          h('p', { class: 'page-sub', id: 'subtitle' })),
         h('div', { id: 'scroller' }))),
     h('div', { id: 'toast', 'aria-live': 'polite' }),
     h('div', { id: 'modal' }));
@@ -1845,15 +1906,19 @@ function go(id) {
   closeMenu();
   const page = PAGES.find((p) => p.id === id) || PAGES[0];
   current = page.id;
+  const cat = categoryOf(current);
+  cat.lastPage = current;
   dropSyncs(pageSyncs);
   graphs.clear();
-  $('#title').textContent = t('page.' + page.id);
-  $('#subtitle').textContent = t('page.' + page.id + '.sub');
+  $('#title').textContent = t('cat.' + cat.id);
+  const sub = $('#subtitle');
+  if (sub) sub.textContent = t('page.' + page.id + '.sub');
+  renderSubtabs(cat, current);
   const scroller = $('#scroller');
   pageSyncs = scoped(() => scroller.replaceChildren(h('div', { class: 'page' }, [].concat(page.build(), slotsFor(page.id)))));
   scroller.scrollTop = 0;
   for (const item of document.querySelectorAll('.nav-item')) {
-    if (item.dataset.page === current) item.setAttribute('aria-current', 'page'); else item.removeAttribute('aria-current');
+    if (item.dataset.page === cat.id) item.setAttribute('aria-current', 'page'); else item.removeAttribute('aria-current');
   }
   send({ t: 'page', id: current });
 }
@@ -1946,7 +2011,7 @@ window.__selftest = function () {
       search('zzqx');
       expect(shown().length === 0 && !$('.nav-empty').hidden, 'a search that matches nothing says so');
       search('');
-      expect(shown().length === PAGES.length && $('.nav-empty').hidden, 'clearing the search shows every page');
+      expect(shown().length === CATEGORIES.length && $('.nav-empty').hidden, 'clearing the search shows every page');
     }
 
     // Shortcut helpers.
@@ -2015,7 +2080,8 @@ window.__selftest = function () {
     expect(sent.some((m) => m.t === 'hotkey' && m.target === 'clipboard' && m.value === 'opt+cmd+v'), 'a combination is sent: ' + JSON.stringify(sent));
     expect(sent.some((m) => m.t === 'recording' && m.on === false), 'recording stops');
     go('tiling');
-    expect(document.querySelectorAll('.tile').length === 13, 'thirteen layouts are shown');
+    expect(document.querySelectorAll('.tile').length === 22, 'all 22 layouts are shown');
+    expect(S.tiling.layouts[13].key === 'grid_1' && S.tiling.layouts[13].shortcut === 'cmd+1', 'the first grid cell uses Command+1');
 
     // The keys inside the panels are recorded like any shortcut, Delete included, and the clipboard page
     // lists the ones in use.

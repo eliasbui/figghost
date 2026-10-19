@@ -63,7 +63,16 @@
       { "key": "center", "shortcut": "", "default": "ctrl+opt+c" },
       { "key": "first_third", "shortcut": "ctrl+opt+d", "default": "ctrl+opt+d" },
       { "key": "center_third", "shortcut": "ctrl+opt+f", "default": "ctrl+opt+f" },
-      { "key": "last_third", "shortcut": "ctrl+opt+g", "default": "ctrl+opt+g" }
+      { "key": "last_third", "shortcut": "ctrl+opt+g", "default": "ctrl+opt+g" },
+      { "key": "grid_1", "shortcut": "cmd+1", "default": "cmd+1" },
+      { "key": "grid_2", "shortcut": "cmd+2", "default": "cmd+2" },
+      { "key": "grid_3", "shortcut": "cmd+3", "default": "cmd+3" },
+      { "key": "grid_4", "shortcut": "cmd+4", "default": "cmd+4" },
+      { "key": "grid_5", "shortcut": "cmd+5", "default": "cmd+5" },
+      { "key": "grid_6", "shortcut": "cmd+6", "default": "cmd+6" },
+      { "key": "grid_7", "shortcut": "cmd+7", "default": "cmd+7" },
+      { "key": "grid_8", "shortcut": "cmd+8", "default": "cmd+8" },
+      { "key": "grid_9", "shortcut": "cmd+9", "default": "cmd+9" }
     ]
   }
 }
