@@ -8,13 +8,16 @@
 
 use block2::RcBlock;
 use objc2::MainThreadMarker;
-use objc2_app_kit::{NSApplicationWillTerminateNotification, NSModalResponseOK, NSOpenPanel};
+use objc2_app_kit::{
+    NSApplicationWillTerminateNotification, NSCursor, NSEvent, NSEventMask, NSModalResponseOK,
+    NSOpenPanel,
+};
 use objc2_core_graphics::{CGColorSpace, CGContext};
 use objc2_foundation::{NSArray, NSNotification, NSNotificationCenter, NSString};
 use std::ffi::{CString, c_void};
 use std::path::PathBuf;
 use std::ptr::{NonNull, null};
-use std::sync::Once;
+use std::sync::{Mutex, Once};
 use std::sync::atomic::{AtomicBool, Ordering};
 
 type Ref = *mut c_void;
@@ -126,6 +129,74 @@ unsafe extern "C" {
         callbacks: *const c_void,
     ) -> Ref;
     fn CFStringCreateWithCString(allocator: Ref, text: *const i8, encoding: u32) -> Ref;
+}
+
+/// What the system's own arrow and hand look like (size and hot spot), seen before the first replacement, so that
+/// `was_reset` can tell when the window server shows one of them again.
+static DEFAULTS: Mutex<Vec<[i32; 4]>> = Mutex::new(Vec::new());
+
+fn signature(cursor: &NSCursor) -> [i32; 4] {
+    let size = cursor.image().size();
+    let spot = cursor.hotSpot();
+    [size.width, size.height, spot.x, spot.y].map(|v| v.round() as i32)
+}
+
+/// Called before the first replacement. Cursors left registered by an earlier run are given back first, or the
+/// "system" cursors seen here would be those.
+fn remember_defaults() {
+    let mut defaults = DEFAULTS.lock().unwrap_or_else(|e| e.into_inner());
+    if defaults.is_empty() {
+        restore();
+        *defaults = vec![
+            signature(&NSCursor::arrowCursor()),
+            signature(&NSCursor::pointingHandCursor()),
+        ];
+    }
+}
+
+/// Whether the pointer shows the system's own arrow or hand again: the app in front sets its cursor whenever the
+/// pointer crosses into another part of its window, and that puts the system's back.
+#[allow(deprecated)]
+pub fn was_reset() -> bool {
+    let Some(current) = NSCursor::currentSystemCursor() else {
+        return false;
+    };
+    let seen = signature(&current);
+    DEFAULTS
+        .lock()
+        .unwrap_or_else(|e| e.into_inner())
+        .contains(&seen)
+}
+
+/// Calls `f` when the pointer moves (anywhere but in this app's own windows) and the system's cursor is showing
+/// again, at most every 50 ms. Stops when dropped.
+pub struct Watch(Option<objc2::rc::Retained<objc2::runtime::AnyObject>>);
+
+impl Watch {
+    pub fn new(f: impl Fn() + 'static) -> Self {
+        let last = std::cell::Cell::new(std::time::Instant::now());
+        let handler = RcBlock::new(move |_: NonNull<NSEvent>| {
+            if last.get().elapsed().as_millis() >= 50 {
+                last.set(std::time::Instant::now());
+                if was_reset() {
+                    f();
+                }
+            }
+        });
+        Self(NSEvent::addGlobalMonitorForEventsMatchingMask_handler(
+            NSEventMask::MouseMoved | NSEventMask::LeftMouseDragged,
+            &handler,
+        ))
+    }
+}
+
+impl Drop for Watch {
+    fn drop(&mut self) {
+        if let Some(token) = self.0.take() {
+            // SAFETY: the token came from addGlobalMonitorForEventsMatchingMask and is removed once.
+            unsafe { NSEvent::removeMonitor(&token) };
+        }
+    }
 }
 
 /// Whether this process has replaced a cursor and not given it back.
@@ -412,6 +483,7 @@ pub fn apply(
         return false;
     }
     let size = size.clamp(8.0, 128.0);
+    remember_defaults();
     let Some(stacked) = frames.stacked(order, (size * 2.0).round() as usize) else {
         return false;
     };

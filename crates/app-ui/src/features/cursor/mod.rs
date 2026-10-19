@@ -161,6 +161,7 @@ pub struct Feature {
     /// The file of the `custom` theme could not be read.
     unreadable: Cell<bool>,
     refresh: RefCell<Option<Timer>>,
+    watch: RefCell<Option<cursor_ui::Watch>>,
     me: Weak<Feature>,
 }
 
@@ -174,6 +175,7 @@ pub fn attach(env: &AttachEnv) -> Option<Rc<Feature>> {
         applied: Cell::new(false),
         unreadable: Cell::new(false),
         refresh: RefCell::new(None),
+        watch: RefCell::new(None),
         me: me.clone(),
     });
     if let Err(fault) = feature.configure(&config) {
@@ -208,6 +210,7 @@ impl Feature {
             }
             self.applied.set(false);
             self.refresh.take();
+            self.watch.take();
             return Ok(());
         }
         let result = self.install(config);
@@ -219,6 +222,7 @@ impl Feature {
             self.keep_applied();
         } else {
             self.refresh.take();
+            self.watch.take();
         }
         result
     }
@@ -228,6 +232,13 @@ impl Feature {
         if self.refresh.borrow().is_some() {
             return;
         }
+        let reset = self.me.clone();
+        *self.watch.borrow_mut() = Some(cursor_ui::Watch::new(move || {
+            if let Some(feature) = reset.upgrade() {
+                let config = feature.config.borrow().clone();
+                let _ = feature.install(&config);
+            }
+        }));
         let me = self.me.clone();
         *self.refresh.borrow_mut() = Some(app::every(REAPPLY_SECONDS, move || {
             if let Some(feature) = me.upgrade() {
