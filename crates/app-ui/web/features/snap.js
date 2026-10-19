@@ -3,7 +3,7 @@
 // choice of layouts for each screen and the layouts a person makes from a grid.
 (function () {
   // core-window's snap::PER_ROW, templates::MAX_GRID, MAX_CUSTOM and MAX_NAME, and templates::DEFAULT.
-  const PER_ROW = 7;
+  const PER_ROW = 10;
   const MAX_GRID = 6;
   const MAX_CUSTOM = 12;
   const MAX_NAME = 24;
@@ -390,7 +390,7 @@
       expect(document.querySelectorAll('.snap-shape .snap-row').length === 1, 'seven layouts make one row');
       expect(document.querySelector('.snap-cap').textContent === nameFor(state.snap.templates[0]), 'each layout has its name');
       expect(document.querySelectorAll('.snap-cell')[3].querySelectorAll('.snap-mini i').length === 4, 'quarters are drawn with four cells');
-      for (const [n, rows] of [[1, [1]], [7, [7]], [8, [4, 4]], [9, [5, 4]], [15, [5, 5, 5]], [22, [6, 6, 5, 5]]]) {
+      for (const [n, rows] of [[1, [1]], [7, [7]], [8, [8]], [9, [9]], [10, [10]], [11, [6, 5]], [15, [8, 7]], [22, [8, 7, 7]]]) {
         expect(rowLengths(n).join() === rows.join(), 'rows of ' + n + ': ' + rowLengths(n));
       }
 
@@ -409,7 +409,7 @@
       state.snap.templates = catalog();
       runSyncs();
       expect(picks().every((p) => !p.disabled), 'all of them can be chosen');
-      expect(document.querySelectorAll('.snap-shape .snap-row').length === 2, 'and make two rows');
+      expect(document.querySelectorAll('.snap-shape .snap-row').length === 1, 'and fit on one row');
       named(t('snap.layouts.reset')).click();
       expect(state.snap.templates.join() === DEFAULT.join(), 'the reset button restores the defaults');
 

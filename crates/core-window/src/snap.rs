@@ -22,7 +22,7 @@ pub const CELL: (f64, f64) = (84.0, 66.0);
 pub const GAP: f64 = 8.0;
 pub const PAD: f64 = 12.0;
 /// The most layouts in one row; more go on further rows, as even as they can be.
-pub const PER_ROW: usize = 7;
+pub const PER_ROW: usize = 10;
 /// What the row shrinks to once a layout is chosen and the pointer is on the screen: a chip with its name.
 pub const CHIP: (f64, f64) = (176.0, 26.0);
 /// How far from the top edge the pointer must be for the row to appear on a screen without a notch; with one the
@@ -553,23 +553,24 @@ mod tests {
         };
         assert_eq!(lengths(1), [1]);
         assert_eq!(lengths(PER_ROW), [PER_ROW]);
-        assert_eq!(lengths(8), [4, 4]);
-        assert_eq!(lengths(9), [5, 4]);
+        assert_eq!(lengths(8), [8]);
+        assert_eq!(lengths(9), [9]);
+        assert_eq!(lengths(10), [10]);
         assert_eq!(lengths(14), [7, 7]);
-        assert_eq!(lengths(15), [5, 5, 5]);
-        assert_eq!(lengths(22), [6, 6, 5, 5]);
+        assert_eq!(lengths(15), [8, 7]);
+        assert_eq!(lengths(22), [8, 7, 7]);
         assert!(d.cells(0).is_empty());
-        let panel = d.panel(9);
-        assert!(near(panel.w, 5.0 * CELL.0 + 4.0 * GAP + 2.0 * PAD));
+        let panel = d.panel(11);
+        assert!(near(panel.w, 6.0 * CELL.0 + 5.0 * GAP + 2.0 * PAD));
         assert!(near(panel.h, 38.0 + 2.0 * CELL.1 + GAP + PAD));
-        let cells = d.cells(9);
+        let cells = d.cells(11);
         let centre = |first: usize, last: usize| (cells[first].x + right(cells[last])) / 2.0;
         assert!(
-            near(centre(0, 4), -756.0) && near(centre(5, 8), -756.0),
+            near(centre(0, 5), -756.0) && near(centre(6, 10), -756.0),
             "each row is centred"
         );
         assert!(
-            near(bottom(panel) - bottom(cells[8]), PAD),
+            near(bottom(panel) - bottom(cells[10]), PAD),
             "padding below the last row"
         );
     }
@@ -649,7 +650,7 @@ mod tests {
     #[test]
     fn the_pointer_maps_to_a_layout_on_every_row_without_a_dead_spot() {
         let d = plain();
-        for count in [9, 15, 22] {
+        for count in [9, 10, 15, 22] {
             let cells = d.cells(count);
             for (i, c) in cells.iter().enumerate() {
                 assert_eq!(d.zone_at(count, middle(*c)), Some(i), "{count}: layout {i}");
@@ -667,18 +668,21 @@ mod tests {
             }
         }
         // The gap between two rows is split between them.
-        let cells = d.cells(9);
+        let cells = d.cells(11);
         let split = bottom(cells[0]) + GAP / 2.0;
-        assert_eq!(d.zone_at(9, (middle(cells[5]).0, split - 0.01)), Some(1));
-        assert_eq!(d.zone_at(9, (middle(cells[5]).0, split)), Some(5));
+        assert_eq!(d.zone_at(11, (middle(cells[6]).0, split - 0.01)), Some(1));
+        assert_eq!(d.zone_at(11, (middle(cells[6]).0, split)), Some(6));
         // The shorter row reaches the edges of the shape, and the last row the padding below it.
-        let panel = d.panel(9);
-        assert_eq!(d.zone_at(9, (panel.x + 1.0, middle(cells[5]).1)), Some(5));
+        let panel = d.panel(11);
+        assert_eq!(d.zone_at(11, (panel.x + 1.0, middle(cells[6]).1)), Some(6));
         assert_eq!(
-            d.zone_at(9, (right(panel) - 1.0, middle(cells[5]).1)),
-            Some(8)
+            d.zone_at(11, (right(panel) - 1.0, middle(cells[6]).1)),
+            Some(10)
         );
-        assert_eq!(d.zone_at(9, (middle(cells[8]).0, bottom(panel))), Some(8));
+        assert_eq!(
+            d.zone_at(11, (middle(cells[10]).0, bottom(panel))),
+            Some(10)
+        );
     }
 
     #[test]
@@ -788,6 +792,30 @@ mod tests {
         assert_eq!(cells.len(), 3);
         assert_eq!(cells[0], Rect::new(0.0, 25.0, 640.0, 1055.0));
         assert_eq!(m.footprint(), None, "three cells: nothing to land in yet");
+    }
+
+    #[test]
+    fn ten_layouts_fit_one_row_so_moving_down_keeps_the_first_choice() {
+        let d = plain();
+        let templates = templates::choose(&templates::BUILT_IN, &[]);
+        let mut m = Machine::new();
+        m.press(vec![d], vec![templates], (500.0, 300.0), true);
+        drag_to(&mut m, (960.0, 2.0));
+        let first = middle(d.cells(10)[0]);
+        drag_to(&mut m, first);
+        // This was the second row's first tile when ten layouts split into two rows.
+        let below_picker = (first.0, d.frame.y + d.inset + CELL.1 + GAP + CELL.1 / 2.0);
+        drag_to(&mut m, below_picker);
+        assert_eq!(m.view().chosen, Some(0));
+        assert!(m.view().compact);
+        assert_eq!(
+            m.release(below_picker),
+            Some(Dropped {
+                display: 0,
+                template: 0,
+                cell: 0
+            })
+        );
     }
 
     #[test]
