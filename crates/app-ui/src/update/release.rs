@@ -98,7 +98,7 @@ fn sha256_of(digest: &str) -> Option<String> {
 /// The lines of the notes worth showing: the list under `Changes:` (what `scripts/release.sh` writes), or
 /// every list item when the notes were written by hand. The release commit itself is not news, and a
 /// commit's `feat(scope):` label is the author's, not the reader's.
-fn changes(notes: &str) -> Vec<String> {
+pub(super) fn changes(notes: &str) -> Vec<String> {
     let lines: Vec<&str> = notes.lines().map(str::trim).collect();
     let start = lines
         .iter()

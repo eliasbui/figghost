@@ -1,8 +1,8 @@
 //! Runs the real update popup in WebKit without showing a window.
 //!
-//!   update_preview selftest
+//!   update_preview selftest [news]
 //!       runs the page's own checks; exits with status 1 on a failure
-//!   update_preview snap <available|installing|ready|blocked> <out.png> [--dark] [--lang vi] [--few]
+//!   update_preview snap <available|installing|ready|blocked|news> <out.png> [--dark] [--lang vi] [--few] [--slide N]
 //!       renders one state to a PNG; --few shows a short list of changes instead of a long one
 
 use macos_sys::{MainThreadMarker, app, webview::HiddenStage, widgets::image_png};
@@ -14,6 +14,8 @@ mod page;
 
 const WIDTH: f64 = 460.0;
 const HEIGHT: f64 = 540.0;
+/// The window of the news popup.
+const NEWS_SIZE: (f64, f64) = (520.0, 580.0);
 const APP_ICON: &[u8] = include_bytes!("../assets/Figghost.icns");
 
 fn base64(bytes: &[u8]) -> String {
@@ -44,6 +46,20 @@ fn option(args: &[String], name: &str) -> Option<String> {
 
 /// What the app would send the popup, with changes like the ones a real release lists.
 fn sample(state: &str, lang: &str, few: bool) -> Value {
+    if state == "news" {
+        let changes = if few {
+            vec!["Add a thing: it does this", "Fix another"]
+        } else {
+            vec![
+                "New app icon: a friendlier ghost on a deep blue glass tile",
+                "Sidebar with names: every page shows its name beside its icon",
+                "Notch size styles: pick Compact, Standard or Wide, or set each size yourself",
+                "Cleaner Drag wheel page",
+                "What's new after an update: slides when there is a lot",
+            ]
+        };
+        return json!({ "t": "show", "lang": lang, "version": "0.8.0", "changes": changes });
+    }
     let mut changes = vec![
         "Add a Mole page for health, clean, optimize, purge, uninstall, disk usage and history",
         "Check for updates downloads and installs the new version; restart Figghost to use it",
@@ -106,6 +122,9 @@ fn main() {
     let mtm = MainThreadMarker::new().expect("main thread");
     let args: Vec<String> = env::args().skip(1).collect();
     let mode = args.first().cloned().unwrap_or_default();
+    let news = args.get(1).is_some_and(|a| a == "news");
+    let (width, height) = if news { NEWS_SIZE } else { (WIDTH, HEIGHT) };
+    let slide: u32 = option(&args, "--slide").and_then(|n| n.parse().ok()).unwrap_or(0);
     if mode != "selftest" && mode != "snap" {
         eprintln!(
             "usage: update_preview selftest | snap <state> <out.png> [--dark] [--lang vi] [--few]"
@@ -124,7 +143,11 @@ fn main() {
     let icon = image_png(APP_ICON, 64.0, 2.0)
         .map(|png| format!("data:image/png;base64,{}", base64(&png)))
         .unwrap_or_default();
-    let html = page::html(&icon);
+    let html = if news {
+        page::news_html(&icon)
+    } else {
+        page::html(&icon)
+    };
 
     app::run_accessory(mtm, move || {
         let slot: Rc<RefCell<Option<Rc<HiddenStage>>>> = Rc::default();
@@ -144,7 +167,7 @@ fn main() {
         };
         let stage = Rc::new(HiddenStage::new(
             mtm,
-            (WIDTH, HEIGHT),
+            (width, height),
             dark,
             &html,
             on_message,
@@ -164,9 +187,16 @@ fn main() {
                     "document.documentElement.style.background = '{ground}'"
                 ));
             });
+            // Slides: step forward to the one asked for, with the slide's own motion given time to end.
+            let step = Rc::clone(&stage);
+            app::after(0.9, move || {
+                for _ in 0..slide {
+                    step.host.eval("document.getElementById('next').click()");
+                }
+            });
             let shot = Rc::clone(&stage);
-            app::after(1.5, move || {
-                shot.host.snapshot_png(mtm, WIDTH, move |png| {
+            app::after(2.2, move || {
+                shot.host.snapshot_png(mtm, width, move |png| {
                     let Some(png) = png else {
                         println!("the snapshot failed");
                         process::exit(1);

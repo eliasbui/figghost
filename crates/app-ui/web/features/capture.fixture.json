@@ -14,7 +14,9 @@
     "text": "cmd+shift+1",
     "scroll": "",
     "record": "",
-    "gif": ""
+    "gif": "",
+    "again": "",
+    "folder": ""
   },
   "record": {
     "system_audio": false,

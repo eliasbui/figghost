@@ -71,6 +71,13 @@ pub struct NotchConfig {
     pub open_on_hover: bool,
     /// How long the pointer rests on the notch before it opens, 0 to 1000.
     pub hover_delay_ms: u32,
+    /// The least width of the open notch in points, 0 for what each tab needs, otherwise 480 to 1000.
+    pub width: u32,
+    /// The least height of the open notch in points, 0 for what each tab needs, otherwise 260 to 900.
+    pub height: u32,
+    /// The closed notch on a screen without a hardware notch: width 120 to 400 and height 20 to 48, 0 for the default.
+    pub rest_width: u32,
+    pub rest_height: u32,
     /// On a screen without a notch: `notch` shows a black tab, `hidden` only a strip at the top edge.
     pub rest: String,
     /// Keeps the notch out of screenshots and screen recordings.
@@ -105,6 +112,10 @@ impl Default for NotchConfig {
             motion: "spring".into(),
             open_on_hover: true,
             hover_delay_ms: 120,
+            width: 0,
+            height: 0,
+            rest_width: 0,
+            rest_height: 0,
             rest: "notch".into(),
             hide_in_capture: false,
             haptics: true,
@@ -121,6 +132,13 @@ impl Default for NotchConfig {
 }
 
 /// `value` when it is one of `words`, else the default.
+/// A size in points: 0 for automatic, otherwise kept between `least` and `most`.
+pub fn size_or_auto(value: &serde_json::Value, least: u64, most: u64, default: u32) -> u32 {
+    value
+        .as_u64()
+        .map_or(default, |n| if n == 0 { 0 } else { n.clamp(least, most) as u32 })
+}
+
 fn word(value: &serde_json::Value, words: &[&str], default: &str) -> String {
     value
         .as_str()
@@ -183,6 +201,10 @@ impl From<serde_json::Value> for NotchConfig {
             hover_delay_ms: v["hover_delay_ms"]
                 .as_u64()
                 .map_or(d.hover_delay_ms, |ms| ms.min(1000) as u32),
+            width: size_or_auto(&v["width"], 480, 1000, d.width),
+            height: size_or_auto(&v["height"], 260, 900, d.height),
+            rest_width: size_or_auto(&v["rest_width"], 120, 400, d.rest_width),
+            rest_height: size_or_auto(&v["rest_height"], 20, 48, d.rest_height),
             rest: word(&v["rest"], &["notch", "hidden"], &d.rest),
             hide_in_capture: flag("hide_in_capture", d.hide_in_capture),
             haptics: flag("haptics", d.haptics),
@@ -225,6 +247,10 @@ impl NotchConfig {
             },
             hide_in_capture: self.hide_in_capture,
             haptics: self.haptics,
+            min_width: f64::from(self.width),
+            min_height: f64::from(self.height),
+            rest_width: f64::from(self.rest_width),
+            rest_height: f64::from(self.rest_height),
             display: match self.display.strip_prefix("screen:") {
                 Some(name) if !name.is_empty() => Display::Screen(name.to_owned()),
                 _ => match self.display.as_str() {

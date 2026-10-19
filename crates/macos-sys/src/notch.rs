@@ -195,6 +195,14 @@ pub struct Style {
     pub open_page: OpenPage,
     /// The ids of the tabs to show, in order. Empty shows every tab, in the order they were added.
     pub pages: Vec<String>,
+    /// The least width of the open shape in points; 0 lets each page decide. A page narrower than this stays centred
+    /// in it.
+    pub min_width: f64,
+    /// The least height of the open shape in points; 0 lets each page decide.
+    pub min_height: f64,
+    /// The size of the resting shape on a screen without a hardware notch; 0 keeps the default for that side.
+    pub rest_width: f64,
+    pub rest_height: f64,
 }
 
 impl Default for Style {
@@ -211,6 +219,10 @@ impl Default for Style {
             display: Display::Auto,
             open_page: OpenPage::Activity,
             pages: Vec::new(),
+            min_width: 0.0,
+            min_height: 0.0,
+            rest_width: 0.0,
+            rest_height: 0.0,
         }
     }
 }
@@ -1868,6 +1880,17 @@ impl Inner {
         self.panel.setHasShadow(shadow);
         if shadow {
             self.panel.invalidateShadow();
+            // The glass is laid out by SwiftUI a moment after the frame, so the shadow taken now can still be that of
+            // the size before: a dark outline wider than the glass. Taking it again once the glass has caught up
+            // removes it.
+            for seconds in [0.08, 0.3] {
+                let panel = self.panel.clone();
+                crate::app::after(seconds, move || {
+                    if panel.hasShadow() {
+                        panel.invalidateShadow();
+                    }
+                });
+            }
         }
         if shape != Shape::Open {
             self.content.setHidden(true);
@@ -1985,7 +2008,7 @@ impl Inner {
             self.active.set(index);
             self.shown.set(Some(index));
             self.sync_switcher();
-            retarget = self.page_size(index);
+            retarget = self.shape_size(index);
             (page.on_show)();
             if previous != index {
                 // The page comes in from the side it sits on in the strip.
@@ -2076,7 +2099,7 @@ impl Inner {
         let first = !self.is_open();
         let page = page.unwrap_or_else(|| self.page_to_open());
         if first {
-            self.open_size.set(self.page_size(page));
+            self.open_size.set(self.shape_size(page));
             self.switcher.setHidden(false);
             for (i, p) in self.pages.borrow().iter().enumerate() {
                 p.root.setHidden(i != page);
@@ -2107,7 +2130,7 @@ impl Inner {
     }
 
     fn relayout(&self, geometry: NotchGeometry) {
-        self.geometry.set(geometry);
+        self.geometry.set(self.tuned(geometry));
         self.layout_header();
         let shape = self.shape.get();
         let window = self.window_size(shape);
@@ -2172,6 +2195,31 @@ impl Inner {
         })
     }
 
+    /// The size of the open shape on a page: the page's own, no narrower than the width the user chose.
+    fn shape_size(&self, index: usize) -> NSSize {
+        let size = self.page_size(index);
+        let style = self.style.borrow();
+        NSSize::new(
+            size.width.max(style.min_width),
+            size.height.max(style.min_height),
+        )
+    }
+
+    /// The geometry with the resting shape sized as the user chose. Only a screen without a hardware notch follows
+    /// it: the cutout of a real one is what it is.
+    fn tuned(&self, mut geometry: NotchGeometry) -> NotchGeometry {
+        let style = self.style.borrow();
+        if !geometry.hardware {
+            if style.rest_width > 0.0 {
+                geometry.notch.width = style.rest_width;
+            }
+            if style.rest_height > 0.0 {
+                geometry.notch.height = style.rest_height;
+            }
+        }
+        geometry
+    }
+
     /// Where a page's root sits in the content: centred, against the top, below the header.
     fn page_origin(&self, size: NSSize) -> NSPoint {
         let content = self.content_size.get();
@@ -2187,6 +2235,13 @@ impl Inner {
         let largest = (0..count)
             .map(|i| self.page_size(i))
             .fold(EXPANDED_SIZE, union_size);
+        let largest = {
+            let style = self.style.borrow();
+            NSSize::new(
+                largest.width.max(style.min_width),
+                largest.height.max(style.min_height),
+            )
+        };
         self.content_size.set(largest);
         self.content.setFrameSize(largest);
         for i in 0..count {
@@ -2225,8 +2280,9 @@ impl Inner {
             known[index] = size;
         }
         self.sync_content();
-        if self.is_open() && index == self.active.get() && size != self.open_size.get() {
-            self.open_size.set(size);
+        let shape = self.shape_size(index);
+        if self.is_open() && index == self.active.get() && shape != self.open_size.get() {
+            self.open_size.set(shape);
             self.move_to(Shape::Open);
         }
     }
@@ -2325,10 +2381,18 @@ impl Inner {
         if before.material != style.material {
             self.set_material(style.material);
         }
-        if before.display != style.display
+        if (before.display != style.display
+            || before.rest_width != style.rest_width
+            || before.rest_height != style.rest_height)
             && let Some(geometry) = NotchGeometry::detect_on(self.mtm, style.display.clone())
         {
-            self.geometry.set(geometry);
+            self.geometry.set(self.tuned(geometry));
+        }
+        if before.min_width != style.min_width || before.min_height != style.min_height {
+            self.sync_content();
+            if self.is_open() {
+                self.open_size.set(self.shape_size(self.active.get()));
+            }
         }
         if before.pages != style.pages {
             self.sync_order();

@@ -1,14 +1,14 @@
 //! This feature's part of the settings model: the JSON the page renders and the changes it may make.
 //! Pure data with no AppKit, so every rule is covered by plain unit tests.
 
-use super::{Config, Kind};
+use super::{ACTIONS, Config, Kind};
 use crate::settings::model::Fault;
 use serde_json::{Map, Value, json};
 
 /// The state under the key "capture". `runtime` is `Feature::runtime()`, or null when the feature is not running.
 /// `web/features/capture.fixture.json` must have exactly the same keys; a unit test checks it.
 pub fn state(config: &Config, runtime: &Value) -> Value {
-    let shortcuts: Map<String, Value> = Kind::ALL
+    let mut shortcuts: Map<String, Value> = Kind::ALL
         .into_iter()
         .map(|kind| {
             let shortcut = config
@@ -18,6 +18,10 @@ pub fn state(config: &Config, runtime: &Value) -> Value {
             (kind.key().to_owned(), Value::from(shortcut.trim()))
         })
         .collect();
+    for action in ACTIONS {
+        let shortcut = config.shortcuts.get(action).map_or("", String::as_str);
+        shortcuts.insert(action.to_owned(), Value::from(shortcut.trim()));
+    }
     json!({
         "enabled": config.enabled,
         "folder_path": runtime["folder_path"].as_str().unwrap_or(""),
@@ -79,21 +83,27 @@ pub fn set(config: &mut Config, path: &str, value: &Value) -> Option<Result<(), 
 /// This feature's shortcuts as (target, shortcut). A target is "capture" or "capture:<what>", which is what the
 /// page's shortcut recorder sends. Shortcuts are checked against all the others before `set_shortcut` runs.
 pub fn shortcuts(config: &Config) -> Vec<(String, String)> {
-    config
+    let kinds = config
         .bindings()
         .into_iter()
-        .map(|(kind, shortcut)| (format!("capture:{}", kind.key()), shortcut))
-        .collect()
+        .map(|(kind, shortcut)| (format!("capture:{}", kind.key()), shortcut));
+    let actions = config
+        .action_bindings()
+        .into_iter()
+        .map(|(action, shortcut)| (format!("capture:{action}"), shortcut));
+    kinds.chain(actions).collect()
 }
 
 /// Stores a shortcut that was already parsed and checked for conflicts; an empty value removes it, and the
 /// built-in one stays off.
 pub fn set_shortcut(config: &mut Config, target: &str, value: &str) -> Option<Result<(), Fault>> {
     let what = target.strip_prefix("capture:")?;
-    let kind = Kind::ALL.into_iter().find(|k| k.key() == what)?;
-    config
-        .shortcuts
-        .insert(kind.key().to_owned(), value.trim().to_owned());
+    let key = Kind::ALL
+        .into_iter()
+        .map(Kind::key)
+        .chain(ACTIONS)
+        .find(|k| *k == what)?;
+    config.shortcuts.insert(key.to_owned(), value.trim().to_owned());
     Some(Ok(()))
 }
 
@@ -145,6 +155,11 @@ mod tests {
             "cmd+shift+8"
         );
         assert!(set_shortcut(&mut config, "capture:nothing", "cmd+k").is_none());
+        assert!(shortcuts(&config).iter().all(|(t, _)| t != "capture:again"), "an action is off until it has a key");
+        assert!(set_shortcut(&mut config, "capture:again", "cmd+shift+9").unwrap().is_ok());
+        assert!(set_shortcut(&mut config, "capture:folder", "cmd+shift+0").unwrap().is_ok());
+        assert!(shortcuts(&config).contains(&("capture:again".into(), "cmd+shift+9".into())));
+        assert_eq!(state(&config, &Value::Null)["shortcuts"]["folder"], "cmd+shift+0");
         assert!(set_shortcut(&mut config, "tiling:left", "cmd+k").is_none());
     }
 

@@ -2,6 +2,8 @@
 // recording includes. The capture itself runs in the app (features/capture in Rust).
 (function () {
   const KINDS = ['area', 'window', 'screen', 'timer', 'text', 'scroll', 'record', 'gif'];
+  // Shortcuts that are not a kind of capture.
+  const ACTIONS = ['again', 'folder'];
   const RECORD = ['system_audio', 'microphone', 'camera', 'clicks', 'keys'];
   const on = () => S.capture.enabled;
 
@@ -62,6 +64,8 @@
       'capture.kind.scroll': 'Scrolling capture',
       'capture.kind.record': 'Record the screen, again to stop',
       'capture.kind.gif': 'Record a GIF, again to stop',
+      'capture.kind.again': 'Capture again, the same kind as the last one',
+      'capture.kind.folder': 'Open the folder of the captures',
       'sec.capture.record': 'Recordings',
       'capture.record.unsupported': 'Recording needs macOS 15 or later.',
       'capture.record.system_audio.title': 'Computer audio',
@@ -107,6 +111,8 @@
       'capture.kind.scroll': 'Chụp cuộn',
       'capture.kind.record': 'Quay màn hình, bấm lại để dừng',
       'capture.kind.gif': 'Quay GIF, bấm lại để dừng',
+      'capture.kind.again': 'Chụp lại, cùng kiểu với lần trước',
+      'capture.kind.folder': 'Mở thư mục chứa ảnh chụp',
       'sec.capture.record': 'Quay màn hình',
       'capture.record.unsupported': 'Quay màn hình cần macOS 15 trở lên.',
       'capture.record.system_audio.title': 'Âm thanh máy tính',
@@ -138,7 +144,7 @@
             format: (v) => t('capture.seconds', { n: v }),
           })),
         sectionTitle(t('sec.capture.shortcuts')),
-        card(...KINDS.map((kind) => row(t('capture.kind.' + kind), null,
+        card(...KINDS.concat(ACTIONS).map((kind) => row(t('capture.kind.' + kind), null,
           hotkeyButton('capture:' + kind, { allowClear: true, label: t('capture.kind.' + kind) }), { when: on }))),
         sectionTitle(t('sec.capture.record')),
         card(
@@ -150,7 +156,7 @@
     selftest({ expect, go, sent, S }) {
       go('capture');
       const page = document.querySelector('#scroller');
-      expect(page.querySelectorAll('.hotkey').length === KINDS.length, 'capture: a shortcut button per kind');
+      expect(page.querySelectorAll('.hotkey').length === KINDS.length + ACTIONS.length, 'capture: a shortcut button per kind');
       sent.length = 0;
       const keys = [...page.querySelectorAll('.switch')].find((s) => s.getAttribute('aria-label') === t('capture.record.keys.title'));
       const was = S.capture.record.keys;

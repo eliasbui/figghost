@@ -8,6 +8,7 @@
 mod install;
 mod page;
 mod release;
+mod whatsnew;
 
 use crate::{
     config::Config as AppConfig,
@@ -48,12 +49,23 @@ const ICON_POINTS: f64 = 64.0;
 const ICON_SCALE: f64 = 2.0;
 
 /// The settings of updating. Looking for a new version has none: it happens every day.
-#[derive(Debug, Clone, Default, PartialEq, Serialize, Deserialize)]
+#[derive(Debug, Clone, PartialEq, Serialize, Deserialize)]
 #[serde(default)]
 pub struct Config {
     /// Install a new version as soon as it is found instead of asking first. Either way the running app
     /// keeps its version until it is restarted.
     pub auto: bool,
+    /// Open what is new by itself the first time a new version runs.
+    pub whats_new: bool,
+}
+
+impl Default for Config {
+    fn default() -> Self {
+        Self {
+            auto: false,
+            whats_new: true,
+        }
+    }
 }
 
 /// Who started a check: the clock, or a press of the button.
@@ -163,6 +175,8 @@ pub struct UpdateFeature {
     popup: RefCell<Option<Rc<WebWindow>>>,
     /// The popup's page has loaded and can be told things.
     popup_ready: Cell<bool>,
+    /// The window that says what is new in this version.
+    news: RefCell<Option<Rc<WebWindow>>>,
     listeners: RefCell<Vec<Listener>>,
     ticker: RefCell<Option<app::Timer>>,
 }
@@ -177,6 +191,7 @@ impl UpdateFeature {
             phase: RefCell::new(Phase::Idle),
             popup: RefCell::default(),
             popup_ready: Cell::new(false),
+            news: RefCell::default(),
             listeners: RefCell::default(),
             ticker: RefCell::default(),
         });
@@ -187,6 +202,7 @@ impl UpdateFeature {
     /// Starts the daily checks. A program that is not an installed app, such as a build folder or a test
     /// instance, never checks by itself: there is nothing there to update, and a test should stay off the network.
     pub fn start(&self) {
+        self.start_whats_new();
         let Some(bundle) = install::running_bundle() else {
             return;
         };
@@ -480,6 +496,7 @@ mod tests {
     #[test]
     fn updating_by_itself_is_off_until_it_is_turned_on() {
         assert!(!Config::default().auto);
+        assert!(Config::default().whats_new, "the news is on until it is turned off");
         let on: Config = serde_json::from_str(r#"{ "auto": true }"#).unwrap();
         assert!(on.auto);
         let none: Config = serde_json::from_str("{}").unwrap();

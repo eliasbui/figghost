@@ -3,6 +3,13 @@
 
 const PAGE: &str = include_str!("../../web/update.html");
 
+const NEWS_PAGE: &str = include_str!("../../web/whatsnew.html");
+
+/// The page that says what is new in the version that was just installed, with the same `icon`.
+pub fn news_html(icon: &str) -> String {
+    NEWS_PAGE.replace("/*__ICON__*/", icon)
+}
+
 /// `icon` is the app's icon as a data URL, or empty for none.
 pub fn html(icon: &str) -> String {
     PAGE.replace("/*__ICON__*/", icon)
@@ -22,6 +29,17 @@ mod tests {
         for forbidden in ["src=\"http", "href=\"http", "url(http", "@import", "<link "] {
             assert!(!page.contains(forbidden), "found {forbidden}");
         }
+    }
+
+    #[test]
+    fn the_news_page_is_one_self_contained_document() {
+        let page = news_html("data:image/png;base64,AAAA");
+        assert!(!page.contains("/*__ICON__*/"));
+        assert!(page.contains("Content-Security-Policy"));
+        for forbidden in ["src=\"http", "href=\"http", "url(http", "@import", "<link "] {
+            assert!(!page.contains(forbidden), "found {forbidden}");
+        }
+        assert_eq!(NEWS_PAGE.to_lowercase().matches("</script").count(), 2);
     }
 
     #[test]

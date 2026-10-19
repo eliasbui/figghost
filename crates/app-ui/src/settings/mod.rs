@@ -471,6 +471,7 @@ impl SettingsFeature {
             }
             "open_login_settings" => login_item::open_settings(),
             "check_updates" => self.ctx.update.check_now(),
+            "show_whats_new" => self.ctx.update.show_whats_new(),
             "install_update" => self.ctx.update.install_available(),
             "open_release" => self.ctx.update.open_release(),
             "open_config" => {

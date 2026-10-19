@@ -239,6 +239,7 @@ pub fn state(config: &Config, env: &Env) -> Value {
         },
         "update": {
             "auto": config.update.auto,
+            "whats_new": config.update.whats_new,
         },
         "mouse": {
             "smooth": m.smooth,
@@ -340,6 +341,10 @@ fn notch_state(config: &Config, env: &Env) -> Value {
         "motion": n.motion,
         "open_on_hover": n.open_on_hover,
         "hover_delay_ms": n.hover_delay_ms,
+        "width": n.width,
+        "height": n.height,
+        "rest_width": n.rest_width,
+        "rest_height": n.rest_height,
         "rest": n.rest,
         "hide_in_capture": n.hide_in_capture,
         "haptics": n.haptics,
@@ -539,6 +544,10 @@ fn set(config: &mut Config, path: &str, value: &Value) -> Outcome {
             config.menu_icon = flag(value)?;
             Ok(Effect::MenuIcon(config.menu_icon))
         }
+        "update.whats_new" => {
+            config.update.whats_new = flag(value)?;
+            Ok(Effect::None)
+        }
         "update.auto" => {
             config.update.auto = flag(value)?;
             Ok(Effect::None)
@@ -575,6 +584,22 @@ fn set(config: &mut Config, path: &str, value: &Value) -> Outcome {
             let mut words = vec!["last", "activity"];
             words.extend(crate::config::NOTCH_PAGES);
             config.notch.open_page = one_of(value, &words)?;
+            Ok(Effect::Notch)
+        }
+        "notch.width" => {
+            config.notch.width = crate::config::size_or_auto(&json!(number(value, 0.0, 1000.0)?.round() as u64), 480, 1000, 0);
+            Ok(Effect::Notch)
+        }
+        "notch.height" => {
+            config.notch.height = crate::config::size_or_auto(&json!(number(value, 0.0, 900.0)?.round() as u64), 260, 900, 0);
+            Ok(Effect::Notch)
+        }
+        "notch.rest_width" => {
+            config.notch.rest_width = crate::config::size_or_auto(&json!(number(value, 0.0, 400.0)?.round() as u64), 120, 400, 0);
+            Ok(Effect::Notch)
+        }
+        "notch.rest_height" => {
+            config.notch.rest_height = crate::config::size_or_auto(&json!(number(value, 0.0, 48.0)?.round() as u64), 20, 48, 0);
             Ok(Effect::Notch)
         }
         "notch.hover_delay_ms" => {

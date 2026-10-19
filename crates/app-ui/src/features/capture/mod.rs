@@ -100,6 +100,10 @@ impl Kind {
     }
 }
 
+/// Shortcuts that are not a kind of capture: take the last kind again, and open the folder of the captures. Off
+/// until the user gives them a key.
+pub const ACTIONS: [&str; 2] = ["again", "folder"];
+
 #[derive(Debug, Clone, PartialEq, Serialize, Deserialize)]
 #[serde(default)]
 pub struct Config {
@@ -189,6 +193,17 @@ impl Config {
             .collect()
     }
 
+    /// The shortcuts of `ACTIONS` that have a key.
+    pub fn action_bindings(&self) -> Vec<(&'static str, String)> {
+        ACTIONS
+            .into_iter()
+            .filter_map(|action| {
+                let shortcut = self.shortcuts.get(action)?.trim();
+                (!shortcut.is_empty()).then(|| (action, shortcut.to_owned()))
+            })
+            .collect()
+    }
+
     pub fn folder(&self, home: &Path) -> PathBuf {
         let folder = self.folder.trim();
         if let Some(rest) = folder.strip_prefix("~/") {
@@ -274,6 +289,8 @@ pub struct Feature {
     config: RefCell<Config>,
     home: PathBuf,
     hotkeys: RefCell<Vec<Hotkey>>,
+    /// The kind of the last capture asked for, which the "again" shortcut repeats.
+    last: Cell<Option<Kind>>,
     overlay: RefCell<Option<Rc<Overlay>>>,
     busy: Cell<bool>,
     quick: RefCell<Vec<(u64, Rc<QuickPanel>)>>,
@@ -298,6 +315,7 @@ impl Feature {
             config: RefCell::new(config.clone()),
             home: user_home(),
             hotkeys: RefCell::new(Vec::new()),
+            last: Cell::new(None),
             overlay: RefCell::new(None),
             busy: Cell::new(false),
             quick: RefCell::new(Vec::new()),
@@ -458,8 +476,37 @@ impl Feature {
                 )),
             }
         }
+        for (action, shortcut) in self.config.borrow().action_bindings() {
+            let spec = match parse_hotkey(&shortcut) {
+                Ok(spec) => spec,
+                Err(e) => {
+                    notes.push(format!("invalid shortcut '{shortcut}' for {action}: {e}"));
+                    continue;
+                }
+            };
+            let me = self.me.clone();
+            match Hotkey::register(self.mtm, spec.key_code, spec.modifiers, move || {
+                if let Some(feature) = me.upgrade() {
+                    feature.run_action(action);
+                }
+            }) {
+                Ok(hotkey) => hotkeys.push(hotkey),
+                Err(status) => notes.push(format!(
+                    "cannot register '{shortcut}' for {action} (status {status}); another app probably owns it"
+                )),
+            }
+        }
         *self.hotkeys.borrow_mut() = hotkeys;
         notes
+    }
+
+    /// A shortcut of `ACTIONS`. Again takes the area when nothing has been captured yet.
+    fn run_action(&self, action: &str) {
+        match action {
+            "again" => self.take(self.last.get().unwrap_or(Kind::Area)),
+            "folder" => self.open_folder(),
+            _ => {}
+        }
     }
 
     pub fn open_folder(&self) {
@@ -476,6 +523,7 @@ impl Feature {
     /// recording in progress instead.
     pub fn take(&self, kind: Kind) {
         trace::log(&format!("capture: {} requested", kind.key()));
+        self.last.set(Some(kind));
         let text = i18n::current();
         if !screen_capture::capture_supported() {
             capture_ui::toast(self.mtm, text.capture_needs_newer_macos());

@@ -1,0 +1,324 @@
+<!doctype html>
+<html lang="en">
+<head>
+<meta charset="utf-8">
+<meta http-equiv="Content-Security-Policy" content="default-src 'none'; style-src 'unsafe-inline'; script-src 'unsafe-inline'; img-src data:">
+<meta name="viewport" content="width=device-width, initial-scale=1">
+<title>Figghost</title>
+<style>
+:root {
+  color-scheme: light dark;
+  --font: -apple-system, BlinkMacSystemFont, "SF Pro Text", "SF Pro Display", Inter, system-ui, sans-serif;
+  --accent: #007aff;
+  --text: rgba(0, 0, 0, 0.88);
+  --text-2: rgba(0, 0, 0, 0.58);
+  --card: rgba(255, 255, 255, 0.6);
+  --stroke: rgba(0, 0, 0, 0.09);
+  --control: rgba(0, 0, 0, 0.06);
+  --control-hover: rgba(0, 0, 0, 0.1);
+  --dot: rgba(0, 0, 0, 0.18);
+}
+@media (prefers-color-scheme: dark) {
+  :root {
+    --accent: #0a84ff;
+    --text: rgba(255, 255, 255, 0.92);
+    --text-2: rgba(255, 255, 255, 0.6);
+    --card: rgba(255, 255, 255, 0.07);
+    --stroke: rgba(255, 255, 255, 0.1);
+    --control: rgba(255, 255, 255, 0.12);
+    --control-hover: rgba(255, 255, 255, 0.18);
+    --dot: rgba(255, 255, 255, 0.22);
+  }
+}
+* { box-sizing: border-box; }
+html, body {
+  margin: 0;
+  height: 100%;
+  background: transparent;
+  color: var(--text);
+  font: 13px/1.45 var(--font);
+  -webkit-font-smoothing: antialiased;
+  cursor: default;
+  overflow: hidden;
+}
+body { display: flex; flex-direction: column; padding: 44px 28px 22px; }
+.drag { position: fixed; top: 0; left: 0; right: 0; height: 40px; }
+button {
+  height: 30px;
+  padding: 0 18px;
+  font: inherit;
+  color: var(--text);
+  background: var(--control);
+  border: 0.5px solid var(--stroke);
+  border-radius: 8px;
+  cursor: default;
+}
+button:hover { background: var(--control-hover); }
+button.primary { color: #fff; font-weight: 500; background: var(--accent); border-color: transparent; }
+button.primary:hover { filter: brightness(1.08); }
+button[hidden] { display: none; }
+button:focus-visible { outline: 2px solid var(--accent); outline-offset: 2px; }
+
+/* The short form: a header and a list */
+#list-view { display: flex; flex: 1; flex-direction: column; gap: 18px; min-height: 0; }
+#list-view[hidden], #slides-view[hidden] { display: none; }
+.head { display: flex; align-items: center; gap: 16px; }
+.head img { width: 60px; height: 60px; flex: none; }
+.head img:not([src]) { display: none; }
+h1 { margin: 0; font-size: 20px; font-weight: 700; letter-spacing: -0.02em; line-height: 1.25; }
+.sub { margin-top: 3px; color: var(--text-2); }
+ul {
+  flex: 0 1 auto;
+  min-height: 0;
+  margin: 0;
+  padding: 14px 16px 14px 32px;
+  overflow-y: auto;
+  list-style: disc;
+  background: var(--card);
+  border: 0.5px solid var(--stroke);
+  border-radius: 14px;
+  -webkit-user-select: text;
+  user-select: text;
+}
+li { padding-left: 2px; margin-bottom: 10px; }
+li:last-child { margin-bottom: 0; }
+li b { font-weight: 650; }
+ul.empty { list-style: none; padding-left: 16px; color: var(--text-2); }
+.foot { display: flex; justify-content: flex-end; gap: 8px; margin-top: 18px; }
+
+/* The slides: one feature each, sliding sideways */
+#slides-view { display: flex; flex: 1; flex-direction: column; min-height: 0; }
+.viewport { flex: 1; min-height: 0; overflow: hidden; border-radius: 18px; }
+.track { display: flex; height: 100%; transition: transform 0.38s cubic-bezier(0.22, 0.8, 0.28, 1); }
+@media (prefers-reduced-motion: reduce) { .track { transition: none; } }
+.slide { flex: none; width: 100%; display: flex; flex-direction: column; align-items: center; justify-content: center; gap: 14px; padding: 8px 18px 0; text-align: center; }
+.art {
+  display: grid; place-items: center;
+  width: 132px; height: 132px; margin-bottom: 10px;
+  border-radius: 34px;
+  color: #fff; font-size: 56px; font-weight: 700; letter-spacing: -0.03em;
+  background: linear-gradient(145deg, var(--a), var(--b));
+  box-shadow: 0 18px 40px -12px var(--b), inset 0 1.5px 0 rgba(255, 255, 255, 0.45), inset 0 -10px 22px rgba(0, 0, 0, 0.12);
+}
+.art img { width: 100%; height: 100%; border-radius: 34px; }
+.slide h2 { margin: 0; max-width: 24ch; font-size: 26px; font-weight: 720; letter-spacing: -0.03em; line-height: 1.15; }
+.slide p { margin: 0; max-width: 38ch; font-size: 15px; line-height: 1.5; color: var(--text-2); -webkit-user-select: text; user-select: text; }
+.kicker { font-size: 11.5px; font-weight: 650; letter-spacing: 0.08em; text-transform: uppercase; color: var(--accent); }
+.nav { display: flex; align-items: center; justify-content: space-between; gap: 12px; margin-top: 18px; }
+.nav .side { width: 96px; display: flex; }
+.nav .side:last-child { justify-content: flex-end; }
+.dots { display: flex; gap: 7px; }
+.dots i { width: 7px; height: 7px; border-radius: 50%; background: var(--dot); transition: background 0.2s, width 0.2s; }
+.dots i.on { width: 20px; border-radius: 4px; background: var(--accent); }
+</style>
+</head>
+<body>
+<div class="drag" data-drag></div>
+
+<section id="list-view" hidden>
+  <div class="head">
+    <img id="list-icon" alt="">
+    <div><h1 id="list-title"></h1><div class="sub" id="list-sub"></div></div>
+  </div>
+  <ul id="list"></ul>
+  <div class="foot"><button id="list-done" class="primary"></button></div>
+</section>
+
+<section id="slides-view" hidden>
+  <div class="viewport"><div class="track" id="track"></div></div>
+  <div class="nav">
+    <div class="side"><button id="back"></button></div>
+    <div class="dots" id="dots" role="tablist"></div>
+    <div class="side"><button id="next" class="primary"></button></div>
+  </div>
+</section>
+
+<script>window.__icon = "/*__ICON__*/";</script>
+<script>
+(function () {
+  'use strict';
+
+  // More than this many changes are shown as slides, one each, after a first slide that names the version.
+  const SLIDE_FROM = 4;
+  const TEXT = {
+    en: {
+      title: "What's new in Figghost {v}", sub: 'Here is what changed since the last version.',
+      intro: "What's new", count: '{n} new things in this version', swipe: 'Use the arrow keys or the buttons.',
+      done: 'Done', next: 'Next', back: 'Back', start: 'Show me', none: 'This release has no notes. The release page tells more.',
+    },
+    vi: {
+      title: 'Có gì mới trong Figghost {v}', sub: 'Những gì đã thay đổi so với bản trước.',
+      intro: 'Có gì mới', count: '{n} điều mới trong bản này', swipe: 'Dùng phím mũi tên hoặc các nút.',
+      done: 'Xong', next: 'Tiếp', back: 'Quay lại', start: 'Xem ngay', none: 'Bản này chưa có ghi chú. Xem trang phát hành để biết thêm.',
+    },
+  };
+  // Two colours for each slide's picture, taken in turn.
+  const TONES = [['#5ea0ff', '#4b4fe0'], ['#b06cf5', '#6b3fd6'], ['#34c7a4', '#1b86c9'], ['#ff9f5a', '#e0457b'], ['#62c6ff', '#3a63e8']];
+  let lang = 'en';
+  const $ = (id) => document.getElementById(id);
+  const tr = (key, vars) => (TEXT[lang][key] || TEXT.en[key] || key)
+    .replace(/\{(\w+)\}/g, (_, name) => (vars && vars[name] != null ? vars[name] : ''));
+  const send = (message) => window.fig.send(message);
+  const close = () => send({ t: 'action', name: 'close' });
+  const reduced = () => window.matchMedia('(prefers-reduced-motion: reduce)').matches;
+
+  if (window.__icon) $('list-icon').src = window.__icon;
+
+  // "Title: detail" gives a slide a heading and a line under it; a line without that stays a heading.
+  function split(line) {
+    const at = line.indexOf(': ');
+    if (at > 0 && at <= 48 && line.length > at + 2) {
+      const detail = line.slice(at + 2);
+      return { title: line.slice(0, at), detail: detail[0].toUpperCase() + detail.slice(1) };
+    }
+    return { title: line, detail: '' };
+  }
+
+  let index = 0;
+  let count = 0;
+
+  function show(position) {
+    index = Math.max(0, Math.min(count - 1, position));
+    $('track').style.transform = 'translateX(' + (-100 * index) + '%)';
+    [...$('dots').children].forEach((dot, i) => dot.classList.toggle('on', i === index));
+    const last = index === count - 1;
+    $('back').hidden = index === 0;
+    $('next').textContent = last ? tr('done') : index === 0 ? tr('start') : tr('next');
+  }
+
+  function el(tag, cls, text) {
+    const node = document.createElement(tag);
+    if (cls) node.className = cls;
+    if (text != null) node.textContent = text;
+    return node;
+  }
+
+  function renderSlides(m, items) {
+    const track = $('track');
+    const dots = $('dots');
+    track.textContent = '';
+    dots.textContent = '';
+    const intro = el('div', 'slide');
+    const art = el('div', 'art');
+    if (window.__icon) { const img = document.createElement('img'); img.src = window.__icon; img.alt = ''; art.appendChild(img); }
+    art.style.setProperty('--a', TONES[0][0]);
+    art.style.setProperty('--b', TONES[0][1]);
+    intro.append(art, el('div', 'kicker', tr('intro')), el('h2', '', 'Figghost ' + m.version), el('p', '', tr('count', { n: items.length })));
+    track.appendChild(intro);
+    items.forEach((line, i) => {
+      const { title, detail } = split(line);
+      const slide = el('div', 'slide');
+      const badge = el('div', 'art', String(i + 1));
+      const tone = TONES[(i + 1) % TONES.length];
+      badge.style.setProperty('--a', tone[0]);
+      badge.style.setProperty('--b', tone[1]);
+      slide.append(badge, el('div', 'kicker', (i + 1) + ' / ' + items.length), el('h2', '', title));
+      if (detail) slide.appendChild(el('p', '', detail));
+      track.appendChild(slide);
+    });
+    count = items.length + 1;
+    for (let i = 0; i < count; i++) dots.appendChild(el('i'));
+    $('back').textContent = tr('back');
+    track.style.transition = 'none';
+    show(0);
+    // Back on the next frame so that the first picture does not slide in from the previous one.
+    requestAnimationFrame(() => { track.style.transition = reduced() ? 'none' : ''; });
+  }
+
+  function renderList(m, items) {
+    $('list-title').textContent = tr('title', { v: m.version });
+    $('list-sub').textContent = tr('sub');
+    $('list-done').textContent = tr('done');
+    const list = $('list');
+    list.textContent = '';
+    list.classList.toggle('empty', items.length === 0);
+    for (const line of items.length ? items : [tr('none')]) {
+      const { title, detail } = split(line);
+      const item = document.createElement('li');
+      if (detail) { item.appendChild(el('b', '', title)); item.appendChild(document.createTextNode(': ' + detail)); } else item.textContent = title;
+      list.appendChild(item);
+    }
+  }
+
+  function render(m) {
+    lang = TEXT[m.lang] ? m.lang : 'en';
+    document.documentElement.lang = lang;
+    const items = Array.isArray(m.changes) ? m.changes : [];
+    const slides = items.length >= SLIDE_FROM;
+    $('slides-view').hidden = !slides;
+    $('list-view').hidden = slides;
+    if (slides) renderSlides(m, items); else renderList(m, items);
+  }
+
+  window.__fig = { recv(message) { if (message.t === 'show') render(message); } };
+
+  $('next').onclick = () => (index === count - 1 ? close() : show(index + 1));
+  $('back').onclick = () => show(index - 1);
+  $('list-done').onclick = close;
+
+  document.addEventListener('contextmenu', (e) => e.preventDefault());
+  document.addEventListener('mousedown', (e) => { if (e.button === 0 && e.target.closest('[data-drag]')) window.fig.drag(); });
+  document.addEventListener('keydown', (e) => {
+    if (e.key === 'Escape') return close();
+    if ($('slides-view').hidden) return;
+    if (e.key === 'ArrowRight' || e.key === 'Enter' || e.key === ' ') { e.preventDefault(); $('next').click(); }
+    else if (e.key === 'ArrowLeft') { e.preventDefault(); show(index - 1); }
+  });
+
+  // Run by the headless check (examples/update_preview.rs).
+  window.__selftest = function () {
+    const failures = [];
+    const expect = (ok, message) => { if (!ok) failures.push(message); };
+    const sent = [];
+    const real = window.fig.send;
+    window.fig.send = (message) => sent.push(message);
+    const few = ['Add a thing: it does this', 'Fix another'];
+    const many = ['One: first detail', 'Two: second detail', 'Three', 'Four: fourth detail', 'Five: fifth'];
+    try {
+      window.__fig.recv({ t: 'show', lang: 'en', version: '9.9.9', changes: few });
+      expect(!$('list-view').hidden && $('slides-view').hidden, 'a short list is not slides');
+      expect($('list-title').textContent === "What's new in Figghost 9.9.9", 'list title: ' + $('list-title').textContent);
+      expect(document.querySelectorAll('#list li').length === 2, 'one line per change');
+      expect($('list').querySelector('b').textContent === 'Add a thing', 'the label is bold');
+      sent.length = 0; $('list-done').click();
+      expect(sent.some((m) => m.name === 'close'), 'done closes');
+
+      window.__fig.recv({ t: 'show', lang: 'en', version: '9.9.9', changes: [] });
+      expect($('list').classList.contains('empty') && $('list').textContent.includes('no notes'), 'no notes says so');
+
+      window.__fig.recv({ t: 'show', lang: 'en', version: '9.9.9', changes: many });
+      expect($('list-view').hidden && !$('slides-view').hidden, 'a long list is slides');
+      expect(document.querySelectorAll('.slide').length === 6, 'an intro and a slide for each change');
+      expect(document.querySelectorAll('#dots i').length === 6, 'a dot for each slide');
+      expect($('back').hidden && $('next').textContent === 'Show me', 'the first slide has no way back');
+      $('next').click();
+      expect(index === 1 && $('track').style.transform === 'translateX(-100%)', 'next moves one slide');
+      expect($('next').textContent === 'Next' && !$('back').hidden, 'a middle slide has both buttons');
+      document.dispatchEvent(new KeyboardEvent('keydown', { key: 'ArrowLeft' }));
+      expect(index === 0, 'the left arrow goes back');
+      for (let i = 0; i < 5; i++) document.dispatchEvent(new KeyboardEvent('keydown', { key: 'ArrowRight' }));
+      expect(index === 5 && $('next').textContent === 'Done', 'the last slide says Done');
+      sent.length = 0; $('next').click();
+      expect(sent.some((m) => m.name === 'close'), 'Done on the last slide closes');
+      expect(document.querySelectorAll('.slide')[3].querySelector('p') === null, 'a line without detail has no second line');
+
+      window.__fig.recv({ t: 'show', lang: 'vi', version: '9.9.9', changes: many });
+      expect($('next').textContent === 'Xem ngay', 'Vietnamese: ' + $('next').textContent);
+      for (const key of Object.keys(TEXT.en)) if (!TEXT.vi[key]) failures.push('missing in Vietnamese: ' + key);
+      for (const key of Object.keys(TEXT.vi)) if (!TEXT.en[key]) failures.push('missing in English: ' + key);
+
+      window.__fig.recv({ t: 'show', lang: 'en', version: '9.9.9', changes: ['<img src=x onerror=alert(1)>: <b>x</b>', 'b', 'c', 'd'] });
+      expect(!document.querySelector('.slide img[src="x"]') && !document.querySelector('.slide h2 b'), 'notes are not parsed as HTML');
+    } catch (error) {
+      failures.push('exception: ' + (error && error.stack ? error.stack : error));
+    } finally {
+      window.fig.send = real;
+    }
+    return failures;
+  };
+
+  send({ t: 'ready' });
+})();
+</script>
+</body>
+</html>

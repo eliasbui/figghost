@@ -138,6 +138,7 @@ const I18N = {
     'about.update.ready': 'Version {v} is installed. Restart Figghost to use it.', 'about.update.restart': 'Restart',
     'about.update.blocked': 'Version {v} is out, but it could not be installed here: {detail}', 'about.update.open': 'Download',
     'about.update.failed': 'Could not check: {detail}',
+    'update.news.title': "What's new after an update", 'update.news.desc': 'Opens a short tour of the new features the first time a new version runs. Many changes show as slides.', 'update.news.show': "Show what's new",
     'update.auto.title': 'Update automatically', 'update.auto.desc': 'Install a new version as soon as it is found, without asking. Otherwise Figghost asks once a day. Either way, restart Figghost to use it.',
 
     'rec.press': 'Press shortcut', 'rec.esc': 'Esc to cancel',
@@ -237,6 +238,7 @@ const I18N = {
     'about.update.ready': 'Đã cài bản {v}. Khởi động lại Figghost để dùng.', 'about.update.restart': 'Khởi động lại',
     'about.update.blocked': 'Đã có bản {v} nhưng không cài được ở đây: {detail}', 'about.update.open': 'Tải về',
     'about.update.failed': 'Không kiểm tra được: {detail}',
+    'update.news.title': 'Có gì mới sau khi cập nhật', 'update.news.desc': 'Mở bản giới thiệu ngắn các tính năng mới ngay lần đầu chạy bản mới. Nhiều thay đổi sẽ hiện dạng trang trượt.', 'update.news.show': 'Xem có gì mới',
     'update.auto.title': 'Tự động cập nhật', 'update.auto.desc': 'Cài bản mới ngay khi tìm thấy, không hỏi trước. Nếu tắt, Figghost hỏi bạn mỗi ngày một lần. Dù cách nào, bạn cũng cần khởi động lại Figghost để dùng bản mới.',
 
     'rec.press': 'Nhấn phím tắt', 'rec.esc': 'Esc để hủy',
@@ -257,6 +259,14 @@ Object.assign(I18N.en, {
   'notch.hover.title': 'Open on hover', 'notch.hover.desc': 'Move the pointer onto the notch to open it. Off: a click opens it.',
   'notch.delay.title': 'Hover delay', 'notch.delay.desc': 'How long the pointer rests on the notch before it opens. A longer delay keeps it shut when the pointer only passes by.',
   'notch.delay.none': 'Immediately', 'notch.delay.ms': '{n} ms',
+  'notch.width.title': 'Width', 'notch.width.desc': 'How wide the open notch is. Automatic fits each tab; a wider notch keeps the tab in the middle.',
+  'notch.width.auto': 'Automatic', 'notch.width.pt': '{n} pt',
+  'sec.notch.style': 'Size', 'notch.style.compact': 'Compact', 'notch.style.compact.desc': 'A narrower closed pill', 'notch.style.standard': 'Standard', 'notch.style.standard.desc': 'Fits each tab',
+  'notch.style.wide': 'Wide', 'notch.style.wide.desc': 'A big open notch', 'notch.style.custom': 'Custom', 'notch.style.custom.desc': 'Set each size',
+  'notch.style.reset': 'Reset', 'notch.style.reset.title': 'Back to standard', 'notch.style.reset.desc': 'Every size returns to automatic.',
+  'notch.height.title': 'Height', 'notch.height.desc': 'How tall the open notch is. Automatic fits each tab; a taller notch leaves room below it.',
+  'notch.restwidth.title': 'Closed width', 'notch.restwidth.desc': 'How wide the closed notch is on a screen without a hardware notch. A real notch keeps its own size.',
+  'notch.restheight.title': 'Closed height', 'notch.restheight.desc': 'How tall the closed notch is on a screen without a hardware notch.',
   'notch.openpage.title': 'Opens on', 'notch.openpage.desc': 'The tab shown when the notch opens.',
   'notch.openpage.activity': 'What is live', 'notch.openpage.last': 'The last tab used',
   'notch.haptics.title': 'Haptic feedback', 'notch.haptics.desc': 'A light tap on a Force Touch trackpad when the notch opens under the pointer.',
@@ -303,6 +313,14 @@ Object.assign(I18N.vi, {
   'notch.hover.title': 'Mở khi rê chuột', 'notch.hover.desc': 'Đưa con trỏ lên notch để mở. Tắt thì cần nhấp chuột.',
   'notch.delay.title': 'Độ trễ khi rê chuột', 'notch.delay.desc': 'Thời gian con trỏ dừng trên notch trước khi notch mở. Trễ lâu hơn thì notch không mở nhầm khi chuột chỉ lướt qua.',
   'notch.delay.none': 'Ngay lập tức', 'notch.delay.ms': '{n} ms',
+  'notch.width.title': 'Độ rộng', 'notch.width.desc': 'Độ rộng của notch khi mở. Tự động là vừa với từng tab; notch rộng hơn vẫn giữ tab ở giữa.',
+  'notch.width.auto': 'Tự động', 'notch.width.pt': '{n} pt',
+  'sec.notch.style': 'Kích thước', 'notch.style.compact': 'Gọn', 'notch.style.compact.desc': 'Viên đóng hẹp hơn', 'notch.style.standard': 'Chuẩn', 'notch.style.standard.desc': 'Vừa với từng tab',
+  'notch.style.wide': 'Rộng', 'notch.style.wide.desc': 'Notch mở lớn', 'notch.style.custom': 'Tùy chỉnh', 'notch.style.custom.desc': 'Tự đặt từng kích thước',
+  'notch.style.reset': 'Đặt lại', 'notch.style.reset.title': 'Về mặc định', 'notch.style.reset.desc': 'Mọi kích thước trở về tự động.',
+  'notch.height.title': 'Chiều cao', 'notch.height.desc': 'Chiều cao của notch khi mở. Tự động là vừa với từng tab; notch cao hơn thì chừa thêm chỗ bên dưới.',
+  'notch.restwidth.title': 'Độ rộng khi đóng', 'notch.restwidth.desc': 'Độ rộng của notch khi đóng trên màn hình không có tai thỏ. Tai thỏ thật giữ nguyên kích thước của nó.',
+  'notch.restheight.title': 'Chiều cao khi đóng', 'notch.restheight.desc': 'Chiều cao của notch khi đóng trên màn hình không có tai thỏ.',
   'notch.openpage.title': 'Mở vào', 'notch.openpage.desc': 'Tab hiện ra khi notch mở.',
   'notch.openpage.activity': 'Theo hoạt động', 'notch.openpage.last': 'Tab dùng gần nhất',
   'notch.haptics.title': 'Phản hồi xúc giác', 'notch.haptics.desc': 'Một cú chạm nhẹ trên trackpad Force Touch khi notch mở dưới con trỏ.',
@@ -1145,6 +1163,70 @@ function tabRow(page) {
   return row(title, I18N.en['tab.' + page.id + '.desc'] ? t('tab.' + page.id + '.desc') : null, [h('span', { class: 'tab-order' }, up, down), toggle]);
 }
 
+// The sizes of the notch as ready-made styles. 0 is automatic: what each tab needs, or the default pill.
+const NOTCH_SIZES = ['width', 'height', 'rest_width', 'rest_height'];
+const NOTCH_STYLES = {
+  compact: { width: 0, height: 0, rest_width: 150, rest_height: 0 },
+  standard: { width: 0, height: 0, rest_width: 0, rest_height: 0 },
+  wide: { width: 800, height: 520, rest_width: 260, rest_height: 32 },
+};
+const notchStyleOf = () => Object.keys(NOTCH_STYLES).find((k) => NOTCH_SIZES.every((f) => NOTCH_STYLES[k][f] === S.notch[f])) || 'custom';
+
+/** A card with a small drawing of the closed pill and the open shape; `sizes` are the values it stands for. */
+function styleCard(id, sizes, pressed, onPick) {
+  const pill = h('span', { class: 'sc-pill' });
+  const open = h('span', { class: 'sc-open' });
+  const el = h('button', { class: 'style-card', type: 'button', 'aria-pressed': 'false', onclick: onPick },
+    h('span', { class: 'sc-art', 'aria-hidden': 'true' }, pill, open),
+    h('span', { class: 'sc-name', text: t('notch.style.' + id) }),
+    h('span', { class: 'sc-desc', text: t('notch.style.' + id + '.desc') }));
+  reg(() => {
+    const v = sizes();
+    pill.style.width = ((v.rest_width || 200) * 0.2) + 'px';
+    pill.style.height = Math.max(4, (v.rest_height || 24) * 0.2) + 'px';
+    open.style.width = ((v.width || 560) * 0.11) + 'px';
+    open.style.height = ((v.height || 440) * 0.09) + 'px';
+    el.setAttribute('aria-pressed', String(pressed()));
+    $('.sc-name', el).textContent = t('notch.style.' + id);
+    $('.sc-desc', el).textContent = t('notch.style.' + id + '.desc');
+  });
+  return el;
+}
+
+function notchStyleSection(on) {
+  let customOpen = false;
+  const cards = h('div', { class: 'style-cards', role: 'group', 'aria-label': t('sec.notch.style') });
+  for (const id of Object.keys(NOTCH_STYLES)) {
+    cards.append(styleCard(id, () => NOTCH_STYLES[id], () => !customOpen && notchStyleOf() === id, () => {
+      customOpen = false;
+      NOTCH_SIZES.forEach((f) => change('notch.' + f, NOTCH_STYLES[id][f]));
+    }));
+  }
+  cards.append(styleCard('custom', () => S.notch, () => customOpen || notchStyleOf() === 'custom', () => { customOpen = true; runSyncs(); }));
+  const slider = (field, min, max, step, key) => sliderRow({
+    path: 'notch.' + field, title: t(key + '.title'), desc: t(key + '.desc'), min, max, step,
+    format: (v) => (S.notch[field] === 0 ? t('notch.width.auto') : t('notch.width.pt', { n: Math.round(v) })),
+  });
+  const closed = () => on() && !S.notch.hardware;
+  const reset = button(t('notch.style.reset'), () => { customOpen = false; NOTCH_SIZES.forEach((f) => change('notch.' + f, 0)); }, { small: true });
+  const custom = card(
+    slider('width', 480, 1000, 10, 'notch.width'),
+    slider('height', 260, 900, 10, 'notch.height'),
+    row(t('notch.restwidth.title'), t('notch.restwidth.desc'), null, { when: closed }),
+    row(t('notch.restheight.title'), t('notch.restheight.desc'), null, { when: closed }),
+    row(t('notch.style.reset.title'), t('notch.style.reset.desc'), reset));
+  // The two closed sliders replace the plain rows above, so the closed ones are built the same way.
+  custom.replaceChildren(
+    custom.children[0], custom.children[1],
+    ...[slider('rest_width', 120, 400, 5, 'notch.restwidth'), slider('rest_height', 20, 48, 1, 'notch.restheight')]
+      .map((r) => { reg(() => r.classList.toggle('disabled', !closed())); return r; }),
+    custom.children[4]);
+  reg(() => { custom.style.display = customOpen || notchStyleOf() === 'custom' ? '' : 'none'; });
+  const wrap = h('div', { class: 'style-wrap' }, cards, custom);
+  reg(() => wrap.classList.toggle('disabled', !on()));
+  return [sectionTitle(t('sec.notch.style')), wrap];
+}
+
 function pageNotch() {
   const shelfCount = h('span', { class: 'row-title' });
   reg(() => { shelfCount.textContent = String(S.notch.shelf_count); });
@@ -1156,6 +1238,7 @@ function pageNotch() {
   return [
     notchStage(),
     card(toggleRow('notch.enabled', t('notch.panel.title'), t('notch.panel.desc'))),
+    ...notchStyleSection(on),
     sectionTitle(t('sec.notch.behavior')),
     card(
       toggleRow('notch.open_on_hover', t('notch.hover.title'), t('notch.hover.desc'), { when: on }),
@@ -1379,6 +1462,7 @@ function pageAbout() {
       row(t('about.version'), null, h('span', { class: 'row-title', text: S.app.version })),
       updateRow(),
       toggleRow('update.auto', t('update.auto.title'), t('update.auto.desc')),
+      row(t('update.news.title'), t('update.news.desc'), h('div', { class: 'row-actions' }, button(t('update.news.show'), () => send({ t: 'action', name: 'show_whats_new' }), { small: true }), switchEl('update.whats_new', t('update.news.title')))),
       row(t('about.privacy'), t('about.privacy.val'), null),
       row(t('data.title'), S.app.config_dir, button(t('data.open'), () => send({ t: 'action', name: 'open_config' }), { icon: 'folder', small: true }))),
     card(row(t('about.quit'), t('about.quit.desc'), button(t('about.quit'), () => send({ t: 'action', name: 'quit' }), { icon: 'power', small: true, danger: true }))),
@@ -1656,6 +1740,10 @@ window.__selftest = function () {
     material.value = 'accent';
     material.dispatchEvent(new Event('change'));
     expect(sent.some((m) => m.t === 'set' && m.path === 'notch.material' && m.value === 'accent'), 'the material is sent: ' + JSON.stringify(sent));
+    sent.length = 0;
+    document.querySelectorAll('.style-card')[2].click();
+    expect(sent.some((m) => m.path === 'notch.width' && m.value === 800) && sent.some((m) => m.path === 'notch.rest_height' && m.value === 32), 'a style card sends its sizes: ' + JSON.stringify(sent));
+    expect(document.querySelectorAll('.style-card')[2].getAttribute('aria-pressed') === 'true', 'and shows as chosen');
     expect($('.notch').classList.contains('mat-accent'), 'the preview follows the material');
     S.notch.volume_hud = true;
     runSyncs();
