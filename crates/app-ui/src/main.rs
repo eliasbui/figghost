@@ -17,6 +17,7 @@ mod mcp;
 mod media;
 mod menu;
 mod mouse;
+mod permissions_popup;
 mod settings;
 mod shelf;
 mod shelf_actions;
@@ -37,6 +38,7 @@ use live_media::LiveMedia;
 use macos_sys::{MainThreadMarker, app, hello, status_item::StatusMenu, workspace};
 use media::MediaFeature;
 use mouse::Mouse;
+use permissions_popup::PermissionsPopup;
 use settings::SettingsFeature;
 use shelf::ShelfFeature;
 use std::{cell::RefCell, path::PathBuf, rc::Rc, sync::Arc};
@@ -94,6 +96,7 @@ struct Shell {
     settings: Rc<SettingsFeature>,
     status: Rc<StatusMenu>,
     reopen: app::ReopenHandler,
+    permissions_popup: Rc<PermissionsPopup>,
 }
 
 /// Whether the settings window should open now: always when asked for, never at login or when told to
@@ -192,6 +195,7 @@ impl Shell {
             audio.engine.set_on_soft(move |on| hud.set_soft_keys(on));
         }
 
+        let permissions_popup = PermissionsPopup::new(mtm);
         let update = UpdateFeature::new(mtm, home.clone(), Rc::clone(&config));
         let ctx = Rc::new(AppContext {
             mtm,
@@ -206,10 +210,13 @@ impl Shell {
             volume_hud: Rc::clone(&volume_hud),
             tiling: Rc::clone(&tiling),
             update: Rc::clone(&update),
+            permissions_popup: Rc::clone(&permissions_popup),
         });
         let settings = SettingsFeature::new(Rc::clone(&ctx));
         let on_settings = Rc::clone(&settings);
         app::set_settings_handler(move || on_settings.show());
+        let on_perms = Rc::clone(&permissions_popup);
+        app::set_menu_handler("permissions", move || on_perms.show());
         let on_update = Rc::clone(&update);
         app::set_menu_handler("updates", move || on_update.check_from_menu());
         let on_news = Rc::clone(&update);
@@ -234,6 +241,9 @@ impl Shell {
         if show_settings {
             settings.show();
         }
+        if args.iter().any(|a| a == "--permissions" || a == "--check-permissions") {
+            permissions_popup.show();
+        }
         update.start();
         Shell {
             mouse,
@@ -250,6 +260,7 @@ impl Shell {
             settings,
             status,
             reopen,
+            permissions_popup,
         }
     }
 }

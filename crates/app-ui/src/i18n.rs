@@ -137,6 +137,13 @@ impl Language {
         }
     }
 
+    pub fn menu_permissions(self) -> &'static str {
+        match self {
+            Language::English => "Check permissions...",
+            Language::Vietnamese => "Kiểm tra quyền truy cập...",
+        }
+    }
+
     pub fn menu_volume_hud(self) -> &'static str {
         match self {
             Language::English => "Volume indicator in the notch",
@@ -792,6 +799,7 @@ mod tests {
                 language.menu_reverse().to_owned(),
                 language.menu_volume_hud().to_owned(),
                 language.menu_settings().to_owned(),
+                language.menu_permissions().to_owned(),
                 language.pick_app_prompt().to_owned(),
                 language.agents_wants("Claude Code", "Bash"),
                 language.agents_asks("Codex"),

@@ -474,6 +474,7 @@ impl SettingsFeature {
     fn action(&self, name: &str) {
         let mtm = self.ctx.mtm;
         match name {
+            "check_permissions" => self.ctx.permissions_popup.show(),
             "open_accessibility" => {
                 permissions::accessibility_trusted(true);
                 workspace::open_url(ACCESSIBILITY_PANE);

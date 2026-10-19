@@ -95,6 +95,7 @@ const I18N = {
     'lang.restart': 'Restart Figghost to use the new language in menus and the notch.', 'lang.restart.btn': 'Restart now',
     'access.title': 'Accessibility', 'access.desc': 'Needed for smooth scrolling, pasting into other apps, window snapping and the volume indicator.',
     'access.granted': 'Granted', 'access.missing': 'Not granted', 'access.open': 'Open System Settings',
+    'perm.all_title': 'All permissions', 'perm.all_desc': 'Check and grant all system permissions Figghost uses.', 'perm.all_btn': 'Check all permissions…',
     'data.title': 'Settings folder', 'data.desc': 'Where your settings, clipboard history and shelf are stored. Everything stays on this Mac.', 'data.open': 'Open folder',
 
     'sec.wheel': 'Mouse wheel', 'sec.feel': 'Feel', 'sec.try': 'Try it', 'sec.mods': 'Modifier keys', 'sec.apps': 'Apps',
@@ -209,6 +210,7 @@ const I18N = {
     'lang.restart': 'Hãy khởi động lại Figghost để dùng ngôn ngữ mới trong menu và notch.', 'lang.restart.btn': 'Khởi động lại',
     'access.title': 'Trợ năng', 'access.desc': 'Cần cho cuộn mượt, dán vào ứng dụng khác, chia cửa sổ và chỉ báo âm lượng.',
     'access.granted': 'Đã cấp', 'access.missing': 'Chưa cấp', 'access.open': 'Mở Cài đặt hệ thống',
+    'perm.all_title': 'Tất cả quyền', 'perm.all_desc': 'Kiểm tra và cấp tất cả quyền hệ thống mà Figghost sử dụng.', 'perm.all_btn': 'Kiểm tra tất cả quyền…',
     'data.title': 'Thư mục dữ liệu', 'data.desc': 'Nơi lưu cài đặt, lịch sử clipboard và khay tệp. Mọi thứ nằm trên máy Mac này.', 'data.open': 'Mở thư mục',
 
     'sec.wheel': 'Con lăn chuột', 'sec.feel': 'Cảm giác cuộn', 'sec.try': 'Thử ngay', 'sec.mods': 'Phím bổ trợ', 'sec.apps': 'Ứng dụng',
@@ -825,6 +827,7 @@ function pageGeneral() {
     sectionTitle(t('sec.permissions')),
     card(
       access,
+      row(t('perm.all_title'), t('perm.all_desc'), button(t('perm.all_btn'), () => send({ t: 'action', name: 'check_permissions' }), { small: true })),
       row(t('data.title'), t('data.desc'), button(t('data.open'), () => send({ t: 'action', name: 'open_config' }), { icon: 'folder', small: true }))),
   ];
 }

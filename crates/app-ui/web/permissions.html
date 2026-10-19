@@ -1,0 +1,423 @@
+<!doctype html>
+<html lang="en">
+<head>
+<meta charset="utf-8">
+<meta http-equiv="Content-Security-Policy" content="default-src 'none'; style-src 'unsafe-inline'; script-src 'unsafe-inline'; img-src data:">
+<meta name="viewport" content="width=device-width, initial-scale=1">
+<title>Figghost</title>
+<style>
+:root {
+  color-scheme: light dark;
+  --font: -apple-system, BlinkMacSystemFont, "SF Pro Text", "SF Pro Display", Inter, system-ui, sans-serif;
+  --accent: #007aff;
+  --green: #34c759;
+  --green-bg: rgba(52, 199, 89, 0.15);
+  --orange: #ff9500;
+  --orange-bg: rgba(255, 149, 0, 0.15);
+  --text: rgba(0, 0, 0, 0.88);
+  --text-2: rgba(0, 0, 0, 0.58);
+  --card: rgba(255, 255, 255, 0.65);
+  --card-border: rgba(0, 0, 0, 0.08);
+  --control: rgba(0, 0, 0, 0.06);
+  --control-hover: rgba(0, 0, 0, 0.1);
+  --stroke: rgba(0, 0, 0, 0.09);
+}
+@media (prefers-color-scheme: dark) {
+  :root {
+    --accent: #0a84ff;
+    --green: #30d158;
+    --green-bg: rgba(48, 209, 88, 0.2);
+    --orange: #ff9f0a;
+    --orange-bg: rgba(255, 159, 10, 0.2);
+    --text: rgba(255, 255, 255, 0.92);
+    --text-2: rgba(255, 255, 255, 0.6);
+    --card: rgba(255, 255, 255, 0.08);
+    --card-border: rgba(255, 255, 255, 0.12);
+    --control: rgba(255, 255, 255, 0.12);
+    --control-hover: rgba(255, 255, 255, 0.18);
+    --stroke: rgba(255, 255, 255, 0.1);
+  }
+}
+* { box-sizing: border-box; }
+html, body {
+  margin: 0;
+  height: 100%;
+  background: transparent;
+  color: var(--text);
+  font: 13px/1.45 var(--font);
+  -webkit-font-smoothing: antialiased;
+  cursor: default;
+  overflow: hidden;
+}
+body {
+  display: flex;
+  flex-direction: column;
+  padding: 38px 24px 20px;
+}
+.drag {
+  position: fixed;
+  top: 0;
+  left: 0;
+  right: 0;
+  height: 38px;
+  -webkit-app-region: drag;
+}
+header {
+  display: flex;
+  align-items: center;
+  gap: 14px;
+  margin-bottom: 16px;
+  flex: none;
+}
+header img {
+  width: 48px;
+  height: 48px;
+  border-radius: 11px;
+  flex: none;
+}
+header img:not([src]) { display: none; }
+.header-text { flex: 1; min-width: 0; }
+h1 {
+  margin: 0 0 2px;
+  font-size: 19px;
+  font-weight: 700;
+  letter-spacing: -0.02em;
+}
+.subtitle {
+  margin: 0;
+  font-size: 12px;
+  color: var(--text-2);
+}
+.summary-bar {
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  background: var(--card);
+  border: 0.5px solid var(--card-border);
+  border-radius: 10px;
+  padding: 8px 14px;
+  margin-bottom: 12px;
+  flex: none;
+}
+.summary-status {
+  display: flex;
+  align-items: center;
+  gap: 8px;
+  font-weight: 600;
+  font-size: 13px;
+}
+.status-badge {
+  display: inline-flex;
+  align-items: center;
+  gap: 6px;
+  padding: 3px 9px;
+  border-radius: 12px;
+  font-size: 11px;
+  font-weight: 600;
+}
+.status-badge.ok {
+  color: var(--green);
+  background: var(--green-bg);
+}
+.status-badge.warn {
+  color: var(--orange);
+  background: var(--orange-bg);
+}
+.dot {
+  width: 7px;
+  height: 7px;
+  border-radius: 50%;
+  background: currentColor;
+}
+.list-wrap {
+  flex: 1;
+  overflow-y: auto;
+  min-height: 0;
+  padding-right: 4px;
+  display: flex;
+  flex-direction: column;
+  gap: 8px;
+}
+.perm-card {
+  display: flex;
+  align-items: center;
+  gap: 12px;
+  padding: 10px 14px;
+  background: var(--card);
+  border: 0.5px solid var(--card-border);
+  border-radius: 10px;
+  transition: background 0.15s ease;
+}
+.perm-card:hover {
+  background: var(--control-hover);
+}
+.perm-icon {
+  width: 32px;
+  height: 32px;
+  border-radius: 8px;
+  background: var(--control);
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  font-size: 16px;
+  flex: none;
+}
+.perm-info {
+  flex: 1;
+  min-width: 0;
+}
+.perm-name {
+  font-weight: 600;
+  font-size: 13px;
+  margin-bottom: 2px;
+  display: flex;
+  align-items: center;
+  gap: 6px;
+}
+.perm-desc {
+  font-size: 11.5px;
+  color: var(--text-2);
+  line-height: 1.35;
+}
+.perm-actions {
+  display: flex;
+  align-items: center;
+  gap: 8px;
+  flex: none;
+}
+button {
+  height: 28px;
+  padding: 0 12px;
+  font: inherit;
+  font-size: 12px;
+  color: var(--text);
+  background: var(--control);
+  border: 0.5px solid var(--stroke);
+  border-radius: 7px;
+  cursor: default;
+  display: inline-flex;
+  align-items: center;
+  gap: 4px;
+}
+button:hover { background: var(--control-hover); }
+button.primary {
+  color: #fff;
+  font-weight: 500;
+  background: var(--accent);
+  border-color: transparent;
+}
+button.primary:hover { filter: brightness(1.08); }
+button:focus-visible { outline: 2px solid var(--accent); outline-offset: 2px; }
+footer {
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  margin-top: 14px;
+  padding-top: 10px;
+  border-top: 0.5px solid var(--stroke);
+  flex: none;
+}
+.live-note {
+  font-size: 11px;
+  color: var(--text-2);
+  display: flex;
+  align-items: center;
+  gap: 5px;
+}
+.live-pulse {
+  width: 6px;
+  height: 6px;
+  border-radius: 50%;
+  background: var(--green);
+  box-shadow: 0 0 6px var(--green);
+}
+.footer-buttons {
+  display: flex;
+  gap: 8px;
+}
+</style>
+</head>
+<body>
+<div class="drag" onmousedown="window.fig.drag()" ondblclick="window.fig.zoom()"></div>
+
+<header>
+  <img id="icon" src="/*__ICON__*/" alt="Figghost">
+  <div class="header-text">
+    <h1 id="title">Permissions</h1>
+    <p class="subtitle" id="subtitle">All system permissions required by Figghost.</p>
+  </div>
+</header>
+
+<div class="summary-bar">
+  <div class="summary-status" id="summary-text">Checking permissions...</div>
+  <div class="status-badge" id="summary-badge">
+    <span class="dot"></span>
+    <span id="badge-text">...</span>
+  </div>
+</div>
+
+<div class="list-wrap" id="perm-list"></div>
+
+<footer>
+  <div class="live-note">
+    <span class="live-pulse"></span>
+    <span id="live-text">Live checking every second</span>
+  </div>
+  <div class="footer-buttons">
+    <button type="button" id="btn-refresh">Recheck</button>
+    <button type="button" class="primary" id="btn-close">Done</button>
+  </div>
+</footer>
+
+<script>
+const ICONS = {
+  accessibility: '♿️',
+  screen_recording: '🖥️',
+  microphone: '🎙️',
+  camera: '📷',
+  calendar: '📅',
+  reminders: '✅',
+  bluetooth: '🎧',
+  automation: '⚡️'
+};
+
+const STR = {
+  en: {
+    title: 'Permissions',
+    subtitle: 'All system permissions required by Figghost.',
+    recheck: 'Recheck',
+    done: 'Done',
+    live: 'Live checking every second',
+    granted: 'Granted',
+    missing: 'Not granted',
+    grant_btn: 'Grant Access',
+    settings_btn: 'Settings',
+    all_ok: 'All permissions granted',
+    needs_attention: '{n} permissions needed'
+  },
+  vi: {
+    title: 'Quyền truy cập',
+    subtitle: 'Tất cả quyền hệ thống Figghost cần để hoạt động đầy đủ tính năng.',
+    recheck: 'Kiểm tra lại',
+    done: 'Xong',
+    live: 'Tự động kiểm tra trực tiếp theo thời gian thực',
+    granted: 'Đã cấp',
+    missing: 'Chưa cấp',
+    grant_btn: 'Cấp quyền',
+    settings_btn: 'Cài đặt',
+    all_ok: 'Tất cả quyền đã được cấp đầy đủ',
+    needs_attention: 'Cần cấp thêm {n} quyền'
+  }
+};
+
+let currentLang = 'en';
+
+function send(msg) {
+  if (window.fig && window.fig.send) {
+    window.fig.send(msg);
+  }
+}
+
+function render(data) {
+  currentLang = data.lang === 'vi' ? 'vi' : 'en';
+  const t = STR[currentLang];
+
+  document.getElementById('title').textContent = t.title;
+  document.getElementById('subtitle').textContent = t.subtitle;
+  document.getElementById('btn-refresh').textContent = t.recheck;
+  document.getElementById('btn-close').textContent = t.done;
+  document.getElementById('live-text').textContent = t.live;
+
+  const items = data.items || [];
+  const total = items.length;
+  const grantedCount = items.filter(i => i.granted).length;
+  const missingCount = total - grantedCount;
+
+  const summaryText = document.getElementById('summary-text');
+  const summaryBadge = document.getElementById('summary-badge');
+  const badgeText = document.getElementById('badge-text');
+
+  if (missingCount === 0) {
+    summaryText.textContent = t.all_ok;
+    summaryBadge.className = 'status-badge ok';
+    badgeText.textContent = `${grantedCount}/${total} ${t.granted}`;
+  } else {
+    summaryText.textContent = t.needs_attention.replace('{n}', missingCount);
+    summaryBadge.className = 'status-badge warn';
+    badgeText.textContent = `${grantedCount}/${total} ${t.granted}`;
+  }
+
+  const list = document.getElementById('perm-list');
+  list.innerHTML = '';
+
+  for (const item of items) {
+    const card = document.createElement('div');
+    card.className = 'perm-card';
+
+    const iconDiv = document.createElement('div');
+    iconDiv.className = 'perm-icon';
+    iconDiv.textContent = ICONS[item.id] || '⚙️';
+
+    const infoDiv = document.createElement('div');
+    infoDiv.className = 'perm-info';
+
+    const nameDiv = document.createElement('div');
+    nameDiv.className = 'perm-name';
+    nameDiv.textContent = currentLang === 'vi' ? (item.name_vi || item.name) : item.name;
+
+    const descDiv = document.createElement('div');
+    descDiv.className = 'perm-desc';
+    descDiv.textContent = currentLang === 'vi' ? (item.desc_vi || item.desc) : item.desc;
+
+    infoDiv.appendChild(nameDiv);
+    infoDiv.appendChild(descDiv);
+
+    const actionsDiv = document.createElement('div');
+    actionsDiv.className = 'perm-actions';
+
+    const badge = document.createElement('span');
+    badge.className = 'status-badge ' + (item.granted ? 'ok' : 'warn');
+    badge.innerHTML = `<span class="dot"></span><span>${item.granted ? t.granted : t.missing}</span>`;
+    actionsDiv.appendChild(badge);
+
+    const btn = document.createElement('button');
+    btn.type = 'button';
+    if (item.granted) {
+      btn.textContent = t.settings_btn;
+      btn.onclick = () => send({ t: 'open_pane', id: item.id });
+    } else {
+      btn.className = 'primary';
+      btn.textContent = t.grant_btn;
+      btn.onclick = () => send({ t: 'request', id: item.id });
+    }
+    actionsDiv.appendChild(btn);
+
+    card.appendChild(iconDiv);
+    card.appendChild(infoDiv);
+    card.appendChild(actionsDiv);
+    list.appendChild(card);
+  }
+}
+
+window.__fig = {
+  recv: function(msg) {
+    if (msg.t === 'state') {
+      render(msg);
+    }
+  }
+};
+
+document.getElementById('btn-refresh').onclick = () => send({ t: 'refresh' });
+document.getElementById('btn-close').onclick = () => send({ t: 'close' });
+
+window.addEventListener('keydown', (e) => {
+  if (e.key === 'Escape') {
+    send({ t: 'close' });
+  }
+});
+
+// Let app know we are ready
+send({ t: 'ready' });
+</script>
+</body>
+</html>

@@ -53,6 +53,7 @@ pub mod symbols {
 
     symbols! {
         SETTINGS = "gearshape",
+        PERMISSIONS = "checkmark.shield",
         ACCESSIBILITY = "hand.raised",
         SMOOTH = "computermouse",
         REVERSE = "arrow.up.arrow.down",
@@ -93,6 +94,13 @@ pub fn build(ctx: &AppContext, settings: &Rc<SettingsFeature>) -> StatusMenu {
         let settings = Rc::clone(settings);
         Entry::Item(
             Item::new(text.menu_settings(), move || settings.show()).symbol(symbols::SETTINGS),
+        )
+    };
+    let open_permissions = {
+        let permissions_popup = Rc::clone(&ctx.permissions_popup);
+        Entry::Item(
+            Item::new(text.menu_permissions(), move || permissions_popup.show())
+                .symbol(symbols::PERMISSIONS),
         )
     };
 
@@ -235,6 +243,7 @@ pub fn build(ctx: &AppContext, settings: &Rc<SettingsFeature>) -> StatusMenu {
 
     let mut entries = vec![
         open_settings,
+        open_permissions,
         Entry::Separator,
         Entry::Item(
             Item::new(text.menu_accessibility(), || {
