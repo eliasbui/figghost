@@ -1,0 +1,255 @@
+<!doctype html>
+<html lang="en">
+<head>
+<meta charset="utf-8">
+<meta http-equiv="Content-Security-Policy" content="default-src 'none'; style-src 'unsafe-inline'; script-src 'unsafe-inline'; img-src data:">
+<meta name="viewport" content="width=device-width, initial-scale=1">
+<title>Figghost</title>
+<style>
+:root {
+  color-scheme: light dark;
+  --font: -apple-system, BlinkMacSystemFont, "SF Pro Text", "SF Pro Display", Inter, system-ui, sans-serif;
+  --accent: #007aff;
+  --text: rgba(0, 0, 0, 0.88);
+  --text-2: rgba(0, 0, 0, 0.55);
+  --card: rgba(255, 255, 255, 0.6);
+  --stroke: rgba(0, 0, 0, 0.09);
+  --control: rgba(0, 0, 0, 0.06);
+  --control-hover: rgba(0, 0, 0, 0.1);
+}
+@media (prefers-color-scheme: dark) {
+  :root {
+    --accent: #0a84ff;
+    --text: rgba(255, 255, 255, 0.9);
+    --text-2: rgba(255, 255, 255, 0.55);
+    --card: rgba(255, 255, 255, 0.07);
+    --stroke: rgba(255, 255, 255, 0.1);
+    --control: rgba(255, 255, 255, 0.12);
+    --control-hover: rgba(255, 255, 255, 0.18);
+  }
+}
+* { box-sizing: border-box; }
+html, body {
+  margin: 0;
+  height: 100%;
+  background: transparent;
+  color: var(--text);
+  font: 13px/1.45 var(--font);
+  -webkit-font-smoothing: antialiased;
+  cursor: default;
+  overflow: hidden;
+}
+body { display: flex; flex-direction: column; gap: 18px; padding: 46px 26px 22px; }
+.drag { position: fixed; top: 0; left: 0; right: 0; height: 40px; }
+header { display: flex; align-items: center; gap: 16px; }
+header img { width: 60px; height: 60px; flex: none; }
+header img:not([src]) { display: none; }
+h1 { margin: 0; font-size: 18px; font-weight: 650; letter-spacing: -0.2px; line-height: 1.25; }
+.sub { margin-top: 3px; color: var(--text-2); }
+.news { display: flex; flex: 1; flex-direction: column; gap: 8px; min-height: 0; }
+.news h2 {
+  margin: 0 2px;
+  font-size: 11.5px;
+  font-weight: 600;
+  letter-spacing: 0.04em;
+  text-transform: uppercase;
+  color: var(--text-2);
+}
+ul {
+  flex: 1;
+  min-height: 0;
+  margin: 0;
+  padding: 14px 16px 14px 32px;
+  overflow-y: auto;
+  list-style: disc;
+  background: var(--card);
+  border: 0.5px solid var(--stroke);
+  border-radius: 12px;
+  -webkit-user-select: text;
+  user-select: text;
+}
+li { padding-left: 2px; margin-bottom: 9px; }
+li:last-child { margin-bottom: 0; }
+ul.empty { list-style: none; padding-left: 16px; color: var(--text-2); }
+.status { min-height: 18px; font-size: 12px; color: var(--text-2); }
+footer { display: flex; justify-content: flex-end; gap: 8px; }
+button {
+  height: 28px;
+  padding: 0 16px;
+  font: inherit;
+  color: var(--text);
+  background: var(--control);
+  border: 0.5px solid var(--stroke);
+  border-radius: 7px;
+  cursor: default;
+}
+button:hover { background: var(--control-hover); }
+button.primary { color: #fff; font-weight: 500; background: var(--accent); border-color: transparent; }
+button.primary:hover { filter: brightness(1.08); }
+button:disabled { opacity: 0.45; }
+button[hidden] { display: none; }
+</style>
+</head>
+<body>
+<div class="drag" data-drag></div>
+<header data-drag>
+  <img id="icon" alt="">
+  <div>
+    <h1 id="title"></h1>
+    <div class="sub" id="sub"></div>
+  </div>
+</header>
+<section class="news">
+  <h2 id="news-title"></h2>
+  <ul id="list"></ul>
+</section>
+<div class="status" id="status"></div>
+<footer>
+  <button id="secondary"></button>
+  <button id="primary" class="primary"></button>
+</footer>
+<script>window.__icon = "/*__ICON__*/";</script>
+<script>
+(function () {
+  'use strict';
+
+  // The popup only ever shows a version that is waiting for a decision: available, being installed,
+  // installed (a restart away), or found but not installable here.
+  const TEXT = {
+    en: {
+      available: 'Figghost {v} is available', installing: 'Updating to Figghost {v}',
+      ready: 'Figghost {v} is installed', blocked: 'Figghost {v} is available',
+      sub: 'You have version {c}.', subReady: 'Restart Figghost to start using it.',
+      news: "What's new", none: 'This release has no notes. The release page tells more.',
+      downloading: 'Downloading\u2026', installingNow: 'Installing\u2026',
+      readyHint: 'The app is signed ad hoc, so macOS may ask for Accessibility access again after the restart.',
+      blockedHint: 'It could not be installed here: {d}',
+      later: 'Later', close: 'Close', update: 'Update now', restart: 'Restart now', download: 'Download',
+    },
+    vi: {
+      available: 'Đã có Figghost {v}', installing: 'Đang cập nhật lên Figghost {v}',
+      ready: 'Đã cài Figghost {v}', blocked: 'Đã có Figghost {v}',
+      sub: 'Bạn đang dùng bản {c}.', subReady: 'Khởi động lại Figghost để dùng bản mới.',
+      news: 'Có gì mới', none: 'Bản này chưa có ghi chú. Xem trang phát hành để biết thêm.',
+      downloading: 'Đang tải về\u2026', installingNow: 'Đang cài\u2026',
+      readyHint: 'Ứng dụng được ký ad hoc nên sau khi khởi động lại, macOS có thể hỏi lại quyền Trợ năng.',
+      blockedHint: 'Không cài được ở đây: {d}',
+      later: 'Để sau', close: 'Đóng', update: 'Cập nhật ngay', restart: 'Khởi động lại ngay', download: 'Tải về',
+    },
+  };
+  let lang = 'en';
+  const $ = (id) => document.getElementById(id);
+  const tr = (key, vars) => (TEXT[lang][key] || TEXT.en[key] || key)
+    .replace(/\{(\w+)\}/g, (_, name) => (vars && vars[name] != null ? vars[name] : ''));
+  const send = (message) => window.fig.send(message);
+
+  if (window.__icon) $('icon').src = window.__icon;
+
+  // [label key, action] for the two buttons of each state; null leaves a button out.
+  const BUTTONS = {
+    available: [['later', 'later'], ['update', 'install']],
+    installing: [['close', 'later'], null],
+    ready: [['later', 'later'], ['restart', 'restart']],
+    blocked: [['close', 'later'], ['download', 'download']],
+  };
+
+  function setButton(el, spec) {
+    el.hidden = !spec;
+    if (!spec) return;
+    el.textContent = tr(spec[0]);
+    el.onclick = () => send({ t: 'action', name: spec[1] });
+  }
+
+  function render(m) {
+    if (!BUTTONS[m.state]) return;
+    lang = TEXT[m.lang] ? m.lang : 'en';
+    document.documentElement.lang = lang;
+    $('title').textContent = tr(m.state, { v: m.version });
+    $('sub').textContent = m.state === 'ready' ? tr('subReady') : tr('sub', { c: m.current });
+    $('news-title').textContent = tr('news');
+
+    const list = $('list');
+    const changes = Array.isArray(m.changes) ? m.changes : [];
+    list.textContent = '';
+    list.classList.toggle('empty', changes.length === 0);
+    for (const text of changes.length ? changes : [tr('none')]) {
+      const item = document.createElement('li');
+      item.textContent = text;
+      list.appendChild(item);
+    }
+
+    $('status').textContent = m.state === 'installing' ? tr(m.stage === 'downloading' ? 'downloading' : 'installingNow')
+      : m.state === 'ready' ? tr('readyHint')
+      : m.state === 'blocked' ? tr('blockedHint', { d: m.detail })
+      : '';
+    const [secondary, primary] = BUTTONS[m.state];
+    setButton($('secondary'), secondary);
+    setButton($('primary'), primary);
+  }
+
+  window.__fig = { recv(message) { if (message.t === 'show') render(message); } };
+
+  // This is a dialog, not a web page: no browser menu, and the top of the window moves it.
+  document.addEventListener('contextmenu', (e) => e.preventDefault());
+  document.addEventListener('mousedown', (e) => { if (e.button === 0 && e.target.closest('[data-drag]')) window.fig.drag(); });
+  document.addEventListener('keydown', (e) => { if (e.key === 'Escape') send({ t: 'action', name: 'later' }); });
+
+  // Run by the headless check (examples/update_preview.rs).
+  window.__selftest = function () {
+    const failures = [];
+    const expect = (ok, message) => { if (!ok) failures.push(message); };
+    const sent = [];
+    const real = window.fig.send;
+    window.fig.send = (message) => sent.push(message);
+    const base = { t: 'show', lang: 'en', version: '9.9.9', current: '1.0.0', changes: ['Add a thing', 'Fix another'], stage: '', detail: '' };
+    const click = (id) => { sent.length = 0; $(id).click(); return sent.map((m) => m.name).join(); };
+    try {
+      window.__fig.recv({ ...base, state: 'available' });
+      expect($('title').textContent === 'Figghost 9.9.9 is available', 'title: ' + $('title').textContent);
+      expect($('sub').textContent === 'You have version 1.0.0.', 'sub: ' + $('sub').textContent);
+      expect(document.querySelectorAll('#list li').length === 2, 'one line per change');
+      expect($('list').textContent.includes('Add a thing'), 'the changes are shown');
+      expect($('primary').textContent === 'Update now' && !$('primary').hidden, 'the question has a yes');
+      expect(click('primary') === 'install', 'yes installs');
+      expect(click('secondary') === 'later', 'later closes');
+
+      window.__fig.recv({ ...base, state: 'installing', stage: 'downloading' });
+      expect($('status').textContent.startsWith('Downloading'), 'download status');
+      expect($('primary').hidden, 'nothing to press while it installs');
+      window.__fig.recv({ ...base, state: 'installing', stage: 'checking' });
+      expect($('status').textContent.startsWith('Installing'), 'install status');
+
+      window.__fig.recv({ ...base, state: 'ready' });
+      expect($('title').textContent === 'Figghost 9.9.9 is installed', 'ready title');
+      expect($('status').textContent.includes('Accessibility'), 'the Accessibility hint');
+      expect(click('primary') === 'restart', 'the restart button');
+
+      window.__fig.recv({ ...base, state: 'blocked', detail: 'no permission' });
+      expect($('status').textContent.includes('no permission'), 'the reason');
+      expect(click('primary') === 'download', 'the fallback is the release page');
+
+      window.__fig.recv({ ...base, state: 'available', changes: [] });
+      expect($('list').textContent.includes('no notes'), 'a release without notes says so');
+      expect($('list').classList.contains('empty'), 'and is not a list');
+
+      window.__fig.recv({ ...base, state: 'available', lang: 'vi' });
+      expect($('title').textContent === 'Đã có Figghost 9.9.9', 'Vietnamese title: ' + $('title').textContent);
+      for (const key of Object.keys(TEXT.en)) if (!TEXT.vi[key]) failures.push('missing in Vietnamese: ' + key);
+      for (const key of Object.keys(TEXT.vi)) if (!TEXT.en[key]) failures.push('missing in English: ' + key);
+
+      // A line of notes is text, never markup.
+      window.__fig.recv({ ...base, state: 'available', lang: 'en', changes: ['<img src=x onerror=alert(1)>'] });
+      expect(!document.querySelector('#list img'), 'notes are not parsed as HTML');
+    } catch (error) {
+      failures.push('exception: ' + (error && error.stack ? error.stack : error));
+    } finally {
+      window.fig.send = real;
+    }
+    return failures;
+  };
+
+  send({ t: 'ready' });
+})();
+</script>
+</body>
+</html>

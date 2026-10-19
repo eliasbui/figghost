@@ -128,11 +128,16 @@ const I18N = {
     'layout.maximize': 'Maximize', 'layout.center': 'Center', 'layout.first_third': 'First third', 'layout.center_third': 'Center third', 'layout.last_third': 'Last third',
 
     'about.line': 'Smooth scrolling like Mos, clipboard history like Maccy, a notch toolbox like OneNotch.',
-    'about.version': 'Version', 'about.privacy': 'Privacy', 'about.privacy.val': 'Everything stays on this Mac. Nothing is sent anywhere.', 'about.quit': 'Quit Figghost',
+    'about.version': 'Version', 'about.privacy': 'Privacy', 'about.privacy.val': 'Everything stays on this Mac. The only thing Figghost asks the network by itself is whether a new version exists, once a day.', 'about.quit': 'Quit Figghost',
     'about.quit.desc': 'Stops scrolling, clipboard and notch features until you open the app again.',
-    'about.update': 'Check for updates', 'about.update.desc': 'Asks GitHub for the latest release. Nothing is downloaded for you.', 'about.update.check': 'Check now',
+    'about.update': 'Check for updates', 'about.update.desc': 'Looks for a new version every day. Press Check now to look at once; a new version is downloaded and installed for you.', 'about.update.check': 'Check now',
     'about.update.checking': 'Checking GitHub…', 'about.update.current': 'This is the latest version ({v}).',
-    'about.update.newer': 'Version {v} is out.', 'about.update.failed': 'Could not check: {detail}', 'about.update.open': 'Download',
+    'about.update.available': 'Version {v} is available.', 'about.update.install': 'Update',
+    'about.update.downloading': 'Downloading version {v}…', 'about.update.installing': 'Installing version {v}…',
+    'about.update.ready': 'Version {v} is installed. Restart Figghost to use it.', 'about.update.restart': 'Restart',
+    'about.update.blocked': 'Version {v} is out, but it could not be installed here: {detail}', 'about.update.open': 'Download',
+    'about.update.failed': 'Could not check: {detail}',
+    'update.auto.title': 'Update automatically', 'update.auto.desc': 'Install a new version as soon as it is found, without asking. Otherwise Figghost asks once a day. Either way, restart Figghost to use it.',
 
     'rec.press': 'Press shortcut', 'rec.esc': 'Esc to cancel',
     'fault.invalid_value': 'That value is not valid.', 'fault.unknown_setting': 'Unknown setting.', 'fault.invalid_app_id': 'That app cannot be used.', 'fault.needs_modifier': 'Add Control, Option, Shift or Command.',
@@ -222,11 +227,16 @@ const I18N = {
     'layout.maximize': 'Phóng to tối đa', 'layout.center': 'Giữa màn hình', 'layout.first_third': 'Một phần ba đầu', 'layout.center_third': 'Một phần ba giữa', 'layout.last_third': 'Một phần ba cuối',
 
     'about.line': 'Cuộn mượt như Mos, lịch sử clipboard như Maccy, hộp công cụ notch như OneNotch.',
-    'about.version': 'Phiên bản', 'about.privacy': 'Riêng tư', 'about.privacy.val': 'Mọi thứ nằm trên máy Mac này. Không gửi đi đâu cả.', 'about.quit': 'Thoát Figghost',
+    'about.version': 'Phiên bản', 'about.privacy': 'Riêng tư', 'about.privacy.val': 'Mọi thứ nằm trên máy Mac này. Thứ duy nhất Figghost tự hỏi qua mạng là đã có bản mới hay chưa, mỗi ngày một lần.', 'about.quit': 'Thoát Figghost',
     'about.quit.desc': 'Dừng cuộn mượt, clipboard và notch cho đến khi bạn mở lại ứng dụng.',
-    'about.update': 'Kiểm tra bản mới', 'about.update.desc': 'Hỏi GitHub xem có bản phát hành mới nhất chưa. Không tự tải về máy.', 'about.update.check': 'Kiểm tra',
+    'about.update': 'Kiểm tra bản mới', 'about.update.desc': 'Mỗi ngày tự hỏi GitHub xem có bản mới chưa. Bấm Kiểm tra để hỏi ngay; bản mới sẽ được tải và cài sẵn cho bạn.', 'about.update.check': 'Kiểm tra',
     'about.update.checking': 'Đang hỏi GitHub…', 'about.update.current': 'Bạn đang dùng bản mới nhất ({v}).',
-    'about.update.newer': 'Đã có bản {v}.', 'about.update.failed': 'Không kiểm tra được: {detail}', 'about.update.open': 'Tải về',
+    'about.update.available': 'Đã có bản {v}.', 'about.update.install': 'Cập nhật',
+    'about.update.downloading': 'Đang tải bản {v}…', 'about.update.installing': 'Đang cài bản {v}…',
+    'about.update.ready': 'Đã cài bản {v}. Khởi động lại Figghost để dùng.', 'about.update.restart': 'Khởi động lại',
+    'about.update.blocked': 'Đã có bản {v} nhưng không cài được ở đây: {detail}', 'about.update.open': 'Tải về',
+    'about.update.failed': 'Không kiểm tra được: {detail}',
+    'update.auto.title': 'Tự động cập nhật', 'update.auto.desc': 'Cài bản mới ngay khi tìm thấy, không hỏi trước. Nếu tắt, Figghost hỏi bạn mỗi ngày một lần. Dù cách nào, bạn cũng cần khởi động lại Figghost để dùng bản mới.',
 
     'rec.press': 'Nhấn phím tắt', 'rec.esc': 'Esc để hủy',
     'fault.invalid_value': 'Giá trị không hợp lệ.', 'fault.unknown_setting': 'Thiết lập không tồn tại.', 'fault.invalid_app_id': 'Không dùng được ứng dụng này.', 'fault.needs_modifier': 'Thêm Control, Option, Shift hoặc Command.',
@@ -1312,29 +1322,38 @@ function pageTiling() {
 
 // -- about ----------------------------------------------------------
 
-// The answer of the last update check; the app sends it when GitHub replies.
+// Where the update stands, as the app reports it: checking, current, available, installing, ready, blocked or failed.
 let release = { state: 'idle', version: '', detail: '' };
 function onUpdate(message) {
   release = message;
   runSyncs();
 }
 
-/** The version row: the app's own version, and a button that asks GitHub for a newer one. */
+/** The update row: a button that looks for a new version, and what is happening to the one it found. */
 function updateRow() {
   const desc = h('div', { class: 'row-desc' });
-  const open = button(t('about.update.open'), () => send({ t: 'action', name: 'open_release' }), { small: true, primary: true });
-  const check = button(t('about.update.check'), () => send({ t: 'action', name: 'check_updates' }), { small: true, icon: 'refresh' });
+  const ask = (name) => () => send({ t: 'action', name });
+  const install = button(t('about.update.install'), ask('install_update'), { small: true, primary: true });
+  const restart = button(t('about.update.restart'), ask('restart'), { small: true, primary: true });
+  const open = button(t('about.update.open'), ask('open_release'), { small: true, primary: true });
+  const check = button(t('about.update.check'), ask('check_updates'), { small: true, icon: 'refresh' });
   const el = h('div', { class: 'row' },
     h('div', { class: 'row-text' }, h('div', { class: 'row-title', text: t('about.update') }), desc),
-    h('div', { class: 'row-control' }, open, check));
+    h('div', { class: 'row-control' }, install, restart, open, check));
   reg(() => {
-    desc.textContent = release.state === 'checking' ? t('about.update.checking')
-      : release.state === 'current' ? t('about.update.current', { v: S.app.version })
-      : release.state === 'newer' ? t('about.update.newer', { v: release.version })
-      : release.state === 'failed' ? t('about.update.failed', { detail: release.detail })
+    const { state, version: v, detail } = release;
+    desc.textContent = state === 'checking' ? t('about.update.checking')
+      : state === 'current' ? t('about.update.current', { v: S.app.version })
+      : state === 'available' ? t('about.update.available', { v })
+      : state === 'installing' ? t(release.stage === 'downloading' ? 'about.update.downloading' : 'about.update.installing', { v })
+      : state === 'ready' ? t('about.update.ready', { v })
+      : state === 'blocked' ? t('about.update.blocked', { v, detail })
+      : state === 'failed' ? t('about.update.failed', { detail })
       : t('about.update.desc');
-    open.style.display = release.state === 'newer' ? '' : 'none';
-    check.disabled = release.state === 'checking';
+    install.style.display = state === 'available' ? '' : 'none';
+    restart.style.display = state === 'ready' ? '' : 'none';
+    open.style.display = state === 'blocked' ? '' : 'none';
+    check.disabled = state === 'checking' || state === 'installing';
   });
   return el;
 }
@@ -1347,6 +1366,7 @@ function pageAbout() {
     card(
       row(t('about.version'), null, h('span', { class: 'row-title', text: S.app.version })),
       updateRow(),
+      toggleRow('update.auto', t('update.auto.title'), t('update.auto.desc')),
       row(t('about.privacy'), t('about.privacy.val'), null),
       row(t('data.title'), S.app.config_dir, button(t('data.open'), () => send({ t: 'action', name: 'open_config' }), { icon: 'folder', small: true }))),
     card(row(t('about.quit'), t('about.quit.desc'), button(t('about.quit'), () => send({ t: 'action', name: 'quit' }), { icon: 'power', small: true, danger: true }))),
@@ -1723,21 +1743,50 @@ window.__selftest = function () {
     go('agents');
     expect(document.body.textContent.includes(t('agents.spend.claude')), 'the spend of Claude Code is listed');
 
-    // The update row follows what the app reports back from GitHub.
+    // The update row follows what the app reports: a button to look, then the version it found and what became of it.
     go('about');
     const btn = (label) => [...document.querySelectorAll('.btn')].find((b) => b.textContent === label);
+    const visible = (label) => { const b = btn(label); return !!b && b.style.display !== 'none'; };
+    const pressed = (name) => sent.some((m) => m.t === 'action' && m.name === name);
     sent.length = 0;
     btn(t('about.update.check')).click();
-    expect(sent.some((m) => m.t === 'action' && m.name === 'check_updates'), 'the update button asks the app: ' + JSON.stringify(sent));
-    expect(btn(t('about.update.open')).style.display === 'none', 'nothing to download before an answer');
-    window.__fig.recv({ t: 'update', state: 'newer', version: '9.9.9', url: 'https://example.com/release' });
-    expect($('#scroller').textContent.includes('9.9.9'), 'the row names the version GitHub answered with');
+    expect(pressed('check_updates'), 'the update button asks the app: ' + JSON.stringify(sent));
+    expect(!visible(t('about.update.install')) && !visible(t('about.update.restart')) && !visible(t('about.update.open')), 'nothing else to press before an answer');
+
+    window.__fig.recv({ t: 'update', state: 'available', version: '9.9.9' });
+    expect($('#scroller').textContent.includes('9.9.9'), 'the row names the version that was found');
+    expect(visible(t('about.update.install')), 'a version that was found can be installed');
+    sent.length = 0;
+    btn(t('about.update.install')).click();
+    expect(pressed('install_update'), 'the update button installs: ' + JSON.stringify(sent));
+
+    window.__fig.recv({ t: 'update', state: 'installing', version: '9.9.9', stage: 'downloading' });
+    expect($('#scroller').textContent.includes(t('about.update.downloading', { v: '9.9.9' })), 'the download is shown');
+    expect(btn(t('about.update.check')).disabled, 'no second check while one installs');
+    window.__fig.recv({ t: 'update', state: 'installing', version: '9.9.9', stage: 'checking' });
+    expect($('#scroller').textContent.includes(t('about.update.installing', { v: '9.9.9' })), 'and then the install');
+
+    window.__fig.recv({ t: 'update', state: 'ready', version: '9.9.9' });
+    expect(visible(t('about.update.restart')), 'an installed version is a restart away');
+    sent.length = 0;
+    btn(t('about.update.restart')).click();
+    expect(pressed('restart'), 'the restart button restarts: ' + JSON.stringify(sent));
+
+    window.__fig.recv({ t: 'update', state: 'blocked', version: '9.9.9', detail: 'no permission' });
+    expect($('#scroller').textContent.includes('no permission'), 'a version that cannot be installed says why');
     sent.length = 0;
     btn(t('about.update.open')).click();
-    expect(sent.some((m) => m.t === 'action' && m.name === 'open_release'), 'the download button opens the release page: ' + JSON.stringify(sent));
+    expect(pressed('open_release'), 'and can be downloaded by hand: ' + JSON.stringify(sent));
+
     window.__fig.recv({ t: 'update', state: 'failed', detail: 'offline' });
     expect($('#scroller').textContent.includes('offline'), 'a failed check says why');
     window.__fig.recv({ t: 'update', state: 'idle' });
+
+    const auto = [...document.querySelectorAll('.switch')].find((s) => s.getAttribute('aria-label') === t('update.auto.title'));
+    expect(auto, 'the About page has the switch for updating by itself');
+    sent.length = 0;
+    auto.click();
+    expect(sent.some((m) => m.t === 'set' && m.path === 'update.auto' && m.value === true), 'the switch is sent: ' + JSON.stringify(sent));
 
     // The field in the sidebar keeps the pages whose name matches, and puts them all back when it is cleared.
     const navItems = () => [...document.querySelectorAll('.nav-item')];

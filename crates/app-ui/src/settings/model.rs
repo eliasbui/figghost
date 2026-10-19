@@ -237,6 +237,9 @@ pub fn state(config: &Config, env: &Env) -> Value {
             "menu_icon": config.menu_icon,
             "theme": config.theme,
         },
+        "update": {
+            "auto": config.update.auto,
+        },
         "mouse": {
             "smooth": m.smooth,
             "reverse": m.reverse,
@@ -535,6 +538,10 @@ fn set(config: &mut Config, path: &str, value: &Value) -> Outcome {
         "general.menu_icon" => {
             config.menu_icon = flag(value)?;
             Ok(Effect::MenuIcon(config.menu_icon))
+        }
+        "update.auto" => {
+            config.update.auto = flag(value)?;
+            Ok(Effect::None)
         }
         "general.theme" => {
             config.theme = one_of(value, &["auto", "light", "dark"])?;
@@ -1111,6 +1118,25 @@ mod tests {
             "invalid_value"
         );
         assert_eq!(config.theme, "dark");
+    }
+
+    #[test]
+    fn updating_by_itself_is_a_switch() {
+        let mut config = Config::default();
+        assert!(!config.update.auto, "off until it is asked for");
+        assert_eq!(
+            set_value(&mut config, "update.auto", json!(true)),
+            Ok(Effect::None)
+        );
+        assert!(config.update.auto);
+        assert_eq!(
+            set_value(&mut config, "update.auto", json!("yes"))
+                .unwrap_err()
+                .code,
+            "invalid_value"
+        );
+        assert!(config.update.auto, "a refused change leaves it alone");
+        assert_eq!(state(&config, &env())["update"]["auto"], true);
     }
 
     #[test]

@@ -21,6 +21,7 @@ mod shelf;
 mod shelf_actions;
 mod tiling;
 mod trace;
+mod update;
 mod volume_hud;
 
 use agents::AgentsFeature;
@@ -38,6 +39,7 @@ use settings::SettingsFeature;
 use shelf::ShelfFeature;
 use std::{cell::RefCell, path::PathBuf, rc::Rc, sync::Arc};
 use tiling::Tiling;
+use update::UpdateFeature;
 use volume_hud::VolumeHud;
 
 fn main() {
@@ -158,6 +160,7 @@ impl Shell {
             audio.engine.set_on_soft(move |on| hud.set_soft_keys(on));
         }
 
+        let update = UpdateFeature::new(mtm, home.clone(), Rc::clone(&config));
         let ctx = Rc::new(AppContext {
             mtm,
             home,
@@ -170,6 +173,7 @@ impl Shell {
             features,
             volume_hud: Rc::clone(&volume_hud),
             tiling: Rc::clone(&tiling),
+            update: Rc::clone(&update),
         });
         let settings = SettingsFeature::new(Rc::clone(&ctx));
         let on_settings = Rc::clone(&settings);
@@ -185,6 +189,7 @@ impl Shell {
         if show_settings {
             settings.show();
         }
+        update.start();
         Shell {
             mouse,
             clipboard,

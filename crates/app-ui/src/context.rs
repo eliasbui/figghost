@@ -2,7 +2,7 @@
 
 use crate::{
     agents::AgentsFeature, clipboard::Clipboard, config::Config, features::Features,
-    shelf::ShelfFeature, tiling::Tiling, volume_hud::VolumeHud,
+    shelf::ShelfFeature, tiling::Tiling, update::UpdateFeature, volume_hud::VolumeHud,
 };
 use core_mouse::Control;
 use macos_sys::MainThreadMarker;
@@ -20,6 +20,7 @@ pub struct AppContext {
     pub features: Features,
     pub volume_hud: Rc<VolumeHud>,
     pub tiling: Rc<Tiling>,
+    pub update: Rc<UpdateFeature>,
 }
 
 impl AppContext {

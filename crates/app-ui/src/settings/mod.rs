@@ -2,7 +2,6 @@
 
 pub mod model;
 mod page;
-mod release;
 
 use crate::{context::AppContext, i18n, trace};
 use core_agents::Agent;
@@ -61,8 +60,6 @@ pub struct SettingsFeature {
     last_state: RefCell<String>,
     /// Shows or hides the menu bar icon; set once the menu exists.
     menu_icon: RefCell<Option<ShowIcon>>,
-    /// The page of the latest release found by the update check, for the button that opens it.
-    release: RefCell<Option<String>>,
 }
 
 impl SettingsFeature {
@@ -76,9 +73,13 @@ impl SettingsFeature {
             icons: RefCell::default(),
             last_state: RefCell::default(),
             menu_icon: RefCell::default(),
-            release: RefCell::default(),
         });
         FEATURE.with(|slot| *slot.borrow_mut() = Rc::downgrade(&feature));
+        // The About page follows the update, which goes on whether or not this window is open.
+        feature
+            .ctx
+            .update
+            .on_status(|status| with_feature(|this| this.post(status)));
         feature
     }
 
@@ -262,7 +263,10 @@ impl SettingsFeature {
             }
         };
         match &message {
-            Message::Ready => self.push_state(true),
+            Message::Ready => {
+                self.push_state(true);
+                self.post(&self.ctx.update.status());
+            }
             Message::JsError { message, line } => {
                 eprintln!("settings page: {message} (line {line})");
             }
@@ -443,12 +447,9 @@ impl SettingsFeature {
                 workspace::open_url(ACCESSIBILITY_PANE);
             }
             "open_login_settings" => login_item::open_settings(),
-            "check_updates" => self.check_updates(),
-            "open_release" => {
-                if let Some(url) = self.release.borrow().clone() {
-                    workspace::open_url(&url);
-                }
-            }
+            "check_updates" => self.ctx.update.check_now(),
+            "install_update" => self.ctx.update.install_available(),
+            "open_release" => self.ctx.update.open_release(),
             "open_config" => {
                 let _ = std::fs::create_dir_all(&self.ctx.home);
                 workspace::open_path(&self.ctx.home);
@@ -475,7 +476,7 @@ impl SettingsFeature {
             "agents_remove_codex" => self.agent_hooks(Agent::Codex, false),
             "agents_usage_on" => self.agent_usage(true),
             "agents_usage_off" => self.agent_usage(false),
-            "restart" => relaunch(mtm),
+            "restart" => relaunch(mtm, "--show-settings"),
             "quit" => app::quit(mtm),
             other => {
                 let result = {
@@ -493,34 +494,6 @@ impl SettingsFeature {
             }
         }
         self.push_state(true);
-    }
-
-    /// Asks GitHub for the latest release on a background thread, so the window never waits on the network,
-    /// and tells the page what came back.
-    fn check_updates(&self) {
-        self.post(&json!({ "t": "update", "state": "checking" }));
-        std::thread::spawn(|| {
-            let answer = match release::latest() {
-                Ok(release) => {
-                    let newer = release::newer(&release.version, env!("CARGO_PKG_VERSION"));
-                    json!({
-                        "t": "update",
-                        "state": if newer { "newer" } else { "current" },
-                        "version": release.version,
-                        "url": release.url,
-                    })
-                }
-                Err(detail) => json!({ "t": "update", "state": "failed", "detail": detail }),
-            };
-            app::on_main(move || with_feature(|this| this.update_arrived(answer)));
-        });
-    }
-
-    fn update_arrived(&self, answer: Value) {
-        if let Some(url) = answer["url"].as_str() {
-            *self.release.borrow_mut() = Some(url.to_owned());
-        }
-        self.post(&answer);
     }
 
     /// Adds our hooks to an agent's file, or takes them out. Installing also turns the listening on, since
@@ -615,29 +588,33 @@ impl SettingsFeature {
 }
 
 /// Starts a new copy of the app and quits this one. The new copy waits for this one to exit, so the two
-/// never hold the same global shortcuts.
-fn relaunch(mtm: macos_sys::MainThreadMarker) {
+/// never hold the same global shortcuts. `flag` is how the new copy is told to start: `--show-settings` for
+/// a restart asked for from the settings window, `--background` for one that should come back quietly.
+pub(crate) fn relaunch(mtm: macos_sys::MainThreadMarker, flag: &str) {
     let Ok(exe) = std::env::current_exe() else {
         return;
     };
-    let quote =
-        |path: &std::path::Path| format!("'{}'", path.to_string_lossy().replace('\'', "'\\''"));
-    let script = match exe
-        .ancestors()
-        .nth(3)
-        .filter(|bundle| bundle.extension().is_some_and(|e| e == "app"))
-    {
-        Some(bundle) => format!(
-            "sleep 0.7; open -n {} --args --show-settings",
-            quote(bundle)
-        ),
-        None => format!("sleep 0.7; exec {} --show-settings", quote(&exe)),
-    };
+    let script = relaunch_script(&exe, flag);
     if let Err(e) = Command::new("/bin/sh").args(["-c", &script]).spawn() {
         eprintln!("restart: cannot start the new copy: {e}");
         return;
     }
     app::quit(mtm);
+}
+
+/// The shell command that starts the new copy once this one is gone: the app that `exe` is in, or the
+/// program itself when it is not in one.
+fn relaunch_script(exe: &std::path::Path, flag: &str) -> String {
+    let quote =
+        |path: &std::path::Path| format!("'{}'", path.to_string_lossy().replace('\'', "'\\''"));
+    match exe
+        .ancestors()
+        .nth(3)
+        .filter(|bundle| bundle.extension().is_some_and(|e| e == "app"))
+    {
+        Some(bundle) => format!("sleep 0.7; open -n {} --args {flag}", quote(bundle)),
+        None => format!("sleep 0.7; exec {} {flag}", quote(exe)),
+    }
 }
 
 /// The JSON an assistant's configuration needs to start the clipboard server.
@@ -683,6 +660,33 @@ mod tests {
         assert_eq!(server["args"][0], "--mcp");
         // Paths with quotes or backslashes stay valid JSON.
         assert!(serde_json::from_str::<Value>(&mcp_config("/odd \"path\\x")).is_ok());
+    }
+
+    #[test]
+    fn a_restart_opens_the_app_with_the_flag_it_was_given() {
+        use std::path::Path;
+        let exe = Path::new("/Applications/Figghost.app/Contents/MacOS/Figghost");
+        assert_eq!(
+            relaunch_script(exe, "--background"),
+            "sleep 0.7; open -n '/Applications/Figghost.app' --args --background"
+        );
+        assert_eq!(
+            relaunch_script(exe, "--show-settings"),
+            "sleep 0.7; open -n '/Applications/Figghost.app' --args --show-settings"
+        );
+        // Outside an app the program itself starts again.
+        assert_eq!(
+            relaunch_script(Path::new("/x/target/debug/app-ui"), "--show-settings"),
+            "sleep 0.7; exec '/x/target/debug/app-ui' --show-settings"
+        );
+        // A quote in the path cannot end the quoting early.
+        assert_eq!(
+            relaunch_script(
+                Path::new("/tmp/it's/Figghost.app/Contents/MacOS/Figghost"),
+                "--background"
+            ),
+            "sleep 0.7; open -n '/tmp/it'\\''s/Figghost.app' --args --background"
+        );
     }
 
     #[test]

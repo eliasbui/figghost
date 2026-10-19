@@ -322,6 +322,7 @@ pub struct Config {
     pub menubar: crate::features::menubar::Config,
     pub stack: crate::features::stack::Config,
     pub mascot: crate::features::mascot::Config,
+    pub update: crate::update::Config,
     /// Replace the system volume indicator with one in the notch. Needs Accessibility access.
     pub volume_hud: bool,
     /// Unpinned items kept in history.
@@ -357,6 +358,7 @@ impl Default for Config {
             menubar: crate::features::menubar::Config::default(),
             stack: crate::features::stack::Config::default(),
             mascot: crate::features::mascot::Config::default(),
+            update: crate::update::Config::default(),
             volume_hud: false,
             history_limit: 500,
             ignored_apps: Vec::new(),
