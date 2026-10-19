@@ -17,7 +17,7 @@
 
     'stack.sec.boards': 'Pinned boards',
     'stack.boards.title': 'Boards',
-    'stack.boards.desc': 'A board groups pinned items and shows as a chip above the clipboard list. Option+B files the selected item in the next board, and a right click on a row offers a menu. Deleting a board keeps its items pinned.',
+    'stack.boards.desc': 'A board groups pinned items and shows as a chip above the clipboard list. {key} files the selected item in the next board, and a right click on a row offers a menu. Deleting a board keeps its items pinned.',
     'stack.boards.empty': 'No boards yet.',
     'stack.boards.items': '{n} items',
     'stack.boards.name': 'Board name',
@@ -65,7 +65,7 @@
 
     'stack.sec.boards': 'Bảng ghim',
     'stack.boards.title': 'Bảng',
-    'stack.boards.desc': 'Bảng gom các mục đã ghim và hiện thành một nhãn phía trên danh sách. Option+B đưa mục đang chọn vào bảng kế tiếp, nhấn chuột phải vào một dòng để mở menu. Xóa bảng vẫn giữ các mục ở trạng thái đã ghim.',
+    'stack.boards.desc': 'Bảng gom các mục đã ghim và hiện thành một nhãn phía trên danh sách. {key} đưa mục đang chọn vào bảng kế tiếp, nhấn chuột phải vào một dòng để mở menu. Xóa bảng vẫn giữ các mục ở trạng thái đã ghim.',
     'stack.boards.empty': 'Chưa có bảng nào.',
     'stack.boards.items': '{n} mục',
     'stack.boards.name': 'Tên bảng',
@@ -171,7 +171,7 @@
     return [
       sectionTitle(t('stack.sec.boards')),
       card(
-        row(t('stack.boards.title'), t('stack.boards.desc'), null),
+        row(t('stack.boards.title'), t('stack.boards.desc', { key: keysText(S.keys.shortcuts.board) }), null),
         dynamicList(() => S.stack.boards, boardRow, t('stack.boards.empty')),
         addBoardRow()),
     ];

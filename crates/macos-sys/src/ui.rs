@@ -1411,9 +1411,10 @@ impl ClipUi {
         };
 
         let scroll = NSScrollView::initWithFrame(mtm.alloc(), NSRect::ZERO);
-        scroll.setHasVerticalScroller(!strip);
-        // The strip has no scroller: with the legacy ones (a mouse is connected) it would take a strip of the cards'
-        // height. It still scrolls, with a trackpad, the wheel (see `scrollWheel:`) and the arrow keys.
+        scroll.setHasVerticalScroller(false);
+        // No scroller at all: with the legacy ones (a mouse is connected) it is a wide bar over the rows, and in the
+        // strip it would take a strip of the cards' height. Still scrolls with a trackpad, the wheel (see
+        // `scrollWheel:`) and the arrow keys.
         scroll.setHasHorizontalScroller(false);
         scroll.setAutohidesScrollers(true);
         scroll.setScrollerStyle(NSScrollerStyle::Overlay);

@@ -15,6 +15,8 @@ pub struct Frame {
 
 pub struct Window(Element);
 
+const RAISE_TIMEOUT_SECONDS: f32 = 0.3;
+
 impl Window {
     /// The window an element belongs to: the element itself when it is one.
     pub fn containing(element: &Element) -> Option<Self> {
@@ -70,6 +72,11 @@ impl Window {
     /// keyboard, as it does when a person clicks the window.
     pub fn raise(&self) -> bool {
         let app = self.0.pid().and_then(Element::application);
+        // An app that hangs must not hang this one for the system's default of several seconds.
+        if let Some(app) = &app {
+            app.set_timeout(RAISE_TIMEOUT_SECONDS);
+        }
+        self.0.set_timeout(RAISE_TIMEOUT_SECONDS);
         let front = app
             .as_ref()
             .is_some_and(|app| app.set_flag("AXFrontmost", true));

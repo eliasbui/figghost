@@ -2,6 +2,9 @@
   "app": { "version": "0.2.0", "bundled": true, "config_dir": "/Users/you/Library/Application Support/Figghost" },
   "env": { "accessibility": true, "login": "disabled", "language": "en", "reduce_transparency": false, "reduce_motion": false, "increase_contrast": false },
   "general": { "language": "auto", "show_on_launch": true, "launch_effect": true, "menu_icon": true, "theme": "auto" },
+  "keys": {
+    "shortcuts": { "pin": "opt+p", "board": "opt+b", "paste_other": "opt+shift+return", "delete": "opt+delete" }
+  },
   "update": { "auto": false, "whats_new": true },
   "mouse": {
     "smooth": true, "reverse": false, "step_px": 36, "speed": 1, "duration_ms": 360,

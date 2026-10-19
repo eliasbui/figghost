@@ -13,10 +13,12 @@ use std::{collections::HashMap, path::Path, rc::Rc};
 
 pub mod calendar;
 pub mod capture;
+pub mod cursor;
 pub mod lyrics;
 pub mod mascot;
 pub mod menubar;
 pub mod mole;
+pub mod pin;
 pub mod smart;
 pub mod snap;
 pub mod stack;
@@ -56,6 +58,8 @@ pub struct Features {
     pub wheel: Option<Rc<wheel::Feature>>,
     pub mole: Option<Rc<mole::Feature>>,
     pub translate: Option<Rc<translate::Feature>>,
+    pub pin: Option<Rc<pin::Feature>>,
+    pub cursor: Option<Rc<cursor::Feature>>,
 }
 
 impl Features {
@@ -75,6 +79,8 @@ impl Features {
             mascot: mascot::attach(env),
             mole: mole::attach(env),
             translate: translate::attach(env),
+            pin: pin::attach(env),
+            cursor: cursor::attach(env),
         }
     }
 
@@ -116,6 +122,12 @@ impl Features {
         }
         if let Some(f) = &self.translate {
             out.insert("translate", f.runtime());
+        }
+        if let Some(f) = &self.pin {
+            out.insert("pin", f.runtime());
+        }
+        if let Some(f) = &self.cursor {
+            out.insert("cursor", f.runtime());
         }
         out
     }
@@ -167,6 +179,14 @@ impl Features {
                 .translate
                 .as_ref()
                 .map_or(Ok(()), |f| f.configure(&config.translate)),
+            "pin" => self
+                .pin
+                .as_ref()
+                .map_or(Ok(()), |f| f.configure(&config.pin)),
+            "cursor" => self
+                .cursor
+                .as_ref()
+                .map_or(Ok(()), |f| f.configure(&config.cursor)),
             _ => Ok(()),
         }
     }
@@ -206,6 +226,9 @@ impl Features {
         if let Some(f) = &self.translate {
             f.suspend_hotkeys();
         }
+        if let Some(f) = &self.pin {
+            f.suspend_hotkeys();
+        }
     }
 
     pub fn resume_hotkeys(&self, config: &Config) {
@@ -241,6 +264,9 @@ impl Features {
         }
         if let Some(f) = &self.translate {
             f.resume_hotkeys(&config.translate);
+        }
+        if let Some(f) = &self.pin {
+            f.resume_hotkeys(&config.pin);
         }
     }
 
@@ -301,6 +327,16 @@ impl Features {
         {
             return Some(result);
         }
+        if let Some(f) = &self.pin
+            && let Some(result) = f.action(name, &mut config.pin)
+        {
+            return Some(result);
+        }
+        if let Some(f) = &self.cursor
+            && let Some(result) = f.action(name, &mut config.cursor)
+        {
+            return Some(result);
+        }
         if let Some(f) = &self.mole
             && let Some(result) = f.action(name)
         {
@@ -344,6 +380,9 @@ impl Features {
         }
         if let Some(f) = &self.translate {
             entries.extend(translate::Feature::menu_entries(f));
+        }
+        if let Some(f) = &self.pin {
+            entries.extend(pin::Feature::menu_entries(f));
         }
         if let Some(f) = &self.mole {
             entries.extend(mole::Feature::menu_entries(f));
@@ -404,6 +443,14 @@ pub fn state(
         translate::settings::state(&config.translate, runtime.get("translate").unwrap_or(&none)),
     );
     root.insert(
+        "pin".into(),
+        pin::settings::state(&config.pin, runtime.get("pin").unwrap_or(&none)),
+    );
+    root.insert(
+        "cursor".into(),
+        cursor::settings::state(&config.cursor, runtime.get("cursor").unwrap_or(&none)),
+    );
+    root.insert(
         "mole".into(),
         mole::settings::state(runtime.get("mole").unwrap_or(&none)),
     );
@@ -443,6 +490,10 @@ pub fn set(config: &mut Config, path: &str, value: &Value) -> Option<Result<&'st
         }
         "translate" => translate::settings::set(&mut config.translate, rest, value)
             .map(|r| r.map(|()| "translate")),
+        "pin" => pin::settings::set(&mut config.pin, rest, value).map(|r| r.map(|()| "pin")),
+        "cursor" => {
+            cursor::settings::set(&mut config.cursor, rest, value).map(|r| r.map(|()| "cursor"))
+        }
         _ => None,
     }
 }
@@ -462,6 +513,7 @@ pub fn shortcut_owner(target: &str) -> Option<&'static str> {
         "mascot",
         "wheel",
         "translate",
+        "pin",
     ]
     .into_iter()
     .find(|id| *id == head)
@@ -481,6 +533,7 @@ pub fn shortcuts(config: &Config) -> Vec<(String, String)> {
     all.extend(mascot::settings::shortcuts(&config.mascot));
     all.extend(wheel::settings::shortcuts(&config.wheel));
     all.extend(translate::settings::shortcuts(&config.translate));
+    all.extend(pin::settings::shortcuts(&config.pin));
     all
 }
 
@@ -513,6 +566,9 @@ pub fn set_shortcut(
             .map(|r| r.map(|()| "wheel")),
         "translate" => translate::settings::set_shortcut(&mut config.translate, target, value)
             .map(|r| r.map(|()| "translate")),
+        "pin" => {
+            pin::settings::set_shortcut(&mut config.pin, target, value).map(|r| r.map(|()| "pin"))
+        }
         _ => None,
     }
 }

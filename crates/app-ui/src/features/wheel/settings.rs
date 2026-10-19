@@ -22,7 +22,7 @@ pub fn state(config: &Config, _runtime: &Value) -> Value {
     let wheel = |kind: Kind| {
         json!({
             "enabled": config.wheel(kind).enabled,
-            "key": config.key_of(kind).as_str(),
+            "key": config.key_name_of(kind),
             "hidden": config.hidden_ids(kind),
         })
     };
@@ -45,10 +45,10 @@ fn taken_by_other(config: &Config, kind: Kind, key: Key) -> bool {
         .any(|other| other != kind && config.wheel(other).enabled && config.key_of(other) == key)
 }
 
-fn taken(key: Key) -> Fault {
+fn taken(name: &str) -> Fault {
     Fault::new(
         "wheel_key_taken",
-        format!("{} is used by another wheel", key.as_str()),
+        format!("{name} is used by another wheel"),
     )
 }
 
@@ -78,24 +78,27 @@ fn set_enabled(config: &mut Config, kind: Kind, value: &Value) -> Result<(), Fau
     let on = value
         .as_bool()
         .ok_or_else(|| invalid("expected true or false"))?;
-    let key = config.key_of(kind);
-    if on && taken_by_other(config, kind, key) {
-        return Err(taken(key));
+    if on && taken_by_other(config, kind, config.key_of(kind)) {
+        return Err(taken(&config.key_name_of(kind)));
     }
     set_wheel(config, kind, |w| w.enabled = on);
     Ok(())
 }
 
 fn set_key(config: &mut Config, kind: Kind, value: &Value) -> Result<(), Fault> {
-    let key = value
+    let (name, key) = value
         .as_str()
-        .and_then(Key::parse)
-        .ok_or_else(|| invalid("expected shift, command, control or option"))?;
+        .and_then(|name| Key::parse(name).map(|key| (name, key)))
+        .ok_or_else(|| {
+            invalid(
+                "expected shift, command, control, option or the name of a key other than Escape",
+            )
+        })?;
     // A wheel that is off may take any key: the conflict is checked when it is turned on.
     if config.wheel(kind).enabled && taken_by_other(config, kind, key) {
-        return Err(taken(key));
+        return Err(taken(name));
     }
-    set_wheel(config, kind, |w| w.key = key.as_str().to_owned());
+    set_wheel(config, kind, |w| w.key = name.to_owned());
     Ok(())
 }
 
@@ -184,9 +187,25 @@ mod tests {
         // With the tools off, their key is free for the formats.
         assert!(run(&mut config, "formats.key", json!("command")).is_ok());
         assert_eq!(config.formats.key, "command");
+        // Any key a shortcut can name works, kept as written; the same key under another name is the same key.
+        assert!(run(&mut config, "formats.key", json!("f19")).is_ok());
+        assert_eq!(config.formats.key, "f19");
+        assert_eq!(config.key_of(Kind::Formats), Key::Other(80));
+        assert_eq!(state(&config, &Value::Null)["formats"]["key"], "f19");
+        assert!(run(&mut config, "formats.key", json!("return")).is_ok());
+        assert_eq!(
+            run(&mut config, "actions.key", json!("enter"))
+                .unwrap_err()
+                .code,
+            "wheel_key_taken"
+        );
+        assert!(run(&mut config, "formats.key", json!("command")).is_ok());
+        // Escape ends the drag, so no wheel can have it; nor a name no shortcut knows.
         for bad in [
             json!("Shift"),
             json!("fn"),
+            json!("escape"),
+            json!("esc"),
             json!(""),
             json!(3),
             json!(null),

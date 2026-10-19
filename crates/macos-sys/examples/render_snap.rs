@@ -330,28 +330,100 @@ fn main() {
     };
     // The drag, step by step, on a notched screen: the row, a layout under the pointer with its cells on the screen,
     // then the pointer on the screen with the row shrunk to a chip and one cell lit.
-    write("step-1-row".into(), &scene(&seven, None, None, None, false, true, false, false), Shot::Screen);
-    write("step-2-hover-thirds".into(), &scene(&seven, Some(2), Some(2), None, false, true, false, false), Shot::Screen);
-    write("step-3-cell".into(), &scene(&seven, None, Some(2), Some(1), true, true, false, false), Shot::Screen);
-    write("step-3-cell-dark".into(), &scene(&seven, None, Some(3), Some(3), true, true, true, false), Shot::Screen);
-    write("step-2-hover-quarters-dark".into(), &scene(&seven, Some(3), Some(3), None, false, true, true, false), Shot::Screen);
-    write("step-2-hover-full".into(), &scene(&seven, Some(0), Some(0), None, false, true, false, false), Shot::Screen);
+    write(
+        "step-1-row".into(),
+        &scene(&seven, None, None, None, false, true, false, false),
+        Shot::Screen,
+    );
+    write(
+        "step-2-hover-thirds".into(),
+        &scene(&seven, Some(2), Some(2), None, false, true, false, false),
+        Shot::Screen,
+    );
+    write(
+        "step-3-cell".into(),
+        &scene(&seven, None, Some(2), Some(1), true, true, false, false),
+        Shot::Screen,
+    );
+    write(
+        "step-3-cell-dark".into(),
+        &scene(&seven, None, Some(3), Some(3), true, true, true, false),
+        Shot::Screen,
+    );
+    write(
+        "step-2-hover-quarters-dark".into(),
+        &scene(&seven, Some(3), Some(3), None, false, true, true, false),
+        Shot::Screen,
+    );
+    write(
+        "step-2-hover-full".into(),
+        &scene(&seven, Some(0), Some(0), None, false, true, false, false),
+        Shot::Screen,
+    );
     let close_ups = [
-        ("close-rest", scene(&seven, None, None, None, false, true, false, false)),
-        ("close-hover-halves", scene(&seven, Some(1), Some(1), None, false, true, true, false)),
-        ("close-outlined", scene(&seven, None, Some(2), None, false, true, true, false)),
-        ("close-chip", scene(&seven, None, Some(2), Some(0), true, true, true, false)),
-        ("close-chip-notchless", scene(&seven, None, Some(4), Some(0), true, false, false, false)),
-        ("close-vietnamese", scene(&seven, Some(4), Some(4), None, false, true, true, true)),
-        ("close-notchless", scene(&seven, Some(0), Some(0), None, false, false, false, false)),
-        ("close-nine-two-rows", scene(&nine, Some(7), Some(7), None, false, true, true, false)),
-        ("close-one", scene(&seven[..1], Some(0), Some(0), None, false, true, false, false)),
+        (
+            "close-rest",
+            scene(&seven, None, None, None, false, true, false, false),
+        ),
+        (
+            "close-hover-halves",
+            scene(&seven, Some(1), Some(1), None, false, true, true, false),
+        ),
+        (
+            "close-outlined",
+            scene(&seven, None, Some(2), None, false, true, true, false),
+        ),
+        (
+            "close-chip",
+            scene(&seven, None, Some(2), Some(0), true, true, true, false),
+        ),
+        (
+            "close-chip-notchless",
+            scene(&seven, None, Some(4), Some(0), true, false, false, false),
+        ),
+        (
+            "close-vietnamese",
+            scene(&seven, Some(4), Some(4), None, false, true, true, true),
+        ),
+        (
+            "close-notchless",
+            scene(&seven, Some(0), Some(0), None, false, false, false, false),
+        ),
+        (
+            "close-nine-two-rows",
+            scene(&nine, Some(7), Some(7), None, false, true, true, false),
+        ),
+        (
+            "close-one",
+            scene(
+                &seven[..1],
+                Some(0),
+                Some(0),
+                None,
+                false,
+                true,
+                false,
+                false,
+            ),
+        ),
     ];
     for (file, scene) in close_ups {
         write(file.into(), &scene, Shot::Close);
     }
     // The pictures of the README: the row with a layout under the pointer, and the cells with the chip.
-    write("readme-row".into(), &scene(&seven, None, Some(2), None, false, false, false, false), Shot::Close);
-    write("readme-row-hover".into(), &scene(&seven, Some(2), Some(2), None, false, false, false, false), Shot::Close);
-    write("readme-cells".into(), &scene(&seven, None, Some(2), Some(1), true, true, false, false), Shot::Top);
+    write(
+        "readme-row".into(),
+        &scene(&seven, None, Some(2), None, false, false, false, false),
+        Shot::Close,
+    );
+    write(
+        "readme-row-hover".into(),
+        &scene(&seven, Some(2), Some(2), None, false, false, false, false),
+        Shot::Close,
+    );
+    write(
+        "readme-cells".into(),
+        &scene(&seven, None, Some(2), Some(1), true, true, false, false),
+        Shot::Top,
+    );
 }

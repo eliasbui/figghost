@@ -49,9 +49,18 @@ function throttleBy(key, ms, fn) {
 
 const I18N = {
   en: {
-    'side.search': 'Search', 'side.clear': 'Clear search', 'side.none': 'No settings found',
-    'nav.general': 'General', 'nav.scroll': 'Scrolling', 'nav.clipboard': 'Clipboard', 'nav.notch': 'Notch', 'nav.agents': 'AI agents', 'nav.tiling': 'Window snapping', 'nav.about': 'About',
+    'side.search': 'Search settings', 'side.clear': 'Clear search', 'side.none': 'No settings found',
+    'nav.general': 'General', 'nav.keys': 'Shortcuts', 'nav.scroll': 'Scrolling', 'nav.clipboard': 'Clipboard', 'nav.notch': 'Notch', 'nav.agents': 'AI agents', 'nav.tiling': 'Window snapping', 'nav.about': 'About',
     'page.general': 'General', 'page.general.sub': 'Startup, language and permissions.',
+    'page.keys': 'Shortcuts', 'page.keys.sub': 'The keys Figghost listens to, in one place. Click a shortcut, then press the new keys.',
+    'keys.sec.panel': 'In the notch and the clipboard popup', 'keys.board.title': 'Put in the next board', 'keys.board.desc': 'Boards group pinned items above the clipboard list.',
+    'keys.pastealt.desc': 'Keeps the formatting when pasting without it is on, and the other way round.',
+    'keys.delete.title': 'Delete, deny or dismiss', 'keys.delete.desc': 'Deletes the selected item, refuses what an agent asks and dismisses a calendar alert.',
+    'keys.sec.fixed': 'Standard keys', 'keys.fixed.desc': 'They work as they do everywhere on the Mac and stay as they are.',
+    'keys.fixed.enter': 'Paste, allow or join', 'keys.fixed.move': 'Move the selection', 'keys.fixed.tab': 'Switch tab or paste a row',
+    'keys.sec.global': 'Anywhere on the Mac', 'keys.elsewhere': 'Several shortcuts, set on its own page.', 'keys.open': 'Open', 'keys.change': 'Change keys',
+    'target.keys:pin': 'the pin key', 'target.keys:board': 'the board key', 'target.keys:paste_other': 'the key that pastes the other way', 'target.keys:delete': 'the delete key',
+    'fault.reserved': 'Command with one key already means a tab, a pinned item or Delete in the panels. Add Option, Control or Shift.',
     'page.scroll': 'Scrolling', 'page.scroll.sub': 'Smooth, reversible mouse-wheel scrolling. Trackpads and the Magic Mouse are never touched.',
     'page.clipboard': 'Clipboard', 'page.clipboard.sub': 'A history of everything you copy, with instant search, pinning and keyboard shortcuts.',
     'page.notch': 'Notch', 'page.notch.sub': 'A panel that grows out of the top edge of your screen: clipboard, file shelf, media, a focus timer, your coding agents and your calendar.',
@@ -105,7 +114,7 @@ const I18N = {
     'sec.shortcut': 'Shortcut', 'sec.pasting': 'Pasting', 'sec.history': 'History', 'sec.privacy': 'Privacy', 'sec.keys': 'Keyboard',
     'clip.hotkey.title': 'Open clipboard history', 'clip.hotkey.desc': 'Works everywhere. The popup appears next to the pointer.',
     'paste.auto.title': 'Paste automatically', 'paste.auto.desc': 'Press Enter on an item to paste it into the app you were using. Off copies only.',
-    'paste.plain.title': 'Paste without formatting', 'paste.plain.desc': 'Text goes in as plain text. Option + Shift + Enter does the opposite for one paste.',
+    'paste.plain.title': 'Paste without formatting', 'paste.plain.desc': 'Text goes in as plain text. {key} does the opposite for one paste.',
     'limit.title': 'Items to keep', 'limit.desc': 'Pinned items are never removed.', 'count.title': 'In the history now',
     'clear.title': 'Clear history', 'clear.desc': 'Removes every item that is not pinned.', 'clear.btn': 'Clear',
     'clear.confirm.title': 'Clear the clipboard history?', 'clear.confirm.body': 'Every item that is not pinned is removed. This cannot be undone.', 'cancel': 'Cancel',
@@ -150,9 +159,18 @@ const I18N = {
     'mcp.how': 'Add this to the assistant\'s MCP settings:', 'mcp.copy': 'Copy configuration', 'mcp.copied': 'Copied to the clipboard.',
   },
   vi: {
-    'side.search': 'Tìm', 'side.clear': 'Xóa tìm kiếm', 'side.none': 'Không có mục nào',
-    'nav.general': 'Chung', 'nav.scroll': 'Cuộn chuột', 'nav.clipboard': 'Clipboard', 'nav.notch': 'Notch', 'nav.agents': 'Tác tử AI', 'nav.tiling': 'Chia cửa sổ', 'nav.about': 'Giới thiệu',
+    'side.search': 'Tìm chức năng', 'side.clear': 'Xóa tìm kiếm', 'side.none': 'Không có mục nào',
+    'nav.general': 'Chung', 'nav.keys': 'Phím tắt', 'nav.scroll': 'Cuộn chuột', 'nav.clipboard': 'Clipboard', 'nav.notch': 'Notch', 'nav.agents': 'Tác tử AI', 'nav.tiling': 'Chia cửa sổ', 'nav.about': 'Giới thiệu',
     'page.general': 'Chung', 'page.general.sub': 'Khởi động, ngôn ngữ và quyền truy cập.',
+    'page.keys': 'Phím tắt', 'page.keys.sub': 'Mọi phím Figghost dùng, gom về một chỗ. Nhấn vào một phím tắt rồi bấm tổ hợp phím mới.',
+    'keys.sec.panel': 'Trong notch và cửa sổ clipboard', 'keys.board.title': 'Đưa vào bảng kế tiếp', 'keys.board.desc': 'Bảng gom các mục đã ghim phía trên danh sách clipboard.',
+    'keys.pastealt.desc': 'Giữ định dạng khi đang bật Dán không định dạng, và ngược lại.',
+    'keys.delete.title': 'Xóa, từ chối hoặc bỏ qua', 'keys.delete.desc': 'Xóa mục đang chọn, từ chối yêu cầu của tác tử và bỏ qua nhắc lịch.',
+    'keys.sec.fixed': 'Phím chuẩn', 'keys.fixed.desc': 'Dùng như ở mọi nơi trên máy Mac và giữ nguyên.',
+    'keys.fixed.enter': 'Dán, cho phép hoặc tham gia', 'keys.fixed.move': 'Di chuyển lựa chọn', 'keys.fixed.tab': 'Chuyển tab hoặc dán một dòng',
+    'keys.sec.global': 'Ở mọi nơi trên máy Mac', 'keys.elsewhere': 'Nhiều phím tắt, đặt ở trang riêng.', 'keys.open': 'Mở', 'keys.change': 'Đổi phím',
+    'target.keys:pin': 'phím ghim', 'target.keys:board': 'phím đưa vào bảng', 'target.keys:paste_other': 'phím dán theo kiểu ngược lại', 'target.keys:delete': 'phím xóa',
+    'fault.reserved': 'Command với một phím đã dùng cho tab, mục đã ghim hoặc Xóa trong panel. Thêm Option, Control hoặc Shift.',
     'page.scroll': 'Cuộn chuột', 'page.scroll.sub': 'Cuộn mượt và đảo chiều cho con lăn chuột. Trackpad và Magic Mouse không bị can thiệp.',
     'page.clipboard': 'Clipboard', 'page.clipboard.sub': 'Lịch sử mọi thứ bạn sao chép, tìm kiếm tức thì, ghim và phím tắt.',
     'page.notch': 'Notch', 'page.notch.sub': 'Bảng mọc ra từ mép trên màn hình: clipboard, khay tệp, media, đồng hồ tập trung, các tác tử lập trình và lịch của bạn.',
@@ -206,7 +224,7 @@ const I18N = {
     'sec.shortcut': 'Phím tắt', 'sec.pasting': 'Dán', 'sec.history': 'Lịch sử', 'sec.privacy': 'Riêng tư', 'sec.keys': 'Bàn phím',
     'clip.hotkey.title': 'Mở lịch sử clipboard', 'clip.hotkey.desc': 'Dùng ở mọi nơi. Cửa sổ nhỏ hiện cạnh con trỏ.',
     'paste.auto.title': 'Dán tự động', 'paste.auto.desc': 'Nhấn Enter ở một mục để dán vào ứng dụng bạn đang dùng. Tắt thì chỉ sao chép.',
-    'paste.plain.title': 'Dán không định dạng', 'paste.plain.desc': 'Văn bản vào ở dạng thuần. Option + Shift + Enter làm ngược lại cho một lần dán.',
+    'paste.plain.title': 'Dán không định dạng', 'paste.plain.desc': 'Văn bản vào ở dạng thuần. {key} làm ngược lại cho một lần dán.',
     'limit.title': 'Số mục giữ lại', 'limit.desc': 'Mục đã ghim không bao giờ bị xóa.', 'count.title': 'Hiện có trong lịch sử',
     'clear.title': 'Xóa lịch sử', 'clear.desc': 'Xóa mọi mục chưa ghim.', 'clear.btn': 'Xóa',
     'clear.confirm.title': 'Xóa lịch sử clipboard?', 'clear.confirm.body': 'Mọi mục chưa ghim sẽ bị xóa. Không thể hoàn tác.', 'cancel': 'Hủy',
@@ -444,7 +462,7 @@ function iconImg(id) {
 const MOD_ORDER = ['ctrl', 'opt', 'shift', 'cmd'];
 const MOD_ALIASES = { command: 'cmd', control: 'ctrl', option: 'opt', alt: 'opt' };
 const KEY_ALIASES = { enter: 'return', escape: 'esc' };
-const SYMBOLS = { ctrl: '⌃', opt: '⌥', shift: '⇧', cmd: '⌘', left: '←', right: '→', up: '↑', down: '↓', return: '↩', space: 'Space', tab: '⇥', esc: '⎋' };
+const SYMBOLS = { ctrl: '⌃', opt: '⌥', shift: '⇧', cmd: '⌘', left: '←', right: '→', up: '↑', down: '↓', return: '↩', space: 'Space', tab: '⇥', esc: '⎋', delete: '⌫' };
 const MODIFIER_CODES = new Set(['ShiftLeft', 'ShiftRight', 'ControlLeft', 'ControlRight', 'AltLeft', 'AltRight', 'MetaLeft', 'MetaRight', 'CapsLock', 'Fn']);
 
 /** The key name the app understands for a KeyboardEvent.code, or null when it does not support it. */
@@ -453,7 +471,7 @@ function keyName(code) {
   if ((m = /^Key([A-Z])$/.exec(code))) return m[1].toLowerCase();
   if ((m = /^Digit(\d)$/.exec(code))) return m[1];
   if ((m = /^F(\d{1,2})$/.exec(code)) && +m[1] >= 1 && +m[1] <= 20) return 'f' + m[1];
-  return { ArrowLeft: 'left', ArrowRight: 'right', ArrowUp: 'up', ArrowDown: 'down', Enter: 'return', NumpadEnter: 'return', Space: 'space', Tab: 'tab' }[code] || null;
+  return { ArrowLeft: 'left', ArrowRight: 'right', ArrowUp: 'up', ArrowDown: 'down', Enter: 'return', NumpadEnter: 'return', Space: 'space', Tab: 'tab', Backspace: 'delete' }[code] || null;
 }
 
 /** "cmd+shift+c" as the parts to draw: modifiers in the order macOS writes them, then the key. */
@@ -463,6 +481,8 @@ function shortcutParts(shortcut) {
   return [...MOD_ORDER.filter((m) => parts.includes(m)), ...parts.filter((p) => !MOD_ORDER.includes(p))];
 }
 function keyLabel(part) { return SYMBOLS[part] || part.toUpperCase(); }
+/** A shortcut as macOS writes it in a sentence: "opt+shift+return" is "⌥⇧↩". */
+function keysText(shortcut) { return shortcutParts(shortcut).map(keyLabel).join(''); }
 function keycapsEl(shortcut) {
   return h('span', { class: 'keys' }, shortcutParts(shortcut).map((p) => h('kbd', { text: keyLabel(p) })));
 }
@@ -585,8 +605,10 @@ function segmented({ options, value, onPick, small, label }) {
   const el = h('div', { class: 'seg' + (small ? ' small' : ''), role: 'radiogroup', 'aria-label': label || '', style: `--n:${options.length}` }, thumb, buttons);
   reg(() => {
     const current = value();
-    const i = Math.max(0, options.findIndex((o) => o.value === current));
-    el.style.setProperty('--i', i);
+    // A value that is none of the options (the drag wheel's own key) chooses none, rather than the first.
+    const i = options.findIndex((o) => o.value === current);
+    thumb.hidden = i < 0;
+    el.style.setProperty('--i', Math.max(0, i));
     buttons.forEach((b, k) => b.setAttribute('aria-checked', String(k === i)));
   });
   return el;
@@ -1059,7 +1081,7 @@ function pageClipboard() {
     card(
       row(t('clip.hotkey.title'), t('clip.hotkey.desc'), hotkeyButton('clipboard', { label: t('clip.hotkey.title') })),
       toggleRow('clipboard.auto_paste', t('paste.auto.title'), t('paste.auto.desc')),
-      toggleRow('clipboard.paste_plain', t('paste.plain.title'), t('paste.plain.desc'))),
+      toggleRow('clipboard.paste_plain', t('paste.plain.title'), t('paste.plain.desc', { key: keysText(S.keys.shortcuts.paste_other) }))),
     sectionTitle(t('sec.history')),
     card(
       row(t('limit.title'), t('limit.desc'), limitSelect()),
@@ -1074,12 +1096,44 @@ function pageClipboard() {
     sectionTitle(t('sec.keys')),
     h('section', { class: 'card' }, h('div', { class: 'cheats' },
       cheat(['↩'], t('key.paste')),
-      cheat(['⌥', '⇧', '↩'], t('key.pastealt')),
-      cheat(['⌥', 'P'], t('key.pin')),
-      cheat(['⌥', '⌫'], t('key.delete')),
+      cheat(shortcutParts(S.keys.shortcuts.paste_other).map(keyLabel), t('key.pastealt')),
+      cheat(shortcutParts(S.keys.shortcuts.pin).map(keyLabel), t('key.pin')),
+      cheat(shortcutParts(S.keys.shortcuts.delete).map(keyLabel), t('key.delete')),
       cheat(['⌘', 'B…'], t('key.pinkey')),
       cheat(['Esc'], t('key.close')),
       h('div', { class: 'cheat' }, h('span', { text: t('key.filters') }), h('span', { class: 'row-title', style: 'font-family:var(--mono);font-size:12px', text: t('key.filters.val') })))),
+    h('div', {}, button(t('keys.change'), () => go('keys'), { icon: 'keyboard', small: true })),
+  ];
+}
+
+// -- shortcuts --------------------------------------------------------
+
+function pageKeys() {
+  const key = (action, title, desc) => row(title, desc, hotkeyButton('keys:' + action, { label: title }));
+  // The shortcuts that work anywhere, each also on its own page; a feature that is not built in is left out.
+  const global = [['clipboard', t('clip.hotkey.title')], ['notch', t('notch.shortcut.title'), true]]
+    .concat(['smart', 'translate', 'vision', 'pin'].filter((id) => S[id] && PAGES.some((p) => p.id === id)).map((id) => [id, t('nav.' + id), id !== 'smart' && id !== 'translate']))
+    .map(([target, title, allowClear]) => row(title, null, hotkeyButton(target, { label: title, allowClear })));
+  const elsewhere = ['capture', 'tiling'].filter((id) => PAGES.some((p) => p.id === id))
+    .map((id) => row(t('nav.' + id), t('keys.elsewhere'), button(t('keys.open'), () => go(id), { small: true })));
+  return [
+    sectionTitle(t('keys.sec.panel')),
+    card(
+      key('pin', t('key.pin'), null),
+      key('board', t('keys.board.title'), t('keys.board.desc')),
+      key('paste_other', t('key.pastealt'), t('keys.pastealt.desc')),
+      key('delete', t('keys.delete.title'), t('keys.delete.desc'))),
+    sectionTitle(t('keys.sec.fixed')),
+    h('section', { class: 'card' }, h('div', { class: 'cheats' },
+      cheat(['↩'], t('keys.fixed.enter')),
+      cheat(['↑', '↓'], t('keys.fixed.move')),
+      cheat(['⌘', '1-9'], t('keys.fixed.tab')),
+      cheat(['⌘', 'A-Z'], t('key.pinkey')),
+      cheat(['⌘', '⌫'], t('key.delete')),
+      cheat(['Esc'], t('key.close'))),
+      h('div', { class: 'row-desc', style: 'padding:0 14px 12px', text: t('keys.fixed.desc') })),
+    sectionTitle(t('keys.sec.global')),
+    card(...global, ...elsewhere),
   ];
 }
 
@@ -1484,7 +1538,7 @@ const MIT_LICENSE = [
 Object.assign(I18N.en, {
   'about.sec.what': 'About Figghost',
   'about.what.title': 'One light app for the small tools of a Mac',
-  'about.what.body': 'Smooth mouse-wheel scrolling, a clipboard history, a panel that grows out of the notch with a file shelf, media, a focus timer, your calendar and your coding agents, sound for each app and window snapping live in one place. Screenshots, screen recordings, a colour picker, Smart Select and more can be switched on when you want them.',
+  'about.what.body': 'Smooth mouse-wheel scrolling, a clipboard history, a panel that grows out of the notch with a file shelf, media, a focus timer, your calendar and your coding agents, sound for each app window snapping, a window kept on top and a cursor of your own live in one place. Screenshots, screen recordings, a colour picker, Smart Select, Translate and more can be switched on when you want them.',
   'about.native.title': 'Native, and kept on this Mac',
   'about.native.body': 'It is written in Rust on AppKit, with no browser engine in the app itself; only this settings window is a web page. It idles light, comes in English and Vietnamese, and everything it keeps stays on this Mac.',
   'about.sec.history': 'How it came to be',
@@ -1497,6 +1551,8 @@ Object.assign(I18N.en, {
   'about.v.0_6': 'Version 0.6, 19 October 2026', 'about.v.0_6.body': 'Updating from inside the app: a daily look for a new version, the download and the install, with what is new shown first.',
   'about.v.0_7': 'Version 0.7, 19 October 2026', 'about.v.0_7.body': 'A redesigned notch, and the Drag wheel, which converts files and runs tools on them while you drag.',
   'about.v.0_8': 'Version 0.8, 19 October 2026', 'about.v.0_8.body': 'A new app icon and a sidebar with a name beside every icon.',
+  'about.v.0_9': 'Version 0.9, 19 October 2026', 'about.v.0_9.body': 'A hello from the ghost, Translate, Bluetooth in the notch, 3D sound, and window snapping in two steps with layouts of your own.',
+  'about.v.1_0': 'Version 1.0, 19 October 2026', 'about.v.1_0.body': 'The first big release: a custom cursor, Always on top, a Shortcuts page, a search field for the settings, and a simpler area picker for screenshots.',
   'about.sec.license': 'Licence',
   'about.license.title': 'MIT License',
   'about.license.body': 'Figghost is free, open source software under the MIT License, copyright 2026 Doanh Thai Bui. You may use it for any purpose, at home or at work, copy it, change it, share it and even sell what you make from it. The one condition is that the copyright notice and the licence text stay with every copy or substantial part of it. It comes without any warranty: the authors are not liable for what it does on your Mac.',
@@ -1507,7 +1563,7 @@ Object.assign(I18N.en, {
 Object.assign(I18N.vi, {
   'about.sec.what': 'Giới thiệu Figghost',
   'about.what.title': 'Một ứng dụng nhẹ cho các công cụ nhỏ của máy Mac',
-  'about.what.body': 'Cuộn chuột mượt, lịch sử clipboard, một bảng mở ra từ notch với khay tệp, nhạc đang phát, đồng hồ tập trung, lịch và các tác tử lập trình của bạn, âm thanh riêng cho từng ứng dụng và ghim cửa sổ, tất cả nằm chung một chỗ. Chụp màn hình, quay màn hình, chọn màu, Smart Select và nhiều thứ khác có thể bật khi bạn cần.',
+  'about.what.body': 'Cuộn chuột mượt, lịch sử clipboard, một bảng mở ra từ notch với khay tệp, nhạc đang phát, đồng hồ tập trung, lịch và các tác tử lập trình của bạn, âm thanh riêng cho từng ứng dụng, ghim cửa sổ, giữ một cửa sổ luôn trên cùng và con trỏ riêng của bạn, tất cả nằm chung một chỗ. Chụp màn hình, quay màn hình, chọn màu, Smart Select, Dịch và nhiều thứ khác có thể bật khi bạn cần.',
   'about.native.title': 'Bản địa, và ở lại trên máy này',
   'about.native.body': 'Ứng dụng viết bằng Rust trên AppKit, không có trình duyệt nhúng trong chính ứng dụng; chỉ cửa sổ cài đặt này là một trang web. Nó chạy nhẹ, có tiếng Anh và tiếng Việt, và mọi thứ nó lưu đều ở lại trên máy Mac này.',
   'about.sec.history': 'Vì sao có Figghost',
@@ -1520,6 +1576,8 @@ Object.assign(I18N.vi, {
   'about.v.0_6': 'Phiên bản 0.6, 19/10/2026', 'about.v.0_6.body': 'Cập nhật ngay trong ứng dụng: mỗi ngày tự tìm bản mới, tải và cài, có hiện trước những gì mới.',
   'about.v.0_7': 'Phiên bản 0.7, 19/10/2026', 'about.v.0_7.body': 'Notch được thiết kế lại, và Vòng kéo thả giúp đổi định dạng tệp và chạy công cụ trên tệp ngay khi bạn đang kéo.',
   'about.v.0_8': 'Phiên bản 0.8, 19/10/2026', 'about.v.0_8.body': 'Biểu tượng ứng dụng mới và thanh bên có tên bên cạnh mỗi biểu tượng.',
+  'about.v.0_9': 'Phiên bản 0.9, 19/10/2026', 'about.v.0_9.body': 'Lời chào của chú ma, Dịch, Bluetooth trên notch, âm thanh 3D, và ghim cửa sổ hai bước với bố cục của riêng bạn.',
+  'about.v.1_0': 'Phiên bản 1.0, 19/10/2026', 'about.v.1_0.body': 'Bản lớn đầu tiên: con trỏ tùy chỉnh, Luôn trên cùng, trang Phím tắt, ô tìm trong cài đặt, và cách chọn vùng chụp màn hình gọn hơn.',
   'about.sec.license': 'Giấy phép',
   'about.license.title': 'Giấy phép MIT',
   'about.license.body': 'Figghost là phần mềm mã nguồn mở, miễn phí, theo Giấy phép MIT, bản quyền 2026 Doanh Thai Bui. Bạn được dùng cho mọi mục đích, ở nhà hay ở nơi làm việc, sao chép, sửa đổi, chia sẻ và thậm chí bán sản phẩm bạn làm ra từ nó. Điều kiện duy nhất là thông báo bản quyền và nội dung giấy phép phải đi kèm mọi bản sao hoặc phần đáng kể của phần mềm. Phần mềm được cung cấp nguyên trạng, không bảo hành: tác giả không chịu trách nhiệm về những gì nó làm trên máy Mac của bạn.',
@@ -1553,7 +1611,7 @@ function pageAbout() {
     card(row(t('about.why.title'), t('about.why.body'), null)),
     card(
       row(t('about.versions.title'), null, null),
-      ...['0_2', '0_4', '0_5', '0_6', '0_7', '0_8'].map((v) => version('v.' + v))),
+      ...['0_2', '0_4', '0_5', '0_6', '0_7', '0_8', '0_9', '1_0'].map((v) => version('v.' + v))),
     sectionTitle(t('about.sec.license')),
     card(
       row(t('about.license.title'), t('about.license.body'), toggle),
@@ -1565,6 +1623,7 @@ function pageAbout() {
 
 const PAGES = [
   { id: 'general', icon: 'gearshape.fill', build: pageGeneral },
+  { id: 'keys', icon: 'keyboard', build: pageKeys },
   { id: 'scroll', icon: 'computermouse.fill', build: pageScroll },
   { id: 'clipboard', icon: 'doc.on.clipboard.fill', build: pageClipboard },
   { id: 'notch', icon: 'rectangle.topthird.inset.filled', build: pageNotch },
@@ -1602,10 +1661,87 @@ function accessPill() {
   return el;
 }
 
+// ---------------------------------------------------------------- search
+
+/** Text without case or Vietnamese marks, so "cuon" finds "Cuộn" and "hover" finds "Hover delay". */
+function folded(text) {
+  return String(text).normalize('NFD').replace(/[̀-ͯ]/g, '').replace(/[đĐ]/g, 'd').toLowerCase();
+}
+
+/** What each page says, folded: its name, the line under its title, and the titles and notes of its rows. Each
+ *  page is built off screen for it the first time a search needs it, and what it registered is dropped at once. */
+let searchIndex = null;
+let searchWords = [];
+function pageTexts() {
+  if (searchIndex) return searchIndex;
+  searchIndex = new Map();
+  for (const p of PAGES) {
+    let node = null;
+    dropSyncs(scoped(() => { node = h('div', {}, [].concat(p.build(), slotsFor(p.id))); }));
+    const parts = [t('nav.' + p.id), t('page.' + p.id + '.sub')];
+    for (const el of node.querySelectorAll('.row-title, .row-desc, .section-title, .feat-name, label, .btn')) parts.push(el.textContent);
+    searchIndex.set(p.id, folded(parts.join('\n')));
+  }
+  return searchIndex;
+}
+
+/** Shows the pages that say every word of `query`, and says so when none does. */
+function applySearch(query) {
+  searchWords = folded(query).split(/\s+/).filter(Boolean);
+  const index = searchWords.length ? pageTexts() : null;
+  let shown = 0;
+  for (const item of document.querySelectorAll('.nav-item')) {
+    const text = index ? index.get(item.dataset.page) || '' : '';
+    item.hidden = !!index && !searchWords.every((w) => text.includes(w));
+    if (!item.hidden) shown += 1;
+  }
+  for (const sep of document.querySelectorAll('.nav-sep')) sep.hidden = searchWords.length > 0;
+  const empty = $('.nav-empty');
+  if (empty) empty.hidden = shown > 0;
+}
+
+/** On the page just opened from a search, brings the first row that says the words into view and marks it. */
+function reveal(words) {
+  if (!words.length) return;
+  const rows = [...document.querySelectorAll('#scroller .row, #scroller .section-title, #scroller .feat')];
+  const hit = rows.find((row) => words.every((w) => folded(row.textContent).includes(w)));
+  if (!hit) return;
+  hit.scrollIntoView({ block: 'center', behavior: document.documentElement.classList.contains('reduce-motion') ? 'auto' : 'smooth' });
+  hit.classList.add('found');
+  setTimeout(() => hit.classList.remove('found'), 1600);
+}
+
+function navSearch() {
+  const input = h('input', { type: 'search', id: 'side-search', autocomplete: 'off', spellcheck: 'false', placeholder: t('side.search'), 'aria-label': t('side.search') });
+  input.addEventListener('input', () => applySearch(input.value));
+  input.addEventListener('keydown', (e) => {
+    if (e.key === 'Escape' && input.value) {
+      e.preventDefault();
+      input.value = '';
+      applySearch('');
+    } else if (e.key === 'Enter') {
+      const first = [...document.querySelectorAll('.nav-item')].find((item) => !item.hidden);
+      if (first) { go(first.dataset.page); reveal(searchWords); }
+    }
+  });
+  // Command-F finds, as in any Mac window. Bound once: the shell is rebuilt when the language changes.
+  if (!navSearch.bound) {
+    navSearch.bound = true;
+    document.addEventListener('keydown', (e) => {
+      if (e.metaKey && !e.shiftKey && !e.altKey && !e.ctrlKey && e.code === 'KeyF') {
+        e.preventDefault();
+        const field = $('#side-search');
+        if (field) { field.focus(); field.select(); }
+      }
+    });
+  }
+  return h('label', { class: 'side-search' }, icon('magnifyingglass'), input);
+}
+
 function renderNavItems() {
   const groupOf = (id) => {
-    if (id === 'general') return 1;
-    if (['scroll', 'clipboard', 'tiling'].includes(id)) return 2;
+    if (id === 'general' || id === 'keys') return 1;
+    if (['scroll', 'clipboard', 'tiling', 'pin', 'cursor'].includes(id)) return 2;
     if (['notch', 'agents', 'calendar'].includes(id)) return 3;
     if (['smart', 'translate', 'capture', 'vision'].includes(id)) return 4;
     return 5;
@@ -1619,7 +1755,7 @@ function renderNavItems() {
       elements.push(h('div', { class: 'nav-sep', 'aria-hidden': 'true' }));
     }
     lastGroup = g;
-    elements.push(h('button', { class: 'nav-item', 'data-page': p.id, 'data-name': t('nav.' + p.id), onclick: () => go(p.id) },
+    elements.push(h('button', { class: 'nav-item', 'data-page': p.id, 'data-name': t('nav.' + p.id), onclick: () => { go(p.id); reveal(searchWords); } },
       h('span', { class: 'nav-icon' }, icon(p.icon)),
       h('span', { class: 'nav-label', text: t('nav.' + p.id) })));
   }
@@ -1632,8 +1768,10 @@ function buildShell() {
     h('div', { id: 'app' },
       h('aside', { id: 'sidebar', class: 'glass' },
         h('div', { class: 'dragzone', 'data-drag': '' }),
+        navSearch(),
         h('nav', { id: 'nav', 'aria-label': 'Figghost' },
-          ...renderNavItems()),
+          ...renderNavItems(),
+          h('div', { class: 'nav-empty', hidden: true, text: t('side.none') })),
         h('div', { class: 'side-foot' }, accessPill())),
       h('main', { id: 'main' },
         h('div', { class: 'dragzone', 'data-drag': '' }),
@@ -1662,6 +1800,9 @@ function go(id) {
 }
 
 function rebuild() {
+  // The words of every page change with the language: the search starts over.
+  searchIndex = null;
+  searchWords = [];
   dropSyncs(shellSyncs);
   shellSyncs = scoped(buildShell);
   go(current);
@@ -1735,9 +1876,24 @@ window.__selftest = function () {
     expect(en.filter((k) => !I18N.vi[k]).length === 0, 'missing in vi: ' + en.filter((k) => !I18N.vi[k]).join(', '));
     expect(vi.filter((k) => !I18N.en[k]).length === 0, 'missing in en: ' + vi.filter((k) => !I18N.en[k]).join(', '));
 
+    // The search over the sidebar finds pages by what their settings say, with or without Vietnamese marks.
+    {
+      const field = $('#side-search');
+      const search = (text) => { field.value = text; field.dispatchEvent(new Event('input')); };
+      const shown = () => [...document.querySelectorAll('.nav-item')].filter((item) => !item.hidden).map((item) => item.dataset.page);
+      search('hover');
+      expect(shown().includes('notch') && !shown().includes('scroll'), 'search finds the notch by its hover delay: ' + shown());
+      expect(folded('Cuộn chuột Đ') === 'cuon chuot d', 'search ignores marks: ' + folded('Cuộn chuột Đ'));
+      search('zzqx');
+      expect(shown().length === 0 && !$('.nav-empty').hidden, 'a search that matches nothing says so');
+      search('');
+      expect(shown().length === PAGES.length && $('.nav-empty').hidden, 'clearing the search shows every page');
+    }
+
     // Shortcut helpers.
     expect(keyName('KeyC') === 'c' && keyName('Digit7') === '7' && keyName('F13') === 'f13' && keyName('ArrowLeft') === 'left', 'keyName basics');
-    expect(keyName('Backquote') === null && keyName('F21') === null, 'keyName rejects unsupported keys');
+    expect(keyName('Backquote') === null && keyName('F21') === null && keyName('Delete') === null, 'keyName rejects unsupported keys');
+    expect(keyName('Backspace') === 'delete' && keysText('opt+shift+return') === '⌥⇧↩', 'Delete and sentence labels');
     expect(shortcutParts('cmd+shift+c').join() === 'shift,cmd,c', 'shortcutParts order: ' + shortcutParts('cmd+shift+c'));
     expect(shortcutParts('control+option+left').join() === 'ctrl,opt,left', 'shortcutParts aliases');
     expect(shortcutParts('').length === 0, 'shortcutParts empty');
@@ -1802,6 +1958,25 @@ window.__selftest = function () {
     go('tiling');
     expect(document.querySelectorAll('.tile').length === 13, 'thirteen layouts are shown');
 
+    // The keys inside the panels are recorded like any shortcut, Delete included, and the clipboard page
+    // lists the ones in use.
+    go('keys');
+    const panelKey = (action) => [...document.querySelectorAll('.hotkey')].find((b) => b.getAttribute('aria-label').startsWith(t(action === 'pin' ? 'key.pin' : 'keys.delete.title')));
+    sent.length = 0;
+    panelKey('pin').click();
+    window.dispatchEvent(new KeyboardEvent('keydown', { code: 'KeyK', altKey: true, bubbles: true, cancelable: true }));
+    expect(sent.some((m) => m.t === 'hotkey' && m.target === 'keys:pin' && m.value === 'opt+k'), 'a new pin key is sent: ' + JSON.stringify(sent));
+    panelKey('delete').click();
+    window.dispatchEvent(new KeyboardEvent('keydown', { code: 'Backspace', ctrlKey: true, bubbles: true, cancelable: true }));
+    expect(sent.some((m) => m.t === 'hotkey' && m.target === 'keys:delete' && m.value === 'ctrl+delete'), 'Delete can be part of a key: ' + JSON.stringify(sent));
+    expect(targetName('keys:delete') === t('target.keys:delete'), 'a conflict names the panel key');
+    expect(document.querySelectorAll('.hotkey').length >= 6, 'the shortcuts of the whole Mac are listed too');
+    const pinKey = S.keys.shortcuts.pin;
+    S.keys.shortcuts.pin = 'ctrl+j';
+    go('clipboard');
+    expect([...document.querySelectorAll('.cheat')].some((c) => c.textContent === t('key.pin') + '⌃J'), 'the clipboard page shows the pin key in use');
+    S.keys.shortcuts.pin = pinKey;
+
     // The agents page: switches write their setting, the button follows what is installed.
     go('agents');
     sent.length = 0;
@@ -1865,7 +2040,7 @@ window.__selftest = function () {
     // The About page says what the app is, where it comes from and under what licence it is used.
     expect(['about.sec.what', 'about.sec.history', 'about.sec.license'].every((key) => $('#scroller').textContent.includes(t(key))), 'About has its sections');
     expect($('#scroller').textContent.includes(t('about.license.title')) && $('#scroller').textContent.includes('Doanh Thai Bui'), 'and names the licence and its holder');
-    expect(['0_2', '0_4', '0_5', '0_6', '0_7', '0_8'].every((v) => $('#scroller').textContent.includes(t('about.v.' + v + '.body'))), 'and lists the versions');
+    expect(['0_2', '0_4', '0_5', '0_6', '0_7', '0_8', '0_9', '1_0'].every((v) => $('#scroller').textContent.includes(t('about.v.' + v + '.body'))), 'and lists the versions');
     const licence = $('.license');
     expect(licence && licence.hidden && licence.textContent.includes('Permission is hereby granted'), 'the licence text is there but hidden');
     const showLicence = [...document.querySelectorAll('.btn')].find((b) => b.textContent === t('about.license.show'));

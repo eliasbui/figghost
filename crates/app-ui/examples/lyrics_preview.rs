@@ -25,7 +25,7 @@ fn main() {
     let dir = env::args().nth(1).unwrap_or_else(|| "/tmp/lyrics".into());
     let language = Language::from_tag(&env::args().nth(2).unwrap_or_default()).unwrap_or_default();
     i18n::set(language);
-    macos_sys::labels::set(language.labels());
+    macos_sys::labels::set(language.labels("opt+p", "opt+delete"));
     fs::create_dir_all(&dir).expect("output directory");
 
     let media = MediaView::preview(mtm);

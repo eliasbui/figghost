@@ -391,7 +391,10 @@ mod tests {
 
     /// The last `n` lines of the log.
     fn tail(lines: &[String], n: usize) -> Vec<&str> {
-        lines[lines.len() - n..].iter().map(String::as_str).collect()
+        lines[lines.len() - n..]
+            .iter()
+            .map(String::as_str)
+            .collect()
     }
 
     /// The pointer position over the middle of the tile of layout `layout` of display `display`.

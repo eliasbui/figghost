@@ -1,0 +1,37 @@
+/* Custom cursor. Styles for the page in web/features/cursor.js, using the variables at the top of app.css. */
+.cursor-tiles { display: grid; grid-template-columns: repeat(auto-fill, minmax(104px, 1fr)); gap: 10px; width: 100%; }
+.cursor-tile {
+  display: flex; flex-direction: column; align-items: center; justify-content: center; gap: 8px;
+  height: 96px; padding: 8px 6px; border-radius: var(--r-tile);
+  background: var(--fill-2); box-shadow: inset 0 0 0 1px var(--glass-edge);
+  color: var(--text); font: inherit; font-size: var(--fs-small); cursor: default;
+  appearance: none; -webkit-appearance: none; border: 0; margin: 0;
+  transition: background var(--motion-fast), box-shadow var(--motion-fast);
+}
+.cursor-tile:hover { background: var(--fill); }
+.cursor-tile[aria-checked="true"] { box-shadow: inset 0 0 0 2px var(--tint); background: var(--fill); }
+.cursor-tile .cursor-label { max-width: 100%; overflow: hidden; text-overflow: ellipsis; white-space: nowrap; }
+.cursor-art { width: 48px; height: 48px; display: flex; align-items: center; justify-content: center; flex: none; }
+/* A sheet is twelve frames of 48 pixels in a row; the cursor stands and blinks, on whole frames. */
+.cursor-sprite {
+  width: 48px; height: 48px; background-repeat: no-repeat; background-size: 576px 48px; background-position: 0 0;
+  image-rendering: pixelated; animation: cursor-blink 3.3s steps(1, end) infinite;
+}
+@keyframes cursor-blink {
+  0%, 88% { background-position: 0 0; }
+  90%, 96% { background-position: -48px 0; }
+  98%, 100% { background-position: 0 0; }
+}
+/* The rainbow arrow: the outline of the drawn one, its colour turning once a second. */
+.cursor-neon-frame { filter: drop-shadow(0 0 1.5px #fff) drop-shadow(0 1px 1px rgba(0, 0, 0, 0.5)); }
+.cursor-neon {
+  width: 34px; height: 40px; background: #a23bff;
+  clip-path: polygon(0 0, 0 80%, 20% 62%, 34% 94%, 48% 88%, 35% 57%, 60% 57%);
+  animation: cursor-hue 1s linear infinite;
+}
+@keyframes cursor-hue { to { filter: hue-rotate(360deg); } }
+.cursor-art .glyph { width: 26px; height: 26px; opacity: 0.7; }
+.cursor-file { max-width: 220px; overflow: hidden; text-overflow: ellipsis; white-space: nowrap; }
+@media (prefers-reduced-motion: reduce) {
+  .cursor-sprite, .cursor-neon { animation: none; }
+}

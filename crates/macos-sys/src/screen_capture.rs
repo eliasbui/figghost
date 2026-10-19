@@ -42,6 +42,11 @@ pub fn screen_access(prompt: bool) -> bool {
     prompt && CGRequestScreenCaptureAccess()
 }
 
+/// The privacy pane of System Settings that holds the Screen Recording list, where access is switched on once the
+/// system's own dialog has been shown.
+pub const SCREEN_RECORDING_PANE: &str =
+    "x-apple.systempreferences:com.apple.preference.security?Privacy_ScreenCapture";
+
 /// The folder macOS saves its own screenshots to, when the user changed it.
 pub fn system_screenshot_folder() -> Option<std::path::PathBuf> {
     let defaults = objc2_foundation::NSUserDefaults::standardUserDefaults();

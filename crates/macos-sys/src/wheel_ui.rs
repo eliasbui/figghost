@@ -1,6 +1,7 @@
-//! The drag wheel: while files are dragged out of any app, tapping Shift, Command or Control opens a ring of
-//! slots around the pointer, and dropping the files on a slot hands them to the app. This file notices the drag,
-//! owns the panel that takes the drop and draws the ring; what a slot does is the caller's business.
+//! The drag wheel: while files are dragged out of any app, tapping a key (Shift, Command or Control unless the
+//! user chose others) opens a ring of slots around the pointer, and dropping the files on a slot hands them to the
+//! app. This file notices the drag, owns the panel that takes the drop and draws the ring; what a slot does is the
+//! caller's business.
 //!
 //! How a drag is noticed, as found by trying it against a second process dragging a file (examples/wheel_check):
 //! - A global mouse monitor sees the left button, and the drag events of another app's drag session, without any
@@ -11,6 +12,9 @@
 //! - The modifier keys are polled with `NSEvent::modifierFlags()` on a timer while such a drag lasts. That reads
 //!   the session's key state and needs no permission, unlike relying on a flagsChanged monitor, which the system
 //!   may withhold without Accessibility access.
+//! - A wheel bound to a key that is not a modifier is opened by a global keyDown monitor that lives only while
+//!   files are dragged. Monitors of keys need Accessibility, as the app's other key features do; the monitor hands
+//!   on the code of the key and keeps nothing.
 //! - A panel ordered front in the middle of the drag receives `draggingEntered`, `draggingUpdated` and
 //!   `performDragOperation` like any window, but only for its opaque pixels: a drop on a transparent pixel goes
 //!   to the window underneath, as usual. The hub is therefore drawn solid and refuses the drop.
@@ -35,20 +39,21 @@ use crate::{
     widgets::{self, Fit},
     workspace,
 };
+use block2::RcBlock;
 use objc2::{
     AnyThread, DefinedClass, MainThreadMarker, MainThreadOnly, define_class, msg_send,
     rc::Retained,
-    runtime::{AnyClass, ProtocolObject},
+    runtime::{AnyClass, AnyObject, ProtocolObject},
 };
 use objc2_app_kit::{
     NSAccessibility, NSBackingStoreType, NSBezierPath, NSBitmapImageFileType, NSBitmapImageRep,
     NSColor, NSCompositingOperation, NSDeviceRGBColorSpace, NSDragOperation, NSDraggingDestination,
-    NSDraggingInfo, NSEvent, NSEventModifierFlags, NSGlassEffectView, NSGraphicsContext,
-    NSLineJoinStyle, NSMainMenuWindowLevel, NSPanel, NSPasteboard, NSPasteboardNameDrag,
-    NSPasteboardTypeFileURL, NSScreen, NSStringDrawing, NSStringDrawingOptions,
-    NSStringNSExtendedStringDrawing, NSView, NSVisualEffectBlendingMode, NSVisualEffectState,
-    NSVisualEffectView, NSWindingRule, NSWindowAnimationBehavior, NSWindowCollectionBehavior,
-    NSWindowStyleMask,
+    NSDraggingInfo, NSEvent, NSEventMask, NSEventModifierFlags, NSGlassEffectView,
+    NSGraphicsContext, NSLineJoinStyle, NSMainMenuWindowLevel, NSPanel, NSPasteboard,
+    NSPasteboardNameDrag, NSPasteboardTypeFileURL, NSScreen, NSStringDrawing,
+    NSStringDrawingOptions, NSStringNSExtendedStringDrawing, NSView, NSVisualEffectBlendingMode,
+    NSVisualEffectState, NSVisualEffectView, NSWindingRule, NSWindowAnimationBehavior,
+    NSWindowCollectionBehavior, NSWindowStyleMask,
 };
 use objc2_foundation::{
     NSArray, NSDictionary, NSObjectProtocol, NSPoint, NSRect, NSSize, NSString,
@@ -57,6 +62,7 @@ use std::{
     cell::{Cell, RefCell},
     f64::consts::{PI, TAU},
     path::PathBuf,
+    ptr::NonNull,
     rc::{Rc, Weak},
     time::Instant,
 };
@@ -224,36 +230,54 @@ pub enum Modifier {
     Option,
 }
 
+/// What opens a wheel: a tap of a modifier key alone, or a press of any other key, by its virtual key code.
+#[derive(Debug, Clone, Copy, PartialEq, Eq)]
+pub enum Trigger {
+    Modifier(Modifier),
+    Key(u16),
+}
+
 /// The key that opens each wheel; `None` means that wheel is off.
 #[derive(Debug, Clone, Copy, PartialEq, Eq)]
 pub struct Keys {
-    pub formats: Option<Modifier>,
-    pub tools: Option<Modifier>,
-    pub actions: Option<Modifier>,
+    pub formats: Option<Trigger>,
+    pub tools: Option<Trigger>,
+    pub actions: Option<Trigger>,
 }
 
 impl Default for Keys {
     /// Shift for formats, Command for tools, Control for actions; Option stays a plain copy drag.
     fn default() -> Self {
         Self {
-            formats: Some(Modifier::Shift),
-            tools: Some(Modifier::Command),
-            actions: Some(Modifier::Control),
+            formats: Some(Trigger::Modifier(Modifier::Shift)),
+            tools: Some(Trigger::Modifier(Modifier::Command)),
+            actions: Some(Trigger::Modifier(Modifier::Control)),
         }
     }
 }
 
 impl Keys {
-    /// The wheel bound to `modifier`, if any.
-    fn wheel_of(self, modifier: Modifier) -> Option<Kind> {
+    fn all(self) -> [(Option<Trigger>, Kind); 3] {
         [
             (self.formats, Kind::Formats),
             (self.tools, Kind::Tools),
             (self.actions, Kind::Actions),
         ]
-        .into_iter()
-        .find(|(bound, _)| *bound == Some(modifier))
-        .map(|(_, kind)| kind)
+    }
+
+    /// The wheel bound to `trigger`, if any.
+    fn wheel_of(self, trigger: Trigger) -> Option<Kind> {
+        self.all()
+            .into_iter()
+            .find(|(bound, _)| *bound == Some(trigger))
+            .map(|(_, kind)| kind)
+    }
+
+    /// Whether a wheel is bound to a key that is not a modifier, which takes watching the keys of other apps.
+    fn any_key(self) -> bool {
+        self.all()
+            .into_iter()
+            .any(|(bound, _)| matches!(bound, Some(Trigger::Key(_))))
     }
 }
 
@@ -398,6 +422,8 @@ enum Event {
     Drag { files: bool, mods: Mods },
     /// The modifier keys as they are now, from the timer.
     Mods(Mods),
+    /// A key that is not a modifier went down in some app, by its virtual key code.
+    Key(u16),
     /// The button went up, or its release was missed.
     Up,
 }
@@ -449,6 +475,24 @@ impl Machine {
                     Act::Nothing
                 }
             }
+            Event::Key(code) => {
+                if self.tracking() {
+                    self.open_for(Trigger::Key(code))
+                } else {
+                    Act::Nothing
+                }
+            }
+        }
+    }
+
+    /// Opens the wheel bound to `trigger`, unless it is the one already open or none is.
+    fn open_for(&mut self, trigger: Trigger) -> Act {
+        match self.keys.wheel_of(trigger) {
+            Some(kind) if self.kind != Some(kind) => {
+                self.kind = Some(kind);
+                Act::Open(kind)
+            }
+            _ => Act::Nothing,
         }
     }
 
@@ -481,15 +525,38 @@ impl Machine {
         .into_iter()
         .filter(|(down, _)| *down);
         match (newly.next(), newly.next()) {
-            (Some((_, modifier)), None) => match self.keys.wheel_of(modifier) {
-                Some(kind) if self.kind != Some(kind) => {
-                    self.kind = Some(kind);
-                    Act::Open(kind)
-                }
-                _ => Act::Nothing,
-            },
+            (Some((_, modifier)), None) => self.open_for(Trigger::Modifier(modifier)),
             _ => Act::Nothing,
         }
+    }
+}
+
+/// The keys pressed in other apps, for a wheel bound to a key that is not a modifier. Started only while files are
+/// dragged and removed when dropped. Key monitors need Accessibility; without it none starts and only the
+/// modifier keys open wheels. Repeats of a held key are not presses.
+struct KeyMonitor {
+    token: Retained<AnyObject>,
+}
+
+impl KeyMonitor {
+    fn start(handler: impl Fn(u16) + 'static) -> Option<Self> {
+        let block = RcBlock::new(move |event: NonNull<NSEvent>| {
+            // SAFETY: AppKit passes a live event for the duration of the call.
+            let event = unsafe { event.as_ref() };
+            if !event.isARepeat() {
+                handler(event.keyCode());
+            }
+        });
+        let token =
+            NSEvent::addGlobalMonitorForEventsMatchingMask_handler(NSEventMask::KeyDown, &block)?;
+        Some(Self { token })
+    }
+}
+
+impl Drop for KeyMonitor {
+    fn drop(&mut self) {
+        // SAFETY: the token came from addGlobalMonitorForEventsMatchingMask and is removed once.
+        unsafe { NSEvent::removeMonitor(&self.token) };
     }
 }
 
@@ -1080,6 +1147,8 @@ struct Shell {
     count_read: Cell<isize>,
     paths: RefCell<Vec<PathBuf>>,
     poll: RefCell<Option<app::Timer>>,
+    /// Watches the keys of other apps while files are dragged, when a wheel is bound to a key that is no modifier.
+    key_watch: RefCell<Option<KeyMonitor>>,
     /// Counts openings, so a delayed hide that a newer opening has outdated does nothing.
     epoch: Cell<u64>,
     /// Where the wheel was asked for (the pointer, Cocoa coordinates) and whether it is on screen and wanted.
@@ -1132,10 +1201,10 @@ impl Shell {
     }
 
     fn feed(&self, event: Event) {
-        let (act, tracking) = {
+        let (act, tracking, any_key) = {
             let mut machine = self.machine.borrow_mut();
             let act = machine.step(event);
-            (act, machine.tracking())
+            (act, machine.tracking(), machine.keys.any_key())
         };
         if tracking && self.poll.borrow().is_none() {
             let weak = self.me.clone();
@@ -1146,6 +1215,16 @@ impl Shell {
             }));
         } else if !tracking {
             self.poll.borrow_mut().take();
+        }
+        if tracking && any_key && self.key_watch.borrow().is_none() {
+            let weak = self.me.clone();
+            *self.key_watch.borrow_mut() = KeyMonitor::start(move |code| {
+                if let Some(shell) = weak.upgrade() {
+                    shell.feed(Event::Key(code));
+                }
+            });
+        } else if !tracking {
+            self.key_watch.borrow_mut().take();
         }
         match act {
             Act::Nothing => {}
@@ -1432,6 +1511,7 @@ impl Shell {
 impl Drop for Shell {
     fn drop(&mut self) {
         self.poll.borrow_mut().take();
+        self.key_watch.borrow_mut().take();
         self.anim.borrow_mut().take();
         self.panel.orderOut(None);
         self.panel.close();
@@ -1489,6 +1569,7 @@ impl DragWheel {
             count_read: Cell::new(-1),
             paths: RefCell::new(Vec::new()),
             poll: RefCell::new(None),
+            key_watch: RefCell::new(None),
             epoch: Cell::new(0),
             wanted: Cell::new(NSPoint::ZERO),
             shown: Cell::new(false),
@@ -1891,8 +1972,8 @@ mod tests {
     fn option_bound_to_a_wheel_opens_it() {
         let mut m = Machine {
             keys: Keys {
-                formats: Some(Modifier::Option),
-                tools: Some(Modifier::Command),
+                formats: Some(Trigger::Modifier(Modifier::Option)),
+                tools: Some(Trigger::Modifier(Modifier::Command)),
                 actions: None,
             },
             ..Machine::default()
@@ -1913,6 +1994,37 @@ mod tests {
             m.step(Event::Mods(only(false, true, false))),
             Act::Open(Kind::Tools)
         );
+    }
+
+    #[test]
+    fn any_other_key_opens_its_wheel_while_files_are_dragged() {
+        let f19 = 80;
+        let mut m = Machine {
+            keys: Keys {
+                formats: Some(Trigger::Key(f19)),
+                ..Keys::default()
+            },
+            ..Machine::default()
+        };
+        assert!(m.keys.any_key() && !Keys::default().any_key());
+        // Not without a file drag: a key pressed at any other time is the app's own business.
+        assert_eq!(m.step(Event::Key(f19)), Act::Nothing);
+        m.step(Event::Down);
+        m.step(Event::Drag {
+            files: true,
+            mods: NONE,
+        });
+        assert_eq!(m.step(Event::Key(f19)), Act::Open(Kind::Formats));
+        // Pressed again it stays; a key no wheel has does nothing; the modifiers still work alongside.
+        assert_eq!(m.step(Event::Key(f19)), Act::Nothing);
+        assert_eq!(m.step(Event::Key(0)), Act::Nothing);
+        assert_eq!(
+            m.step(Event::Mods(only(false, true, false))),
+            Act::Open(Kind::Tools)
+        );
+        assert_eq!(m.step(Event::Key(f19)), Act::Open(Kind::Formats));
+        assert_eq!(m.step(Event::Up), Act::Hide);
+        assert_eq!(m.step(Event::Key(f19)), Act::Nothing);
     }
 
     #[test]
@@ -1945,9 +2057,9 @@ mod tests {
     #[test]
     fn keys_survive_the_button_going_up_and_down() {
         let keys = Keys {
-            formats: Some(Modifier::Control),
+            formats: Some(Trigger::Modifier(Modifier::Control)),
             tools: None,
-            actions: Some(Modifier::Shift),
+            actions: Some(Trigger::Modifier(Modifier::Shift)),
         };
         let mut m = Machine {
             keys,

@@ -544,17 +544,54 @@ impl Language {
         }
     }
 
-    /// The text the UI layer draws itself.
-    pub fn labels(self) -> Labels {
+    /// A shortcut ("opt+delete") the way the hints write it ("Opt+Delete").
+    pub fn key_text(self, shortcut: &str) -> String {
+        shortcut
+            .split('+')
+            .map(|part| match part.trim().to_lowercase().as_str() {
+                "cmd" | "command" => "Cmd".to_owned(),
+                "opt" | "option" | "alt" => "Opt".to_owned(),
+                "ctrl" | "control" => "Ctrl".to_owned(),
+                "delete" | "backspace" if self == Language::Vietnamese => "Xoá".to_owned(),
+                other => {
+                    let mut chars = other.chars();
+                    chars
+                        .next()
+                        .map_or_else(String::new, |c| c.to_uppercase().chain(chars).collect())
+                }
+            })
+            .collect::<Vec<_>>()
+            .join("+")
+    }
+
+    /// The text the UI layer draws itself. The hints name the shortcuts chosen for pinning and deleting
+    /// in the panels ("opt+p", "opt+delete").
+    pub fn labels(self, pin: &str, delete: &str) -> Labels {
+        let (pin, delete) = (self.key_text(pin), self.key_text(delete));
         match self {
-            Language::English => Labels::default(),
+            Language::English => Labels {
+                clipboard_hint: format!(
+                    "Enter: paste    Cmd+1-9: paste row    {pin}: pin    {delete}: delete    Esc: close"
+                ),
+                clipboard_hint_strip: format!(
+                    "Enter: paste    Left and Right: browse    {pin}: pin    {delete}: delete    Esc: close"
+                ),
+                agents_hint: format!(
+                    "Return: allow    {delete}: deny    Without an answer the agent asks in its terminal."
+                ),
+                ..Labels::default()
+            },
             Language::Vietnamese => Labels {
                 clipboard_tab: "Clipboard".into(),
                 shelf_tab: "Khay".into(),
                 search_placeholder: "Tìm kiếm  (@image @link @code @file @pin)".into(),
                 search_placeholder_short: "Tìm kiếm".into(),
-                clipboard_hint: "Enter: dán    Cmd+1-9: dán dòng    Opt+P: ghim    Opt+Xoá: xoá    Esc: đóng".into(),
-                clipboard_hint_strip: "Enter: dán    Trái và Phải: duyệt    Opt+P: ghim    Opt+Xoá: xoá    Esc: đóng".into(),
+                clipboard_hint: format!(
+                    "Enter: dán    Cmd+1-9: dán dòng    {pin}: ghim    {delete}: xoá    Esc: đóng"
+                ),
+                clipboard_hint_strip: format!(
+                    "Enter: dán    Trái và Phải: duyệt    {pin}: ghim    {delete}: xoá    Esc: đóng"
+                ),
                 chip_all: "Tất cả".into(),
                 chip_pinned: "Đã ghim".into(),
                 chip_links: "Liên kết".into(),
@@ -567,8 +604,9 @@ impl Language {
                         .into(),
                 shelf_empty: "Kéo tệp vào đây để giữ tạm".into(),
                 agents_tab: "Tác tử".into(),
-                agents_hint: "Return: cho phép    Opt+Xoá: từ chối    Không trả lời thì tác tử hỏi ngay trong terminal."
-                    .into(),
+                agents_hint: format!(
+                    "Return: cho phép    {delete}: từ chối    Không trả lời thì tác tử hỏi ngay trong terminal."
+                ),
                 media_tab: "Media".into(),
                 media_idle: "Không có bài nào đang phát".into(),
                 media_previous: "Trước".into(),
@@ -789,7 +827,7 @@ mod tests {
                     "{language:?}: unfilled placeholder in '{text}'"
                 );
             }
-            let labels = language.labels();
+            let labels = language.labels("opt+p", "opt+delete");
             for text in [
                 &labels.clipboard_tab,
                 &labels.shelf_tab,
@@ -851,21 +889,55 @@ mod tests {
     }
 
     #[test]
+    fn hints_name_the_keys_the_user_chose() {
+        let en = Language::English.labels("ctrl+shift+f5", "opt+backspace");
+        assert!(en.clipboard_hint.contains("Ctrl+Shift+F5: pin"));
+        assert!(en.agents_hint.contains("Opt+Backspace: deny"));
+        assert!(
+            Language::Vietnamese
+                .labels("opt+p", "opt+delete")
+                .clipboard_hint
+                .contains("Opt+Xoá: xoá")
+        );
+    }
+
+    #[test]
     fn translations_are_not_copies_of_english() {
         let (en, vi) = (Language::English, Language::Vietnamese);
         assert_ne!(en.menu_quit(), vi.menu_quit());
         assert_ne!(en.pinned(), vi.pinned());
-        assert_ne!(en.labels().shelf_hint, vi.labels().shelf_hint);
-        assert_ne!(en.labels().clipboard_hint, vi.labels().clipboard_hint);
         assert_ne!(
-            en.labels().clipboard_hint_strip,
-            vi.labels().clipboard_hint_strip
+            en.labels("opt+p", "opt+delete").shelf_hint,
+            vi.labels("opt+p", "opt+delete").shelf_hint
         );
-        assert_ne!(en.labels().shelf_tab, vi.labels().shelf_tab);
-        assert_ne!(en.labels().media_idle, vi.labels().media_idle);
-        assert_ne!(en.labels().media_play_pause, vi.labels().media_play_pause);
-        assert_ne!(en.labels().chip_all, vi.labels().chip_all);
-        assert_ne!(en.labels().chip_pinned, vi.labels().chip_pinned);
+        assert_ne!(
+            en.labels("opt+p", "opt+delete").clipboard_hint,
+            vi.labels("opt+p", "opt+delete").clipboard_hint
+        );
+        assert_ne!(
+            en.labels("opt+p", "opt+delete").clipboard_hint_strip,
+            vi.labels("opt+p", "opt+delete").clipboard_hint_strip
+        );
+        assert_ne!(
+            en.labels("opt+p", "opt+delete").shelf_tab,
+            vi.labels("opt+p", "opt+delete").shelf_tab
+        );
+        assert_ne!(
+            en.labels("opt+p", "opt+delete").media_idle,
+            vi.labels("opt+p", "opt+delete").media_idle
+        );
+        assert_ne!(
+            en.labels("opt+p", "opt+delete").media_play_pause,
+            vi.labels("opt+p", "opt+delete").media_play_pause
+        );
+        assert_ne!(
+            en.labels("opt+p", "opt+delete").chip_all,
+            vi.labels("opt+p", "opt+delete").chip_all
+        );
+        assert_ne!(
+            en.labels("opt+p", "opt+delete").chip_pinned,
+            vi.labels("opt+p", "opt+delete").chip_pinned
+        );
     }
 
     #[test]

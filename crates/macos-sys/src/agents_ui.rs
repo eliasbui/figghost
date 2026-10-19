@@ -683,7 +683,7 @@ impl AgentsView {
         *self.dynamic.borrow_mut() = added;
     }
 
-    /// Returns true when the key was consumed: Enter allows the command in line, Option+Delete denies it, and
+    /// Returns true when the key was consumed: Enter allows the command in line, the delete key (Option+Delete by default) denies it, and
     /// Command+R reads the usage limits again.
     pub fn handle_key(&self, key: Key) -> bool {
         if key == Key::Shortcut('r') {

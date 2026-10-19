@@ -12,7 +12,7 @@ use core_window::{
 use macos_sys::{
     MainThreadMarker, app,
     pin_ui::{self, PinPanel, PinShots},
-    window::Frame,
+    window::{Frame, Window},
 };
 use std::{cell::RefCell, env, process, rc::Rc, time::Duration};
 
@@ -28,10 +28,21 @@ fn frame(r: Rect) -> Frame {
 fn main() {
     let mtm = MainThreadMarker::new().expect("main thread");
     let args: Vec<String> = env::args().skip(1).collect();
-    let id: u32 = args.first().and_then(|a| a.parse().ok()).expect("a window number");
+    let id: u32 = args
+        .first()
+        .and_then(|a| a.parse().ok())
+        .expect("a window number");
     let seconds: f64 = args.get(1).and_then(|a| a.parse().ok()).unwrap_or(10.0);
     app::run_accessory(mtm, move || {
-        let panel = Rc::new(PinPanel::new(mtm, || println!("the copy was pressed")));
+        let panel = Rc::new(PinPanel::new(mtm, move || {
+            // The first window of the process stands in for the pinned one, which is enough for a test window.
+            let pid = pin_ui::on_screen_windows()
+                .iter()
+                .find(|w| w.id == id)
+                .map(|w| w.pid);
+            let raised = pid.and_then(Window::first_of).is_some_and(|w| w.raise());
+            println!("the copy was pressed, raised: {raised}");
+        }));
         let shots: Rc<RefCell<Option<PinShots>>> = Rc::default();
         {
             let shots = Rc::clone(&shots);
@@ -48,7 +59,13 @@ fn main() {
         let timer = {
             let (panel, shots) = (Rc::clone(&panel), Rc::clone(&shots));
             app::every(0.066, move || {
-                let listed: Vec<Listed> = pin_ui::on_screen_windows()
+                let started = std::time::Instant::now();
+                let list = pin_ui::on_screen_windows();
+                let took = started.elapsed();
+                if std::env::var_os("PIN_CHECK_TIMES").is_some() {
+                    println!("list of {} windows in {took:?}", list.len());
+                }
+                let listed: Vec<Listed> = list
                     .into_iter()
                     .map(|w| Listed {
                         id: w.id,

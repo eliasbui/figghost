@@ -115,6 +115,18 @@ Layouts per screen, made from presets or from a grid, opened by dragging a windo
 
 ![The Window snapping page with the layouts and a grid editor](docs/images/settings-snap.png)
 
+### Always on top
+
+A shortcut keeps the window in front above all the others, with a red border round it (off by default). macOS lets a program raise only its own windows, so while another window covers the pinned one, a live picture of it is shown over the cover, and a click on the picture brings the real window forward. One window is pinned at a time, from the shortcut or from the switch in the menu bar panel, and the same shortcut lets go of it. Floating windows such as picture in picture stay above it, as the system means them to.
+
+![The Always on top page with its shortcut, the pinned window and the permissions it needs](docs/images/settings-pin.png)
+
+### Cursor
+
+Gives the pointer a look of its own (off by default): a rainbow arrow whose colour turns, one of the six pixel characters of the clipboard mascot that stands, blinks and beams when you point at a link, or any picture, GIF or animated PNG you choose, with its own size, speed and point that clicks. The arrow and the hand over links change; the text cursor stays the system's. The system plays the animation, so nothing runs while the pointer moves. It shows over every other app, and the pointer goes back to normal when you turn it off or quit; if the app is killed, turning the feature off and on again gives the cursors back.
+
+![The Cursor page with the pictures to choose from](docs/images/settings-cursor.png)
+
 ### Sound (like SoundSource and Boom 3D)
 
 Volume to 400 %, mute, output device and equalizer for each app, effects on everything played (equalizer, compressor, limiter), and volume keys for speakers the system cannot turn down.
@@ -188,7 +200,7 @@ For development, create a persistent local Code Signing certificate in Keychain 
 
 Accessibility access is tied to the code signature of the app. The default ad-hoc signature names the app (`vn.figghost.app`) instead of one build, so a rebuild or an update keeps the access that was granted. That is only as strong as the name: a program that signs itself with the same name is let in too. To pin the access to a certificate that nobody else holds, create a local code-signing certificate in Keychain and run `SIGN_IDENTITY="Certificate name" scripts/bundle.sh`; changing from one kind of signature to the other asks for the access once more. `scripts/dev.sh` takes `SIGN_IDENTITY=-` for the ad-hoc one.
 
-Accessibility is needed for smooth scrolling, automatic paste, window snapping and the volume indicator. Without it the app still runs: the popup and the notch work, items are copied for a manual paste, and the scroll engine starts by itself once access is granted. Music and Spotify ask once for permission to be read by the media tab.
+Accessibility is needed for smooth scrolling, automatic paste, window snapping, keeping a window on top and the volume indicator. Without it the app still runs: the popup and the notch work, items are copied for a manual paste, and the scroll engine starts by itself once access is granted. Music and Spotify ask once for permission to be read by the media tab.
 
 The app icon is drawn by code: `cargo run -p macos-sys --example make_icon -- X.iconset`, then `iconutil -c icns X.iconset -o crates/app-ui/assets/Figghost.icns`.
 
@@ -204,7 +216,7 @@ The settings window is a macOS window on Liquid Glass. The sidebar is a glass pa
 
 History lives in `~/Library/Application Support/Figghost` (`history.sqlite`, an `images` folder, `shelf.json` and the files of the features you turn on), with directory mode 0700 and no encryption. Screenshots and recordings are saved in the folder of macOS's own screenshots (else the Desktop) unless you choose another; the key display of a recording shows shortcuts and keys such as Return, never plain typing. Items flagged by the source app and password managers are skipped, but a password copied from another source can still be stored: use the ignored apps list or clear the history. The settings page is loaded from a string and cannot reach the network. Everything else stays on this Mac.
 
-Apart from the daily look for a new version (one request to api.github.com that carries nothing about you, and the download from github.com when you update), nothing is sent over the network unless you turn it on, and then only what the settings text says: Smart Select downloads a table of exchange rates (nothing about you) and, to translate, sends the selected text (at most 450 characters) to api.mymemory.translated.net; lyrics send the artist, track and album names and the track length to lrclib.net. Both go through the system's curl over https. The refresh button of the usage limits on the Agents tab (Command+R there) runs the Codex program installed on this Mac to ask for its current limits; Codex contacts OpenAI itself, as it does whenever you use it, and Figghost sends nothing and never reads the Codex login. The permissions asked for are Accessibility (shortcuts that act on other apps, the volume indicator, Copy Stack, Smart Select, drag to the notch), Screen Recording (screenshots, recordings and the colour picker, only when you use them), System Audio Recording (Sound, the first time an app is changed, a recording with the computer's audio, and the bars of the closed notch when they follow the sound), Microphone and Camera (a recording, when turned on in its options), Calendars and Reminders (only when you turn the calendar on) and Automation of Music and Spotify (the Media tab).
+Apart from the daily look for a new version (one request to api.github.com that carries nothing about you, and the download from github.com when you update), nothing is sent over the network unless you turn it on, and then only what the settings text says: Smart Select downloads a table of exchange rates (nothing about you) and, to translate, sends the selected text (at most 450 characters) to api.mymemory.translated.net; lyrics send the artist, track and album names and the track length to lrclib.net. Both go through the system's curl over https. The refresh button of the usage limits on the Agents tab (Command+R there) runs the Codex program installed on this Mac to ask for its current limits; Codex contacts OpenAI itself, as it does whenever you use it, and Figghost sends nothing and never reads the Codex login. The permissions asked for are Accessibility (shortcuts that act on other apps, the volume indicator, Copy Stack, Smart Select, drag to the notch, keeping a window on top), Screen Recording (screenshots, recordings, the colour picker and the picture of a window kept on top, only when you use them), System Audio Recording (Sound, the first time an app is changed, a recording with the computer's audio, and the bars of the closed notch when they follow the sound), Microphone and Camera (a recording, when turned on in its options), Calendars and Reminders (only when you turn the calendar on) and Automation of Music and Spotify (the Media tab).
 
 ## Technology choices
 

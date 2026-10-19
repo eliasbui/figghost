@@ -19,10 +19,12 @@ impl Language {
         }
     }
 
-    pub fn calendar_hint(self) -> &'static str {
+    /// `delete` is the shortcut that dismisses ("opt+delete").
+    pub fn calendar_hint(self, delete: &str) -> String {
+        let dismiss = self.key_text(delete);
         match self {
-            Language::English => "Return: join    Opt+Delete: dismiss",
-            Language::Vietnamese => "Return: tham gia    Opt+Delete: bỏ qua",
+            Language::English => format!("Return: join    {dismiss}: dismiss"),
+            Language::Vietnamese => format!("Return: tham gia    {dismiss}: bỏ qua"),
         }
     }
 
@@ -222,7 +224,6 @@ mod tests {
         for language in Language::ALL {
             let all = [
                 language.calendar_tab(),
-                language.calendar_hint(),
                 language.calendar_starting_soon(),
                 language.calendar_started(),
                 language.calendar_dismiss(),
@@ -246,6 +247,7 @@ mod tests {
                 language.calendar_empty_title(),
                 language.calendar_empty_hint(),
             ];
+            assert!(!language.calendar_hint("opt+delete").trim().is_empty());
             for text in all {
                 assert!(!text.trim().is_empty(), "{language:?}");
             }

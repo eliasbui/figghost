@@ -392,10 +392,7 @@ fn main() {
         r.check(a != b, "pointing at a layout changes what is drawn");
         fs::write(out.join("live-hover.png"), b).expect("write");
     }
-    r.check(
-        visible_cells(mtm),
-        "its cells show over the screen at once",
-    );
+    r.check(visible_cells(mtm), "its cells show over the screen at once");
     if let Some(cells) = cells_panel(mtm) {
         r.check(
             same(top_left(mtm, cells.frame()), display.area),
@@ -406,7 +403,9 @@ fn main() {
             ),
         );
         r.check(
-            cells.ignoresMouseEvents() && !cells.canBecomeKeyWindow() && !cells.canBecomeMainWindow(),
+            cells.ignoresMouseEvents()
+                && !cells.canBecomeKeyWindow()
+                && !cells.canBecomeMainWindow(),
             "they let clicks through and cannot take the focus",
         );
         r.check(
@@ -533,7 +532,9 @@ fn main() {
         "and so are the footprint and the cells",
     );
 
-    println!("the way back to the top, another layout, and a layout of one cell dropped on in the row");
+    println!(
+        "the way back to the top, another layout, and a layout of one cell dropped on in the row"
+    );
     script.frame.set(start);
     script.placed.borrow_mut().clear();
     pointer = title(start);
@@ -543,7 +544,10 @@ fn main() {
     c.handle(Mouse::Dragged(middle(tiles[thirds])));
     drag_to(&mut pointer, in_cell(thirds, 0));
     settle(0.5);
-    r.check(visible_cells(mtm) && visible_footprint(mtm), "the cells and a lit one show");
+    r.check(
+        visible_cells(mtm) && visible_footprint(mtm),
+        "the cells and a lit one show",
+    );
     // Back up to the top edge: the chip is the row again, with the cells still showing, nothing lit.
     drag_to(&mut pointer, (centre_x, top + 1.0));
     settle(0.5);
@@ -557,19 +561,28 @@ fn main() {
     );
     c.handle(Mouse::Dragged(middle(tiles[quarters])));
     settle(0.3);
-    r.check(visible_cells(mtm), "pointing at the quarters shows their cells");
+    r.check(
+        visible_cells(mtm),
+        "pointing at the quarters shows their cells",
+    );
     c.handle(Mouse::Dragged(middle(tiles[full])));
     settle(0.5);
     let whole = display.area;
     r.check(
         footprint_frame(mtm).is_some_and(|f| same(f, whole)),
-        &format!("on the layout of one cell the whole area is the footprint: {:?}", footprint_frame(mtm)),
+        &format!(
+            "on the layout of one cell the whole area is the footprint: {:?}",
+            footprint_frame(mtm)
+        ),
     );
     c.handle(Mouse::Up(middle(tiles[full])));
     settle(0.4);
     r.check(
         script.placed.borrow().len() == 1 && same(script.placed.borrow()[0], whole),
-        &format!("and a drop there fills it: {:?}", script.placed.borrow().first()),
+        &format!(
+            "and a drop there fills it: {:?}",
+            script.placed.borrow().first()
+        ),
     );
     settle(0.5);
 
@@ -730,9 +743,14 @@ fn main() {
         c.handle(Mouse::Dragged(in_cell(thirds, 0)));
         let shrinking = sizes(0.6);
         let narrowing = shrinking.windows(2).all(|w| w[1].0 <= w[0].0 + 0.5);
-        r.check(narrowing, "going down onto the screen, the row only narrows (ease out, no bounce)");
         r.check(
-            shrinking.last().is_some_and(|s| near(s.0, chip.w) && near(s.1, chip.h)),
+            narrowing,
+            "going down onto the screen, the row only narrows (ease out, no bounce)",
+        );
+        r.check(
+            shrinking
+                .last()
+                .is_some_and(|s| near(s.0, chip.w) && near(s.1, chip.h)),
             "and comes to rest as the chip",
         );
         c.handle(Mouse::Lost);

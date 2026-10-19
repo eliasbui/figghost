@@ -18,7 +18,7 @@ use macos_sys::{
     pasteboard::Write,
     status_item::Entry,
     vision,
-    wheel_ui::{self, DragWheel, Keys, Modifier, Slot, Wheel},
+    wheel_ui::{self, DragWheel, Keys, Modifier, Slot, Trigger, Wheel},
     workspace,
 };
 use serde::{Deserialize, Serialize};
@@ -76,29 +76,45 @@ use guard::TempDir;
 
 use catalog::{MainAction, Plan};
 
-/// The keys a wheel can be bound to: a tap of exactly this key, alone, opens it.
+/// The keys a wheel can be bound to: a tap of one of the four modifier keys, alone, opens it, and so does a press
+/// of any other key a shortcut can name ("f19", "a", "space"), held by its virtual key code.
 #[derive(Debug, Clone, Copy, PartialEq, Eq)]
 pub enum Key {
     Shift,
     Command,
     Control,
     Option,
+    Other(u32),
 }
 
+/// The virtual key code of Escape, which ends the drag and so can never open a wheel.
+const ESCAPE: u32 = 53;
+
 impl Key {
+    /// The four modifier keys.
     pub const ALL: [Key; 4] = [Key::Shift, Key::Command, Key::Control, Key::Option];
 
+    /// The name of a modifier key; empty for another key, whose name stays as it was written
+    /// (`Config::key_name_of`).
     pub const fn as_str(self) -> &'static str {
         match self {
             Key::Shift => "shift",
             Key::Command => "command",
             Key::Control => "control",
             Key::Option => "option",
+            Key::Other(_) => "",
         }
     }
 
     pub fn parse(name: &str) -> Option<Self> {
-        Self::ALL.into_iter().find(|k| k.as_str() == name)
+        Self::ALL
+            .into_iter()
+            .find(|k| k.as_str() == name)
+            .or_else(|| {
+                crate::config::key_code(name)
+                    .filter(|&code| code != ESCAPE)
+                    .map(Key::Other)
+            })
     }
 }
 
@@ -190,9 +206,19 @@ impl Config {
         }
     }
 
-    /// The key of a wheel as written, or its own key when the name is not one of the four.
+    /// The key of a wheel as written, or its own key when the name is not one a wheel can have.
     pub fn key_of(&self, kind: catalog::Kind) -> Key {
         Key::parse(&self.wheel(kind).key).unwrap_or(default_key(kind))
+    }
+
+    /// The name of the key of a wheel, as the page shows it: the one written, or the wheel's own.
+    pub fn key_name_of(&self, kind: catalog::Kind) -> String {
+        let written = &self.wheel(kind).key;
+        if Key::parse(written).is_some() {
+            written.clone()
+        } else {
+            default_key(kind).as_str().to_owned()
+        }
     }
 
     /// The slots of a wheel that are hidden: only ids the wheel has, each once, in the order of the page.
@@ -238,18 +264,20 @@ pub fn keys_from(config: &Config) -> WheelKeys {
 
 /// The settings' keys in the form the wheel takes.
 fn wheel_keys(keys: WheelKeys) -> Keys {
-    let modifier = |key: Option<Key>| {
+    let trigger = |key: Option<Key>| {
         key.map(|k| match k {
-            Key::Shift => Modifier::Shift,
-            Key::Command => Modifier::Command,
-            Key::Control => Modifier::Control,
-            Key::Option => Modifier::Option,
+            Key::Shift => Trigger::Modifier(Modifier::Shift),
+            Key::Command => Trigger::Modifier(Modifier::Command),
+            Key::Control => Trigger::Modifier(Modifier::Control),
+            Key::Option => Trigger::Modifier(Modifier::Option),
+            // Every name a shortcut knows has a code below 128.
+            Key::Other(code) => Trigger::Key(code as u16),
         })
     };
     Keys {
-        formats: modifier(keys.formats),
-        tools: modifier(keys.tools),
-        actions: modifier(keys.actions),
+        formats: trigger(keys.formats),
+        tools: trigger(keys.tools),
+        actions: trigger(keys.actions),
     }
 }
 

@@ -72,7 +72,8 @@ fn main() {
     let language =
         i18n::Language::resolve(&config.language, &macos_sys::locale::preferred_languages());
     i18n::set(language);
-    macos_sys::labels::set(language.labels());
+    macos_sys::labels::set(language.labels(&config.panel_keys.pin, &config.panel_keys.delete));
+    macos_sys::panel::set_action_keys(config.panel_keys.action_keys());
     app::run_accessory(mtm, move || Shell::build(mtm, home, config));
 }
 
@@ -275,8 +276,10 @@ mod tests {
         assert!(greets(&config, &args(&["--show-settings"]), false));
         assert!(!greets(&config, &args(&[]), true));
         assert!(!greets(&config, &args(&["--background"]), false));
-        let mut off = Config::default();
-        off.launch_effect = false;
+        let off = Config {
+            launch_effect: false,
+            ..Config::default()
+        };
         assert!(!greets(&off, &args(&[]), false));
         let mut no_notch = Config::default();
         no_notch.notch.enabled = false;

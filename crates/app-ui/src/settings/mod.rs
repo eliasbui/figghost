@@ -401,6 +401,10 @@ impl SettingsFeature {
             }
             Effect::Feature(id) => self.ctx.features.configure(id, &config),
             Effect::Hotkey(target) => self.register_hotkey(&config, target),
+            Effect::PanelKeys => {
+                macos_sys::panel::set_action_keys(config.panel_keys.action_keys());
+                Ok(())
+            }
         }
     }
 

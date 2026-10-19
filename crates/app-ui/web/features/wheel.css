@@ -18,3 +18,7 @@
 .wheel-name { min-width: 0; }
 .wheel-foot { display: flex; align-items: center; justify-content: space-between; gap: 12px; margin-top: 8px; }
 .wheel-foot .row-desc { margin: 0; }
+/* The key of a wheel: the four modifiers, and a button that records any other key. */
+.wheel-key { display: flex; flex-wrap: wrap; align-items: center; justify-content: flex-end; gap: 8px; }
+.wheel-other.on { color: var(--tint); box-shadow: inset 0 0 0 1px var(--tint); }
+.wheel-other.recording { color: var(--tint); box-shadow: inset 0 0 0 1px var(--tint), 0 0 0 3px color-mix(in srgb, var(--tint) 22%, transparent); }

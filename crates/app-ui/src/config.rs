@@ -341,6 +341,8 @@ pub struct Config {
     /// Each time the app is started by hand, its ghost comes out of the notch and blinks (never at login, never
     /// when started in the background, and only with the notch on).
     pub launch_effect: bool,
+    /// The keys of the actions in the notch and the clipboard popup.
+    pub panel_keys: PanelKeys,
     /// The icon in the menu bar. Without it, opening the app again (Finder, Spotlight) shows the settings.
     pub menu_icon: bool,
     /// The settings window's appearance: `auto` follows the system, or `light` or `dark`.
@@ -368,6 +370,8 @@ pub struct Config {
     pub update: crate::update::Config,
     pub wheel: crate::features::wheel::Config,
     pub translate: crate::features::translate::Config,
+    pub pin: crate::features::pin::Config,
+    pub cursor: crate::features::cursor::Config,
     /// Replace the system volume indicator with one in the notch. Needs Accessibility access.
     pub volume_hud: bool,
     /// Unpinned items kept in history.
@@ -385,6 +389,7 @@ impl Default for Config {
             language: "auto".into(),
             show_settings_on_launch: true,
             launch_effect: true,
+            panel_keys: PanelKeys::default(),
             menu_icon: true,
             theme: "auto".into(),
             mouse: Settings::default(),
@@ -407,6 +412,8 @@ impl Default for Config {
             update: crate::update::Config::default(),
             wheel: crate::features::wheel::Config::default(),
             translate: crate::features::translate::Config::default(),
+            pin: crate::features::pin::Config::default(),
+            cursor: crate::features::cursor::Config::default(),
             volume_hud: false,
             history_limit: 500,
             ignored_apps: Vec::new(),
@@ -502,6 +509,80 @@ impl Config {
     }
 }
 
+/// The keys of the actions in the notch and the clipboard popup, as shortcuts ("opt+p"). Arrows, Return, Escape,
+/// Page Up and Down, Command with a number or a letter, and Command+Delete keep the meaning they have everywhere
+/// on the Mac.
+#[derive(Debug, Clone, PartialEq, Serialize, Deserialize)]
+#[serde(default)]
+pub struct PanelKeys {
+    /// Pins or unpins the selected item.
+    pub pin: String,
+    /// Files the selected item in the next board.
+    pub board: String,
+    /// Pastes the other way, with or without its formatting.
+    pub paste_other: String,
+    /// Deletes the selected item, refuses an agent's request, dismisses an alert.
+    pub delete: String,
+}
+
+impl Default for PanelKeys {
+    fn default() -> Self {
+        Self {
+            pin: "opt+p".into(),
+            board: "opt+b".into(),
+            paste_other: "opt+shift+return".into(),
+            delete: "opt+delete".into(),
+        }
+    }
+}
+
+impl PanelKeys {
+    /// The actions, by the names their targets carry ("keys:pin").
+    pub const ACTIONS: [&'static str; 4] = ["pin", "board", "paste_other", "delete"];
+
+    pub fn get(&self, action: &str) -> Option<&String> {
+        match action {
+            "pin" => Some(&self.pin),
+            "board" => Some(&self.board),
+            "paste_other" => Some(&self.paste_other),
+            "delete" => Some(&self.delete),
+            _ => None,
+        }
+    }
+
+    pub fn get_mut(&mut self, action: &str) -> Option<&mut String> {
+        match action {
+            "pin" => Some(&mut self.pin),
+            "board" => Some(&mut self.board),
+            "paste_other" => Some(&mut self.paste_other),
+            "delete" => Some(&mut self.delete),
+            _ => None,
+        }
+    }
+
+    /// The keys as the panels take them. A shortcut that does not read (a hand-edited file) falls back to the
+    /// action's default key.
+    pub fn action_keys(&self) -> macos_sys::panel::ActionKeys {
+        let default = Self::default();
+        let combo = |text: &str, fallback: &str| {
+            let spec = parse_hotkey(text).or_else(|_| parse_hotkey(fallback));
+            spec.ok().map(|spec| macos_sys::panel::Combo {
+                key_code: spec.key_code as u16,
+                command: spec.modifiers & modifier::COMMAND != 0,
+                option: spec.modifiers & modifier::OPTION != 0,
+                shift: spec.modifiers & modifier::SHIFT != 0,
+                control: spec.modifiers & modifier::CONTROL != 0,
+            })
+        };
+        macos_sys::panel::ActionKeys {
+            pin: combo(&self.pin, &default.pin),
+            board: combo(&self.board, &default.board),
+            paste_other: combo(&self.paste_other, &default.paste_other),
+            delete: combo(&self.delete, &default.delete),
+        }
+    }
+}
+
 #[derive(Debug, Clone, Copy, PartialEq, Eq)]
 pub struct HotkeySpec {
     pub key_code: u32,
@@ -541,7 +622,8 @@ pub fn parse_hotkey(text: &str) -> Result<HotkeySpec, String> {
     })
 }
 
-fn key_code(name: &str) -> Option<u32> {
+/// The virtual key code of a key by the name shortcuts and the drag wheel write ("a", "f19", "space").
+pub(crate) fn key_code(name: &str) -> Option<u32> {
     Some(match name {
         "a" => 0,
         "s" => 1,
@@ -583,6 +665,7 @@ fn key_code(name: &str) -> Option<u32> {
         "return" | "enter" => 36,
         "tab" => 48,
         "escape" | "esc" => 53,
+        "delete" | "backspace" => 51,
         "left" => 123,
         "right" => 124,
         "down" => 125,

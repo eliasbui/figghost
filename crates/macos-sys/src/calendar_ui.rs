@@ -700,7 +700,7 @@ impl CalendarView {
         body.addSubview(&button);
     }
 
-    /// Return joins the meeting in the alert; Option+Delete dismisses it.
+    /// Return joins the meeting in the alert; the delete key (Option+Delete by default) dismisses it.
     pub fn handle_key(&self, key: Key) -> bool {
         let first = self.first_alert.borrow().clone();
         let Some((id, joinable)) = first else {

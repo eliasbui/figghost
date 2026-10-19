@@ -27,10 +27,6 @@ pub mod colour;
 pub mod settings;
 mod strings;
 
-/// The privacy pane that holds the Screen Recording list.
-const SCREEN_RECORDING_PANE: &str =
-    "x-apple.systempreferences:com.apple.preference.security?Privacy_ScreenCapture";
-
 pub const DEFAULT_SHORTCUT: &str = "ctrl+opt+cmd+8";
 
 #[derive(Debug, Clone, PartialEq, Serialize, Deserialize)]
@@ -186,7 +182,7 @@ impl Feature {
         // The system's own dialog appears the first time only; after that the list in System Settings is
         // the only place to switch it on.
         if !screen_capture::screen_access(true) {
-            workspace::open_url(SCREEN_RECORDING_PANE);
+            workspace::open_url(screen_capture::SCREEN_RECORDING_PANE);
         }
         Some(Ok(()))
     }

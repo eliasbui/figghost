@@ -276,10 +276,25 @@ pub fn install_statusline(doc: &mut Value, exe: &str) -> Result<StatusLineChange
         .ok_or_else(|| InstallError::Shape("the file is not a JSON object".into()))?;
     let current = root.get("statusLine").cloned();
     if current.as_ref().is_some_and(|c| is_ours(c, STATUS_MARKER)) {
-        return Ok(StatusLineChange {
-            chain: String::new(),
-            changed: false,
+        // Ours already, but maybe at a path the app has moved away from (a build folder, then Applications): Claude
+        // Code would run a program that is gone and the usage limits would stop at the last ones read. Only the
+        // command changes; the line that was there before ours stays saved, and it is still the one to chain to.
+        let wanted = statusline_command(exe);
+        let chain = root
+            .get(ORIGINAL_STATUS_LINE)
+            .and_then(|c| c.get("command"))
+            .and_then(Value::as_str)
+            .unwrap_or_default()
+            .to_owned();
+        let line = root.get_mut("statusLine").and_then(Value::as_object_mut);
+        let changed = line.is_some_and(|line| {
+            let stale = line.get("command").and_then(Value::as_str) != Some(wanted.as_str());
+            if stale {
+                line.insert("command".to_owned(), Value::String(wanted));
+            }
+            stale
         });
+        return Ok(StatusLineChange { chain, changed });
     }
     let chain = current
         .as_ref()
@@ -646,6 +661,29 @@ mod tests {
         assert!(remove_statusline(&mut doc));
         assert_eq!(doc, original);
         assert!(!remove_statusline(&mut doc));
+    }
+
+    #[test]
+    fn a_status_line_left_at_an_old_path_follows_the_app() {
+        // Installed from a build folder, then the app moved to Applications.
+        let original = user_settings();
+        let mut doc = original.clone();
+        let built = "/Users/me/figghost/dist/Figghost.app/Contents/MacOS/Figghost";
+        install_statusline(&mut doc, built).unwrap();
+        let moved = install_statusline(&mut doc, EXE).unwrap();
+        assert_eq!(
+            moved,
+            StatusLineChange {
+                chain: "'/Users/me/bin/status'".into(),
+                changed: true
+            }
+        );
+        assert_eq!(doc["statusLine"]["command"], statusline_command(EXE));
+        assert_eq!(doc["statusLine"]["padding"], 2);
+        assert!(!install_statusline(&mut doc, EXE).unwrap().changed);
+        // The user's own line is still the one that comes back.
+        assert!(remove_statusline(&mut doc));
+        assert_eq!(doc, original);
     }
 
     #[test]

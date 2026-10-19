@@ -42,6 +42,7 @@ fn items(access: bool, recording: bool) -> Value {
             Some(true),
             true,
         ),
+        ("Keep window on top", "pin", Some(false), true),
         ("Open clipboard history", "doc.on.clipboard", None, true),
         ("Clear history (keep pinned)", "trash", None, true),
         ("Start at login", "power", Some(true), true),

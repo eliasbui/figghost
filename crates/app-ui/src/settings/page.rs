@@ -17,6 +17,8 @@ const FEATURE_SCRIPTS: &[&str] = &[
     include_str!("../../web/features/lyrics.js"),
     include_str!("../../web/features/calendar.js"),
     include_str!("../../web/features/snap.js"),
+    include_str!("../../web/features/pin.js"),
+    include_str!("../../web/features/cursor.js"),
     include_str!("../../web/features/menubar.js"),
     include_str!("../../web/features/stack.js"),
     include_str!("../../web/features/mascot.js"),
@@ -31,6 +33,8 @@ const FEATURE_STYLES: &[&str] = &[
     include_str!("../../web/features/lyrics.css"),
     include_str!("../../web/features/calendar.css"),
     include_str!("../../web/features/snap.css"),
+    include_str!("../../web/features/pin.css"),
+    include_str!("../../web/features/cursor.css"),
     include_str!("../../web/features/menubar.css"),
     include_str!("../../web/features/stack.css"),
     include_str!("../../web/features/mascot.css"),
@@ -59,6 +63,11 @@ const FEATURE_FIXTURES: &[(&str, &str)] = &[
         include_str!("../../web/features/calendar.fixture.json"),
     ),
     ("snap", include_str!("../../web/features/snap.fixture.json")),
+    ("pin", include_str!("../../web/features/pin.fixture.json")),
+    (
+        "cursor",
+        include_str!("../../web/features/cursor.fixture.json"),
+    ),
     (
         "menubar",
         include_str!("../../web/features/menubar.fixture.json"),
@@ -86,6 +95,7 @@ const FEATURE_FIXTURES: &[(&str, &str)] = &[
 /// for an icon whose name is missing here.
 const SYMBOLS: &[&str] = &[
     "gearshape.fill",
+    "keyboard",
     "computermouse.fill",
     "doc.on.clipboard.fill",
     "rectangle.topthird.inset.filled",
@@ -93,6 +103,8 @@ const SYMBOLS: &[&str] = &[
     "magnifyingglass",
     "text.magnifyingglass",
     "character.bubble",
+    "pin",
+    "cursorarrow.rays",
     "camera.viewfinder",
     "eyedropper.halffull",
     "calendar",

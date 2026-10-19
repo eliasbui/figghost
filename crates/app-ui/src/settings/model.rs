@@ -2,7 +2,7 @@
 //! before it touches the config. Pure data with no AppKit, so every rule is covered by plain unit tests.
 
 use crate::{
-    config::{Config, HotkeySpec, parse_hotkey},
+    config::{Config, HotkeySpec, PanelKeys, parse_hotkey},
     i18n::Language,
 };
 use core_window::Layout;
@@ -113,6 +113,8 @@ pub enum Effect {
     Feature(&'static str),
     /// `clipboard` or `tiling:<layout>`.
     Hotkey(String),
+    /// A key of the actions inside the notch and the clipboard popup.
+    PanelKeys,
 }
 
 /// A refused change. `code` is stable so the page can word it in the user's language.
@@ -237,6 +239,9 @@ pub fn state(config: &Config, env: &Env) -> Value {
             "launch_effect": config.launch_effect,
             "menu_icon": config.menu_icon,
             "theme": config.theme,
+        },
+        "keys": {
+            "shortcuts": config.panel_keys,
         },
         "update": {
             "auto": config.update.auto,
@@ -706,6 +711,13 @@ fn set(config: &mut Config, path: &str, value: &Value) -> Outcome {
 
 /// The shortcut a target currently has, if any.
 fn shortcut_of(config: &Config, target: &str) -> Option<String> {
+    if let Some(action) = target.strip_prefix("keys:") {
+        return config
+            .panel_keys
+            .get(action)
+            .filter(|s| !s.is_empty())
+            .cloned();
+    }
     if target == "clipboard" {
         return Some(config.hotkey.clone());
     }
@@ -730,6 +742,9 @@ fn all_targets() -> Vec<String> {
             .into_iter()
             .map(|l| format!("tiling:{}", l.key())),
     );
+    // The panels' keys take part too: a shortcut of the whole system would reach the app first and the
+    // action in the panel would never see its key.
+    targets.extend(PanelKeys::ACTIONS.map(|a| format!("keys:{a}")));
     targets
 }
 
@@ -743,23 +758,46 @@ fn all_shortcuts(config: &Config) -> Vec<(String, String)> {
     all
 }
 
+/// Reads a shortcut for `target` and refuses it when another target already has it.
+fn free_shortcut(config: &Config, target: &str, value: &str) -> Result<HotkeySpec, Fault> {
+    let spec = parse_hotkey(value).map_err(|e| {
+        let code = if e.contains("modifier") {
+            "needs_modifier"
+        } else {
+            "invalid_shortcut"
+        };
+        Fault::new(code, e)
+    })?;
+    for (other, shortcut) in all_shortcuts(config) {
+        if other != target && parse_hotkey(&shortcut).ok() == Some(spec) {
+            return Err(Fault::new("conflict", other));
+        }
+    }
+    Ok(spec)
+}
+
 fn set_hotkey(config: &mut Config, target: &str, value: &str) -> Outcome {
+    if let Some(action) = target.strip_prefix("keys:") {
+        if !PanelKeys::ACTIONS.contains(&action) {
+            return Err(Fault::new("unknown_setting", target));
+        }
+        let value = value.trim();
+        if value.is_empty() {
+            return Err(Fault::new("shortcut_required", target));
+        }
+        // Command with a single key already means a tab, a pinned item or Delete in the panels.
+        if free_shortcut(config, target, value)?.modifiers == macos_sys::hotkey::modifier::COMMAND {
+            return Err(Fault::new("reserved", target));
+        }
+        if let Some(key) = config.panel_keys.get_mut(action) {
+            *key = value.to_owned();
+        }
+        return Ok(Effect::PanelKeys);
+    }
     if crate::features::shortcut_owner(target).is_some() {
         let value = value.trim();
         if !value.is_empty() {
-            let spec = parse_hotkey(value).map_err(|e| {
-                let code = if e.contains("modifier") {
-                    "needs_modifier"
-                } else {
-                    "invalid_shortcut"
-                };
-                Fault::new(code, e)
-            })?;
-            for (other, shortcut) in all_shortcuts(config) {
-                if other != target && parse_hotkey(&shortcut).ok() == Some(spec) {
-                    return Err(Fault::new("conflict", other));
-                }
-            }
+            free_shortcut(config, target, value)?;
         }
         return match crate::features::set_shortcut(config, target, value) {
             Some(result) => result.map(Effect::Feature),
@@ -788,19 +826,7 @@ fn set_hotkey(config: &mut Config, target: &str, value: &str) -> Outcome {
             .insert(layout.key().into(), String::new());
         return Ok(Effect::Hotkey(target.to_owned()));
     }
-    let spec = parse_hotkey(value).map_err(|e| {
-        let code = if e.contains("modifier") {
-            "needs_modifier"
-        } else {
-            "invalid_shortcut"
-        };
-        Fault::new(code, e)
-    })?;
-    for (other, shortcut) in all_shortcuts(config) {
-        if other != target && parse_hotkey(&shortcut).ok() == Some(spec) {
-            return Err(Fault::new("conflict", other));
-        }
-    }
+    free_shortcut(config, target, value)?;
     match tiling_layout {
         Some(layout) if layout.default_shortcut() == value => {
             // Back to the default: leave no override behind.
@@ -1485,9 +1511,70 @@ mod tests {
             "stack",
             "wheel",
             "translate",
+            "pin",
+            "cursor",
         ] {
             assert!(state[id].is_object(), "{id} is missing from the state");
             assert!(state[id]["enabled"].is_boolean(), "{id} has no switch");
         }
+    }
+
+    #[test]
+    fn the_keys_of_the_panels_can_be_changed_but_not_to_a_key_in_use() {
+        let mut config = Config::default();
+        let fault = |config: &mut Config, target: &str, value: &str| {
+            let fault = hotkey(config, target, value).unwrap_err();
+            (fault.code, fault.detail)
+        };
+        // The defaults stay out of the way of every shortcut the app ships with.
+        let all = all_shortcuts(&config);
+        for (i, (target, shortcut)) in all.iter().enumerate() {
+            let spec = parse_hotkey(shortcut).ok();
+            assert!(
+                all[i + 1..]
+                    .iter()
+                    .all(|(_, other)| parse_hotkey(other).ok() != spec),
+                "{target} shares {shortcut}"
+            );
+        }
+        assert_eq!(
+            hotkey(&mut config, "keys:pin", "opt+k"),
+            Ok(Effect::PanelKeys)
+        );
+        assert_eq!(config.panel_keys.pin, "opt+k");
+        assert_eq!(state(&config, &env())["keys"]["shortcuts"]["pin"], "opt+k");
+        assert_eq!(
+            fault(&mut config, "keys:board", "opt+k"),
+            ("conflict", "keys:pin".into())
+        );
+        // A shortcut of the whole system would take the key before the panel sees it.
+        assert_eq!(
+            fault(&mut config, "clipboard", "opt+k"),
+            ("conflict", "keys:pin".into())
+        );
+        assert_eq!(fault(&mut config, "keys:pin", "cmd+p").0, "reserved");
+        assert_eq!(fault(&mut config, "keys:pin", "p").0, "needs_modifier");
+        assert_eq!(fault(&mut config, "keys:pin", "").0, "shortcut_required");
+        assert_eq!(
+            fault(&mut config, "keys:other", "opt+j").0,
+            "unknown_setting"
+        );
+        assert_eq!(config.panel_keys.pin, "opt+k");
+        let keys = config.panel_keys.action_keys();
+        assert_eq!(
+            keys.pin.map(|c| (c.key_code, c.option, c.command)),
+            Some((40, true, false))
+        );
+        assert_eq!(
+            keys.paste_other.map(|c| (c.key_code, c.option, c.shift)),
+            Some((36, true, true))
+        );
+        assert_eq!(keys.delete.map(|c| c.key_code), Some(51));
+        // A key spoiled by hand in the file is the default one again.
+        config.panel_keys.board = "opt+nokey".into();
+        assert_eq!(
+            config.panel_keys.action_keys().board.map(|c| c.key_code),
+            Some(11)
+        );
     }
 }

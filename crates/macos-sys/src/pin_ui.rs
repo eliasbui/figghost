@@ -21,8 +21,7 @@ use core_foundation::{
 };
 use objc2::{
     AnyThread, DefinedClass, MainThreadMarker, MainThreadOnly, define_class, msg_send,
-    rc::Retained,
-    runtime::AnyObject,
+    rc::Retained, runtime::AnyObject,
 };
 use objc2_app_kit::{
     NSBackingStoreType, NSColor, NSEvent, NSModalPanelWindowLevel, NSPanel, NSScreen, NSView,
@@ -295,7 +294,9 @@ impl PinPanel {
                 NSPoint::new(BORDER, BORDER),
                 NSSize::new(frame.w, frame.h),
             ));
-            inner.copy.setContentsScale(inner.panel.backingScaleFactor());
+            inner
+                .copy
+                .setContentsScale(inner.panel.backingScaleFactor());
         }
         inner.copy.setHidden(!mirror);
         inner.ring.setHidden(!border);
@@ -371,7 +372,10 @@ impl PinShots {
         let pending = Mutex::new(Some(ticket));
         let handler = RcBlock::new(
             move |content: *mut SCShareableContent, error: *mut NSError| {
-                let Some(ticket) = pending.lock().unwrap_or_else(PoisonError::into_inner).take()
+                let Some(ticket) = pending
+                    .lock()
+                    .unwrap_or_else(PoisonError::into_inner)
+                    .take()
                 else {
                     return;
                 };
@@ -415,13 +419,13 @@ impl PinShots {
             if let Some(Sendable(picture)) = picture {
                 let raw: *const CGImage = &*picture;
                 // SAFETY: a CGImage is a valid value for a layer's contents, which keeps it.
-                let _: () = unsafe { msg_send![&*layer, setContents: raw.cast::<AnyObject>().cast_mut()] };
+                let _: () =
+                    unsafe { msg_send![&*layer, setContents: raw.cast::<AnyObject>().cast_mut()] };
             }
         });
         let ticket = Mutex::new(Some(ticket));
         let block = RcBlock::new(move |image: *mut CGImage, _error: *mut NSError| {
-            let Some(ticket) = ticket.lock().unwrap_or_else(PoisonError::into_inner).take()
-            else {
+            let Some(ticket) = ticket.lock().unwrap_or_else(PoisonError::into_inner).take() else {
                 return;
             };
             // SAFETY: a non-null image is live for the call; retaining as CF keeps it.

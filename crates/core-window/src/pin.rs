@@ -16,9 +16,6 @@ pub struct Listed {
     pub alpha: f64,
 }
 
-/// The highest level that counts as covering: ordinary windows and the floating panels above them. The Dock, the
-/// menu bar, menus and the system's own windows are higher and never count.
-pub const MAX_LAYER: i32 = 8;
 /// A window narrower or shorter than this covers nothing that matters: a status item, a tooltip, a handle.
 pub const MIN_SIDE: f64 = 40.0;
 /// A window less opaque than this is not in the way.
@@ -40,14 +37,16 @@ pub enum State {
     Covered(Rect),
 }
 
-/// Whether another window lies over `frame` enough to count.
-fn covers(above: &Listed, frame: Rect, own_pid: i32) -> bool {
+/// Whether another window lies over the pinned one enough to count. Only a window of the pinned one's own level can
+/// be put under it by raising it: a floating panel, a picture-in-picture window, the Dock and the menu bar are above
+/// by design, and a copy shown over them could never be got rid of by clicking it.
+fn covers(above: &Listed, pinned: &Listed, own_pid: i32) -> bool {
     above.pid != own_pid
-        && above.layer <= MAX_LAYER
+        && above.layer <= pinned.layer
         && above.alpha >= MIN_ALPHA
         && above.frame.w >= MIN_SIDE
         && above.frame.h >= MIN_SIDE
-        && above.frame.overlap(&frame) >= MIN_COVERED * frame.w * frame.h
+        && above.frame.overlap(&pinned.frame) >= MIN_COVERED * pinned.frame.w * pinned.frame.h
 }
 
 /// The state of window `id`. `on_screen` is the list of windows on screen, front to back; `exists` says whether the
@@ -58,7 +57,10 @@ pub fn state(on_screen: &[Listed], exists: bool, id: u32, own_pid: i32) -> State
         return if exists { State::Away } else { State::Gone };
     };
     let frame = on_screen[at].frame;
-    if on_screen[..at].iter().any(|w| covers(w, frame, own_pid)) {
+    if on_screen[..at]
+        .iter()
+        .any(|w| covers(w, &on_screen[at], own_pid))
+    {
         State::Covered(frame)
     } else {
         State::Clear(frame)
@@ -95,10 +97,16 @@ mod tests {
 
     #[test]
     fn a_window_with_nothing_over_it_is_clear() {
-        let list = [window(9, 2, Rect::new(900.0, 100.0, 400.0, 300.0)), pinned()];
+        let list = [
+            window(9, 2, Rect::new(900.0, 100.0, 400.0, 300.0)),
+            pinned(),
+        ];
         assert_eq!(state(&list, true, 7, OWN), State::Clear(pinned().frame));
         // The first in the list has nothing before it.
-        assert_eq!(state(&[pinned()], true, 7, OWN), State::Clear(pinned().frame));
+        assert_eq!(
+            state(&[pinned()], true, 7, OWN),
+            State::Clear(pinned().frame)
+        );
     }
 
     #[test]
@@ -109,20 +117,32 @@ mod tests {
             state(&[over, pinned(), behind], true, 7, OWN),
             State::Covered(pinned().frame)
         );
-        assert_eq!(state(&[pinned(), over, behind], true, 7, OWN), State::Clear(pinned().frame));
+        assert_eq!(
+            state(&[pinned(), over, behind], true, 7, OWN),
+            State::Clear(pinned().frame)
+        );
     }
 
     #[test]
     fn a_sliver_or_a_corner_is_not_covering() {
         // 5 points of overlap across a 300 high window: 1500 of 120000 square points.
         let sliver = window(9, 2, Rect::new(495.0, 100.0, 400.0, 300.0));
-        assert_eq!(state(&[sliver, pinned()], true, 7, OWN), State::Clear(pinned().frame));
+        assert_eq!(
+            state(&[sliver, pinned()], true, 7, OWN),
+            State::Clear(pinned().frame)
+        );
         // A tenth of the window is covered: that counts.
         let corner = window(9, 2, Rect::new(460.0, 70.0, 400.0, 100.0));
-        assert!(matches!(state(&[corner, pinned()], true, 7, OWN), State::Covered(_)));
+        assert!(matches!(
+            state(&[corner, pinned()], true, 7, OWN),
+            State::Covered(_)
+        ));
         // A window that only touches the edge overlaps nothing.
         let beside = window(9, 2, Rect::new(500.0, 100.0, 400.0, 300.0));
-        assert_eq!(state(&[beside, pinned()], true, 7, OWN), State::Clear(pinned().frame));
+        assert_eq!(
+            state(&[beside, pinned()], true, 7, OWN),
+            State::Clear(pinned().frame)
+        );
     }
 
     #[test]
@@ -131,22 +151,66 @@ mod tests {
         let clear = |w: Listed| state(&[w, pinned()], true, 7, OWN) == State::Clear(pinned().frame);
         // The windows of this app: the copy and the border that are shown over a pinned window.
         assert!(clear(window(9, OWN, over)));
-        // The Dock and the menu bar sit at higher levels.
-        assert!(clear(Listed { layer: 20, ..window(9, 2, over) }));
-        assert!(clear(Listed { layer: 24, ..window(9, 2, over) }));
-        // A floating panel does cover, as an ordinary window.
-        assert!(!clear(Listed { layer: 3, ..window(9, 2, over) }));
+        // The Dock and the menu bar sit at higher levels, and so does a floating panel: raising the pinned window
+        // would not put it above them.
+        assert!(clear(Listed {
+            layer: 20,
+            ..window(9, 2, over)
+        }));
+        assert!(clear(Listed {
+            layer: 24,
+            ..window(9, 2, over)
+        }));
+        assert!(clear(Listed {
+            layer: 3,
+            ..window(9, 2, over)
+        }));
         // A status item, a transparent window.
         assert!(clear(window(9, 2, Rect::new(300.0, 200.0, 30.0, 300.0))));
         assert!(clear(window(9, 2, Rect::new(300.0, 200.0, 300.0, 30.0))));
-        assert!(clear(Listed { alpha: 0.0, ..window(9, 2, over) }));
-        assert!(!clear(Listed { alpha: 0.5, ..window(9, 2, over) }));
+        assert!(clear(Listed {
+            alpha: 0.0,
+            ..window(9, 2, over)
+        }));
+        assert!(!clear(Listed {
+            alpha: 0.5,
+            ..window(9, 2, over)
+        }));
+    }
+
+    #[test]
+    fn a_pinned_floating_panel_is_covered_by_the_windows_of_its_own_level() {
+        let panel = Listed {
+            layer: 3,
+            ..pinned()
+        };
+        let over = Rect::new(300.0, 200.0, 400.0, 300.0);
+        let same = Listed {
+            layer: 3,
+            ..window(9, 2, over)
+        };
+        assert_eq!(
+            state(&[same, panel], true, 7, OWN),
+            State::Covered(panel.frame)
+        );
+        let menu_bar = Listed {
+            layer: 24,
+            ..window(9, 2, over)
+        };
+        assert_eq!(
+            state(&[menu_bar, panel], true, 7, OWN),
+            State::Clear(panel.frame)
+        );
     }
 
     #[test]
     fn a_window_that_is_not_on_screen_is_away_or_gone() {
         let list = [window(9, 2, Rect::new(0.0, 0.0, 400.0, 300.0))];
-        assert_eq!(state(&list, true, 7, OWN), State::Away, "minimised, hidden or on another desktop");
+        assert_eq!(
+            state(&list, true, 7, OWN),
+            State::Away,
+            "minimised, hidden or on another desktop"
+        );
         assert_eq!(state(&list, false, 7, OWN), State::Gone, "closed");
         assert_eq!(state(&[], false, 7, OWN), State::Gone);
     }
@@ -156,7 +220,10 @@ mod tests {
         let moved = window(7, 1, Rect::new(-1500.0, -900.0, 640.0, 480.0));
         assert_eq!(state(&[moved], true, 7, OWN), State::Clear(moved.frame));
         let over = window(9, 2, Rect::new(-1400.0, -800.0, 500.0, 400.0));
-        assert_eq!(state(&[over, moved], true, 7, OWN), State::Covered(moved.frame));
+        assert_eq!(
+            state(&[over, moved], true, 7, OWN),
+            State::Covered(moved.frame)
+        );
     }
 
     #[test]

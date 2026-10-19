@@ -1,5 +1,5 @@
-//! The selection overlay: every display shows its frozen picture, dimmed, under a crosshair with a
-//! magnifier. Drag to pick an area; Space switches to picking a window, which lights up under the
+//! The selection overlay: every display shows its frozen picture, under the system crosshair
+//! cursor, dimmed only while a selection is drawn. Drag to pick an area; Space switches to picking a window, which lights up under the
 //! pointer; a click without a drag takes the window under the pointer; Return takes the whole display;
 //! Escape or a right click cancels.
 //!
@@ -14,10 +14,9 @@ use objc2::{
     AnyThread, DefinedClass, MainThreadMarker, MainThreadOnly, define_class, msg_send, rc::Retained,
 };
 use objc2_app_kit::{
-    NSApplication, NSBackingStoreType, NSBezierPath, NSColor, NSCompositingOperation, NSCursor,
-    NSEvent, NSFont, NSFontWeightMedium, NSGraphicsContext, NSImage, NSImageInterpolation, NSPanel,
-    NSScreenSaverWindowLevel, NSTrackingArea, NSTrackingAreaOptions, NSView, NSWindingRule,
-    NSWindowCollectionBehavior, NSWindowStyleMask,
+    NSApplication, NSBackingStoreType, NSBezierPath, NSColor, NSCursor, NSEvent, NSFont,
+    NSFontWeightMedium, NSImage, NSPanel, NSScreenSaverWindowLevel, NSTrackingArea,
+    NSTrackingAreaOptions, NSView, NSWindingRule, NSWindowCollectionBehavior, NSWindowStyleMask,
 };
 use objc2_foundation::{NSObjectProtocol, NSPoint, NSRect, NSSize};
 use std::{
@@ -26,10 +25,6 @@ use std::{
 };
 
 const DIM: f64 = 0.38;
-const LOUPE: f64 = 128.0;
-/// Points of the picture the magnifier shows across.
-const LOUPE_SPAN: f64 = 13.0;
-const LOUPE_GAP: f64 = 22.0;
 const LABEL_HEIGHT: f64 = 20.0;
 
 /// What may be picked.
@@ -64,7 +59,6 @@ struct Session {
     done: Done,
     /// Window frames from front to back, in AppKit screen coordinates.
     windows: Vec<(u32, NSRect)>,
-    hint: String,
 }
 
 impl Session {
@@ -300,29 +294,10 @@ impl OverlayView {
             border.stroke();
             self.size_label(selection);
         } else {
-            self.dim(None);
             if let Some(p) = pointer {
-                self.crosshair(p);
+                self.coords(p);
             }
         }
-        if let Some(p) = pointer
-            && !session.window_mode.get()
-        {
-            self.loupe(p);
-        }
-        self.hint();
-    }
-
-    fn crosshair(&self, p: NSPoint) {
-        let bounds = self.bounds();
-        let line = NSBezierPath::bezierPath();
-        line.moveToPoint(NSPoint::new(bounds.origin.x, p.y.floor() + 0.5));
-        line.lineToPoint(NSPoint::new(bounds.size.width, p.y.floor() + 0.5));
-        line.moveToPoint(NSPoint::new(p.x.floor() + 0.5, bounds.origin.y));
-        line.lineToPoint(NSPoint::new(p.x.floor() + 0.5, bounds.size.height));
-        line.setLineWidth(1.0);
-        NSColor::colorWithWhite_alpha(1.0, 0.55).setStroke();
-        line.stroke();
     }
 
     fn label(&self, text: &str, at: NSPoint) {
@@ -360,92 +335,15 @@ impl OverlayView {
         self.label(&text, NSPoint::new(selection.origin.x, y));
     }
 
-    /// A magnified square of the picture around the pointer, with the pixel under it outlined.
-    fn loupe(&self, p: NSPoint) {
-        let ivars = self.ivars();
-        let bounds = self.bounds();
-        let mut origin = NSPoint::new(p.x + LOUPE_GAP, p.y - LOUPE - LOUPE_GAP);
-        if origin.x + LOUPE > bounds.size.width {
-            origin.x = p.x - LOUPE - LOUPE_GAP;
-        }
-        if origin.y < 0.0 {
-            origin.y = p.y + LOUPE_GAP;
-        }
-        let frame = NSRect::new(origin, NSSize::new(LOUPE, LOUPE));
-        let source = NSRect::new(
-            NSPoint::new(p.x - LOUPE_SPAN / 2.0, p.y - LOUPE_SPAN / 2.0),
-            NSSize::new(LOUPE_SPAN, LOUPE_SPAN),
-        );
-        let picture = &ivars.picture;
-        let size = picture.size();
-        // Points of the view map one to one onto points of the picture.
-        let from = NSRect::new(
-            NSPoint::new(
-                source.origin.x * size.width / bounds.size.width,
-                source.origin.y * size.height / bounds.size.height,
-            ),
-            source.size,
-        );
-        if let Some(context) = NSGraphicsContext::currentContext() {
-            context.saveGraphicsState();
-            context.setImageInterpolation(NSImageInterpolation::None);
-            NSBezierPath::bezierPathWithRoundedRect_xRadius_yRadius(frame, 8.0, 8.0).addClip();
-            NSColor::blackColor().setFill();
-            NSBezierPath::fillRect(frame);
-            picture.drawInRect_fromRect_operation_fraction(
-                frame,
-                from,
-                NSCompositingOperation::Copy,
-                1.0,
-            );
-            let cell = LOUPE / LOUPE_SPAN;
-            let center = NSRect::new(
-                NSPoint::new(
-                    origin.x + LOUPE / 2.0 - cell / 2.0,
-                    origin.y + LOUPE / 2.0 - cell / 2.0,
-                ),
-                NSSize::new(cell, cell),
-            );
-            NSColor::colorWithRed_green_blue_alpha(1.0, 0.25, 0.25, 0.9).setStroke();
-            NSBezierPath::bezierPathWithRect(center).stroke();
-            context.restoreGraphicsState();
-        }
-        NSColor::colorWithWhite_alpha(1.0, 0.8).setStroke();
-        let ring = NSBezierPath::bezierPathWithRoundedRect_xRadius_yRadius(frame, 8.0, 8.0);
-        ring.setLineWidth(1.5);
-        ring.stroke();
-        let scale = ivars.scale;
+    /// The pixel position beside the system crosshair cursor.
+    fn coords(&self, p: NSPoint) {
+        let scale = self.ivars().scale;
         let text = format!(
             "{}, {}",
             (p.x * scale).floor(),
-            ((bounds.size.height - p.y) * scale).floor()
+            ((self.bounds().size.height - p.y) * scale).floor()
         );
-        self.label(&text, NSPoint::new(origin.x, origin.y - LABEL_HEIGHT - 4.0));
-    }
-
-    fn hint(&self) {
-        let text = &self.ivars().session.hint;
-        if text.is_empty() {
-            return;
-        }
-        let bounds = self.bounds();
-        let font = NSFont::systemFontOfSize(13.0);
-        let attrs = text_attributes(&font, &NSColor::whiteColor(), Fit::Clip, true);
-        let width = (7.2 * text.chars().count() as f64 + 32.0).min(bounds.size.width - 40.0);
-        let rect = NSRect::new(
-            NSPoint::new((bounds.size.width - width) / 2.0, 36.0),
-            NSSize::new(width, 30.0),
-        );
-        NSColor::colorWithWhite_alpha(0.0, 0.7).setFill();
-        NSBezierPath::bezierPathWithRoundedRect_xRadius_yRadius(rect, 15.0, 15.0).fill();
-        draw_text(
-            text,
-            NSRect::new(
-                NSPoint::new(rect.origin.x, rect.origin.y + 7.0),
-                NSSize::new(width, 17.0),
-            ),
-            &attrs,
-        );
+        self.label(&text, NSPoint::new(p.x + 14.0, p.y - LABEL_HEIGHT - 10.0));
     }
 }
 
@@ -489,7 +387,7 @@ pub fn pick(
     mtm: MainThreadMarker,
     frozen: &Frozen,
     mode: Mode,
-    hint: &str,
+    _hint: &str,
     done: impl FnOnce(Picked) + 'static,
 ) -> Rc<Overlay> {
     let overlay = Rc::new(Overlay {
@@ -507,7 +405,6 @@ pub fn pick(
         window_mode: Cell::new(mode == Mode::Window),
         done,
         windows: frozen.windows.iter().map(|w| (w.id, w.frame)).collect(),
-        hint: hint.to_owned(),
     });
     let pointer = NSEvent::mouseLocation();
     let mut panels = Vec::new();

@@ -9,7 +9,10 @@ use objc2_app_kit::{
     NSWindowAnimationBehavior, NSWindowCollectionBehavior, NSWindowStyleMask,
 };
 use objc2_foundation::{NSObjectProtocol, NSRect};
-use std::{cell::RefCell, rc::Rc};
+use std::{
+    cell::{Cell, RefCell},
+    rc::Rc,
+};
 
 #[derive(Debug, Clone, Copy, PartialEq, Eq)]
 pub enum Key {
@@ -22,11 +25,11 @@ pub enum Key {
     PageUp,
     PageDown,
     Enter,
-    /// Option+Shift+Enter: paste the other way (with or without formatting).
+    /// Paste the other way (with or without formatting); Option+Shift+Return unless the user chose another key.
     EnterAlt,
     Escape,
     Pin,
-    /// Option+B: file the selected item in the next board.
+    /// File the selected item in the next board; Option+B unless the user chose another key.
     Board,
     Delete,
     /// Command plus a letter: pastes the pinned item that has that letter, if there is one.
@@ -82,38 +85,133 @@ fn tab_of_key_code(code: u16) -> Option<u8> {
     })
 }
 
+/// A key and the modifier keys held with it, as an action of a page is bound to.
+#[derive(Debug, Clone, Copy, PartialEq, Eq)]
+pub struct Combo {
+    pub key_code: u16,
+    pub command: bool,
+    pub option: bool,
+    pub shift: bool,
+    pub control: bool,
+}
+
+impl Combo {
+    const fn option(key_code: u16) -> Self {
+        Self {
+            key_code,
+            command: false,
+            option: true,
+            shift: false,
+            control: false,
+        }
+    }
+}
+
+/// The keys of the actions that are the user's to choose. `None` leaves an action without a key. The rest
+/// (arrows, Return, Escape, Page Up and Down, Command with a number or a letter, Command+Delete) keep the meaning
+/// they have everywhere on the Mac.
+#[derive(Debug, Clone, Copy, PartialEq, Eq)]
+pub struct ActionKeys {
+    pub pin: Option<Combo>,
+    pub board: Option<Combo>,
+    /// Pastes the other way, with or without formatting.
+    pub paste_other: Option<Combo>,
+    /// Deletes the selected item; refuses an agent's request; dismisses an alert.
+    pub delete: Option<Combo>,
+}
+
+impl Default for ActionKeys {
+    /// Option+P, Option+B, Option+Shift+Return and Option+Delete.
+    fn default() -> Self {
+        Self {
+            pin: Some(Combo::option(35)),
+            board: Some(Combo::option(11)),
+            paste_other: Some(Combo {
+                shift: true,
+                ..Combo::option(36)
+            }),
+            delete: Some(Combo::option(51)),
+        }
+    }
+}
+
+thread_local! {
+    static ACTION_KEYS: Cell<ActionKeys> = Cell::new(ActionKeys::default());
+}
+
+/// Binds the actions of the pages to these keys from the next key press on.
+pub fn set_action_keys(keys: ActionKeys) {
+    ACTION_KEYS.with(|k| k.set(keys));
+}
+
+/// The modifier keys held during a key press.
+#[derive(Debug, Clone, Copy, Default, PartialEq, Eq)]
+struct Held {
+    command: bool,
+    option: bool,
+    shift: bool,
+    control: bool,
+}
+
 fn decode(event: &NSEvent) -> Option<Key> {
     let flags = event.modifierFlags();
-    let option = flags.contains(NSEventModifierFlags::Option);
-    let command = flags.contains(NSEventModifierFlags::Command);
-    let shift = flags.contains(NSEventModifierFlags::Shift);
-    let control = flags.contains(NSEventModifierFlags::Control);
     // Arrow keys always carry the function and numeric-pad bits, so only real modifiers count.
-    let plain = !flags.intersects(
-        NSEventModifierFlags::Command
-            | NSEventModifierFlags::Option
-            | NSEventModifierFlags::Control
-            | NSEventModifierFlags::Shift,
-    );
-    match event.keyCode() {
+    let held = Held {
+        command: flags.contains(NSEventModifierFlags::Command),
+        option: flags.contains(NSEventModifierFlags::Option),
+        shift: flags.contains(NSEventModifierFlags::Shift),
+        control: flags.contains(NSEventModifierFlags::Control),
+    };
+    decode_key(event.keyCode(), held, ACTION_KEYS.with(Cell::get))
+}
+
+/// What a key press means, with the actions bound to `keys`.
+fn decode_key(code: u16, held: Held, keys: ActionKeys) -> Option<Key> {
+    let plain = held == Held::default();
+    let command_only = held
+        == Held {
+            command: true,
+            ..Held::default()
+        };
+    // Return and Enter are one key to an action, and so are Delete and Forward Delete.
+    let same_key = |a: u16, b: u16| a == b || ([a, b] == [36, 76]) || ([a, b] == [51, 117]);
+    let pressed = |combo: Combo| {
+        same_key(combo.key_code, code)
+            && held
+                == Held {
+                    command: combo.command,
+                    option: combo.option,
+                    shift: combo.shift,
+                    control: combo.control,
+                }
+    };
+    let actions = [
+        (keys.paste_other, Key::EnterAlt),
+        (keys.pin, Key::Pin),
+        (keys.board, Key::Board),
+        (keys.delete, Key::Delete),
+    ];
+    if let Some((_, key)) = actions
+        .into_iter()
+        .find(|(combo, _)| combo.is_some_and(pressed))
+    {
+        return Some(key);
+    }
+    match code {
         126 => Some(Key::Up),
         125 => Some(Key::Down),
         123 if plain => Some(Key::Left),
         124 if plain => Some(Key::Right),
-        code if command && !option && !shift && !control && tab_of_key_code(code).is_some() => {
+        code if command_only && tab_of_key_code(code).is_some() => {
             tab_of_key_code(code).map(Key::Tab)
         }
         116 => Some(Key::PageUp),
         121 => Some(Key::PageDown),
-        36 | 76 if option && shift => Some(Key::EnterAlt),
         36 | 76 => Some(Key::Enter),
         53 => Some(Key::Escape),
-        35 if option => Some(Key::Pin),
-        11 if option && !command => Some(Key::Board),
-        51 | 117 if option || command => Some(Key::Delete),
-        code if command && !option && !shift && !control => {
-            letter_of_key_code(code).map(Key::Shortcut)
-        }
+        // Command+Delete deletes, as it does in Finder, whatever key the action has.
+        51 | 117 if command_only => Some(Key::Delete),
+        code if command_only => letter_of_key_code(code).map(Key::Shortcut),
         _ => None,
     }
 }
@@ -230,5 +328,52 @@ mod tests {
         }
         assert_eq!(tab_of_key_code(29), None, "zero selects nothing");
         assert_eq!(tab_of_key_code(0), None, "letters are not pages");
+    }
+
+    #[test]
+    fn the_actions_follow_the_keys_the_user_chose() {
+        let option = Held {
+            option: true,
+            ..Held::default()
+        };
+        let command = Held {
+            command: true,
+            ..Held::default()
+        };
+        let control = Held {
+            control: true,
+            ..Held::default()
+        };
+        let defaults = ActionKeys::default();
+        // As before: Option+P pins, Option+B files, Option+Shift+Return pastes the other way, Option+Delete deletes.
+        assert_eq!(decode_key(35, option, defaults), Some(Key::Pin));
+        assert_eq!(decode_key(11, option, defaults), Some(Key::Board));
+        let option_shift = Held {
+            shift: true,
+            ..option
+        };
+        assert_eq!(decode_key(76, option_shift, defaults), Some(Key::EnterAlt));
+        assert_eq!(decode_key(117, option, defaults), Some(Key::Delete));
+        // Pin moved to Control+P: Option+P is free, and Control+P pins.
+        let moved = ActionKeys {
+            pin: Some(Combo {
+                option: false,
+                control: true,
+                ..Combo::option(35)
+            }),
+            delete: None,
+            ..defaults
+        };
+        assert_eq!(decode_key(35, option, moved), None);
+        assert_eq!(decode_key(35, control, moved), Some(Key::Pin));
+        // Without a key of its own, Delete still deletes with Command, as in Finder.
+        assert_eq!(decode_key(51, option, moved), None);
+        assert_eq!(decode_key(51, command, moved), Some(Key::Delete));
+        // The keys every page shares are not the user's to move.
+        assert_eq!(decode_key(36, Held::default(), moved), Some(Key::Enter));
+        assert_eq!(decode_key(53, Held::default(), moved), Some(Key::Escape));
+        assert_eq!(decode_key(18, command, moved), Some(Key::Tab(1)));
+        assert_eq!(decode_key(0, command, moved), Some(Key::Shortcut('a')));
+        assert_eq!(decode_key(123, option, moved), None);
     }
 }

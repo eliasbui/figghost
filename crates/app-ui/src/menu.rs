@@ -76,6 +76,7 @@ pub mod symbols {
         CAPTURE_FOLDER = "folder",
         SMART_SELECT = "text.magnifyingglass",
         TRANSLATE = "character.bubble",
+        PIN = "pin",
         COLOR_PICKER = "eyedropper",
         MENU_BAR_ICONS = "menubar.rectangle",
         COPY_STACK = "square.stack.3d.up",

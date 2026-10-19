@@ -45,7 +45,57 @@
     return el;
   }
 
+  // Any other key: the button records the next one pressed, as a shortcut field does, but alone, without a
+  // modifier. Escape gives up, since it is the key that ends a drag; a key no shortcut knows says so.
+  function otherKey(wheel) {
+    const el = h('button', { class: 'btn small wheel-other', type: 'button' });
+    let recording = false;
+    const custom = () => !KEYS.some(([value]) => value === S.wheel[wheel].key);
+    const render = () => {
+      el.classList.toggle('on', custom() && !recording);
+      el.classList.toggle('recording', recording);
+      el.replaceChildren(recording ? t('wheel.key.press') : custom() ? keycapsEl(S.wheel[wheel].key) : t('wheel.key.other'));
+      el.setAttribute('aria-label', t('wheel.key.other') + (custom() ? ': ' + S.wheel[wheel].key : ''));
+    };
+    const stop = () => {
+      recording = false;
+      window.removeEventListener('keydown', onKey, true);
+      window.removeEventListener('mousedown', onAway, true);
+      send({ t: 'recording', on: false });
+      render();
+    };
+    const onAway = (e) => { if (!el.contains(e.target)) stop(); };
+    const onKey = (e) => {
+      e.preventDefault();
+      e.stopPropagation();
+      // A modifier alone is one of the four choices beside the button.
+      if (MODIFIER_CODES.has(e.code)) return;
+      if (e.code === 'Escape') return stop();
+      const key = keyName(e.code);
+      if (!key) return toast(t('fault.unsupported_key'));
+      stop();
+      if (key === S.wheel[wheel].key) return;
+      if (S.wheel[wheel].enabled && takenBy(wheel, key)) return toast(t('fault.wheel_key_taken'));
+      change('wheel.' + wheel + '.key', key);
+    };
+    el.addEventListener('click', () => {
+      if (recording) return stop();
+      recording = true;
+      // Global shortcuts let go while a key is recorded, so the key reaches the page.
+      send({ t: 'recording', on: true });
+      window.addEventListener('keydown', onKey, true);
+      window.addEventListener('mousedown', onAway, true);
+      render();
+    });
+    reg(render);
+    return el;
+  }
+
   function keyChoice(wheel) {
+    return h('div', { class: 'wheel-key' }, modifierChoice(wheel), otherKey(wheel));
+  }
+
+  function modifierChoice(wheel) {
     return segmented({
       label: t('wheel.key.title'),
       options: KEYS.map(([value, label]) => ({ value, label })),
@@ -113,7 +163,8 @@
       'wheel.formats.title': 'Convert formats', 'wheel.formats.desc': 'Convert the files to another format: images, video, audio, PDF and documents, and any file or folder to ZIP, TAR or TGZ.',
       'wheel.tools.title': 'Tools', 'wheel.tools.desc': 'Make images, video and audio smaller, remove metadata, cut out a background, copy the text in an image, annotate it, and merge or split PDFs.',
       'wheel.actions.title': 'Actions', 'wheel.actions.desc': 'Copy the path or the files, send with AirDrop, open Terminal in the folder, show in Finder, or put the files on the shelf.',
-      'wheel.key.title': 'Key', 'wheel.key.desc': 'Tap this key, on its own, while dragging. Two wheels that are on cannot share a key. Option on its own stays a plain copy drag unless a wheel uses it.',
+      'wheel.key.other': 'Other key…', 'wheel.key.press': 'Press a key…',
+      'wheel.key.title': 'Key', 'wheel.key.desc': 'Tap this key, on its own, while dragging, or choose Other key and press any key you like. Two wheels that are on cannot share a key. Option on its own stays a plain copy drag unless a wheel uses it, and Escape always ends the drag.',
       'wheel.slots.title': 'Slots', 'wheel.slots.desc': 'Choose which slots this wheel can show. A wheel shows only the slots that suit every file you drag. New slots in a later version show up here switched on.',
       'wheel.shown': '{n} of {max} shown', 'wheel.showall': 'Show all',
       'wheel.group.image': 'Images', 'wheel.group.video': 'Video', 'wheel.group.audio': 'Audio', 'wheel.group.pdf': 'PDF', 'wheel.group.document': 'Documents', 'wheel.group.any': 'Any file',
@@ -134,7 +185,8 @@
       'wheel.formats.title': 'Chuyển định dạng', 'wheel.formats.desc': 'Chuyển tệp sang định dạng khác: ảnh, video, âm thanh, PDF và tài liệu, còn tệp hay thư mục bất kỳ sang ZIP, TAR hoặc TGZ.',
       'wheel.tools.title': 'Công cụ', 'wheel.tools.desc': 'Làm ảnh, video và âm thanh nhỏ lại, xóa metadata, tách nền, chép chữ trong ảnh, chú thích ảnh, và gộp hoặc tách PDF.',
       'wheel.actions.title': 'Thao tác', 'wheel.actions.desc': 'Chép đường dẫn hoặc tệp, gửi bằng AirDrop, mở Terminal tại thư mục, hiện trong Finder, hoặc đưa tệp lên khay.',
-      'wheel.key.title': 'Phím', 'wheel.key.desc': 'Chạm riêng phím này trong lúc kéo. Hai vòng đang bật không dùng chung một phím. Phím Option đứng riêng vẫn chỉ là kéo để sao chép, trừ khi có vòng dùng nó.',
+      'wheel.key.other': 'Phím khác…', 'wheel.key.press': 'Nhấn một phím…',
+      'wheel.key.title': 'Phím', 'wheel.key.desc': 'Chạm riêng phím này trong lúc kéo, hoặc chọn Phím khác rồi nhấn phím bạn muốn. Hai vòng đang bật không dùng chung một phím. Phím Option đứng riêng vẫn chỉ là kéo để sao chép, trừ khi có vòng dùng nó, còn Esc luôn kết thúc việc kéo.',
       'wheel.slots.title': 'Các ô', 'wheel.slots.desc': 'Chọn những ô vòng này được phép hiện. Vòng chỉ hiện các ô phù hợp với mọi tệp bạn kéo. Ô mới ở bản sau sẽ xuất hiện ở đây ở trạng thái bật.',
       'wheel.shown': 'Hiện {n} trên {max}', 'wheel.showall': 'Hiện tất cả',
       'wheel.group.image': 'Ảnh', 'wheel.group.video': 'Video', 'wheel.group.audio': 'Âm thanh', 'wheel.group.pdf': 'PDF', 'wheel.group.document': 'Tài liệu', 'wheel.group.any': 'Mọi tệp',
@@ -220,6 +272,24 @@
       sent.length = 0;
       cards[1].querySelector('.switch').click();
       expect(!sent.some((m) => m.path === 'wheel.formats.enabled'), 'turning it on with a taken key is not sent');
+      reset();
+
+      // Any other key: the button records the next key pressed and sends its name; Escape only gives up.
+      const other = (i) => cards[i + 1].querySelector('.wheel-other');
+      const press = (code) => window.dispatchEvent(new KeyboardEvent('keydown', { code, bubbles: true, cancelable: true }));
+      sent.length = 0;
+      other(0).click();
+      expect(other(0).classList.contains('recording'), 'the other key button records');
+      press('Escape');
+      expect(!other(0).classList.contains('recording') && !sent.some((m) => m.path === 'wheel.formats.key'), 'Escape gives up and sends nothing');
+      other(0).click();
+      press('ShiftLeft');
+      expect(other(0).classList.contains('recording'), 'a modifier alone does not end the recording');
+      press('F19');
+      // What is sent goes through a short throttle; the choice itself is taken at once.
+      expect(state.wheel.formats.key === 'f19', 'any other key is taken: ' + state.wheel.formats.key);
+      expect(other(0).classList.contains('on') && other(0).textContent.includes('F19'), 'and the button shows it');
+      expect(!other(0).classList.contains('recording'), 'and the recording ends');
       reset();
 
       // The slots: a checkbox hides or shows one, and Show all clears the list.

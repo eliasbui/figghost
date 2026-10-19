@@ -46,6 +46,8 @@ body { display: flex; flex-direction: column; padding: 44px 28px 22px; }
 button {
   height: 30px;
   padding: 0 18px;
+  /* A label never wraps: the button grows instead, inside the room the row keeps for it. */
+  white-space: nowrap;
   font: inherit;
   color: var(--text);
   background: var(--control);
@@ -105,9 +107,11 @@ ul.empty { list-style: none; padding-left: 16px; color: var(--text-2); }
 .slide p { margin: 0; max-width: 38ch; font-size: 15px; line-height: 1.5; color: var(--text-2); -webkit-user-select: text; user-select: text; }
 .kicker { font-size: 11.5px; font-weight: 650; letter-spacing: 0.08em; text-transform: uppercase; color: var(--accent); }
 .nav { display: flex; align-items: center; justify-content: space-between; gap: 12px; margin-top: 18px; }
-.nav .side { width: 96px; display: flex; }
+.nav .side { width: 96px; flex: none; display: flex; }
 .nav .side:last-child { justify-content: flex-end; }
-.dots { display: flex; gap: 7px; }
+.dots { display: flex; flex: 1; min-width: 0; justify-content: center; gap: 7px; }
+/* Past MAX_DOTS slides the dots give way to "3 / 22", which still fits between the buttons. */
+.dots.counter { font-size: 12.5px; color: var(--text-2); font-variant-numeric: tabular-nums; }
 .dots i { width: 7px; height: 7px; border-radius: 50%; background: var(--dot); transition: background 0.2s, width 0.2s; }
 .dots i.on { width: 20px; border-radius: 4px; background: var(--accent); }
 </style>
@@ -176,11 +180,15 @@ ul.empty { list-style: none; padding-left: 16px; color: var(--text-2); }
 
   let index = 0;
   let count = 0;
+  // Dots for at most this many slides: more would not fit between the two buttons.
+  const MAX_DOTS = 9;
 
   function show(position) {
     index = Math.max(0, Math.min(count - 1, position));
     $('track').style.transform = 'translateX(' + (-100 * index) + '%)';
-    [...$('dots').children].forEach((dot, i) => dot.classList.toggle('on', i === index));
+    const dots = $('dots');
+    if (dots.classList.contains('counter')) dots.textContent = (index + 1) + ' / ' + count;
+    else [...dots.children].forEach((dot, i) => dot.classList.toggle('on', i === index));
     const last = index === count - 1;
     $('back').hidden = index === 0;
     $('next').textContent = last ? tr('done') : index === 0 ? tr('start') : tr('next');
@@ -217,7 +225,9 @@ ul.empty { list-style: none; padding-left: 16px; color: var(--text-2); }
       track.appendChild(slide);
     });
     count = items.length + 1;
-    for (let i = 0; i < count; i++) dots.appendChild(el('i'));
+    // A dot for each slide while they fit between the buttons; past that, the number of the slide.
+    dots.classList.toggle('counter', count > MAX_DOTS);
+    if (count <= MAX_DOTS) for (let i = 0; i < count; i++) dots.appendChild(el('i'));
     $('back').textContent = tr('back');
     track.style.transition = 'none';
     show(0);
@@ -302,8 +312,16 @@ ul.empty { list-style: none; padding-left: 16px; color: var(--text-2); }
       expect(sent.some((m) => m.name === 'close'), 'Done on the last slide closes');
       expect(document.querySelectorAll('.slide')[3].querySelector('p') === null, 'a line without detail has no second line');
 
+      // Twenty-one changes, as 0.9.0 had: a count instead of dots, and the button keeps its label on one line.
+      window.__fig.recv({ t: 'show', lang: 'en', version: '9.9.9', changes: Array.from({ length: 21 }, (_, i) => 'Change ' + i) });
+      expect($('dots').classList.contains('counter') && $('dots').textContent === '1 / 22', 'many slides are counted: ' + $('dots').textContent);
+      expect($('next').getBoundingClientRect().height <= 32, 'the button stays on one line');
+      $('next').click();
+      expect($('dots').textContent === '2 / 22', 'the count follows the slide');
+
       window.__fig.recv({ t: 'show', lang: 'vi', version: '9.9.9', changes: many });
       expect($('next').textContent === 'Xem ngay', 'Vietnamese: ' + $('next').textContent);
+      expect(!$('dots').classList.contains('counter') && document.querySelectorAll('#dots i').length === 6, 'few slides have dots again');
       for (const key of Object.keys(TEXT.en)) if (!TEXT.vi[key]) failures.push('missing in Vietnamese: ' + key);
       for (const key of Object.keys(TEXT.vi)) if (!TEXT.en[key]) failures.push('missing in English: ' + key);
 

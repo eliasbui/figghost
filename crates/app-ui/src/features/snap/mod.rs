@@ -74,7 +74,10 @@ impl Default for Config {
     fn default() -> Self {
         Self {
             enabled: true,
-            templates: templates::DEFAULT.iter().map(|id| (*id).to_owned()).collect(),
+            templates: templates::DEFAULT
+                .iter()
+                .map(|id| (*id).to_owned())
+                .collect(),
             custom: Vec::new(),
             screens: BTreeMap::new(),
         }
@@ -189,7 +192,15 @@ mod tests {
         assert!(config.enabled);
         assert_eq!(
             config.templates,
-            ["full", "halves", "thirds", "quarters", "rows", "main_left", "main_right"]
+            [
+                "full",
+                "halves",
+                "thirds",
+                "quarters",
+                "rows",
+                "main_left",
+                "main_right"
+            ]
         );
         let choice = config.choice();
         assert_eq!(ids(&choice.default), config.templates);
@@ -208,7 +219,8 @@ mod tests {
 
     #[test]
     fn the_old_list_of_zones_in_a_file_is_ignored() {
-        let config: Config = serde_json::from_str(r#"{ "enabled": true, "zones": ["left", "right"] }"#).unwrap();
+        let config: Config =
+            serde_json::from_str(r#"{ "enabled": true, "zones": ["left", "right"] }"#).unwrap();
         assert_eq!(config, Config::default());
     }
 
@@ -223,7 +235,11 @@ mod tests {
         assert_eq!(ids(&choice.default), ["full", "halves"]);
         let screen = |name: &str| ids(&choice.screens.iter().find(|(n, _)| n == name).unwrap().1);
         assert_eq!(screen("Mac"), ["quarters"]);
-        assert_eq!(screen("DELL"), templates::DEFAULT, "nothing usable: the default ones");
+        assert_eq!(
+            screen("DELL"),
+            templates::DEFAULT,
+            "nothing usable: the default ones"
+        );
         let empty: Config = serde_json::from_str(r#"{ "templates": [] }"#).unwrap();
         assert_eq!(ids(&empty.choice().default), templates::DEFAULT);
     }

@@ -123,7 +123,10 @@ fn animate(ghost: &CALayer, closed: &CALayer, still: bool) {
             &ease_in,
             &linear,
         ];
-        ghost.addAnimation_forKey(&track("position.y", &y, &y_curves), Some(&NSString::from_str("drop")));
+        ghost.addAnimation_forKey(
+            &track("position.y", &y, &y_curves),
+            Some(&NSString::from_str("drop")),
+        );
         let grow = [
             (0.0, 0.55),
             (0.15, 0.55),
@@ -147,7 +150,10 @@ fn animate(ghost: &CALayer, closed: &CALayer, still: bool) {
         (SECONDS, 0.0),
     ];
     let fade_curves = [&linear, &ease_out, &linear, &ease_in, &linear];
-    ghost.addAnimation_forKey(&track("opacity", &fade, &fade_curves), Some(&NSString::from_str("fade")));
+    ghost.addAnimation_forKey(
+        &track("opacity", &fade, &fade_curves),
+        Some(&NSString::from_str("fade")),
+    );
 
     // The blink is a cut, not a fade: closed from the first moment to the second, open again after.
     let blink = CAKeyframeAnimation::animationWithKeyPath(Some(&NSString::from_str("opacity")));
@@ -186,25 +192,25 @@ fn track(
 fn numbers(values: &[f64]) -> Retained<NSArray> {
     let objects: Vec<Retained<AnyObject>> = values
         .iter()
-        .map(|&v| Retained::into_super(Retained::into_super(Retained::into_super(NSNumber::new_f64(v)))))
+        .map(|&v| {
+            Retained::into_super(Retained::into_super(Retained::into_super(
+                NSNumber::new_f64(v),
+            )))
+        })
         .collect();
     NSArray::from_retained_slice(&objects)
 }
 
 /// Moments in seconds as fractions of the whole, which is how Core Animation takes them.
 fn times(seconds: &[f64]) -> Retained<NSArray<NSNumber>> {
-    let fractions: Vec<Retained<NSNumber>> = seconds.iter().map(|&s| NSNumber::new_f64(s / SECONDS)).collect();
+    let fractions: Vec<Retained<NSNumber>> = seconds
+        .iter()
+        .map(|&s| NSNumber::new_f64(s / SECONDS))
+        .collect();
     NSArray::from_retained_slice(&fractions)
 }
 
-#[cfg(test)]
-mod tests {
-    use super::*;
-
-    #[test]
-    fn the_moments_stay_inside_the_whole_and_in_order() {
-        assert!(BLINK.0 < BLINK.1 && BLINK.1 < SECONDS);
-        // The ghost rests inside the panel, with room below for its overshoot and its bob.
-        assert!(PANEL.height - DROP - SIDE / 2.0 >= 4.0 + 3.0);
-    }
-}
+// The moments stay inside the whole and in order, and the ghost rests inside the panel with room below for
+// its overshoot and its bob.
+const _: () = assert!(BLINK.0 < BLINK.1 && BLINK.1 < SECONDS);
+const _: () = assert!(PANEL.height - DROP - SIDE / 2.0 >= 4.0 + 3.0);

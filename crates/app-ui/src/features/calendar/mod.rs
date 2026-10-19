@@ -122,7 +122,7 @@ pub fn attach(env: &AttachEnv) -> Option<Rc<Feature>> {
         let view = CalendarView::new(
             env.mtm,
             notch.page_frame(),
-            language.calendar_hint(),
+            &language.calendar_hint(&env.config.panel_keys.delete),
             CalendarCallbacks {
                 on_join: Box::new(move |key| {
                     if let Some(f) = join.upgrade() {
