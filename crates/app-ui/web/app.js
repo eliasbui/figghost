@@ -796,7 +796,7 @@ function pageGeneral() {
   ]);
 
   const featureTile = (page, path) => {
-    const el = h('section', { class: 'card feat' },
+    const el = h('section', { class: 'card feat', 'data-page': page },
       h('div', { class: 'feat-top' }, h('span', { class: 'feat-badge' }, icon(PAGES.find((p) => p.id === page).icon)), switchEl(path, t('nav.' + page))),
       h('div', { class: 'feat-name', text: t('nav.' + page) }));
     reg(() => el.classList.toggle('off', !get(path)));
