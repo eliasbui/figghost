@@ -124,7 +124,9 @@ fn main() {
     let mode = args.first().cloned().unwrap_or_default();
     let news = args.get(1).is_some_and(|a| a == "news");
     let (width, height) = if news { NEWS_SIZE } else { (WIDTH, HEIGHT) };
-    let slide: u32 = option(&args, "--slide").and_then(|n| n.parse().ok()).unwrap_or(0);
+    let slide: u32 = option(&args, "--slide")
+        .and_then(|n| n.parse().ok())
+        .unwrap_or(0);
     if mode != "selftest" && mode != "snap" {
         eprintln!(
             "usage: update_preview selftest | snap <state> <out.png> [--dark] [--lang vi] [--few]"

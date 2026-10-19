@@ -1,7 +1,7 @@
 {
   "app": { "version": "0.2.0", "bundled": true, "config_dir": "/Users/you/Library/Application Support/Figghost" },
   "env": { "accessibility": true, "login": "disabled", "language": "en", "reduce_transparency": false, "reduce_motion": false, "increase_contrast": false },
-  "general": { "language": "auto", "show_on_launch": true, "menu_icon": true, "theme": "auto" },
+  "general": { "language": "auto", "show_on_launch": true, "launch_effect": true, "menu_icon": true, "theme": "auto" },
   "update": { "auto": false, "whats_new": true },
   "mouse": {
     "smooth": true, "reverse": false, "step_px": 36, "speed": 1, "duration_ms": 360,
@@ -21,7 +21,7 @@
   "mcp": { "enabled": false, "command": "/Applications/Figghost.app/Contents/MacOS/Figghost" },
   "notch": {
     "enabled": true, "volume_hud": false, "shelf_count": 4,
-    "material": "glass", "hud": "notch", "shadow": true, "motion": "spring", "open_on_hover": true, "hover_delay_ms": 120, "width": 0, "height": 0, "rest_width": 0, "rest_height": 0,
+    "material": "glass", "hud": "notch", "shadow": true, "motion": "spring", "open_on_hover": true, "hover_delay_ms": 300, "width": 0, "height": 0, "rest_width": 0, "rest_height": 0,
     "rest": "notch", "hide_in_capture": false, "haptics": true, "display": "auto", "open_page": "activity",
     "pages": [
       { "id": "clipboard", "title": "Clipboard", "on": true },

@@ -57,6 +57,27 @@ impl Language {
         }
     }
 
+    pub fn audio_spatial(self) -> &'static str {
+        match self {
+            Language::English => "3D sound (headphones)",
+            Language::Vietnamese => "Âm thanh 3D (tai nghe)",
+        }
+    }
+
+    pub fn audio_angle(self) -> &'static str {
+        match self {
+            Language::English => "Turn 360",
+            Language::Vietnamese => "Xoay 360",
+        }
+    }
+
+    pub fn audio_orbit(self) -> &'static str {
+        match self {
+            Language::English => "Orbit speed",
+            Language::Vietnamese => "Tốc độ quay quanh đầu",
+        }
+    }
+
     pub fn audio_mute(self) -> &'static str {
         match self {
             Language::English => "Mute",

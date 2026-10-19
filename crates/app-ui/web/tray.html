@@ -5,100 +5,105 @@
 <meta http-equiv="Content-Security-Policy" content="default-src 'none'; style-src 'unsafe-inline'; script-src 'unsafe-inline'; img-src data:">
 <title>Figghost</title>
 <style>
-:root { color-scheme: light dark; --font: -apple-system, BlinkMacSystemFont, "SF Pro Text", system-ui, sans-serif; --tint: #2f7bff;
-  --inner: linear-gradient(150deg, rgba(255,255,255,.6), rgba(255,255,255,.22)); --edge: rgba(255,255,255,.85); --hi: rgba(255,255,255,.95);
-  --text: #16161d; --text-2: #5c5c68; --text-3: #8e8e9a; --fill: rgba(30,30,60,.08); --track: rgba(120,120,140,.28); --bad: #d4443a; }
-@media (prefers-color-scheme: dark) { :root { --tint: #5c9bff; --inner: linear-gradient(150deg, rgba(255,255,255,.12), rgba(255,255,255,.04));
-  --edge: rgba(255,255,255,.2); --hi: rgba(255,255,255,.45); --text: #f4f4fa; --text-2: #b0b0c0; --text-3: #7c7c8e; --fill: rgba(255,255,255,.1); --track: rgba(255,255,255,.22); --bad: #ff6b60; } }
+:root { color-scheme: light dark; --font: -apple-system, BlinkMacSystemFont, "SF Pro Text", system-ui, sans-serif; --tint: -apple-system-control-accent;
+  --text: #16161d; --text-2: #5c5c68; --text-3: #8e8e9a; --fill: rgba(30,30,60,.08); --line: rgba(120,120,140,.28); --track: rgba(120,120,140,.34); --bad: #d4443a; }
+@media (prefers-color-scheme: dark) { :root { --text: #f4f4fa; --text-2: #b0b0c0; --text-3: #7c7c8e;
+  --fill: rgba(255,255,255,.1); --line: rgba(255,255,255,.16); --track: rgba(255,255,255,.26); --bad: #ff6b60; } }
 * { box-sizing: border-box; }
 html, body { margin: 0; background: transparent; }
-body { font: 13px/1.35 var(--font); color: var(--text); -webkit-font-smoothing: antialiased; -webkit-user-select: none; user-select: none; cursor: default; overflow: hidden; }
+body { font: 13px/1.3 var(--font); color: var(--text); -webkit-font-smoothing: antialiased; -webkit-user-select: none; user-select: none; cursor: default; overflow: hidden; }
 button { font: inherit; color: inherit; cursor: default; }
-:focus-visible { outline: 2px solid var(--tint); outline-offset: 2px; }
-.ic { width: 18px; height: 18px; fill: none; stroke: currentColor; stroke-width: 1.8; stroke-linecap: round; stroke-linejoin: round; flex: none; }
-#root { width: 348px; padding: 12px; display: flex; flex-direction: column; gap: 10px; }
-.head { display: flex; align-items: center; gap: 12px; padding: 4px 4px 2px; }
-.logo { width: 40px; height: 40px; border-radius: 12px; display: grid; place-items: center; background: linear-gradient(145deg, #8b7bff, #5b4bf0); box-shadow: inset 0 0 0 .5px rgba(255,255,255,.35); }
-.logo svg { width: 24px; height: 24px; fill: #fff; }
-.head b { flex: 1; font-size: 15px; font-weight: 650; letter-spacing: -.01em; }
-.icon-btn { display: grid; place-items: center; width: 34px; height: 34px; border: 0; border-radius: 50%; background: var(--fill); color: var(--text-2); box-shadow: inset 0 0 0 .5px var(--edge), inset 0 1px 0 var(--hi); }
-.icon-btn:hover { color: var(--text); }
-.warn { display: flex; align-items: center; gap: 10px; width: 100%; padding: 10px 14px; border: 0; border-radius: 18px; background: color-mix(in srgb, var(--tint) 16%, transparent); box-shadow: inset 0 0 0 .5px color-mix(in srgb, var(--tint) 45%, transparent); text-align: left; font-weight: 500; }
-.card { border-radius: 20px; background: var(--inner); box-shadow: inset 0 0 0 .5px var(--edge), inset 0 1px 0 var(--hi); overflow: hidden; }
-.row { display: flex; align-items: center; gap: 12px; width: 100%; min-height: 44px; padding: 8px 14px; border: 0; background: none; text-align: left; }
-.row + .row { border-top: .5px solid var(--track); }
-button.row:hover { background: var(--fill); }
-.ri { display: grid; place-items: center; width: 30px; height: 30px; border-radius: 50%; background: var(--fill); color: var(--text-2); flex: none; }
-.ri .ic { width: 16px; height: 16px; }
-.rt { flex: 1; min-width: 0; font-weight: 500; white-space: nowrap; overflow: hidden; text-overflow: ellipsis; }
-.row.bad .rt, .row.bad .ri { color: var(--bad); }
-.switch { position: relative; width: 40px; height: 24px; padding: 0; border: 0; border-radius: 999px; background: var(--track); transition: background .12s; flex: none; pointer-events: none; }
-.switch::after { content: ""; position: absolute; top: 2px; left: 2px; width: 20px; height: 20px; border-radius: 50%; background: #fff; box-shadow: 0 1.5px 4px rgba(0,0,0,.3); transition: transform .12s ease-out; }
-.switch.on { background: var(--tint); } .switch.on::after { transform: translateX(16px); }
-.grid { display: grid; grid-template-columns: repeat(4, 1fr); gap: 4px; padding: 8px; }
-.tile { display: flex; flex-direction: column; align-items: center; justify-content: flex-start; gap: 6px; min-height: 66px; padding: 10px 2px 8px; border: 0; border-radius: 16px; background: none; color: var(--text-2); font-size: 11px; line-height: 1.2; text-align: center; transition: background .12s, color .12s; }
-.tile:hover { background: var(--fill); color: var(--text); }
-.tile .ic { width: 22px; height: 22px; }
-.tile span { display: -webkit-box; -webkit-line-clamp: 2; -webkit-box-orient: vertical; overflow: hidden; }
-.tile.live { background: var(--bad); color: #fff; }
+:focus-visible { outline: 2px solid var(--tint); outline-offset: -2px; }
+.ic { width: 18px; height: 18px; flex: none; background-color: currentColor; -webkit-mask: var(--glyph) center / contain no-repeat; mask: var(--glyph) center / contain no-repeat; }
+/* The width is the one TRAY_WIDTH gives the panel in macos-sys/src/webview.rs. */
+#root { width: 276px; padding: 8px; }
+.head { display: flex; align-items: center; gap: 8px; height: 34px; padding: 0 2px 0 4px; }
+.logo { width: 28px; height: 28px; flex: none; }
+.head b { flex: 1; font-size: 14px; font-weight: 650; letter-spacing: -.01em; }
+.icon-btn { display: grid; place-items: center; width: 28px; height: 28px; padding: 0; border: 0; border-radius: 8px; background: none; color: var(--text-2); }
+.icon-btn:hover { background: var(--fill); color: var(--text); }
+.warn { display: flex; align-items: flex-start; gap: 8px; width: 100%; margin-top: 4px; padding: 8px 10px; border: 0; border-radius: 10px; background: color-mix(in srgb, var(--tint) 14%, transparent); text-align: left; font-size: 12px; line-height: 1.3; }
+.warn .ic { width: 15px; height: 15px; margin-top: 1px; color: var(--tint); }
+.warn span { text-wrap: balance; }
+.group { margin-top: 6px; padding-top: 6px; border-top: .5px solid var(--line); }
+.row { display: flex; align-items: center; gap: 10px; width: 100%; height: 28px; padding: 0 10px; border: 0; border-radius: 8px; background: none; text-align: left; }
+.row:hover { background: var(--fill); }
+.row.bad { color: var(--bad); }
+.rt { flex: 1; min-width: 0; white-space: nowrap; overflow: hidden; text-overflow: ellipsis; }
+.switch { position: relative; width: 30px; height: 18px; border-radius: 999px; background: var(--track); transition: background .12s; flex: none; pointer-events: none; }
+.switch::after { content: ""; position: absolute; top: 2px; left: 2px; width: 14px; height: 14px; border-radius: 50%; background: #fff; box-shadow: 0 1px 3px rgba(0,0,0,.3); transition: transform .12s ease-out; }
+.switch.on { background: var(--tint); } .switch.on::after { transform: translateX(12px); }
+.tools { display: grid; grid-template-columns: repeat(6, 1fr); gap: 2px; }
+.tool { display: grid; place-items: center; height: 34px; padding: 0; border: 0; border-radius: 9px; background: none; color: var(--text-2); transition: background .12s, color .12s; }
+.tool:hover { background: var(--fill); color: var(--text); }
+.tool.live, .tool.live:hover { background: var(--bad); color: #fff; }
+/* The name of the tool under the pointer; the line is always there, so the panel does not change height. */
+.cap { height: 16px; margin-top: 2px; font-size: 11px; line-height: 16px; text-align: center; color: var(--text-3); white-space: nowrap; overflow: hidden; text-overflow: ellipsis; }
 @media (prefers-reduced-motion: reduce) { * { transition: none !important; } }
 </style>
 </head>
 <body>
 <div id="root"></div>
+<script>window.__icon = "/*__ICON__*/";</script>
 <script>
-const LUCIDE = {"square-dashed":"<path d=\"M5 3a2 2 0 0 0-2 2\" /> <path d=\"M19 3a2 2 0 0 1 2 2\" /> <path d=\"M21 19a2 2 0 0 1-2 2\" /> <path d=\"M5 21a2 2 0 0 1-2-2\" /> <path d=\"M9 3h1\" /> <path d=\"M9 21h1\" /> <path d=\"M14 3h1\" /> <path d=\"M14 21h1\" /> <path d=\"M3 9v1\" /> <path d=\"M21 9v1\" /> <path d=\"M3 14v1\" /> <path d=\"M21 14v1\" />","app-window":"<rect x=\"2\" y=\"4\" width=\"20\" height=\"16\" rx=\"2\" /> <path d=\"M10 4v4\" /> <path d=\"M2 8h20\" /> <path d=\"M6 4v4\" />","monitor":"<rect width=\"20\" height=\"14\" x=\"2\" y=\"3\" rx=\"2\" /> <line x1=\"8\" x2=\"16\" y1=\"21\" y2=\"21\" /> <line x1=\"12\" x2=\"12\" y1=\"17\" y2=\"21\" />","circle-dot":"<circle cx=\"12\" cy=\"12\" r=\"10\" /> <circle cx=\"12\" cy=\"12\" r=\"1\" />","scan-text":"<path d=\"M3 7V5a2 2 0 0 1 2-2h2\" /> <path d=\"M17 3h2a2 2 0 0 1 2 2v2\" /> <path d=\"M21 17v2a2 2 0 0 1-2 2h-2\" /> <path d=\"M7 21H5a2 2 0 0 1-2-2v-2\" /> <path d=\"M7 8h8\" /> <path d=\"M7 12h10\" /> <path d=\"M7 16h6\" />","pipette":"<path d=\"m2 22 1-1h3l9-9\" /> <path d=\"M3 21v-3l9-9\" /> <path d=\"m15 6 3.4-3.4a2.1 2.1 0 1 1 3 3L18 9l.4.4a2.1 2.1 0 1 1-3 3l-3.8-3.8a2.1 2.1 0 1 1 3-3l.4.4Z\" />","text-search":"<path d=\"M21 6H3\" /> <path d=\"M10 12H3\" /> <path d=\"M10 18H3\" /> <circle cx=\"17\" cy=\"15\" r=\"3\" /> <path d=\"m21 19-1.9-1.9\" />","layers":"<path d=\"M12.83 2.18a2 2 0 0 0-1.66 0L2.6 6.08a1 1 0 0 0 0 1.83l8.58 3.91a2 2 0 0 0 1.66 0l8.58-3.9a1 1 0 0 0 0-1.83z\" /> <path d=\"M2 12a1 1 0 0 0 .58.91l8.6 3.91a2 2 0 0 0 1.65 0l8.58-3.9A1 1 0 0 0 22 12\" /> <path d=\"M2 17a1 1 0 0 0 .58.91l8.6 3.91a2 2 0 0 0 1.65 0l8.58-3.9A1 1 0 0 0 22 17\" />","clipboard-list":"<rect width=\"8\" height=\"4\" x=\"8\" y=\"2\" rx=\"1\" ry=\"1\" /> <path d=\"M16 4h2a2 2 0 0 1 2 2v14a2 2 0 0 1-2 2H6a2 2 0 0 1-2-2V6a2 2 0 0 1 2-2h2\" /> <path d=\"M12 11h4\" /> <path d=\"M12 16h4\" /> <path d=\"M8 11h.01\" /> <path d=\"M8 16h.01\" />","trash-2":"<path d=\"M3 6h18\" /> <path d=\"M19 6v14c0 1-1 2-2 2H7c-1 0-2-1-2-2V6\" /> <path d=\"M8 6V4c0-1 1-2 2-2h4c1 0 2 1 2 2v2\" /> <line x1=\"10\" x2=\"10\" y1=\"11\" y2=\"17\" /> <line x1=\"14\" x2=\"14\" y1=\"11\" y2=\"17\" />","settings":"<path d=\"M12.22 2h-.44a2 2 0 0 0-2 2v.18a2 2 0 0 1-1 1.73l-.43.25a2 2 0 0 1-2 0l-.15-.08a2 2 0 0 0-2.73.73l-.22.38a2 2 0 0 0 .73 2.73l.15.1a2 2 0 0 1 1 1.72v.51a2 2 0 0 1-1 1.74l-.15.09a2 2 0 0 0-.73 2.73l.22.38a2 2 0 0 0 2.73.73l.15-.08a2 2 0 0 1 2 0l.43.25a2 2 0 0 1 1 1.73V20a2 2 0 0 0 2 2h.44a2 2 0 0 0 2-2v-.18a2 2 0 0 1 1-1.73l.43-.25a2 2 0 0 1 2 0l.15.08a2 2 0 0 0 2.73-.73l.22-.39a2 2 0 0 0-.73-2.73l-.15-.08a2 2 0 0 1-1-1.74v-.5a2 2 0 0 1 1-1.74l.15-.09a2 2 0 0 0 .73-2.73l-.22-.38a2 2 0 0 0-2.73-.73l-.15.08a2 2 0 0 1-2 0l-.43-.25a2 2 0 0 1-1-1.73V4a2 2 0 0 0-2-2z\" /> <circle cx=\"12\" cy=\"12\" r=\"3\" />","folder":"<path d=\"M20 20a2 2 0 0 0 2-2V8a2 2 0 0 0-2-2h-7.9a2 2 0 0 1-1.69-.9L9.6 3.9A2 2 0 0 0 7.93 3H4a2 2 0 0 0-2 2v13a2 2 0 0 0 2 2Z\" />","power":"<path d=\"M12 2v10\" /> <path d=\"M18.4 6.6a9 9 0 1 1-12.77.04\" />","log-out":"<path d=\"M9 21H5a2 2 0 0 1-2-2V5a2 2 0 0 1 2-2h4\" /> <polyline points=\"16 17 21 12 16 7\" /> <line x1=\"21\" x2=\"9\" y1=\"12\" y2=\"12\" />","mouse":"<rect x=\"5\" y=\"2\" width=\"14\" height=\"20\" rx=\"7\" /> <path d=\"M12 6v4\" />","arrow-up-down":"<path d=\"m21 16-4 4-4-4\" /> <path d=\"M17 20V4\" /> <path d=\"m3 8 4-4 4 4\" /> <path d=\"M7 4v16\" />","volume-2":"<path d=\"M11 4.702a.705.705 0 0 0-1.203-.498L6.413 7.587A1.4 1.4 0 0 1 5.416 8H3a1 1 0 0 0-1 1v6a1 1 0 0 0 1 1h2.416a1.4 1.4 0 0 1 .997.413l3.383 3.384A.705.705 0 0 0 11 19.298z\" /> <path d=\"M16 9a5 5 0 0 1 0 6\" /> <path d=\"M19.364 18.364a9 9 0 0 0 0-12.728\" />","timer":"<line x1=\"10\" x2=\"14\" y1=\"2\" y2=\"2\" /> <line x1=\"12\" x2=\"15\" y1=\"14\" y2=\"11\" /> <circle cx=\"12\" cy=\"14\" r=\"8\" />","image":"<rect width=\"18\" height=\"18\" x=\"3\" y=\"3\" rx=\"2\" ry=\"2\" /> <circle cx=\"9\" cy=\"9\" r=\"2\" /> <path d=\"m21 15-3.086-3.086a2 2 0 0 0-2.828 0L6 21\" />","video":"<path d=\"m16 13 5.223 3.482a.5.5 0 0 0 .777-.416V7.87a.5.5 0 0 0-.752-.432L16 10.5\" /> <rect x=\"2\" y=\"6\" width=\"14\" height=\"12\" rx=\"2\" />","hand":"<path d=\"M18 11V6a2 2 0 0 0-2-2a2 2 0 0 0-2 2\" /> <path d=\"M14 10V4a2 2 0 0 0-2-2a2 2 0 0 0-2 2v2\" /> <path d=\"M10 10.5V6a2 2 0 0 0-2-2a2 2 0 0 0-2 2v8\" /> <path d=\"M18 8a2 2 0 1 1 4 0v6a8 8 0 0 1-8 8h-2c-2.8 0-4.5-.86-5.99-2.34l-3.6-3.6a2 2 0 0 1 2.83-2.82L7 15\" />","scroll-text":"<path d=\"M15 12h-5\" /> <path d=\"M15 8h-5\" /> <path d=\"M19 17V5a2 2 0 0 0-2-2H4\" /> <path d=\"M8 21h12a2 2 0 0 0 2-2v-1a1 1 0 0 0-1-1H11a1 1 0 0 0-1 1v1a2 2 0 1 1-4 0V5a2 2 0 1 0-4 0v2a1 1 0 0 0 1 1h3\" />","images":"<path d=\"M18 22H4a2 2 0 0 1-2-2V6\" /> <path d=\"m22 13-1.296-1.296a2.41 2.41 0 0 0-3.408 0L11 18\" /> <circle cx=\"12\" cy=\"8\" r=\"2\" /> <rect width=\"16\" height=\"16\" x=\"6\" y=\"2\" rx=\"2\" />","circle-stop":"<circle cx=\"12\" cy=\"12\" r=\"10\" /> <rect x=\"9\" y=\"9\" width=\"6\" height=\"6\" rx=\"1\" />","panel-top":"<rect width=\"18\" height=\"18\" x=\"3\" y=\"3\" rx=\"2\" /> <path d=\"M3 9h18\" />","camera":"<path d=\"M14.5 4h-5L7 7H4a2 2 0 0 0-2 2v9a2 2 0 0 0 2 2h16a2 2 0 0 0 2-2V9a2 2 0 0 0-2-2h-3l-2.5-3z\" /> <circle cx=\"12\" cy=\"13\" r=\"3\" />","sparkles":"<path d=\"M9.937 15.5A2 2 0 0 0 8.5 14.063l-6.135-1.582a.5.5 0 0 1 0-.962L8.5 9.936A2 2 0 0 0 9.937 8.5l1.582-6.135a.5.5 0 0 1 .963 0L14.063 8.5A2 2 0 0 0 15.5 9.937l6.135 1.581a.5.5 0 0 1 0 .964L15.5 14.063a2 2 0 0 0-1.437 1.437l-1.582 6.135a.5.5 0 0 1-.963 0z\" /> <path d=\"M20 3v4\" /> <path d=\"M22 5h-4\" /> <path d=\"M4 17v2\" /> <path d=\"M5 18H3\" />","circle":"<circle cx=\"12\" cy=\"12\" r=\"10\" />","chevron-right":"<path d=\"m9 18 6-6-6-6\" />"};
-const GLYPH = {"gearshape":"settings","hand.raised":"hand","computermouse":"mouse","arrow.up.arrow.down":"arrow-up-down","macwindow":"app-window","speaker.wave.2":"volume-2","doc.on.clipboard":"clipboard-list","trash":"trash-2","power":"power","folder":"folder","xmark.rectangle":"log-out","camera.viewfinder":"camera","rectangle.dashed":"square-dashed","display":"monitor","timer":"timer","text.viewfinder":"scan-text","arrow.up.and.down.text.horizontal":"scroll-text","record.circle":"circle-dot","photo.stack":"images","stop.circle":"circle-stop","text.magnifyingglass":"text-search","eyedropper":"pipette","menubar.rectangle":"panel-top","square.stack.3d.up":"layers","sparkles":"sparkles"};
 const $ = (s) => document.querySelector(s);
 function h(tag, cls, ...kids) { const el = document.createElement(tag); if (cls) el.className = cls; for (const k of kids.flat()) if (k != null) el.append(k); return el; }
-function glyph(symbol) { const span = document.createElement('span'); span.style.display = 'contents'; span.innerHTML = `<svg class="ic" viewBox="0 0 24 24">${LUCIDE[GLYPH[symbol]] || LUCIDE.circle}</svg>`; return span; }
+// The SF Symbol of an entry comes drawn by the system as a picture; it is used as a mask, so it takes the text colour.
+function glyph(src) { const span = h('span', 'ic'); if (src) span.style.setProperty('--glyph', `url("${src}")`); else span.style.visibility = 'hidden'; return span; }
 function send(m) { window.fig.send(m); }
-const LOGO = '<svg viewBox="0 0 24 24"><path d="M12 2.5c-4.4 0-7.5 3.2-7.5 7.6v9.2c0 .9 1 1.4 1.7.8l1.4-1.2 1.6 1.4c.5.4 1.2.4 1.6 0l1.2-1.1 1.2 1.1c.5.4 1.2.4 1.6 0l1.6-1.4 1.4 1.2c.7.6 1.7.1 1.7-.8v-9.2c0-4.4-3.1-7.6-7.5-7.6zM9.3 10.2a1.3 1.8 0 110 3.6 1.3 1.8 0 010-3.6zm5.4 0a1.3 1.8 0 110 3.6 1.3 1.8 0 010-3.6z"/></svg>';
 
 // The entries of the menu come with their title, symbol, check and visibility; this groups them by what they are.
 function render(items) {
   const shown = items.filter((i) => i.visible);
-  const take = (test) => { const found = shown.filter((i) => !used.has(i.id) && test(i)); found.forEach((i) => used.add(i.id)); return found; };
   const used = new Set();
-  const settings = take((i) => i.symbol === 'gearshape')[0];
-  const access = take((i) => i.symbol === 'hand.raised')[0];
-  const quit = [...shown].reverse().find((i) => i.symbol === 'xmark.rectangle');
+  const take = (test) => { const found = shown.filter((i) => !used.has(i.id) && test(i)); found.forEach((i) => used.add(i.id)); return found; };
+  const is = (...symbols) => (i) => symbols.includes(i.symbol);
+  const settings = take(is('gearshape'))[0];
+  const access = take(is('hand.raised'))[0];
+  const quit = [...shown].reverse().find(is('xmark.rectangle'));
   if (quit) used.add(quit.id);
   const login = take((i) => i.symbol === 'power' && i.checked !== null)[0];
-  const config = take((i) => i.symbol === 'folder')[0];
-  const clip = take((i) => i.symbol === 'doc.on.clipboard' || i.symbol === 'trash');
+  const config = take(is('folder'))[0];
+  const clip = take(is('doc.on.clipboard', 'trash'));
   const toggles = take((i) => i.checked !== null);
-  const tiles = take(() => true);
+  // A tool that is in the menu twice, as Stop recording is, is one tile.
+  const seen = new Set();
+  const tools = take(() => true).filter((i) => { const key = i.symbol + '|' + i.title; return !seen.has(key) && seen.add(key); });
+
+  const row = (i, bad) => {
+    const toggle = i.checked !== null;
+    const r = h('button', 'row' + (bad ? ' bad' : ''), h('span', 'rt', i.title), toggle ? h('span', 'switch' + (i.checked ? ' on' : '')) : null);
+    r.title = i.title;
+    if (toggle) { r.setAttribute('role', 'switch'); r.setAttribute('aria-checked', String(i.checked)); }
+    // A switch, and clearing the history, leave the panel open to show what they did.
+    r.onclick = () => send({ t: 'run', id: i.id, keep: toggle || !!bad });
+    return r;
+  };
+  const group = (...kids) => { const list = kids.flat().filter(Boolean); return list.length ? h('div', 'group', list) : null; };
+
+  const head = h('div', 'head');
+  if (/^data:/.test(window.__icon || '')) { const logo = h('img', 'logo'); logo.src = window.__icon; logo.alt = ''; head.append(logo); }
+  head.append(h('b', '', 'Figghost'));
+  if (settings) { const b = h('button', 'icon-btn', glyph(settings.icon)); b.title = settings.title; b.setAttribute('aria-label', settings.title); b.onclick = () => send({ t: 'run', id: settings.id }); head.append(b); }
+  const out = [head];
+  if (access) { const b = h('button', 'warn', glyph(access.icon), h('span', '', access.title)); b.onclick = () => send({ t: 'run', id: access.id }); out.push(b); }
+  out.push(group(toggles.map((i) => row(i))));
+  if (tools.length) {
+    const cap = h('div', 'cap');
+    out.push(group(h('div', 'tools', tools.map((i) => {
+      const b = h('button', 'tool' + (i.symbol === 'stop.circle' ? ' live' : ''), glyph(i.icon));
+      b.setAttribute('aria-label', i.title);
+      b.onclick = () => send({ t: 'run', id: i.id });
+      b.onpointerenter = b.onfocus = () => { cap.textContent = i.title; };
+      b.onpointerleave = b.onblur = () => { cap.textContent = ''; };
+      return b;
+    })), cap));
+  }
+  out.push(group(clip.map((i) => row(i, i.symbol === 'trash'))));
+  out.push(group(login && row(login), config && row(config), quit && row(quit)));
 
   const root = $('#root');
-  const logo = h('div', 'logo'); logo.innerHTML = LOGO;
-  const head = h('div', 'head', logo, h('b', '', 'Figghost'));
-  if (settings) { const b = h('button', 'icon-btn', glyph(settings.symbol)); b.title = settings.title; b.setAttribute('aria-label', settings.title); b.onclick = () => send({ t: 'run', id: settings.id }); head.append(b); }
-  const out = [head];
-  if (access) { const b = h('button', 'warn', glyph(access.symbol), h('span', 'rt', access.title)); b.onclick = () => send({ t: 'run', id: access.id }); out.push(b); }
-  if (toggles.length) out.push(h('div', 'card', toggles.map((i) => {
-    const sw = h('span', 'switch' + (i.checked ? ' on' : ''));
-    const r = h('button', 'row', h('span', 'ri', glyph(i.symbol)), h('span', 'rt', i.title), sw);
-    r.setAttribute('role', 'switch'); r.setAttribute('aria-checked', String(!!i.checked));
-    r.onclick = () => send({ t: 'run', id: i.id, keep: true });
-    return r;
-  })));
-  if (tiles.length) out.push(h('div', 'card', h('div', 'grid', tiles.map((i) => {
-    const b = h('button', 'tile' + (i.symbol === 'stop.circle' ? ' live' : ''), glyph(i.symbol), h('span', '', i.title));
-    b.title = i.title; b.onclick = () => send({ t: 'run', id: i.id });
-    return b;
-  }))));
-  if (clip.length) out.push(h('div', 'card', clip.map((i) => {
-    const r = h('button', 'row' + (i.symbol === 'trash' ? ' bad' : ''), h('span', 'ri', glyph(i.symbol)), h('span', 'rt', i.title));
-    r.onclick = () => send({ t: 'run', id: i.id, keep: i.symbol === 'trash' });
-    return r;
-  })));
-  const foot = [];
-  if (login) { const r = h('button', 'row', h('span', 'ri', glyph(login.symbol)), h('span', 'rt', login.title), h('span', 'switch' + (login.checked ? ' on' : ''))); r.setAttribute('role', 'switch'); r.setAttribute('aria-checked', String(!!login.checked)); r.onclick = () => send({ t: 'run', id: login.id, keep: true }); foot.push(r); }
-  if (config) { const r = h('button', 'row', h('span', 'ri', glyph(config.symbol)), h('span', 'rt', config.title)); r.onclick = () => send({ t: 'run', id: config.id }); foot.push(r); }
-  if (quit) { const r = h('button', 'row bad', h('span', 'ri', glyph(quit.symbol)), h('span', 'rt', quit.title)); r.onclick = () => send({ t: 'run', id: quit.id }); foot.push(r); }
-  if (foot.length) out.push(h('div', 'card', foot));
-  root.replaceChildren(...out);
+  root.replaceChildren(...out.filter(Boolean));
   send({ t: 'size', h: root.offsetHeight });
 }
 

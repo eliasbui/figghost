@@ -496,7 +496,10 @@ mod tests {
     #[test]
     fn updating_by_itself_is_off_until_it_is_turned_on() {
         assert!(!Config::default().auto);
-        assert!(Config::default().whats_new, "the news is on until it is turned off");
+        assert!(
+            Config::default().whats_new,
+            "the news is on until it is turned off"
+        );
         let on: Config = serde_json::from_str(r#"{ "auto": true }"#).unwrap();
         assert!(on.auto);
         let none: Config = serde_json::from_str("{}").unwrap();

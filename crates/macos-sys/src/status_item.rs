@@ -2,6 +2,7 @@
 //! every time the menu opens, so entries can reflect the frontmost app, permissions and login-item state
 //! without any bookkeeping.
 
+use crate::webview::TrayPanel;
 use block2::RcBlock;
 use objc2::{
     DefinedClass, MainThreadMarker, MainThreadOnly, define_class, msg_send,
@@ -10,16 +11,15 @@ use objc2::{
     sel,
 };
 use objc2_app_kit::{
-    NSAccessibility, NSApplication, NSBezierPath, NSColor, NSEventMask, NSEventType, NSControlStateValueOff, NSControlStateValueOn, NSImage,
-    NSMenu, NSMenuDelegate, NSMenuItem, NSStatusBar, NSStatusItem, NSVariableStatusItemLength,
-    NSWindingRule,
+    NSAccessibility, NSBezierPath, NSColor, NSControlStateValueOff, NSControlStateValueOn,
+    NSEventMask, NSImage, NSMenu, NSMenuDelegate, NSMenuItem, NSStatusBar, NSStatusItem,
+    NSVariableStatusItemLength, NSWindingRule,
 };
 use objc2_foundation::{
     NSAffineTransform, NSObject, NSObjectProtocol, NSPoint, NSRect, NSSize, NSString,
 };
-use crate::webview::TrayPanel;
 use serde_json::{Value, json};
-use std::{cell::RefCell, rc::Rc};
+use std::{cell::RefCell, collections::HashMap, rc::Rc};
 
 type Predicate = Box<dyn Fn() -> bool>;
 
@@ -28,6 +28,7 @@ pub struct Item {
     symbol: Option<&'static str>,
     checked: Option<Predicate>,
     visible: Option<Predicate>,
+    menu_only: bool,
     action: Box<dyn Fn()>,
 }
 
@@ -39,6 +40,7 @@ impl Item {
             symbol: None,
             checked: None,
             visible: None,
+            menu_only: false,
             action: Box::new(action),
         }
     }
@@ -63,6 +65,13 @@ impl Item {
 
     pub fn visible_when(mut self, visible: impl Fn() -> bool + 'static) -> Self {
         self.visible = Some(Box::new(visible));
+        self
+    }
+
+    /// Keeps the item out of the panel under the icon, which is for what is wanted at a glance: the item is in the
+    /// menu only.
+    pub fn menu_only(mut self) -> Self {
+        self.menu_only = true;
         self
     }
 }
@@ -245,71 +254,28 @@ fn ghost_path() -> Retained<NSBezierPath> {
     // Top center of the head dome.
     path.moveToPoint(at(11.5, 2.5));
     // Left side of the head dome down to the cheek.
-    path.curveToPoint_controlPoint1_controlPoint2(
-        at(5.0, 9.2),
-        at(8.0, 2.5),
-        at(5.0, 5.8),
-    );
+    path.curveToPoint_controlPoint1_controlPoint2(at(5.0, 9.2), at(8.0, 2.5), at(5.0, 5.8));
     // Left flank down towards the hem.
-    path.curveToPoint_controlPoint1_controlPoint2(
-        at(5.8, 17.0),
-        at(5.0, 12.0),
-        at(5.5, 14.8),
-    );
+    path.curveToPoint_controlPoint1_controlPoint2(at(5.8, 17.0), at(5.0, 12.0), at(5.5, 14.8));
     // First bottom wave (left lobe).
-    path.curveToPoint_controlPoint1_controlPoint2(
-        at(8.0, 19.5),
-        at(6.0, 18.2),
-        at(7.0, 19.5),
-    );
-    path.curveToPoint_controlPoint1_controlPoint2(
-        at(10.2, 17.8),
-        at(9.0, 19.5),
-        at(9.8, 18.5),
-    );
+    path.curveToPoint_controlPoint1_controlPoint2(at(8.0, 19.5), at(6.0, 18.2), at(7.0, 19.5));
+    path.curveToPoint_controlPoint1_controlPoint2(at(10.2, 17.8), at(9.0, 19.5), at(9.8, 18.5));
     // Second bottom wave (center lobe).
-    path.curveToPoint_controlPoint1_controlPoint2(
-        at(12.5, 19.3),
-        at(10.8, 18.8),
-        at(11.8, 19.3),
-    );
-    path.curveToPoint_controlPoint1_controlPoint2(
-        at(14.8, 17.6),
-        at(13.5, 19.3),
-        at(14.2, 18.2),
-    );
+    path.curveToPoint_controlPoint1_controlPoint2(at(12.5, 19.3), at(10.8, 18.8), at(11.8, 19.3));
+    path.curveToPoint_controlPoint1_controlPoint2(at(14.8, 17.6), at(13.5, 19.3), at(14.2, 18.2));
     // Tail wave sweeping up and out to the right.
-    path.curveToPoint_controlPoint1_controlPoint2(
-        at(20.5, 14.5),
-        at(15.5, 18.5),
-        at(18.2, 17.8),
-    );
+    path.curveToPoint_controlPoint1_controlPoint2(at(20.5, 14.5), at(15.5, 18.5), at(18.2, 17.8));
     // Rounded tail tip.
-    path.curveToPoint_controlPoint1_controlPoint2(
-        at(19.4, 12.8),
-        at(21.2, 13.8),
-        at(20.4, 12.8),
-    );
+    path.curveToPoint_controlPoint1_controlPoint2(at(19.4, 12.8), at(21.2, 13.8), at(20.4, 12.8));
     // Inner tail sweep into the flank.
-    path.curveToPoint_controlPoint1_controlPoint2(
-        at(18.3, 9.2),
-        at(18.6, 11.8),
-        at(18.2, 10.5),
-    );
+    path.curveToPoint_controlPoint1_controlPoint2(at(18.3, 9.2), at(18.6, 11.8), at(18.2, 10.5));
     // Right side of dome back to top.
-    path.curveToPoint_controlPoint1_controlPoint2(
-        at(11.5, 2.5),
-        at(18.3, 5.8),
-        at(15.2, 2.5),
-    );
+    path.curveToPoint_controlPoint1_controlPoint2(at(11.5, 2.5), at(18.3, 5.8), at(15.2, 2.5));
     path.closePath();
 
     // Eyes cut out of the ghost shape.
     for &(x, y, w, h) in &[(7.6, 8.4, 2.6, 3.8), (12.6, 8.4, 2.6, 3.8)] {
-        path.appendBezierPathWithOvalInRect(NSRect::new(
-            at(x, y),
-            NSSize::new(w, h),
-        ));
+        path.appendBezierPathWithOvalInRect(NSRect::new(at(x, y), NSSize::new(w, h)));
     }
     path.setWindingRule(NSWindingRule::EvenOdd);
     path
@@ -322,7 +288,10 @@ pub fn ghost_icon() -> Retained<NSImage> {
         let path = ghost_path();
         let place = NSAffineTransform::transform();
         // Center the ghost horizontally and place its top just below the menu bar icon edge.
-        place.translateXBy_yBy(ICON_WIDTH / 2.0 - 12.75 * ICON_SCALE, 1.5 - 2.5 * ICON_SCALE);
+        place.translateXBy_yBy(
+            ICON_WIDTH / 2.0 - 12.75 * ICON_SCALE,
+            1.5 - 2.5 * ICON_SCALE,
+        );
         place.scaleBy(ICON_SCALE);
         path.transformUsingAffineTransform(&place);
         NSColor::blackColor().setFill();
@@ -377,7 +346,7 @@ pub struct StatusMenu {
 
 impl StatusMenu {
     /// The item shows the ghost; `label` is what it is called for assistive technology and in its tooltip. A
-    /// click opens the panel that `tray_html` draws from the entries; a right click opens the plain menu.
+    /// click opens the panel that `tray_html` draws from the entries; the plain menu is `menu`, for other places.
     pub fn new(mtm: MainThreadMarker, label: &str, entries: Vec<Entry>, tray_html: &str) -> Self {
         let item = NSStatusBar::systemStatusBar().statusItemWithLength(NSVariableStatusItemLength);
         let button = item.button(mtm);
@@ -424,31 +393,47 @@ impl StatusMenu {
 
         // The panel is told every entry as it is now, each time it opens and after a switch is flipped.
         let tray_cell: Rc<RefCell<Option<Rc<TrayPanel>>>> = Rc::default();
+        // Each entry's SF Symbol travels as a picture the system draws once per name: the page loads nothing.
+        let icons: Rc<RefCell<HashMap<&'static str, Option<String>>>> = Rc::default();
         let post_state = {
             let (pairs, cell) = (Rc::clone(&pairs), Rc::clone(&tray_cell));
             Rc::new(move || {
                 let Some(tray) = cell.borrow().clone() else {
                     return;
                 };
+                // The id is the place in the whole list, so that it still finds its item when some are left out.
                 let items: Vec<Value> = pairs
                     .iter()
                     .enumerate()
+                    .filter(|(_, (_, spec))| !spec.menu_only)
                     .map(|(id, (_, spec))| {
+                        let icon = spec.symbol.and_then(|name| {
+                            icons
+                                .borrow_mut()
+                                .entry(name)
+                                .or_insert_with(|| crate::widgets::symbol_data_url(name, 18.0, 2.0))
+                                .clone()
+                        });
                         json!({
                             "id": id,
                             "title": (spec.title)(),
                             "symbol": spec.symbol,
+                            "icon": icon,
                             "checked": spec.checked.as_ref().map(|c| c()),
                             "visible": spec.visible.as_ref().is_none_or(|v| v()),
                         })
                     })
                     .collect();
-                tray.host.post(&json!({ "t": "state", "items": items }).to_string());
+                tray.host
+                    .post(&json!({ "t": "state", "items": items }).to_string());
             })
         };
         let on_message = {
-            let (pairs, cell, post_state) =
-                (Rc::clone(&pairs), Rc::clone(&tray_cell), Rc::clone(&post_state));
+            let (pairs, cell, post_state) = (
+                Rc::clone(&pairs),
+                Rc::clone(&tray_cell),
+                Rc::clone(&post_state),
+            );
             move |text: String| {
                 let Ok(message) = serde_json::from_str::<Value>(&text) else {
                     return;
@@ -464,9 +449,8 @@ impl StatusMenu {
                         }
                     }
                     Some("run") => {
-                        let Some((_, spec)) = message["id"]
-                            .as_u64()
-                            .and_then(|id| pairs.get(id as usize))
+                        let Some((_, spec)) =
+                            message["id"].as_u64().and_then(|id| pairs.get(id as usize))
                         else {
                             return;
                         };
@@ -487,31 +471,16 @@ impl StatusMenu {
         *tray_cell.borrow_mut() = Some(Rc::clone(&tray));
 
         let click = {
-            let (item, menu, tray, button) = (
-                item.clone(),
-                menu.clone(),
-                Rc::clone(&tray),
-                button.clone(),
-            );
+            let (tray, button) = (Rc::clone(&tray), button.clone());
             ClickTarget::new(mtm, move || {
                 let Some(button) = &button else {
                     return;
                 };
-                let right = NSApplication::sharedApplication(mtm)
-                    .currentEvent()
-                    .is_some_and(|e| e.r#type() == NSEventType::RightMouseUp);
-                if right {
-                    tray.hide();
-                    // A menu set only for this click, so that the left click is free for the panel.
-                    item.setMenu(Some(&menu));
-                    // SAFETY: a plain click on a button of ours; with the menu set, it only opens the menu.
-                    unsafe { button.performClick(None) };
-                    item.setMenu(None);
-                } else if tray.is_visible() {
+                if tray.is_visible() {
                     tray.hide();
                 } else if let Some(window) = button.window() {
                     post_state();
-                    tray.show_under(mtm, window.frame(), window.windowNumber());
+                    tray.show_under(mtm, window.frame());
                 }
             })
         };
@@ -522,7 +491,7 @@ impl StatusMenu {
                 button.setTarget(Some(&click));
                 button.setAction(Some(sel!(clicked:)));
             }
-            button.sendActionOn(NSEventMask::LeftMouseUp | NSEventMask::RightMouseUp);
+            button.sendActionOn(NSEventMask::LeftMouseUp);
         }
         Self {
             item,

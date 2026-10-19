@@ -18,13 +18,14 @@ use std::{
     rc::Rc,
 };
 
-pub const HEIGHT: f64 = 24.0;
+/// A page's cell is 30 by 24 inside the well, about the 28 by 28 points macOS gives a control to hit.
+pub const HEIGHT: f64 = 28.0;
 const PAD: f64 = 2.0;
-const ITEM_WIDTH: f64 = 28.0;
-const GLYPH: f64 = 12.0;
+const ITEM_WIDTH: f64 = 30.0;
+const GLYPH: f64 = 15.0;
 
 /// The width that fits this many pages.
-pub fn width_for(count: usize) -> f64 {
+pub const fn width_for(count: usize) -> f64 {
     2.0 * PAD + count as f64 * ITEM_WIDTH
 }
 

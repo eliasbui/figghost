@@ -3,6 +3,7 @@
 
 mod agents;
 mod audio;
+mod bluetooth;
 mod clipboard;
 mod config;
 mod context;
@@ -26,13 +27,14 @@ mod volume_hud;
 
 use agents::AgentsFeature;
 use audio::AudioFeature;
+use bluetooth::Bluetooth;
 use clipboard::Clipboard;
 use config::{Config, home_dir};
 use context::AppContext;
 use features::{AttachEnv, Features};
 use focus::FocusFeature;
 use live_media::LiveMedia;
-use macos_sys::{MainThreadMarker, app, status_item::StatusMenu};
+use macos_sys::{MainThreadMarker, app, hello, status_item::StatusMenu};
 use media::MediaFeature;
 use mouse::Mouse;
 use settings::SettingsFeature;
@@ -82,6 +84,7 @@ struct Shell {
     shelf: Option<Rc<ShelfFeature>>,
     media: Option<Rc<MediaFeature>>,
     live_media: Option<Rc<LiveMedia>>,
+    bluetooth: Option<Rc<Bluetooth>>,
     focus: Option<FocusFeature>,
     agents: Option<Rc<AgentsFeature>>,
     audio: AudioFeature,
@@ -101,12 +104,29 @@ fn opens_settings(config: &Config, args: &[String], at_login: bool) -> bool {
     config.show_settings_on_launch && !at_login && !args.iter().any(|a| a == "--background")
 }
 
+/// The ghost of the hello (`macos_sys::hello`), its eyes open and closed, drawn with agy to match the app icon;
+/// `docs/images/ghost-hello.gif` shows the moment.
+const HELLO_OPEN: &[u8] = include_bytes!("../assets/hello/ghost-open.png");
+const HELLO_BLINK: &[u8] = include_bytes!("../assets/hello/ghost-blink.png");
+/// The notch is on the screen a moment after the start; the hello waits for it.
+const HELLO_DELAY: f64 = 0.5;
+
+/// Whether the ghost says hello now: each time the app is opened by hand, never at login or when told to stay in
+/// the background, and only while the notch it comes out of is on.
+fn greets(config: &Config, args: &[String], at_login: bool) -> bool {
+    config.launch_effect
+        && config.notch.enabled
+        && !at_login
+        && !args.iter().any(|a| a == "--background")
+}
+
 impl Shell {
     fn build(mtm: MainThreadMarker, home: PathBuf, config: Config) -> Shell {
         // Only meaningful while the launch event is being handled.
         let at_login = app::launched_at_login();
         let args: Vec<String> = std::env::args().skip(1).collect();
         let show_settings = opens_settings(&config, &args, at_login);
+        let greet = greets(&config, &args, at_login);
 
         let mouse = Mouse::start(config.mouse.clone());
         let clipboard = Clipboard::start(mtm, &home, &config).map(Rc::new);
@@ -118,6 +138,15 @@ impl Shell {
         if let Some(notch) = &notch {
             notch.configure(&config.notch.style());
             notch.set_enabled(config.notch.enabled);
+            if greet {
+                // Out of the notch at rest: the cutout, the pill, or the top edge where the pill is hidden.
+                let geometry = notch.geometry();
+                let rest = geometry.rest_size(config.notch.style().rest);
+                let resting = geometry.frame(rest.width, rest.height);
+                app::after(HELLO_DELAY, move || {
+                    hello::play(mtm, resting, HELLO_OPEN, HELLO_BLINK);
+                });
+            }
         }
         let shelf = notch
             .as_ref()
@@ -127,6 +156,7 @@ impl Shell {
             .as_ref()
             .zip(media.as_ref())
             .map(|(notch, media)| LiveMedia::attach(notch, media, &config.notch));
+        let bluetooth = notch.as_ref().map(Bluetooth::attach);
         let focus = notch.as_ref().map(|notch| FocusFeature::attach(mtm, notch));
         let agents = notch
             .as_ref()
@@ -200,6 +230,7 @@ impl Shell {
             shelf,
             media,
             live_media,
+            bluetooth,
             focus,
             agents,
             audio,
@@ -234,5 +265,21 @@ mod tests {
         };
         assert!(!opens_settings(&quiet, &args(&[]), false));
         assert!(opens_settings(&quiet, &args(&["--show-settings"]), false));
+    }
+
+    #[test]
+    fn the_ghost_says_hello_only_when_opened_by_hand() {
+        let config = Config::default();
+        assert!(greets(&config, &args(&[]), false));
+        // A restart from the settings window is opened by hand too.
+        assert!(greets(&config, &args(&["--show-settings"]), false));
+        assert!(!greets(&config, &args(&[]), true));
+        assert!(!greets(&config, &args(&["--background"]), false));
+        let mut off = Config::default();
+        off.launch_effect = false;
+        assert!(!greets(&off, &args(&[]), false));
+        let mut no_notch = Config::default();
+        no_notch.notch.enabled = false;
+        assert!(!greets(&no_notch, &args(&[]), false));
     }
 }

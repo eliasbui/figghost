@@ -122,7 +122,6 @@ button[hidden] { display: none; }
       sub: 'You have version {c}.', subReady: 'Restart Figghost to start using it.',
       news: "What's new", none: 'This release has no notes. The release page tells more.',
       downloading: 'Downloading\u2026 {p}%', installingNow: 'Installing\u2026',
-      readyHint: 'The app is signed ad hoc, so macOS may ask for Accessibility access again after the restart.',
       blockedHint: 'It could not be installed here: {d}',
       later: 'Later', close: 'Close', update: 'Update now', restart: 'Restart now', download: 'Download',
     },
@@ -132,7 +131,6 @@ button[hidden] { display: none; }
       sub: 'Bạn đang dùng bản {c}.', subReady: 'Khởi động lại Figghost để dùng bản mới.',
       news: 'Có gì mới', none: 'Bản này chưa có ghi chú. Xem trang phát hành để biết thêm.',
       downloading: 'Đang tải về\u2026 {p}%', installingNow: 'Đang cài\u2026',
-      readyHint: 'Ứng dụng được ký ad hoc nên sau khi khởi động lại, macOS có thể hỏi lại quyền Trợ năng.',
       blockedHint: 'Không cài được ở đây: {d}',
       later: 'Để sau', close: 'Đóng', update: 'Cập nhật ngay', restart: 'Khởi động lại ngay', download: 'Tải về',
     },
@@ -179,7 +177,6 @@ button[hidden] { display: none; }
     }
 
     $('status').textContent = m.state === 'installing' ? tr(m.stage === 'downloading' ? 'downloading' : 'installingNow', { p: m.percent || 0 })
-      : m.state === 'ready' ? tr('readyHint')
       : m.state === 'blocked' ? tr('blockedHint', { d: m.detail })
       : '';
     const [secondary, primary] = BUTTONS[m.state];
@@ -221,7 +218,7 @@ button[hidden] { display: none; }
 
       window.__fig.recv({ ...base, state: 'ready' });
       expect($('title').textContent === 'Figghost 9.9.9 is installed', 'ready title');
-      expect($('status').textContent.includes('Accessibility'), 'the Accessibility hint');
+      expect($('status').textContent === '', 'an installed update has nothing more to say');
       expect(click('primary') === 'restart', 'the restart button');
 
       window.__fig.recv({ ...base, state: 'blocked', detail: 'no permission' });

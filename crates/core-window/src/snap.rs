@@ -1,61 +1,38 @@
-//! Dragging a window onto the notch: where the drop zones appear, where the window would land, and the state
-//! machine of one drag.
+//! Dragging a window onto the notch: where the layouts to choose from appear, where the cells of the chosen one
+//! show on the screen, where the window would land, and the state machine of one drag.
 //! Everything is in the coordinates of `Window` frames and the Accessibility API: the origin at the top-left
 //! corner of the primary screen, y growing downwards, so a screen above or left of it has negative values.
 //! The platform layer converts pointer positions to these coordinates and reports what it can see; nothing here
 //! touches the system, so every rule is covered by plain tests.
+//!
+//! A drag goes in two steps. At the top edge of a screen the layouts to choose from hang from the notch, each a
+//! small screen with its cells. Hovering one shows its cells over the screen; moving down onto the screen shrinks the
+//! row to a chip with the name of the layout, and the cell under the pointer lights up. Releasing in a cell puts the
+//! window there.
 
-use crate::{Layout, Rect};
+use crate::{
+    Rect,
+    templates::{Cell, Template},
+};
 
 pub type Point = (f64, f64);
 
-/// Layouts a drop zone can apply, in the order the zones show them: first those that take the whole height of the
-/// screen, then those that take half of it. Centering is left out: it keeps the size, which a drop onto a shape
-/// cannot express.
-pub const OFFERED: [Layout; 12] = [
-    Layout::Left,
-    Layout::Right,
-    Layout::Maximize,
-    Layout::FirstThird,
-    Layout::CenterThird,
-    Layout::LastThird,
-    Layout::Top,
-    Layout::Bottom,
-    Layout::TopLeft,
-    Layout::TopRight,
-    Layout::BottomLeft,
-    Layout::BottomRight,
-];
-
-/// Halves, the whole screen and thirds on the first row; the four quarters on the second.
-pub const DEFAULT_ZONES: [Layout; 10] = [
-    Layout::Left,
-    Layout::Right,
-    Layout::Maximize,
-    Layout::FirstThird,
-    Layout::CenterThird,
-    Layout::LastThird,
-    Layout::TopLeft,
-    Layout::TopRight,
-    Layout::BottomLeft,
-    Layout::BottomRight,
-];
-
-/// Every offered layout fits: each row holds one kind, and there are six of each.
-pub const MAX_ZONES: usize = OFFERED.len();
-
-/// One zone: a small screen with the part the layout takes, and its name under it.
+/// One layout in the row: a small screen with its cells, and its name under it.
 pub const CELL: (f64, f64) = (84.0, 66.0);
 pub const GAP: f64 = 8.0;
 pub const PAD: f64 = 12.0;
-/// How far from the top edge the pointer must be for the zones to appear on a screen without a notch; with one the
-/// band is as tall as the cutout. Never less than the band that opens the notch, so the zones are always up first.
+/// The most layouts in one row; more go on further rows, as even as they can be.
+pub const PER_ROW: usize = 7;
+/// What the row shrinks to once a layout is chosen and the pointer is on the screen: a chip with its name.
+pub const CHIP: (f64, f64) = (176.0, 26.0);
+/// How far from the top edge the pointer must be for the row to appear on a screen without a notch; with one the
+/// band is as tall as the cutout. Never less than the band that opens the notch, so the row is always up first.
 pub const TRIGGER_HEIGHT: f64 = 8.0;
 /// What `Display::inset` holds beyond the height of the cutout: the gap between the cutout and the shapes.
 const CLEARANCE: f64 = 6.0;
 /// The trigger reaches this far past each side of the notch, so the pointer need not hit the cutout exactly.
 pub const TRIGGER_SLACK: f64 = 48.0;
-/// Once shown, the zones stay while the pointer is this close to them, so a slightly wild hand does not hide them.
+/// Once shown, the row stays while the pointer is this close to it, so a slightly wild hand does not hide it.
 pub const STAY_SLACK: f64 = 8.0;
 /// A press this far below the top of a window still counts as on its title bar: toolbars share the title bar.
 pub const TITLE_BAR_HEIGHT: f64 = 52.0;
@@ -65,52 +42,17 @@ const DRAG_SLOP: f64 = 4.0;
 const MAX_CHECKS: u8 = 12;
 const GIVE_UP_DISTANCE: f64 = 120.0;
 
-pub fn layout_from_key(key: &str) -> Option<Layout> {
-    Layout::ALL.into_iter().find(|l| l.key() == key)
-}
-
-/// The zones a list of layout names asks for: unknown and repeated names dropped, the order of `OFFERED`, and the
-/// default zones when nothing valid is left.
-pub fn choose<S: AsRef<str>>(keys: &[S]) -> Vec<Layout> {
-    let wanted: Vec<Layout> = keys
-        .iter()
-        .filter_map(|k| layout_from_key(k.as_ref()))
-        .collect();
-    let chosen: Vec<Layout> = OFFERED.into_iter().filter(|l| wanted.contains(l)).collect();
-    if chosen.is_empty() {
-        DEFAULT_ZONES.to_vec()
-    } else {
-        chosen
+/// Each layout's row, its place in that row and the length of the row. The rows are as even as they can be, with no
+/// more than `PER_ROW` in one.
+fn grid(count: usize) -> Vec<(usize, usize, usize)> {
+    if count == 0 {
+        return Vec::new();
     }
-}
-
-/// Where a layout puts the window, as fractions of the screen area, for drawing the shape of a zone.
-pub fn glyph(layout: Layout) -> Rect {
-    let whole = Rect::new(0.0, 0.0, 360.0, 240.0);
-    let r = layout.place(whole, whole);
-    Rect::new(r.x / 360.0, r.y / 240.0, r.w / 360.0, r.h / 240.0)
-}
-
-/// Each zone's row, its place in that row and the length of the row. A layout that takes the whole height of the
-/// screen goes on the first row and one that takes half of it on the second, so each row reads as one kind of
-/// split whatever was chosen; with only one kind there is one row.
-fn grid(layouts: &[Layout]) -> Vec<(usize, usize, usize)> {
-    let tall = |l: &Layout| glyph(*l).h > 0.75;
-    let first = layouts.iter().filter(|l| tall(l)).count();
-    let split = first > 0 && first < layouts.len();
-    let lengths = if split {
-        [first, layouts.len() - first]
-    } else {
-        [layouts.len(), 0]
-    };
-    let mut next = [0, 0];
-    layouts
-        .iter()
-        .map(|l| {
-            let row = usize::from(split && !tall(l));
-            next[row] += 1;
-            (row, next[row] - 1, lengths[row])
-        })
+    let rows = count.div_ceil(PER_ROW);
+    let (base, extra) = (count / rows, count % rows);
+    let length = |row: usize| base + usize::from(row < extra);
+    (0..rows)
+        .flat_map(|row| (0..length(row)).map(move |column| (row, column, length(row))))
         .collect()
 }
 
@@ -118,11 +60,11 @@ fn grid(layouts: &[Layout]) -> Vec<(usize, usize, usize)> {
 #[derive(Debug, Clone, Copy, PartialEq)]
 pub struct Display {
     pub frame: Rect,
-    /// The usable area: below the menu bar and beside the Dock. Layouts are applied inside it.
+    /// The usable area: below the menu bar and beside the Dock. Cells are placed inside it.
     pub area: Rect,
     /// Width of the notch cutout, or of the pill the notch shows on a screen without one.
     pub cutout: f64,
-    /// Height the zones must leave free at the top so they clear the cutout.
+    /// Height the row must leave free at the top so it clears the cutout.
     pub inset: f64,
 }
 
@@ -144,7 +86,7 @@ fn inflate(r: Rect, by: f64) -> Rect {
 }
 
 impl Display {
-    /// The band along the top edge, centred on the notch, where the pointer makes the zones appear.
+    /// The band along the top edge, centred on the notch, where the pointer makes the row appear.
     pub fn trigger(&self) -> Rect {
         let w = self.cutout + 2.0 * TRIGGER_SLACK;
         Rect::new(
@@ -155,9 +97,9 @@ impl Display {
         )
     }
 
-    /// The shape that hangs from the top edge and holds the zones of `layouts`.
-    pub fn panel(&self, layouts: &[Layout]) -> Rect {
-        let grid = grid(layouts);
+    /// The shape that hangs from the top edge and holds `count` layouts.
+    pub fn panel(&self, count: usize) -> Rect {
+        let grid = grid(count);
         let widest = grid.iter().map(|g| g.2).max().unwrap_or(0) as f64;
         let rows = grid.iter().map(|g| g.0 + 1).max().unwrap_or(1) as f64;
         let row = widest * CELL.0 + (widest - 1.0).max(0.0) * GAP + 2.0 * PAD;
@@ -171,10 +113,21 @@ impl Display {
         )
     }
 
-    /// The drawn shape of each zone, in the order of `layouts`; each row is centred in the shape.
-    pub fn cells(&self, layouts: &[Layout]) -> Vec<Rect> {
-        let panel = self.panel(layouts);
-        grid(layouts)
+    /// The shape the row shrinks to, once a layout is chosen and the pointer is over the screen.
+    pub fn chip(&self) -> Rect {
+        let w = CHIP.0.max(self.cutout + 2.0 * PAD);
+        Rect::new(
+            self.frame.x + (self.frame.w - w) / 2.0,
+            self.frame.y,
+            w,
+            self.inset + CHIP.1 + PAD / 2.0,
+        )
+    }
+
+    /// The drawn shape of each of `count` layouts, in order; each row is centred in the shape.
+    pub fn cells(&self, count: usize) -> Vec<Rect> {
+        let panel = self.panel(count);
+        grid(count)
             .into_iter()
             .map(|(row, column, length)| {
                 let n = length as f64;
@@ -189,27 +142,37 @@ impl Display {
             .collect()
     }
 
-    /// The zone under the pointer. A zone owns half of each gap beside it, the end of its row up to the edge of the
+    /// The layout under the pointer. One owns half of each gap beside it, the end of its row up to the edge of the
     /// shape, and on the last row the padding below, so moving over the shape never passes over a dead spot; the
     /// strip above the shapes, which the trigger band overlaps on a screen without a notch, belongs to none.
-    pub fn zone_at(&self, layouts: &[Layout], p: Point) -> Option<usize> {
-        let panel = self.panel(layouts);
+    pub fn zone_at(&self, count: usize, p: Point) -> Option<usize> {
+        let panel = self.panel(count);
         let top = self.frame.y + self.inset;
         if p.1 < top || p.1 > bottom(panel) || p.0 < panel.x || p.0 > right(panel) {
             return None;
         }
-        let (grid, cells) = (grid(layouts), self.cells(layouts));
-        let two_rows = grid.iter().any(|g| g.0 == 1);
-        let row = usize::from(two_rows && p.1 >= top + CELL.1 + GAP / 2.0);
+        let (grid, cells) = (grid(count), self.cells(count));
+        let rows = grid.iter().map(|g| g.0 + 1).max()?;
+        let row =
+            (((p.1 - top + GAP / 2.0) / (CELL.1 + GAP)).floor().max(0.0) as usize).min(rows - 1);
         let in_row = || (0..cells.len()).filter(|&i| grid[i].0 == row);
         in_row()
             .find(|&i| p.0 < right(cells[i]) + GAP / 2.0)
             .or_else(|| in_row().next_back())
     }
 
-    /// The frame `layout` gives a window currently at `current`, on this display.
-    pub fn place(&self, layout: Layout, current: Rect) -> Rect {
-        layout.place(self.area, current)
+    /// The cell of `template` under the pointer on this screen. The cells cover the usable area, so every point of it
+    /// is in one; on an edge two cells share, the first.
+    pub fn cell_at(&self, template: &Template, p: Point) -> Option<usize> {
+        template
+            .cells
+            .iter()
+            .position(|c| contains(c.place(self.area), p))
+    }
+
+    /// The frame `cell` gives a window on this display.
+    pub fn place(&self, cell: Cell) -> Rect {
+        cell.place(self.area)
     }
 }
 
@@ -267,69 +230,101 @@ enum Phase {
     Dragging,
 }
 
-/// What the zones should look like now.
+/// What the screen should look like now.
 #[derive(Debug, Clone, Copy, PartialEq, Eq, Default)]
 pub struct View {
-    /// The display whose zones are showing.
+    /// The display whose row is showing.
     pub shown: Option<usize>,
-    /// The zone under the pointer, on that display.
+    /// The layout under the pointer in the row, on that display.
     pub hover: Option<usize>,
+    /// The layout whose cells show over the screen: the last one the pointer was on, until the drag ends.
+    pub chosen: Option<usize>,
+    /// The cell of the chosen layout under the pointer, once the pointer is on the screen.
+    pub cell: Option<usize>,
+    /// The row has shrunk to a chip, because a layout is chosen and the pointer is on the screen.
+    pub compact: bool,
 }
 
-/// Where a window was dropped.
+/// Where a window was dropped: a cell of a layout on a display.
 #[derive(Debug, Clone, Copy, PartialEq, Eq)]
 pub struct Dropped {
     pub display: usize,
-    pub zone: usize,
+    pub template: usize,
+    pub cell: usize,
 }
 
 /// One drag from the press to the release. The caller reports what it sees; the machine decides what shows.
 pub struct Machine {
-    zones: Vec<Layout>,
     displays: Vec<Display>,
+    /// The layouts each display offers, in the order of `displays`.
+    templates: Vec<Vec<Template>>,
     phase: Phase,
     view: View,
 }
 
+impl Default for Machine {
+    fn default() -> Self {
+        Self::new()
+    }
+}
+
 impl Machine {
-    pub fn new(zones: Vec<Layout>) -> Self {
+    pub fn new() -> Self {
         Self {
-            zones,
             displays: Vec::new(),
+            templates: Vec::new(),
             phase: Phase::Idle,
             view: View::default(),
         }
-    }
-
-    pub fn set_zones(&mut self, zones: Vec<Layout>) {
-        self.zones = zones;
-        self.cancel();
     }
 
     pub fn view(&self) -> View {
         self.view
     }
 
-    /// Where the window lands if it is dropped now: the lit zone's layout inside the usable area of the display
-    /// that shows the zones, the frame a drop applies. `None` while no zone is lit.
+    /// Where the window lands if it is dropped now: the cell lit under the pointer, or the whole area when the pointer
+    /// is on a layout of one cell. `None` while there is no such cell.
     pub fn footprint(&self) -> Option<Rect> {
-        let display = self.displays.get(self.view.shown?)?;
-        let layout = *self.zones.get(self.view.hover?)?;
-        // Every offered layout takes a fixed part of the area whatever the window's size, so the area stands in
-        // for the window.
-        Some(display.place(layout, display.area))
+        let shown = self.view.shown?;
+        let (display, templates) = (self.displays.get(shown)?, self.templates.get(shown)?);
+        let (template, cell) = match (self.view.chosen, self.view.cell, self.view.hover) {
+            (Some(template), Some(cell), _) => (template, cell),
+            (_, _, Some(template)) if templates.get(template)?.cells.len() == 1 => (template, 0),
+            _ => return None,
+        };
+        let cell = *templates.get(template)?.cells.get(cell)?;
+        Some(display.place(cell))
+    }
+
+    /// The cells of the chosen layout as frames on the screen that shows the row, with the area they fill.
+    pub fn overlay(&self) -> Option<(Rect, Vec<Rect>)> {
+        let shown = self.view.shown?;
+        let display = self.displays.get(shown)?;
+        let template = self.templates.get(shown)?.get(self.view.chosen?)?;
+        Some((
+            display.area,
+            template.cells.iter().map(|c| display.place(*c)).collect(),
+        ))
     }
 
     pub fn is_idle(&self) -> bool {
         self.phase == Phase::Idle
     }
 
-    /// The left button went down at `at`. `on_title_bar` is true only when the platform found a window there
-    /// and the press was on its title bar; without Accessibility it is always false and nothing happens.
-    pub fn press(&mut self, displays: Vec<Display>, at: Point, on_title_bar: bool) {
+    /// The left button went down at `at`. `templates` holds what each display offers. `on_title_bar` is true only when
+    /// the platform found a window there and the press was on its title bar; without Accessibility it is always false
+    /// and nothing happens.
+    pub fn press(
+        &mut self,
+        displays: Vec<Display>,
+        templates: Vec<Vec<Template>>,
+        at: Point,
+        on_title_bar: bool,
+    ) {
         self.cancel();
-        if on_title_bar && !displays.is_empty() {
+        if on_title_bar && !displays.is_empty() && templates.len() == displays.len() {
             self.displays = displays;
+            self.templates = templates;
             self.phase = Phase::Pressed {
                 start: at,
                 checks: 0,
@@ -363,19 +358,36 @@ impl Machine {
         }
     }
 
-    /// The button came up. Returns the zone the window was dropped on, if it was dropped on one.
+    /// The button came up. Returns where the window was dropped, if it was dropped in a cell.
     pub fn release(&mut self, at: Point) -> Option<Dropped> {
         let dropped = if self.phase == Phase::Dragging {
             self.update(at);
-            self.view
-                .shown
-                .zip(self.view.hover)
-                .map(|(display, zone)| Dropped { display, zone })
+            self.dropped()
         } else {
             None
         };
         self.cancel();
         dropped
+    }
+
+    /// A cell lit under the pointer. A layout of one cell has nothing to choose, so a drop on it in the row is a drop
+    /// in its cell.
+    fn dropped(&self) -> Option<Dropped> {
+        let display = self.view.shown?;
+        let templates = self.templates.get(display)?;
+        match (self.view.chosen, self.view.cell, self.view.hover) {
+            (Some(template), Some(cell), _) => Some(Dropped {
+                display,
+                template,
+                cell,
+            }),
+            (_, _, Some(template)) if templates.get(template)?.cells.len() == 1 => Some(Dropped {
+                display,
+                template,
+                cell: 0,
+            }),
+            _ => None,
+        }
     }
 
     /// Forgets the drag: the button was released unseen, a screen went away, the feature was turned off.
@@ -386,22 +398,59 @@ impl Machine {
 
     fn update(&mut self, at: Point) {
         let displays = &self.displays;
+        let before = self.view;
         let entered = display_at(displays, at).filter(|&d| contains(displays[d].trigger(), at));
-        let stays = self.view.shown.filter(|&d| {
-            contains(displays[d].trigger(), at)
-                || contains(inflate(displays[d].panel(&self.zones), STAY_SLACK), at)
+        // The row stays while the pointer is on it or by it, and once a layout is chosen also while the pointer is
+        // over the usable area of the screen, where its cells are.
+        let stays = before.shown.filter(|&d| {
+            let display = &displays[d];
+            let shape = if before.compact {
+                display.chip()
+            } else {
+                display.panel(self.templates[d].len())
+            };
+            contains(display.trigger(), at)
+                || contains(inflate(shape, STAY_SLACK), at)
+                || (before.chosen.is_some() && contains(display.area, at))
         });
-        self.view.shown = stays.or(entered);
-        self.view.hover = self
-            .view
-            .shown
-            .and_then(|d| displays[d].zone_at(&self.zones, at));
+        let shown = stays.or(entered);
+        let mut view = View {
+            shown,
+            ..View::default()
+        };
+        if let Some(d) = shown {
+            let (display, templates) = (&displays[d], &self.templates[d]);
+            // A screen the pointer has just come to starts over.
+            let chosen = before.chosen.filter(|_| shown == before.shown);
+            let at_top = contains(display.trigger(), at);
+            let compact = chosen.is_some()
+                && if before.compact {
+                    // The way back to the row is the top edge or the chip itself.
+                    !(at_top || contains(inflate(display.chip(), STAY_SLACK), at))
+                } else {
+                    !(at_top || contains(inflate(display.panel(templates.len()), STAY_SLACK), at))
+                        && contains(display.area, at)
+                };
+            view.compact = compact;
+            view.hover = if compact {
+                None
+            } else {
+                display.zone_at(templates.len(), at)
+            };
+            view.chosen = view.hover.or(chosen);
+            view.cell = view
+                .chosen
+                .filter(|_| compact)
+                .and_then(|t| display.cell_at(&templates[t], at));
+        }
+        self.view = view;
     }
 }
 
 #[cfg(test)]
 mod tests {
     use super::*;
+    use crate::templates::{self, built_in};
 
     fn display(frame: Rect, cutout: f64, inset: f64) -> Display {
         // The usable area starts below a 25 point menu bar.
@@ -433,24 +482,33 @@ mod tests {
         (a - b).abs() < 1e-9
     }
 
-    /// The layouts that take the whole height of the screen: one row of six.
-    fn six() -> Vec<Layout> {
-        OFFERED[..6].to_vec()
-    }
-
     fn middle(c: Rect) -> Point {
         (c.x + c.w / 2.0, c.y + c.h / 2.0)
     }
 
+    fn row(ids: &[&str]) -> Vec<Template> {
+        templates::choose(ids, &[])
+    }
+
+    /// The seven layouts a screen offers until its owner chooses, in their order.
+    fn offered() -> Vec<Template> {
+        row(&templates::DEFAULT)
+    }
+
+    const FULL: usize = 0;
+    const HALVES: usize = 1;
+    const THIRDS: usize = 2;
+    const QUARTERS: usize = 3;
+
     #[test]
     fn the_row_is_centred_and_hangs_from_the_top_of_a_notchless_screen() {
         let d = plain();
-        let panel = d.panel(&six());
+        let panel = d.panel(6);
         assert!(near(panel.x + panel.w / 2.0, 960.0));
         assert_eq!(panel.y, 0.0);
         assert!(near(panel.w, 6.0 * CELL.0 + 5.0 * GAP + 2.0 * PAD));
         assert!(near(panel.h, 10.0 + CELL.1 + PAD));
-        let cells = d.cells(&six());
+        let cells = d.cells(6);
         assert_eq!(cells.len(), 6);
         assert!(near(cells[0].x - panel.x, PAD), "padding at the left");
         assert!(
@@ -464,84 +522,78 @@ mod tests {
     #[test]
     fn on_a_notched_screen_the_row_clears_the_cutout_and_covers_it() {
         let d = laptop();
-        let two = [Layout::Left, Layout::Right];
-        let panel = d.panel(&two);
-        // Two zones are narrower than the cutout, so the shape is widened to cover it.
+        let panel = d.panel(2);
+        // Two layouts are narrower than the cutout, so the shape is widened to cover it.
         assert!(near(panel.w, 185.0 + 2.0 * PAD));
         assert!(near(panel.x + panel.w / 2.0, -1512.0 / 2.0));
         assert_eq!(panel.y, -982.0, "negative origins are kept");
-        let cells = d.cells(&two);
+        let cells = d.cells(2);
         assert!(cells.iter().all(|c| near(c.y, -982.0 + 38.0)));
         assert!(
             cells[0].x >= panel.x && right(cells[1]) <= right(panel),
             "the cells stay inside the shape"
         );
-        let one = d.cells(&[Layout::Maximize])[0];
+        let one = d.cells(1)[0];
         assert!(
             near(one.x + one.w / 2.0, -756.0),
-            "a single zone is centred"
+            "a single layout is centred"
         );
     }
 
     #[test]
-    fn the_default_zones_hang_in_two_rows_of_one_kind_each() {
+    fn more_layouts_than_fit_a_row_go_on_further_rows_as_even_as_they_can() {
         let d = laptop();
-        let panel = d.panel(&DEFAULT_ZONES);
-        assert!(near(panel.w, 6.0 * CELL.0 + 5.0 * GAP + 2.0 * PAD));
+        let lengths = |count: usize| {
+            let cells = d.cells(count);
+            let mut ys: Vec<f64> = cells.iter().map(|c| c.y).collect();
+            ys.dedup_by(|a, b| near(*a, *b));
+            ys.iter()
+                .map(|y| cells.iter().filter(|c| near(c.y, *y)).count())
+                .collect::<Vec<_>>()
+        };
+        assert_eq!(lengths(1), [1]);
+        assert_eq!(lengths(PER_ROW), [PER_ROW]);
+        assert_eq!(lengths(8), [4, 4]);
+        assert_eq!(lengths(9), [5, 4]);
+        assert_eq!(lengths(14), [7, 7]);
+        assert_eq!(lengths(15), [5, 5, 5]);
+        assert_eq!(lengths(22), [6, 6, 5, 5]);
+        assert!(d.cells(0).is_empty());
+        let panel = d.panel(9);
+        assert!(near(panel.w, 5.0 * CELL.0 + 4.0 * GAP + 2.0 * PAD));
         assert!(near(panel.h, 38.0 + 2.0 * CELL.1 + GAP + PAD));
-        let cells = d.cells(&DEFAULT_ZONES);
-        let (first, second) = cells.split_at(6);
+        let cells = d.cells(9);
+        let centre = |first: usize, last: usize| (cells[first].x + right(cells[last])) / 2.0;
         assert!(
-            first.iter().all(|c| near(c.y, -982.0 + 38.0)),
-            "halves, full and thirds first"
-        );
-        assert!(
-            second
-                .iter()
-                .all(|c| near(c.y, -982.0 + 38.0 + CELL.1 + GAP)),
-            "then the quarters"
-        );
-        assert!(near(second[1].x - right(second[0]), GAP));
-        let centre = |row: &[Rect]| (row[0].x + right(row[row.len() - 1])) / 2.0;
-        assert!(
-            near(centre(first), -756.0) && near(centre(second), -756.0),
+            near(centre(0, 4), -756.0) && near(centre(5, 8), -756.0),
             "each row is centred"
         );
         assert!(
-            near(bottom(panel) - bottom(second[0]), PAD),
+            near(bottom(panel) - bottom(cells[8]), PAD),
             "padding below the last row"
         );
     }
 
     #[test]
-    fn each_zone_goes_on_the_row_of_its_kind_whatever_the_order() {
-        let d = plain();
-        let mixed = [
-            Layout::TopLeft,
-            Layout::Left,
-            Layout::Bottom,
-            Layout::Maximize,
-        ];
-        let cells = d.cells(&mixed);
-        let (upper, lower) = (10.0, 10.0 + CELL.1 + GAP);
-        assert_eq!(
-            cells.iter().map(|c| c.y).collect::<Vec<_>>(),
-            [lower, upper, lower, upper]
-        );
+    fn the_chip_is_centred_and_clears_the_cutout() {
+        let plain_chip = plain().chip();
+        assert!(near(plain_chip.x + plain_chip.w / 2.0, 960.0) && plain_chip.y == 0.0);
+        assert!(near(plain_chip.w, CHIP.0.max(200.0 + 2.0 * PAD)));
+        assert!(near(plain_chip.h, 10.0 + CHIP.1 + PAD / 2.0));
+        let notched = laptop().chip();
+        assert!(near(notched.x + notched.w / 2.0, -756.0));
+        assert!(notched.w >= 185.0 + 2.0 * PAD, "it covers the cutout");
         assert!(
-            cells[1].x < cells[3].x && cells[0].x < cells[2].x,
-            "in the given order"
+            notched.h > 38.0 + CHIP.1 - 1.0,
+            "and the line under it clears the cutout"
         );
-        for (i, c) in cells.iter().enumerate() {
-            assert_eq!(d.zone_at(&mixed, middle(*c)), Some(i), "zone {i}");
+        for d in [plain(), laptop(), big()] {
+            let (chip, panel) = (d.chip(), d.panel(7));
+            assert!(
+                chip.w <= panel.w && chip.h < panel.h,
+                "it is smaller than the row"
+            );
         }
-        // One kind alone is one row.
-        let quarters = &DEFAULT_ZONES[6..];
-        assert!(d.cells(quarters).iter().all(|c| c.y == upper));
-        assert!(near(d.panel(quarters).h, 10.0 + CELL.1 + PAD));
-        // Every offered layout fits: two rows of six.
-        let all = d.panel(&OFFERED);
-        assert!(near(all.w, d.panel(&six()).w) && near(all.h, d.panel(&DEFAULT_ZONES).h));
     }
 
     #[test]
@@ -571,79 +623,72 @@ mod tests {
     }
 
     #[test]
-    fn the_pointer_maps_to_a_zone_or_to_none() {
-        let (d, six) = (plain(), six());
-        let cells = d.cells(&six);
+    fn the_pointer_maps_to_a_layout_or_to_none() {
+        let d = plain();
+        let cells = d.cells(6);
         for (i, c) in cells.iter().enumerate() {
-            assert_eq!(d.zone_at(&six, middle(*c)), Some(i));
+            assert_eq!(d.zone_at(6, middle(*c)), Some(i));
         }
         // The gap between two cells belongs to one of them, never to none.
         for pair in cells.windows(2) {
             let gap_middle = (right(pair[0]) + GAP / 2.0 - 0.01, pair[0].y + 10.0);
-            assert!(d.zone_at(&six, gap_middle).is_some());
+            assert!(d.zone_at(6, gap_middle).is_some());
         }
-        // Padding at the ends belongs to the first and last zone.
-        let panel = d.panel(&six);
-        assert_eq!(d.zone_at(&six, (panel.x + 2.0, cells[0].y + 5.0)), Some(0));
-        assert_eq!(d.zone_at(&six, (right(panel), cells[0].y + 5.0)), Some(5));
+        // Padding at the ends belongs to the first and last layout.
+        let panel = d.panel(6);
+        assert_eq!(d.zone_at(6, (panel.x + 2.0, cells[0].y + 5.0)), Some(0));
+        assert_eq!(d.zone_at(6, (right(panel), cells[0].y + 5.0)), Some(5));
         // Above the shapes, below the shape and beside it: none.
-        assert_eq!(d.zone_at(&six, (cells[2].x + 5.0, 0.0)), None);
-        assert_eq!(
-            d.zone_at(&six, (cells[2].x + 5.0, bottom(panel) + 1.0)),
-            None
-        );
-        assert_eq!(d.zone_at(&six, (panel.x - 1.0, cells[0].y + 5.0)), None);
-        assert_eq!(
-            d.zone_at(&six, (right(panel) + 1.0, cells[0].y + 5.0)),
-            None
-        );
-        assert_eq!(d.zone_at(&[], (960.0, 30.0)), None, "no zones, no hit");
+        assert_eq!(d.zone_at(6, (cells[2].x + 5.0, 0.0)), None);
+        assert_eq!(d.zone_at(6, (cells[2].x + 5.0, bottom(panel) + 1.0)), None);
+        assert_eq!(d.zone_at(6, (panel.x - 1.0, cells[0].y + 5.0)), None);
+        assert_eq!(d.zone_at(6, (right(panel) + 1.0, cells[0].y + 5.0)), None);
+        assert_eq!(d.zone_at(0, (960.0, 30.0)), None, "no layouts, no hit");
     }
 
     #[test]
-    fn the_pointer_maps_to_a_zone_on_either_row_without_a_dead_spot() {
-        let (d, zones) = (plain(), DEFAULT_ZONES);
-        let cells = d.cells(&zones);
-        for (i, c) in cells.iter().enumerate() {
-            assert_eq!(d.zone_at(&zones, middle(*c)), Some(i), "zone {i}");
+    fn the_pointer_maps_to_a_layout_on_every_row_without_a_dead_spot() {
+        let d = plain();
+        for count in [9, 15, 22] {
+            let cells = d.cells(count);
+            for (i, c) in cells.iter().enumerate() {
+                assert_eq!(d.zone_at(count, middle(*c)), Some(i), "{count}: layout {i}");
+            }
+            // Every point of the shape below the strip at the top belongs to a layout.
+            let panel = d.panel(count);
+            let mut y = d.frame.y + d.inset;
+            while y <= bottom(panel) {
+                let mut x = panel.x;
+                while x <= right(panel) {
+                    assert!(d.zone_at(count, (x, y)).is_some(), "{count}: {x} {y}");
+                    x += 1.5;
+                }
+                y += 1.5;
+            }
         }
-        // The gap between the rows is split between them. The shorter row is centred, so its first zone sits under
-        // the second of the row above.
+        // The gap between two rows is split between them.
+        let cells = d.cells(9);
         let split = bottom(cells[0]) + GAP / 2.0;
-        assert_eq!(
-            d.zone_at(&zones, (middle(cells[6]).0, split - 0.01)),
-            Some(1)
-        );
-        assert_eq!(d.zone_at(&zones, (middle(cells[6]).0, split)), Some(6));
+        assert_eq!(d.zone_at(9, (middle(cells[5]).0, split - 0.01)), Some(1));
+        assert_eq!(d.zone_at(9, (middle(cells[5]).0, split)), Some(5));
         // The shorter row reaches the edges of the shape, and the last row the padding below it.
-        let panel = d.panel(&zones);
-        let low = middle(cells[6]).1;
-        assert_eq!(d.zone_at(&zones, (panel.x + 1.0, low)), Some(6));
-        assert_eq!(d.zone_at(&zones, (right(panel) - 1.0, low)), Some(9));
+        let panel = d.panel(9);
+        assert_eq!(d.zone_at(9, (panel.x + 1.0, middle(cells[5]).1)), Some(5));
         assert_eq!(
-            d.zone_at(&zones, (middle(cells[8]).0, bottom(panel))),
+            d.zone_at(9, (right(panel) - 1.0, middle(cells[5]).1)),
             Some(8)
         );
-        // Every point of the shape below the strip at the top belongs to a zone.
-        let mut y = d.frame.y + d.inset;
-        while y <= bottom(panel) {
-            let mut x = panel.x;
-            while x <= right(panel) {
-                assert!(d.zone_at(&zones, (x, y)).is_some(), "{x} {y}");
-                x += 1.5;
-            }
-            y += 1.5;
-        }
+        assert_eq!(d.zone_at(9, (middle(cells[8]).0, bottom(panel))), Some(8));
     }
 
     #[test]
-    fn zones_work_on_every_display_with_its_own_size_and_origin() {
+    fn rows_work_on_every_display_with_its_own_size_and_origin() {
         let displays = [plain(), laptop(), big()];
         for (i, d) in displays.iter().enumerate() {
-            for zone in [3, 8] {
-                let p = middle(d.cells(&DEFAULT_ZONES)[zone]);
+            for layout in [3, 6] {
+                let p = middle(d.cells(7)[layout]);
                 assert_eq!(display_at(&displays, p), Some(i), "display {i}");
-                assert_eq!(d.zone_at(&DEFAULT_ZONES, p), Some(zone));
+                assert_eq!(d.zone_at(7, p), Some(layout));
             }
         }
     }
@@ -663,65 +708,429 @@ mod tests {
     }
 
     #[test]
-    fn a_drop_applies_the_layout_inside_the_usable_area_of_that_display() {
-        let d = big();
-        let current = Rect::new(2000.0, 100.0, 800.0, 600.0);
-        let left = d.place(Layout::Left, current);
-        assert_eq!((left.x, left.y), (1920.0, -200.0 + 25.0));
-        assert_eq!((left.w, left.h), (1280.0, 1440.0 - 25.0));
-        assert_eq!(d.place(Layout::Maximize, current), d.area);
-        let third = d.place(Layout::LastThird, current);
-        assert_eq!(right(third), right(d.area));
-    }
-
-    #[test]
-    fn choosing_zones_drops_the_unknown_and_orders_them() {
-        assert_eq!(choose::<&str>(&[]), DEFAULT_ZONES.to_vec());
-        assert_eq!(choose(&["nonsense", ""]), DEFAULT_ZONES.to_vec());
-        assert_eq!(
-            choose(&["maximize", "left", "left", "bogus", "right"]),
-            vec![Layout::Left, Layout::Right, Layout::Maximize]
-        );
-        assert_eq!(
-            choose(&["center"]),
-            DEFAULT_ZONES.to_vec(),
-            "center is not offered"
-        );
-        let all: Vec<&str> = OFFERED.iter().map(|l| l.key()).collect();
-        assert_eq!(choose(&all), OFFERED.to_vec());
-        assert_eq!(OFFERED.len(), MAX_ZONES);
-        assert!(DEFAULT_ZONES.iter().all(|l| OFFERED.contains(l)));
-    }
-
-    #[test]
-    fn every_offered_layout_has_a_shape_inside_the_unit_square() {
-        for layout in OFFERED {
-            let g = glyph(layout);
-            assert!(g.w > 0.0 && g.h > 0.0);
-            assert!(g.x >= 0.0 && g.y >= 0.0 && right(g) <= 1.0 + 1e-9 && bottom(g) <= 1.0 + 1e-9);
-        }
-        let third = glyph(Layout::CenterThird);
-        assert!(near(third.x, 1.0 / 3.0) && near(third.w, 1.0 / 3.0) && near(third.h, 1.0));
-        assert_eq!(glyph(Layout::Maximize), Rect::new(0.0, 0.0, 1.0, 1.0));
-    }
-
-    #[test]
-    fn an_offered_layout_lands_in_the_same_place_whatever_the_window() {
-        // What the footprint relies on: it is drawn before the window's final frame is known.
+    fn the_cell_under_the_pointer_is_found_on_every_display_and_lands_in_its_usable_area() {
         for d in [plain(), laptop(), big()] {
-            for layout in OFFERED {
-                for window in [
-                    Rect::new(5.0, 5.0, 300.0, 200.0),
-                    Rect::new(-900.0, 40.0, 3000.0, 2000.0),
-                ] {
+            for id in templates::BUILT_IN {
+                let template = built_in(id).unwrap();
+                for (i, cell) in template.cells.iter().enumerate() {
+                    let frame = d.place(*cell);
                     assert_eq!(
-                        d.place(layout, window),
-                        d.place(layout, d.area),
-                        "{layout:?}"
+                        d.cell_at(&template, middle(frame)),
+                        Some(i),
+                        "{id} cell {i}"
+                    );
+                    assert!(
+                        frame.x >= d.area.x
+                            && right(frame) <= right(d.area) + 1e-9
+                            && frame.y >= d.area.y
+                            && bottom(frame) <= bottom(d.area) + 1e-9,
+                        "{id} cell {i} stays in the usable area"
                     );
                 }
+                // Above the usable area is the menu bar, which is no cell.
+                assert_eq!(
+                    d.cell_at(&template, (middle(d.area).0, d.frame.y + 5.0)),
+                    None,
+                    "{id}"
+                );
             }
         }
+        // The one cell of `full` is the whole usable area.
+        let d = big();
+        assert_eq!(d.place(built_in("full").unwrap().cells[0]), d.area);
+    }
+
+    /// A title bar press, shortly after which the window follows the pointer.
+    fn drag_to(m: &mut Machine, to: Point) {
+        m.drag(to, || true);
+    }
+
+    fn started() -> (Machine, Vec<Display>, Vec<Vec<Template>>) {
+        let displays = vec![plain(), laptop(), big()];
+        let offers = vec![offered(); 3];
+        let mut m = Machine::new();
+        m.press(displays.clone(), offers.clone(), (500.0, 300.0), true);
+        (m, displays, offers)
+    }
+
+    #[test]
+    fn a_drag_to_the_top_shows_the_row_and_the_pointer_on_a_layout_lights_it_and_shows_its_cells() {
+        let (mut m, displays, _) = started();
+        assert!(!m.is_idle());
+        drag_to(&mut m, (520.0, 280.0));
+        assert_eq!(m.view(), View::default(), "far from the top: nothing shows");
+        drag_to(&mut m, (960.0, 2.0));
+        assert_eq!(
+            m.view(),
+            View {
+                shown: Some(0),
+                ..View::default()
+            },
+            "the pointer at the notch: the row, nothing lit"
+        );
+        assert_eq!((m.footprint(), m.overlay()), (None, None));
+        let tile = displays[0].cells(7)[THIRDS];
+        drag_to(&mut m, (960.0, 30.0));
+        drag_to(&mut m, middle(tile));
+        assert_eq!(
+            m.view(),
+            View {
+                shown: Some(0),
+                hover: Some(THIRDS),
+                chosen: Some(THIRDS),
+                cell: None,
+                compact: false
+            }
+        );
+        // The cells of the layout show over the screen, none of them lit yet.
+        let (area, cells) = m.overlay().expect("the cells show");
+        assert_eq!(area, displays[0].area);
+        assert_eq!(cells.len(), 3);
+        assert_eq!(cells[0], Rect::new(0.0, 25.0, 640.0, 1055.0));
+        assert_eq!(m.footprint(), None, "three cells: nothing to land in yet");
+    }
+
+    #[test]
+    fn moving_down_onto_the_screen_shrinks_the_row_lights_a_cell_and_a_release_in_it_drops() {
+        let (mut m, displays, _) = started();
+        drag_to(&mut m, (960.0, 2.0));
+        drag_to(&mut m, middle(displays[0].cells(7)[THIRDS]));
+        // Down, away from the row, onto the first third of the screen.
+        drag_to(&mut m, (400.0, 600.0));
+        assert_eq!(
+            m.view(),
+            View {
+                shown: Some(0),
+                hover: None,
+                chosen: Some(THIRDS),
+                cell: Some(0),
+                compact: true
+            }
+        );
+        assert_eq!(m.footprint(), Some(Rect::new(0.0, 25.0, 640.0, 1055.0)));
+        drag_to(&mut m, (1000.0, 600.0));
+        assert_eq!(m.view().cell, Some(1));
+        assert_eq!(m.footprint(), Some(Rect::new(640.0, 25.0, 640.0, 1055.0)));
+        let last = (1700.0, 800.0);
+        drag_to(&mut m, last);
+        assert_eq!(m.view().cell, Some(2));
+        assert_eq!(
+            m.release(last),
+            Some(Dropped {
+                display: 0,
+                template: THIRDS,
+                cell: 2
+            })
+        );
+        assert!(m.is_idle());
+        assert_eq!(m.view(), View::default());
+        assert_eq!(
+            (m.footprint(), m.overlay()),
+            (None, None),
+            "gone once the drag ends"
+        );
+    }
+
+    #[test]
+    fn the_way_back_to_the_top_brings_the_row_back_and_another_layout_can_be_chosen() {
+        let (mut m, displays, _) = started();
+        drag_to(&mut m, (960.0, 2.0));
+        drag_to(&mut m, middle(displays[0].cells(7)[THIRDS]));
+        drag_to(&mut m, (400.0, 600.0));
+        assert!(m.view().compact);
+        // The pointer comes back to the top edge: the row is whole again, with the last choice still showing.
+        drag_to(&mut m, (960.0, 2.0));
+        assert_eq!(
+            m.view(),
+            View {
+                shown: Some(0),
+                hover: None,
+                chosen: Some(THIRDS),
+                cell: None,
+                compact: false
+            }
+        );
+        assert_eq!(m.overlay().map(|o| o.1.len()), Some(3));
+        // Another layout takes its place, and the pointer goes down again into one of its cells.
+        drag_to(&mut m, middle(displays[0].cells(7)[QUARTERS]));
+        assert_eq!(m.view().chosen, Some(QUARTERS));
+        assert_eq!(m.overlay().map(|o| o.1.len()), Some(4));
+        drag_to(&mut m, (300.0, 500.0));
+        assert_eq!((m.view().cell, m.view().compact), (Some(0), true));
+        assert_eq!(
+            m.release((300.0, 500.0)),
+            Some(Dropped {
+                display: 0,
+                template: QUARTERS,
+                cell: 0
+            })
+        );
+    }
+
+    #[test]
+    fn the_chip_is_also_the_way_back_to_the_row() {
+        let (mut m, displays, _) = started();
+        drag_to(&mut m, (960.0, 2.0));
+        drag_to(&mut m, middle(displays[0].cells(7)[HALVES]));
+        drag_to(&mut m, (400.0, 600.0));
+        assert!(m.view().compact);
+        let chip = displays[0].chip();
+        drag_to(
+            &mut m,
+            (chip.x + chip.w / 2.0, bottom(chip) + STAY_SLACK - 1.0),
+        );
+        assert!(!m.view().compact, "the pointer reached the chip");
+        drag_to(&mut m, (400.0, 600.0));
+        assert!(m.view().compact);
+        // Away from the chip and the top edge, on the screen, the row stays small.
+        drag_to(
+            &mut m,
+            (chip.x + chip.w / 2.0, bottom(chip) + STAY_SLACK + 20.0),
+        );
+        assert!(m.view().compact);
+    }
+
+    #[test]
+    fn a_release_on_the_row_drops_only_for_a_layout_of_one_cell() {
+        let (mut m, displays, _) = started();
+        drag_to(&mut m, (960.0, 2.0));
+        let on_halves = middle(displays[0].cells(7)[HALVES]);
+        drag_to(&mut m, on_halves);
+        assert_eq!(
+            m.release(on_halves),
+            None,
+            "two cells: there is nothing to say which"
+        );
+
+        let (mut m, displays, _) = started();
+        drag_to(&mut m, (960.0, 2.0));
+        let on_full = middle(displays[0].cells(7)[FULL]);
+        drag_to(&mut m, on_full);
+        assert_eq!(
+            m.footprint(),
+            Some(displays[0].area),
+            "the whole area is where it would go"
+        );
+        assert_eq!(
+            m.release(on_full),
+            Some(Dropped {
+                display: 0,
+                template: FULL,
+                cell: 0
+            })
+        );
+    }
+
+    #[test]
+    fn leaving_without_a_layout_hides_the_row_and_a_release_in_a_cell_needs_one() {
+        let (mut m, displays, _) = started();
+        drag_to(&mut m, (960.0, 1.0));
+        // Down onto the screen without having been on a layout: the row goes, and no cells show.
+        drag_to(&mut m, (400.0, 600.0));
+        assert_eq!(m.view(), View::default());
+        assert_eq!(m.release((400.0, 600.0)), None);
+
+        let (mut m, displays_again, _) = started();
+        assert_eq!(displays, displays_again);
+        drag_to(&mut m, (960.0, 1.0));
+        drag_to(&mut m, middle(displays[0].cells(7)[THIRDS]));
+        drag_to(&mut m, (400.0, 600.0));
+        assert!(m.view().cell.is_some());
+        // The menu bar is not a cell: the pointer there, away from the chip, ends it all.
+        drag_to(&mut m, (100.0, 10.0));
+        assert_eq!(m.view(), View::default());
+        assert_eq!((m.footprint(), m.overlay()), (None, None));
+        assert_eq!(
+            m.release((100.0, 10.0)),
+            None,
+            "released elsewhere: cancelled"
+        );
+        assert!(m.is_idle());
+    }
+
+    #[test]
+    fn the_row_follows_the_pointer_to_another_display_and_starts_over() {
+        let (mut m, displays, _) = started();
+        drag_to(&mut m, (960.0, 0.0));
+        drag_to(&mut m, middle(displays[0].cells(7)[THIRDS]));
+        assert_eq!(m.view().chosen, Some(THIRDS));
+        drag_to(&mut m, (-756.0, -982.0));
+        assert_eq!(
+            m.view(),
+            View {
+                shown: Some(1),
+                ..View::default()
+            },
+            "another screen: its own row, nothing chosen"
+        );
+        let tile = displays[1].cells(7)[FULL];
+        drag_to(&mut m, middle(tile));
+        assert_eq!(
+            m.release(middle(tile)),
+            Some(Dropped {
+                display: 1,
+                template: FULL,
+                cell: 0
+            })
+        );
+    }
+
+    #[test]
+    fn each_display_offers_its_own_layouts() {
+        let displays = vec![plain(), big()];
+        let offers = vec![row(&["quarters"]), row(&["thirds", "halves", "full"])];
+        let mut m = Machine::new();
+        m.press(displays.clone(), offers, (500.0, 300.0), true);
+        drag_to(&mut m, (960.0, 0.0));
+        assert_eq!(m.view().shown, Some(0));
+        // The row of the first screen has one layout, so the chip and the row are about the same size there.
+        drag_to(&mut m, middle(displays[0].cells(1)[0]));
+        assert_eq!(m.view().chosen, Some(0));
+        assert_eq!(m.overlay().map(|o| o.1.len()), Some(4), "the quarters");
+        drag_to(&mut m, (1920.0 + 1280.0, -200.0));
+        assert_eq!(m.view().shown, Some(1));
+        drag_to(&mut m, middle(displays[1].cells(3)[1]));
+        assert_eq!(
+            m.overlay().map(|o| o.1.len()),
+            Some(2),
+            "the halves, the second layout of that screen"
+        );
+    }
+
+    #[test]
+    fn the_row_stays_a_little_beyond_its_edge() {
+        let (mut m, displays, _) = started();
+        drag_to(&mut m, (960.0, 0.0));
+        let panel = displays[0].panel(7);
+        drag_to(&mut m, (panel.x - STAY_SLACK + 1.0, 30.0));
+        assert_eq!(m.view().shown, Some(0));
+        drag_to(&mut m, (panel.x - STAY_SLACK - 1.0, 30.0));
+        assert_eq!(m.view().shown, None);
+    }
+
+    #[test]
+    fn a_release_while_still_waiting_for_the_window_to_move_drops_nothing() {
+        let (mut m, ..) = started();
+        m.drag((500.0, 320.0), || false);
+        assert_eq!(m.release((960.0, 0.0)), None);
+        assert!(m.is_idle());
+    }
+
+    #[test]
+    fn a_press_that_did_not_start_on_a_window_is_ignored_throughout() {
+        let mut m = Machine::new();
+        // No window under the pointer, a press over a control, or Accessibility not granted: the platform
+        // reports the same thing, and the machine never leaves rest.
+        m.press(vec![plain()], vec![offered()], (500.0, 300.0), false);
+        assert!(m.is_idle());
+        let mut asked = false;
+        m.drag((960.0, 0.0), || {
+            asked = true;
+            true
+        });
+        assert!(!asked && m.view() == View::default());
+        assert_eq!(m.release((960.0, 0.0)), None);
+    }
+
+    #[test]
+    fn a_press_without_any_display_or_with_layouts_missing_for_one_is_ignored() {
+        let mut m = Machine::new();
+        m.press(Vec::new(), Vec::new(), (0.0, 0.0), true);
+        assert!(m.is_idle());
+        m.press(vec![plain(), big()], vec![offered()], (0.0, 0.0), true);
+        assert!(m.is_idle(), "one list for two screens");
+    }
+
+    #[test]
+    fn a_drag_that_never_moves_a_window_is_given_up() {
+        // Selecting text in a title: the pointer travels but the window stays.
+        let (mut m, ..) = started();
+        let mut looks = 0;
+        for i in 0..40 {
+            m.drag((500.0 + f64::from(i), 300.0), || {
+                looks += 1;
+                false
+            });
+        }
+        assert!(m.is_idle(), "gave up");
+        assert!(looks <= usize::from(MAX_CHECKS), "looked {looks} times");
+        // Reaching the top afterwards shows nothing.
+        m.drag((960.0, 0.0), || true);
+        assert_eq!(m.view(), View::default());
+    }
+
+    #[test]
+    fn a_tiny_wobble_is_not_a_drag() {
+        let (mut m, ..) = started();
+        let mut asked = false;
+        m.drag((501.0, 301.0), || {
+            asked = true;
+            true
+        });
+        assert!(
+            !asked,
+            "the window is not looked at before the pointer has really moved"
+        );
+        assert!(!m.is_idle(), "but the press is not forgotten");
+    }
+
+    #[test]
+    fn the_window_is_looked_at_only_until_it_is_known_to_move() {
+        let (mut m, ..) = started();
+        let mut looks = 0;
+        m.drag((520.0, 300.0), || {
+            looks += 1;
+            false
+        });
+        m.drag((540.0, 300.0), || {
+            looks += 1;
+            true
+        });
+        for x in 0..20 {
+            m.drag((560.0 + f64::from(x), 300.0), || {
+                looks += 1;
+                true
+            });
+        }
+        assert_eq!(looks, 2);
+    }
+
+    #[test]
+    fn a_new_press_or_a_cancel_forgets_the_drag() {
+        let (mut m, ..) = started();
+        drag_to(&mut m, (960.0, 0.0));
+        assert_eq!(m.view().shown, Some(0));
+        m.cancel();
+        assert!(m.is_idle() && m.view() == View::default());
+        drag_to(&mut m, (960.0, 0.0));
+        assert_eq!(m.view(), View::default());
+
+        let (mut m, ..) = started();
+        drag_to(&mut m, (960.0, 0.0));
+        m.press(vec![plain()], vec![offered()], (10.0, 10.0), false);
+        assert!(m.is_idle() && m.view() == View::default());
+    }
+
+    #[test]
+    fn a_release_needs_the_row_to_have_been_reached_through_the_top_edge() {
+        let (mut m, displays, _) = started();
+        let tile = displays[0].cells(7)[FULL];
+        let on_tile = (tile.x + 4.0, tile.y + 4.0);
+        // The window followed the pointer, but the row never appeared: a jump straight onto its spot is no drop.
+        drag_to(&mut m, (tile.x, 200.0));
+        assert_eq!(m.release(on_tile), None);
+
+        // Once shown, a quick release on a layout of one cell with no drag event in between still counts.
+        let (mut m, ..) = started();
+        drag_to(&mut m, (960.0, 0.0));
+        assert_eq!(
+            m.release(on_tile),
+            Some(Dropped {
+                display: 0,
+                template: FULL,
+                cell: 0
+            })
+        );
     }
 
     #[test]
@@ -758,290 +1167,5 @@ mod tests {
         ] {
             assert!(!is_title_bar_press(w, (300.0, 210.0), role), "{role}");
         }
-    }
-
-    // A drag as the platform reports it. The window follows the pointer, so `moved` is true from the first look.
-    fn drag_to(m: &mut Machine, to: Point) {
-        m.drag(to, || true);
-    }
-
-    fn started() -> (Machine, Vec<Display>) {
-        let displays = vec![plain(), laptop(), big()];
-        let mut m = Machine::new(DEFAULT_ZONES.to_vec());
-        m.press(displays.clone(), (500.0, 300.0), true);
-        (m, displays)
-    }
-
-    #[test]
-    fn a_drag_to_the_top_shows_the_zones_and_a_release_on_a_zone_drops() {
-        let (mut m, displays) = started();
-        assert!(!m.is_idle());
-        drag_to(&mut m, (520.0, 280.0));
-        assert_eq!(m.view(), View::default(), "far from the top: nothing shows");
-        drag_to(&mut m, (960.0, 2.0));
-        assert_eq!(
-            m.view(),
-            View {
-                shown: Some(0),
-                hover: None
-            },
-            "the pointer at the notch"
-        );
-        let cell = displays[0].cells(&DEFAULT_ZONES)[4];
-        let on_cell = (cell.x + 10.0, cell.y + 10.0);
-        drag_to(&mut m, (960.0, 30.0));
-        drag_to(&mut m, on_cell);
-        assert_eq!(
-            m.view(),
-            View {
-                shown: Some(0),
-                hover: Some(4)
-            }
-        );
-        assert_eq!(
-            m.release(on_cell),
-            Some(Dropped {
-                display: 0,
-                zone: 4
-            })
-        );
-        assert!(m.is_idle());
-        assert_eq!(m.view(), View::default());
-    }
-
-    #[test]
-    fn leaving_a_zone_clears_it_and_leaving_the_shape_hides_it_and_a_release_there_cancels() {
-        let (mut m, displays) = started();
-        drag_to(&mut m, (960.0, 1.0));
-        let cell = displays[0].cells(&DEFAULT_ZONES)[1];
-        let on_cell = (cell.x + 5.0, cell.y + 5.0);
-        drag_to(&mut m, on_cell);
-        assert_eq!(m.view().hover, Some(1));
-        // Up into the area above the shapes: still shown, no zone.
-        drag_to(&mut m, (cell.x + 5.0, 0.5));
-        assert_eq!(
-            m.view(),
-            View {
-                shown: Some(0),
-                hover: None
-            }
-        );
-        drag_to(&mut m, on_cell);
-        assert_eq!(m.view().hover, Some(1));
-        // Down and away from the shape: hidden, and nothing shows where the window would land.
-        drag_to(&mut m, (cell.x + 5.0, 400.0));
-        assert_eq!(m.view(), View::default());
-        assert_eq!(m.footprint(), None);
-        assert_eq!(
-            m.release((cell.x + 5.0, 400.0)),
-            None,
-            "released elsewhere: cancelled"
-        );
-        assert!(m.is_idle());
-    }
-
-    #[test]
-    fn the_footprint_is_the_frame_the_lit_zone_gives_the_window_on_that_display() {
-        let (mut m, displays) = started();
-        assert_eq!(m.footprint(), None, "nothing shows yet");
-        let top_centre = (1920.0 + 1280.0, -200.0);
-        drag_to(&mut m, top_centre);
-        assert_eq!(m.view().shown, Some(2));
-        assert_eq!(m.footprint(), None, "shown, but no zone is lit");
-        let cells = displays[2].cells(&DEFAULT_ZONES);
-        let window = Rect::new(2100.0, 300.0, 640.0, 480.0);
-        for (zone, layout) in DEFAULT_ZONES.into_iter().enumerate() {
-            drag_to(&mut m, middle(cells[zone]));
-            assert_eq!(m.view().hover, Some(zone));
-            assert_eq!(
-                m.footprint(),
-                Some(displays[2].place(layout, window)),
-                "{layout:?}"
-            );
-        }
-        // Up into the strip above the shapes: still shown, nothing lit, nothing to land on.
-        drag_to(&mut m, (top_centre.0, top_centre.1 + 1.0));
-        assert_eq!(m.view().shown, Some(2));
-        assert_eq!(m.footprint(), None);
-        let quarter = middle(cells[9]);
-        drag_to(&mut m, quarter);
-        let shown = m.footprint();
-        assert_eq!(
-            m.release(quarter),
-            Some(Dropped {
-                display: 2,
-                zone: 9
-            })
-        );
-        assert_eq!(shown, Some(displays[2].place(Layout::BottomRight, window)));
-        assert_eq!(m.footprint(), None, "gone once the drag ends");
-    }
-
-    #[test]
-    fn the_zones_follow_the_pointer_to_another_display() {
-        let (mut m, displays) = started();
-        drag_to(&mut m, (960.0, 0.0));
-        assert_eq!(m.view().shown, Some(0));
-        drag_to(&mut m, (-756.0, -982.0));
-        assert_eq!(m.view().shown, Some(1));
-        let cell = displays[1].cells(&DEFAULT_ZONES)[0];
-        let on_cell = (cell.x + 3.0, cell.y + 3.0);
-        drag_to(&mut m, on_cell);
-        assert_eq!(
-            m.release(on_cell),
-            Some(Dropped {
-                display: 1,
-                zone: 0
-            })
-        );
-    }
-
-    #[test]
-    fn the_shape_stays_a_little_beyond_its_edge() {
-        let (mut m, displays) = started();
-        drag_to(&mut m, (960.0, 0.0));
-        let panel = displays[0].panel(&DEFAULT_ZONES);
-        drag_to(&mut m, (panel.x - STAY_SLACK + 1.0, 30.0));
-        assert_eq!(m.view().shown, Some(0));
-        drag_to(&mut m, (panel.x - STAY_SLACK - 1.0, 30.0));
-        assert_eq!(m.view().shown, None);
-    }
-
-    #[test]
-    fn a_release_while_still_waiting_for_the_window_to_move_drops_nothing() {
-        let (mut m, _) = started();
-        m.drag((500.0, 320.0), || false);
-        assert_eq!(m.release((960.0, 0.0)), None);
-        assert!(m.is_idle());
-    }
-
-    #[test]
-    fn a_press_that_did_not_start_on_a_window_is_ignored_throughout() {
-        let mut m = Machine::new(DEFAULT_ZONES.to_vec());
-        // No window under the pointer, a press over a control, or Accessibility not granted: the platform
-        // reports the same thing, and the machine never leaves rest.
-        m.press(vec![plain()], (500.0, 300.0), false);
-        assert!(m.is_idle());
-        let mut asked = false;
-        m.drag((960.0, 0.0), || {
-            asked = true;
-            true
-        });
-        assert!(!asked && m.view() == View::default());
-        assert_eq!(m.release((960.0, 0.0)), None);
-    }
-
-    #[test]
-    fn a_press_without_any_display_is_ignored() {
-        let mut m = Machine::new(DEFAULT_ZONES.to_vec());
-        m.press(Vec::new(), (0.0, 0.0), true);
-        assert!(m.is_idle());
-    }
-
-    #[test]
-    fn a_drag_that_never_moves_a_window_is_given_up() {
-        // Selecting text in a title: the pointer travels but the window stays.
-        let (mut m, _) = started();
-        let mut looks = 0;
-        for i in 0..40 {
-            m.drag((500.0 + f64::from(i), 300.0), || {
-                looks += 1;
-                false
-            });
-        }
-        assert!(m.is_idle(), "gave up");
-        assert!(looks <= usize::from(MAX_CHECKS), "looked {looks} times");
-        // Reaching the top afterwards shows nothing.
-        m.drag((960.0, 0.0), || true);
-        assert_eq!(m.view(), View::default());
-    }
-
-    #[test]
-    fn a_tiny_wobble_is_not_a_drag() {
-        let (mut m, _) = started();
-        let mut asked = false;
-        m.drag((501.0, 301.0), || {
-            asked = true;
-            true
-        });
-        assert!(
-            !asked,
-            "the window is not looked at before the pointer has really moved"
-        );
-        assert!(!m.is_idle(), "but the press is not forgotten");
-    }
-
-    #[test]
-    fn the_window_is_looked_at_only_until_it_is_known_to_move() {
-        let (mut m, _) = started();
-        let mut looks = 0;
-        m.drag((520.0, 300.0), || {
-            looks += 1;
-            false
-        });
-        m.drag((540.0, 300.0), || {
-            looks += 1;
-            true
-        });
-        for x in 0..20 {
-            m.drag((560.0 + f64::from(x), 300.0), || {
-                looks += 1;
-                true
-            });
-        }
-        assert_eq!(looks, 2);
-    }
-
-    #[test]
-    fn a_new_press_or_a_cancel_forgets_the_drag() {
-        let (mut m, _) = started();
-        drag_to(&mut m, (960.0, 0.0));
-        assert_eq!(m.view().shown, Some(0));
-        m.cancel();
-        assert!(m.is_idle() && m.view() == View::default());
-        drag_to(&mut m, (960.0, 0.0));
-        assert_eq!(m.view(), View::default());
-
-        let (mut m, _) = started();
-        drag_to(&mut m, (960.0, 0.0));
-        m.press(vec![plain()], (10.0, 10.0), false);
-        assert!(m.is_idle() && m.view() == View::default());
-    }
-
-    #[test]
-    fn changing_the_zones_in_the_middle_of_a_drag_cancels_it() {
-        let (mut m, _) = started();
-        drag_to(&mut m, (960.0, 0.0));
-        m.set_zones(vec![Layout::Left]);
-        assert!(m.is_idle());
-    }
-
-    #[test]
-    fn a_release_needs_the_zones_to_have_been_reached_through_the_top_edge() {
-        let (mut m, displays) = started();
-        let cell = displays[0].cells(&DEFAULT_ZONES)[0];
-        let on_cell = (cell.x + 4.0, cell.y + 4.0);
-        // The window followed the pointer, but the shape never appeared: a jump straight onto its spot is no drop.
-        drag_to(&mut m, (cell.x, 200.0));
-        assert_eq!(m.release(on_cell), None);
-
-        // Once shown, a quick release on a zone with no drag event in between still counts.
-        let (mut m, _) = started();
-        drag_to(&mut m, (960.0, 0.0));
-        assert_eq!(
-            m.release(on_cell),
-            Some(Dropped {
-                display: 0,
-                zone: 0
-            })
-        );
-    }
-
-    #[test]
-    fn a_layout_name_round_trips() {
-        for layout in Layout::ALL {
-            assert_eq!(layout_from_key(layout.key()), Some(layout));
-        }
-        assert_eq!(layout_from_key("Left"), None);
     }
 }

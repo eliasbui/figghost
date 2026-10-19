@@ -221,7 +221,8 @@ fn draw_side(size: NSSize, level: f64, muted: bool) {
     draw_speaker(size.width / 2.0 - 11.0, 28.0, level, muted);
     if !muted {
         // SAFETY: extern static weight constant.
-        let font = NSFont::monospacedDigitSystemFontOfSize_weight(12.0, unsafe { NSFontWeightMedium });
+        let font =
+            NSFont::monospacedDigitSystemFontOfSize_weight(12.0, unsafe { NSFontWeightMedium });
         let attrs = text_attributes(&font, &NSColor::whiteColor(), Fit::Clip, true);
         draw_text(
             &format!("{:.0}", level * 100.0),
@@ -249,7 +250,11 @@ fn draw_tile(size: NSSize, level: f64, muted: bool) {
 
     let gap = 2.0;
     let width = (size.width - 48.0 - gap * (TILE_SEGMENTS as f64 - 1.0)) / TILE_SEGMENTS as f64;
-    let lit = if muted { 0 } else { (level * TILE_SEGMENTS as f64).round() as usize };
+    let lit = if muted {
+        0
+    } else {
+        (level * TILE_SEGMENTS as f64).round() as usize
+    };
     for i in 0..TILE_SEGMENTS {
         let segment = NSRect::new(
             NSPoint::new(24.0 + i as f64 * (width + gap), 26.0),
@@ -487,7 +492,10 @@ impl Hud {
             objc2::runtime::AnyClass::get(c"NSGlassEffectView")?;
             let glass = NSGlassEffectView::initWithFrame(
                 self.mtm.alloc(),
-                NSRect::new(NSPoint::ZERO, NSSize::new(size.width, size.height + overshoot)),
+                NSRect::new(
+                    NSPoint::ZERO,
+                    NSSize::new(size.width, size.height + overshoot),
+                ),
             );
             glass.setStyle(look);
             glass.setTintColor(Some(&tint));
@@ -503,7 +511,14 @@ impl Hud {
         }
         self.view.setFrame(NSRect::new(
             NSPoint::ZERO,
-            NSSize::new(size.width, if style.hangs() { ROW_HEIGHT } else { size.height }),
+            NSSize::new(
+                size.width,
+                if style.hangs() {
+                    ROW_HEIGHT
+                } else {
+                    size.height
+                },
+            ),
         ));
         *self.bed.borrow_mut() = glass;
         self.view.setNeedsDisplay(true);

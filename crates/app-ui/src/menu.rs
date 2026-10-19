@@ -1,18 +1,40 @@
 //! The menu bar item, a ghost with a menu. Dynamic entries are recomputed each time the menu opens.
 
-use crate::{context::AppContext, i18n, settings::SettingsFeature};
+use crate::{
+    context::AppContext,
+    i18n,
+    settings::{SettingsFeature, base64},
+};
 use core_mouse::Settings;
 use macos_sys::{
     app,
     login_item::{self, LoginItem},
     permissions,
     status_item::{Entry, Item, StatusMenu},
+    widgets::image_png,
     workspace,
 };
 use std::{cell::RefCell, fs, rc::Rc, sync::Arc};
 
 /// The panel the menu bar item opens; it lays the entries of the menu out by what they are.
 const TRAY_PAGE: &str = include_str!("../web/tray.html");
+const APP_ICON: &[u8] = include_bytes!("../assets/Figghost.icns");
+/// The icon is drawn this many points wide, for Retina screens; the page sizes it.
+const ICON_POINTS: f64 = 28.0;
+const ICON_SCALE: f64 = 2.0;
+
+/// The page of the panel with the app's own icon in it, so that the panel never shows an older one. The system
+/// draws it, since the page may load nothing.
+fn tray_page() -> String {
+    let icon = image_png(APP_ICON, ICON_POINTS, ICON_SCALE).map_or_else(String::new, |png| {
+        format!("data:image/png;base64,{}", base64(&png))
+    });
+    page_with_icon(&icon)
+}
+
+fn page_with_icon(icon: &str) -> String {
+    TRAY_PAGE.replace("/*__ICON__*/", icon)
+}
 
 type ChangeSettings = Rc<dyn Fn(&dyn Fn(&mut Settings))>;
 
@@ -53,6 +75,7 @@ pub mod symbols {
         RECORD_STOP = "stop.circle",
         CAPTURE_FOLDER = "folder",
         SMART_SELECT = "text.magnifyingglass",
+        TRANSLATE = "character.bubble",
         COLOR_PICKER = "eyedropper",
         MENU_BAR_ICONS = "menubar.rectangle",
         COPY_STACK = "square.stack.3d.up",
@@ -251,12 +274,27 @@ pub fn build(ctx: &AppContext, settings: &Rc<SettingsFeature>) -> StatusMenu {
     entries.push(Entry::Item(
         Item::new(text.menu_quit(), move || app::quit(mtm)).symbol(symbols::QUIT),
     ));
-    StatusMenu::new(mtm, "Figghost", entries, TRAY_PAGE)
+    StatusMenu::new(mtm, "Figghost", entries, &tray_page())
 }
 
 #[cfg(test)]
 mod tests {
     use super::*;
+
+    #[test]
+    fn the_panel_is_one_self_contained_page_with_the_app_icon() {
+        let page = page_with_icon("data:image/png;base64,AAAA");
+        assert!(!page.contains("/*__ICON__*/"));
+        assert!(page.contains("data:image/png;base64,AAAA"));
+        // Nothing may be fetched: no external scripts, styles, images or fonts.
+        for forbidden in ["src=\"http", "href=\"http", "url(http", "@import", "<link "] {
+            assert!(!page.contains(forbidden), "found {forbidden}");
+        }
+        assert!(
+            image_png(APP_ICON, ICON_POINTS, ICON_SCALE).is_some(),
+            "the app icon"
+        );
+    }
 
     #[test]
     fn the_system_knows_every_symbol_of_the_menu() {

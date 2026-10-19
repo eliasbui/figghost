@@ -1,8 +1,11 @@
 #!/bin/sh
 # Builds Figghost.app: a menu bar app (no Dock icon) signed with SIGN_IDENTITY (default: ad hoc).
 #
-# macOS ties the Accessibility grant to the app's code signature. An ad hoc signature changes on every
-# build, so the grant is lost each time; sign with a stable local certificate to keep it:
+# macOS ties the Accessibility grant to the app's designated requirement. The one an ad hoc signature gets is the
+# hash of that single build, which no later build meets, so the grant would be lost at every update. An ad hoc
+# build is therefore signed to name the app (its identifier) and every later build inherits the grant. That is
+# only as strong as the name: with a certificate the grant is pinned to the certificate as well, which a build
+# signed by someone else cannot copy:
 #   SIGN_IDENTITY="Figghost Local" scripts/bundle.sh
 set -eu
 
@@ -28,6 +31,8 @@ cp "$TARGET/release/libfigghost_nowplaying.dylib" "$APP/Contents/Frameworks/"
 cp "$ROOT/crates/app-ui/assets/Figghost.icns" "$APP/Contents/Resources/Figghost.icns"
 # Inter, the font of the settings page, is inside the executable; its licence travels with the app.
 cp "$ROOT/crates/app-ui/assets/Inter-OFL.txt" "$APP/Contents/Resources/Inter-OFL.txt"
+# The licence of Figghost itself travels with the app, as the MIT License asks of every copy.
+cp "$ROOT/LICENSE" "$APP/Contents/Resources/LICENSE.txt"
 
 cat > "$APP/Contents/Info.plist" <<'PLIST'
 <?xml version="1.0" encoding="UTF-8"?>
@@ -46,6 +51,7 @@ cat > "$APP/Contents/Info.plist" <<'PLIST'
     <key>LSUIElement</key><true/>
     <key>NSHighResolutionCapable</key><true/>
     <key>NSAudioCaptureUsageDescription</key><string>Figghost changes the volume, output and sound of each app, and records the computer's audio in screen recordings when asked to.</string>
+    <key>NSBluetoothAlwaysUsageDescription</key><string>Figghost shows in the notch when a Bluetooth device connects or disconnects.</string>
     <key>NSMicrophoneUsageDescription</key><string>Figghost records the microphone in screen recordings when you turn it on.</string>
     <key>NSCameraUsageDescription</key><string>Figghost shows the camera in screen recordings when you turn it on.</string>
     <key>NSAppleEventsUsageDescription</key><string>Figghost reads the current track from Music and Spotify to show it in the notch.</string>
@@ -76,7 +82,15 @@ mkdir -p "$APP/Contents/Resources/vi.lproj"
 printf '"Add to Figghost Shelf" = "Th\xc3\xaam v\xc3\xa0o khay Figghost";\n' > "$APP/Contents/Resources/vi.lproj/ServicesMenu.strings"
 plutil -lint "$APP/Contents/Resources/vi.lproj/ServicesMenu.strings" >/dev/null
 codesign --force --sign "$IDENTITY" "$APP/Contents/Frameworks/libfigghost_nowplaying.dylib"
-codesign --force --sign "$IDENTITY" "$APP"
+if [ "$IDENTITY" = - ]; then
+    # The same identifier as CFBundleIdentifier above and BUNDLE_ID in crates/app-ui/src/update/install.rs.
+    codesign --force --sign - -r='designated => identifier "vn.figghost.app"' "$APP"
+    # Fails the build if codesign ever stops honouring it, rather than shipping an app that loses its grants.
+    codesign -d -r- "$APP" 2>&1 | grep -qF 'designated => identifier "vn.figghost.app"' ||
+        { echo "bundle: the designated requirement was not pinned" >&2; exit 1; }
+else
+    codesign --force --sign "$IDENTITY" "$APP"
+fi
 codesign --verify --strict "$APP"
 # Lets the Services menu see the item without logging out; harmless where it cannot.
 /System/Library/CoreServices/pbs -update >/dev/null 2>&1 || true

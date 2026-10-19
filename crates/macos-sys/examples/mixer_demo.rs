@@ -42,6 +42,9 @@ fn main() {
         boost: "Nâng âm nhỏ".into(),
         night: "Chế độ đêm".into(),
         width: "Độ rộng stereo".into(),
+        spatial: "Âm thanh 3D".into(),
+        angle: "Hướng".into(),
+        orbit: "Xoay quanh".into(),
         mute: "Tắt".into(),
         app_eq: "EQ riêng cho app này".into(),
     };
@@ -57,6 +60,9 @@ fn main() {
             on_boost: nothing(),
             on_night: Box::new(|_| {}),
             on_width: nothing(),
+            on_spatial: nothing(),
+            on_angle: nothing(),
+            on_orbit: nothing(),
             on_volume: Box::new(|_, _| {}),
             on_mute: Box::new(|_, _| {}),
             on_output: Box::new(|_, _| {}),
@@ -97,6 +103,9 @@ fn main() {
         boost: 0.4,
         night: false,
         width: 0.6,
+        spatial: 0.0,
+        angle: 0.5,
+        orbit: 0.5,
         rows: vec![
             spotify,
             row(

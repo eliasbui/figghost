@@ -1,6 +1,7 @@
-/* Figghost settings, designed with the precision of native macOS System Settings (macOS Sonoma / Sequoia).
-   Split-view window: full-height source list sidebar with window drag region, unified search bar, categorized
-   groups, and grounded grouped content cards with Apple-exact metrics and contrast. */
+/* Figghost settings: a split-view macOS window on Liquid Glass. This first part holds the system's metrics
+   and colours and the plain controls; the glass layer further down (from "Liquid glass theme") draws the sidebar,
+   the cards and the coloured heroes on top of them. Controls take the user's accent colour (--tint), a state
+   takes its own system colour (--good, --warn, --bad), and only the coloured cards use --brand. */
 
 :root {
   color-scheme: light dark;
@@ -17,8 +18,9 @@
   --fs-title: 22px;
 
   /* macOS System Settings control dimensions */
-  --h-control: 26px;
-  --h-small: 20px;
+  /* macOS 27 sizes: large controls are capsules 28 tall, regular ones 24. A row's button is never smaller. */
+  --h-control: 28px;
+  --h-small: 24px;
   --switch-w: 40px;
   --switch-h: 24px;
   --knob: 20px;
@@ -85,8 +87,7 @@
 
 @media (prefers-color-scheme: dark) {
   :root {
-    --tint: #0a84ff;
-    --selection: #0a84ff;
+    /* --tint and --selection stay the system's: they follow the window's appearance and the user's accent. */
     --selection-idle: rgba(255, 255, 255, 0.12);
 
     --accent: #0a84ff;
@@ -362,13 +363,12 @@ html.inactive .nav-item[aria-current="page"] {
   from { opacity: 0; transform: translateY(6px); }
 }
 
-/* Section headers: subtle uppercase label */
+/* Section headers: 13 pt bold in the ink of the text, written as they are, as a macOS grouped form has them */
 .section-title {
   margin: 24px 16px 6px;
-  font-size: 12px;
-  font-weight: 600;
-  letter-spacing: 0.01em;
-  color: var(--text-2);
+  font-size: 13px;
+  font-weight: 700;
+  color: var(--text);
 }
 
 /* Grouped cards: solid, crisp Apple insets */
@@ -409,7 +409,7 @@ html.inactive .nav-item[aria-current="page"] {
   border-top: 0.5px solid var(--stroke);
 }
 
-/* SWITCH: exact Apple 38x22 switch */
+/* SWITCH: a capsule; the glass layer below sets its size */
 .switch {
   position: relative;
   flex: none;
@@ -503,9 +503,9 @@ select.pick {
 }
 select.pick.small {
   height: var(--h-small);
-  padding: 0 22px 0 8px;
+  padding: 0 24px 0 10px;
   border-radius: calc(var(--h-small) / 2);
-  font-size: var(--fs-small);
+  font-size: 12px;
   background-position: right 7px center, 0 0;
 }
 select.pick:active { filter: brightness(0.96); }
@@ -564,9 +564,9 @@ input[type="range"]::-webkit-slider-thumb {
 .btn.danger { color: var(--bad); }
 .btn.small {
   height: var(--h-small);
-  padding: 0 9px;
+  padding: 0 11px;
   border-radius: calc(var(--h-small) / 2);
-  font-size: var(--fs-small);
+  font-size: 12px;
 }
 .btn .glyph { width: 12px; height: 12px; }
 .btn.icon {
@@ -644,6 +644,9 @@ kbd {
   font-size: 12px;
   line-height: 1.4;
 }
+/* The licence text on the About page, shown on request. */
+.license { margin: 0; padding: 4px 20px 16px; white-space: pre-wrap; font: 12px/1.5 var(--mono); color: var(--text-2); -webkit-user-select: text; user-select: text; }
+.license[hidden] { display: none; }
 .chips {
   display: flex;
   align-items: center;
@@ -1137,7 +1140,7 @@ html.reduce-motion *::after {
   input[type="range"] { width: 150px; }
 }
 
-/* ---- Liquid glass theme: icon rail, glass cards, one accent colour. Replaces the earlier sidebar look. ---- */
+/* Liquid glass theme: a glass sidebar, glass cards on a soft backdrop, coloured heroes. */
 :root {
   --canvas: #e9ebf1;
   --card-glass: linear-gradient(145deg, rgba(255, 255, 255, 0.58), rgba(255, 255, 255, 0.2));
@@ -1148,10 +1151,10 @@ html.reduce-motion *::after {
   --aurora-1: rgba(120, 150, 255, 0.38);
   --aurora-2: rgba(170, 175, 200, 0.45);
   --aurora-3: rgba(140, 160, 210, 0.3);
-  --tint: #2f7bff;
-  --selection: #2f7bff;
+  /* The colour of the coloured cards (the heroes). Controls take the user's accent (--tint), and a state its
+     own system colour (--good is green), so one colour never means two things. */
+  --brand: #2f7bff;
   --r-card: 30px;
-  --good: #2f7bff;
   --thumb-bg: #ffffff;
 }
 @media (prefers-color-scheme: dark) {
@@ -1165,9 +1168,7 @@ html.reduce-motion *::after {
     --aurora-1: rgba(80, 110, 230, 0.3);
     --aurora-2: rgba(120, 125, 150, 0.3);
     --aurora-3: rgba(90, 110, 170, 0.25);
-    --tint: #5c9bff;
-    --selection: #5c9bff;
-    --good: #5c9bff;
+    --brand: #5c9bff;
     --thumb-bg: #6a6a70;
   }
 }
@@ -1182,11 +1183,14 @@ html.reduce-motion *::after {
 }
 #main { background: transparent; --gutter: max(28px, calc((100% - 760px) / 2)); }
 
-/* The rail: icons only, the name shows as a tooltip. */
+/* The sidebar: a glass pane below the window buttons, with an icon and a name on each row; a glass pill marks
+   the open page. */
 #sidebar {
-  margin: 8px 0 8px 8px;
-  padding: 50px 0 12px;
-  align-items: center;
+  /* The pane starts below the window buttons, which sit in the top left corner of the window. */
+  --top: 38px;
+  margin: var(--top) 0 8px 8px;
+  padding: 12px 8px 10px;
+  align-items: stretch;
   border: 0;
   border-radius: 28px;
   background: linear-gradient(180deg, rgba(255, 255, 255, 0.5), rgba(255, 255, 255, 0.2));
@@ -1197,15 +1201,25 @@ html.reduce-motion *::after {
 @media (prefers-color-scheme: dark) {
   #sidebar { background: linear-gradient(180deg, rgba(255, 255, 255, 0.14), rgba(255, 255, 255, 0.04)); }
 }
-#nav { align-items: center; gap: 6px; padding: 0; overflow: visible; }
-.nav-sep { width: 24px; margin: 4px 0; }
+/* The strip above the pane still moves the window. */
+#sidebar > .dragzone { top: calc(var(--top) * -1); left: -8px; }
+/* A short window fades the ends of the list, so it reads as scrollable. */
+#nav {
+  align-items: stretch;
+  gap: 2px;
+  padding: 10px 0 16px;
+  overflow-y: auto;
+  -webkit-mask-image: linear-gradient(180deg, transparent 0, #000 8px, #000 calc(100% - 14px), transparent 100%);
+  mask-image: linear-gradient(180deg, transparent 0, #000 8px, #000 calc(100% - 14px), transparent 100%);
+}
+.nav-sep { width: auto; margin: 5px 10px; }
 .nav-item {
-  position: relative;
-  justify-content: center;
-  width: 46px;
-  height: 46px;
-  padding: 0;
-  border-radius: 50%;
+  width: 100%;
+  height: 36px;
+  gap: 10px;
+  padding: 0 10px;
+  border-radius: 12px;
+  font-size: 13px;
   color: var(--text-2);
   transition: background var(--motion-fast), color var(--motion-fast);
 }
@@ -1214,40 +1228,22 @@ html.reduce-motion *::after {
 .nav-item[aria-current="page"],
 html.inactive .nav-item[aria-current="page"] {
   color: var(--text);
-  font-weight: 500;
+  font-weight: 600;
   background: var(--fill);
   box-shadow: inset 0 0 0 0.5px var(--card-edge), inset 0 1.5px 0 var(--card-hi), inset 0 -6px 10px var(--card-glow);
 }
-.nav-label { position: absolute; width: 1px; height: 1px; overflow: hidden; clip-path: inset(50%); }
+/* Symbols take the accent, as macOS 27 draws a sidebar, and go grey while the window is in the background. */
 .nav-icon {
   width: auto;
   height: auto;
   background: none;
   box-shadow: none;
-  color: inherit;
+  color: var(--tint);
 }
-.nav-icon .glyph { width: 22px; height: 22px; }
-.nav-item::after {
-  content: attr(data-name);
-  position: absolute;
-  left: 58px;
-  top: 50%;
-  transform: translateY(-50%);
-  padding: 4px 10px;
-  border-radius: 999px;
-  background: var(--text);
-  color: var(--canvas);
-  font-size: 12px;
-  white-space: nowrap;
-  opacity: 0;
-  pointer-events: none;
-  transition: opacity var(--motion-fast);
-  z-index: 40;
-}
-.nav-item:hover::after { opacity: 1; }
-.side-foot { border: 0; padding: 0; }
-.status-pill { width: 46px; height: 46px; padding: 0; justify-content: center; border-radius: 50%; background: none; border: 0; }
-.status-pill span:not(.dot) { display: none; }
+html.inactive .nav-icon { color: var(--text-3); }
+.nav-icon .glyph { width: 18px; height: 18px; }
+.side-foot { padding: 8px 0 0; }
+.status-pill { height: 34px; padding: 0 10px; border: 0; border-radius: 12px; background: none; }
 
 /* Pages and headers */
 .page-head { padding: 34px var(--gutter) 14px; }
@@ -1265,7 +1261,7 @@ html.inactive .nav-item[aria-current="page"] {
 }
 .row { padding: 13px 20px; }
 .row + .row::before, .app-row + .app-row::before { left: 20px; right: 20px; }
-.hero { padding: 22px 24px; background: linear-gradient(135deg, color-mix(in srgb, var(--tint) 92%, #000 8%), color-mix(in srgb, var(--tint) 62%, transparent)); color: #fff; }
+.hero { padding: 22px 24px; background: linear-gradient(135deg, color-mix(in srgb, var(--brand) 92%, #000 8%), color-mix(in srgb, var(--brand) 62%, transparent)); color: #fff; }
 .hero h2, .hero p { color: #fff; }
 .hero p { opacity: 0.88; }
 .hero-mark { width: 68px; height: 68px; border-radius: 18px; }
@@ -1299,7 +1295,7 @@ html.reduce-transparency .card, html.reduce-transparency #sidebar { -webkit-back
 
 /* General hero: big mark with a soft glow, a faint ghost watermark on the right */
 .hero-ghost { position: relative; overflow: hidden; gap: 20px; padding: 24px 28px; border-radius: 28px;
-  background: radial-gradient(120% 140% at 0% 0%, color-mix(in srgb, var(--tint) 100%, #fff 18%) 0%, color-mix(in srgb, var(--tint) 78%, #000 22%) 62%, color-mix(in srgb, var(--tint) 55%, #000 45%) 100%); }
+  background: radial-gradient(120% 140% at 0% 0%, color-mix(in srgb, var(--brand) 100%, #fff 18%) 0%, color-mix(in srgb, var(--brand) 78%, #000 22%) 62%, color-mix(in srgb, var(--brand) 55%, #000 45%) 100%); }
 .hero-ghost .hero-mark { position: relative; z-index: 1; width: 84px; height: 84px; border-radius: 22px; box-shadow: 0 10px 28px rgba(0, 0, 0, 0.35), 0 0 0 0.5px rgba(255, 255, 255, 0.5); }
 .hero-ghost .hero-body { position: relative; z-index: 1; min-width: 0; }
 .hero-ghost h2 { font-size: 26px; font-weight: 700; letter-spacing: -0.025em; }
@@ -1307,21 +1303,7 @@ html.reduce-transparency .card, html.reduce-transparency #sidebar { -webkit-back
 .hero-ghost .chips { margin-top: 12px; }
 .hero-ghost::after { content: ""; position: absolute; right: -60px; top: -80px; width: 280px; height: 280px; border-radius: 50%; background: radial-gradient(circle, rgba(255, 255, 255, 0.22), transparent 68%); pointer-events: none; }
 
-/* Sidebar with labels: icon and name on each row, a glass pill marks the open page */
-#sidebar { padding: 50px 8px 10px; align-items: stretch; }
-#nav { align-items: stretch; gap: 2px; padding: 0; overflow-y: auto; }
-.nav-sep { width: auto; margin: 5px 10px; }
-.nav-item { width: 100%; height: 36px; justify-content: flex-start; gap: 10px; padding: 0 10px; border-radius: 12px; font-size: 13px; }
-.nav-item::after { display: none; }
-.nav-label { position: static; width: auto; height: auto; overflow: hidden; clip-path: none; }
-.nav-icon .glyph { width: 18px; height: 18px; }
-.nav-item[aria-current="page"], html.inactive .nav-item[aria-current="page"] { font-weight: 600; }
-.side-foot { padding: 8px 0 0; border-top: 0.5px solid var(--stroke); }
-.status-pill { width: 100%; height: 34px; padding: 0 10px; justify-content: flex-start; border-radius: 12px; background: none; }
-.status-pill span:not(.dot) { display: inline; }
-
-/* Responsive: narrower windows get two tiles per row and a tighter hero; a short window fades the nav edges so it reads as scrollable */
-#nav { -webkit-mask-image: linear-gradient(180deg, transparent 0, #000 8px, #000 calc(100% - 14px), transparent 100%); mask-image: linear-gradient(180deg, transparent 0, #000 8px, #000 calc(100% - 14px), transparent 100%); padding: 10px 0 16px; }
+/* Responsive: narrower windows get two tiles per row and a tighter hero */
 @media (max-width: 920px) {
   .tiles-grid { grid-template-columns: repeat(2, minmax(0, 1fr)); }
   .hero-ghost { gap: 16px; padding: 20px; }
@@ -1335,7 +1317,7 @@ html.reduce-transparency .card, html.reduce-transparency #sidebar { -webkit-back
 @media (max-height: 680px) {
   .nav-item { height: 32px; }
   .nav-sep { margin: 3px 10px; }
-  #sidebar { padding-top: 46px; }
+  #sidebar { padding-top: 8px; }
 }
 
 /* Notch size styles: a row of cards that each draw the closed pill and the open shape */

@@ -14,13 +14,12 @@
     'mole.health.refresh': 'Refresh',
     'mole.cpu': 'CPU', 'mole.memory': 'Memory', 'mole.disk': 'Disk',
     'mole.swap': 'Swap {used} of {total}',
-    'mole.sec.clean': 'Clean',
+    'mole.sec.tasks': 'Maintenance',
     'mole.clean.title': 'Free up disk space',
     'mole.clean.desc': 'Caches, logs, temporary files and leftovers of apps that are gone. Preview first: nothing is deleted until you choose Clean now. Items that need an administrator password are skipped.',
     'mole.clean.confirm.title': 'Clean now?',
     'mole.clean.confirm.body': 'Mole deletes the items it found. Run a preview first if you have not seen the list.',
     'mole.clean.run': 'Clean now',
-    'mole.sec.optimize': 'Optimize',
     'mole.optimize.title': 'Refresh caches and services',
     'mole.optimize.desc': 'Rebuilds Finder and system caches, refreshes the network stack and repairs broken settings.',
     'mole.optimize.confirm.title': 'Optimize now?',
@@ -34,7 +33,6 @@
     'mole.report.failed': 'Did not finish',
     'mole.task.clean': 'clean', 'mole.task.optimize': 'optimize',
     'mole.report.empty': 'Run a preview to see what Mole would do.',
-    'mole.sec.purge': 'Project leftovers',
     'mole.purge.title': 'Remove old build folders',
     'mole.purge.desc': 'node_modules, build and virtual environment folders of projects you have not touched for a while, found in the usual project folders.',
     'mole.purge.confirm.title': 'Remove these folders?',
@@ -81,13 +79,12 @@
     'mole.health.refresh': 'Đọc lại',
     'mole.cpu': 'CPU', 'mole.memory': 'Bộ nhớ', 'mole.disk': 'Ổ đĩa',
     'mole.swap': 'Swap {used} trên {total}',
-    'mole.sec.clean': 'Dọn dẹp',
+    'mole.sec.tasks': 'Bảo trì',
     'mole.clean.title': 'Giải phóng dung lượng',
     'mole.clean.desc': 'Bộ nhớ đệm, nhật ký, tệp tạm và phần còn sót của ứng dụng đã xóa. Hãy xem trước: không có gì bị xóa cho đến khi bạn chọn Dọn ngay. Mục cần mật khẩu quản trị sẽ bị bỏ qua.',
     'mole.clean.confirm.title': 'Dọn ngay?',
     'mole.clean.confirm.body': 'Mole sẽ xóa các mục đã tìm thấy. Hãy chạy xem trước nếu bạn chưa xem danh sách.',
     'mole.clean.run': 'Dọn ngay',
-    'mole.sec.optimize': 'Tối ưu',
     'mole.optimize.title': 'Làm mới bộ nhớ đệm và dịch vụ',
     'mole.optimize.desc': 'Dựng lại bộ nhớ đệm của Finder và hệ thống, làm mới mạng và sửa các thiết lập hỏng.',
     'mole.optimize.confirm.title': 'Tối ưu ngay?',
@@ -101,7 +98,6 @@
     'mole.report.failed': 'Chưa hoàn tất',
     'mole.task.clean': 'dọn dẹp', 'mole.task.optimize': 'tối ưu',
     'mole.report.empty': 'Hãy chạy xem trước để biết Mole sẽ làm gì.',
-    'mole.sec.purge': 'Phần còn sót của dự án',
     'mole.purge.title': 'Xóa thư mục build cũ',
     'mole.purge.desc': 'node_modules, thư mục build và môi trường ảo của các dự án lâu chưa đụng tới, tìm trong các thư mục dự án thông dụng.',
     'mole.purge.confirm.title': 'Xóa các thư mục này?',
@@ -181,13 +177,14 @@
     return [sectionTitle(t('mole.sec.health')), card(head, meters)];
   }
 
-  function taskCard(task) {
+  /** One task as a row: what it does, a preview and the run, which asks first. */
+  function taskRow(task) {
     const preview = button(t('mole.preview'), () => act('mole_' + task + '_preview'), { icon: 'magnifyingglass', small: true });
     const run = button(t('mole.' + task + '.run'), () => confirmDialog(
       { title: t('mole.' + task + '.confirm.title'), body: t('mole.' + task + '.confirm.body'), confirm: t('mole.' + task + '.run') },
       () => act('mole_' + task + '_run')), { small: true, danger: task === 'clean' });
     reg(() => { preview.disabled = run.disabled = busy(); });
-    return [sectionTitle(t('mole.sec.' + task)), card(row(t('mole.' + task + '.title'), t('mole.' + task + '.desc'), h('div', { class: 'mole-actions' }, preview, run)))];
+    return row(t('mole.' + task + '.title'), t('mole.' + task + '.desc'), h('div', { class: 'mole-actions' }, preview, run));
   }
 
   function reportCard() {
@@ -298,7 +295,7 @@
     en,
     vi,
     build() {
-      const ready = [...healthCards(), ...reportCard(), ...taskCard('clean'), ...taskCard('optimize'), ...taskCard('purge'), ...uninstallCard(), ...analyzeCard(), ...installerCard(), ...historyCard()];
+      const ready = [...healthCards(), ...reportCard(), sectionTitle(t('mole.sec.tasks')), card(taskRow('clean'), taskRow('optimize'), taskRow('purge')), ...uninstallCard(), ...analyzeCard(), ...installerCard(), ...historyCard()];
       const missing = missingCard();
       const wrap = h('div', {}, ...ready);
       reg(() => {

@@ -5,6 +5,7 @@ use crate::{
     dynamics::{Compressor, Curve, Limiter, coefficient},
     eq::{BANDS, Equalizer},
     params::Params,
+    spatial::Spatial,
 };
 use std::sync::Arc;
 
@@ -50,6 +51,8 @@ struct Stage {
     gain: Smoothed,
     width: Smoothed,
     balance: Smoothed,
+    spatial: Spatial,
+    spatial_amount: Smoothed,
 }
 
 impl Stage {
@@ -62,12 +65,15 @@ impl Stage {
             gain: Smoothed::at(1.0),
             width: Smoothed::at(1.0),
             balance: Smoothed::at(0.0),
+            spatial: Spatial::new(sample_rate),
+            spatial_amount: Smoothed::at(0.0),
         };
         stage.begin(sample_rate);
         // A new stream starts where its settings are, without a ramp.
         stage.gain.value = stage.gain.target;
         stage.width.value = stage.width.target;
         stage.balance.value = stage.balance.target;
+        stage.spatial_amount.value = stage.spatial_amount.target;
         stage
     }
 
@@ -92,6 +98,8 @@ impl Stage {
         };
         self.width.target = f64::from(p.width());
         self.balance.target = f64::from(p.balance());
+        self.spatial_amount.target = f64::from(p.spatial());
+        self.spatial.configure(p.angle(), p.orbit());
     }
 
     #[inline]
@@ -117,6 +125,12 @@ impl Stage {
             l *= 1.0 - balance;
         } else if balance < 0.0 {
             r *= 1.0 + balance;
+        }
+        let amount = self.spatial_amount.next(coef);
+        if amount > 0.0 {
+            let (wet_l, wet_r) = self.spatial.run(l, r);
+            l += (wet_l - l) * amount;
+            r += (wet_r - r) * amount;
         }
         let gain = self.gain.next(coef);
         (l * gain, r * gain)
@@ -321,6 +335,25 @@ mod tests {
         let (quiet, loud) = (lift(0.01), lift(0.9));
         assert!(quiet > 12.0, "quiet lifted by {quiet} dB");
         assert!(loud < 1.5, "loud lifted by {loud} dB");
+    }
+
+    #[test]
+    fn spatial_changes_the_stereo_image_and_off_is_bit_exact() {
+        let device = Arc::new(Params::default());
+        let input = sine(440.0, 0.5, 0.3);
+        // A left-only signal: dry, the right channel stays silent.
+        let left_only: Vec<f32> = input.chunks(2).flat_map(|f| [f[0], 0.0]).collect();
+        assert_eq!(run(None, &device, &left_only), left_only);
+        device.set_spatial(1.0);
+        let out = run(None, &device, &left_only);
+        let right: f64 = out
+            .iter()
+            .skip(1)
+            .step_by(2)
+            .map(|&x| f64::from(x).abs())
+            .sum();
+        assert!(right > 1.0, "the right ear hears the left speaker");
+        assert!(out.iter().all(|x| x.abs() <= 1.0));
     }
 
     #[test]

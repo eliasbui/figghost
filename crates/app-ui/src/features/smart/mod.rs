@@ -43,7 +43,7 @@ use std::{
     rc::{Rc, Weak},
     time::Duration,
 };
-use text::TranslationProblem;
+pub(crate) use text::TranslationProblem;
 
 pub mod settings;
 mod text;
@@ -342,7 +342,7 @@ fn plain_text(text: &str, config: &Config, language: Language) -> (Content, Foll
 }
 
 /// Why nothing could be read from the app in front.
-enum Problem {
+pub(crate) enum Problem {
     Accessibility,
     NotRestorable,
     Nothing,
@@ -374,6 +374,41 @@ fn write_private(path: &Path, bytes: &[u8]) -> std::io::Result<()> {
         .mode(0o600)
         .open(path)?;
     file.write_all(bytes)
+}
+
+/// The selected text of the app in front, whichever way that app gives it up.
+pub(crate) fn read_selection(history: Option<&Rc<History>>) -> Result<String, Problem> {
+    // For tests, which have no app with a selection to read.
+    if let Ok(text) = std::env::var("FIGGHOST_SMART_TEXT") {
+        return Ok(text);
+    }
+    if let Some(text) = selection::selected_text() {
+        return Ok(text);
+    }
+    // The app does not offer its selection: copy it and put the clipboard back. That posts a key, which
+    // needs the same permission.
+    if !permissions::accessibility_trusted(false) {
+        return Err(Problem::Accessibility);
+    }
+    let general;
+    let board = match history {
+        Some(history) => history.pasteboard(),
+        None => {
+            general = Pasteboard::general();
+            &general
+        }
+    };
+    match selection::copy_selected_text(board, COPY_WAIT) {
+        Ok(copied) => {
+            // The copy and the restore were not the person's doing; the history must not record them.
+            if let Some(history) = history {
+                history.skip_change(copied.change_count);
+            }
+            Ok(copied.text)
+        }
+        Err(CopyError::NotRestorable) => Err(Problem::NotRestorable),
+        Err(CopyError::Nothing) => Err(Problem::Nothing),
+    }
 }
 
 pub struct Feature {
@@ -550,37 +585,7 @@ impl Feature {
     }
 
     fn read_selection(&self) -> Result<String, Problem> {
-        // For tests, which have no app with a selection to read.
-        if let Ok(text) = std::env::var("FIGGHOST_SMART_TEXT") {
-            return Ok(text);
-        }
-        if let Some(text) = selection::selected_text() {
-            return Ok(text);
-        }
-        // The app does not offer its selection: copy it and put the clipboard back. That posts a key, which
-        // needs the same permission.
-        if !permissions::accessibility_trusted(false) {
-            return Err(Problem::Accessibility);
-        }
-        let general;
-        let board = match &self.history {
-            Some(history) => history.pasteboard(),
-            None => {
-                general = Pasteboard::general();
-                &general
-            }
-        };
-        match selection::copy_selected_text(board, COPY_WAIT) {
-            Ok(copied) => {
-                // The copy and the restore were not the person's doing; the history must not record them.
-                if let Some(history) = &self.history {
-                    history.skip_change(copied.change_count);
-                }
-                Ok(copied.text)
-            }
-            Err(CopyError::NotRestorable) => Err(Problem::NotRestorable),
-            Err(CopyError::Nothing) => Err(Problem::Nothing),
-        }
+        read_selection(self.history.as_ref())
     }
 
     fn show_text(&self, text: String) {

@@ -1,5 +1,6 @@
-//! Runs window snapping through the real controller, the real AppKit platform (the zones panel, the footprint, the
-//! screens, the notch) and the real pointer translation, without a screen and without any input event: the screen
+//! Runs window snapping through the real controller, the real AppKit platform (the row of layouts, the cells over the
+//! screen, the footprint, the screens, the notch) and the real pointer translation, without a screen and without any
+//! input event: the screen
 //! is the pretend one the notch uses in tests (`FIGGHOST_NOTCH_OFFSCREEN`, far outside every real screen), and the
 //! pointer is a list of points handed to the controller as the monitor would hand them.
 //!
@@ -24,8 +25,12 @@ mod platform;
 #[path = "../src/features/snap/text.rs"]
 mod text;
 
-use controller::{Controller, Held, Platform, Pressed};
-use core_window::{Layout, Rect, snap};
+use controller::{Choice, Controller, Held, Platform, Pressed};
+use core_window::{
+    Rect,
+    snap::{self, View},
+    templates::{self, Template},
+};
 use macos_sys::{
     MainThreadMarker,
     notch::{Notch, NotchGeometry},
@@ -115,7 +120,7 @@ impl Platform for Hybrid {
     fn trusted(&self) -> bool {
         true
     }
-    fn displays(&self) -> Vec<snap::Display> {
+    fn displays(&self) -> Vec<(snap::Display, String)> {
         self.real.displays()
     }
     fn grab(&self, _at: snap::Point) -> Option<Pressed> {
@@ -129,17 +134,17 @@ impl Platform for Hybrid {
             }
         })
     }
-    fn show(&self, display: &snap::Display, layouts: &[Layout], hover: Option<usize>) {
-        self.real.show(display, layouts, hover);
-    }
-    fn set_hover(&self, hover: Option<usize>) {
-        self.real.set_hover(hover);
+    fn show(&self, display: &snap::Display, templates: &[Template], view: View) {
+        self.real.show(display, templates, view);
     }
     fn hide(&self) {
         self.real.hide();
     }
     fn footprint(&self, frame: Option<Rect>) {
         self.real.footprint(frame);
+    }
+    fn cells(&self, shown: Option<(Rect, Vec<Rect>)>) {
+        self.real.cells(shown);
     }
     fn hold_notch(&self, held: bool) {
         self.real.hold_notch(held);
@@ -149,7 +154,7 @@ impl Platform for Hybrid {
     }
 }
 
-/// The panel that holds a view of class `view`: the zones or the footprint.
+/// The panel that holds a view of class `view`: the row, the cells or the footprint.
 fn panel_of(mtm: MainThreadMarker, view: &str) -> Option<objc2::rc::Retained<NSWindow>> {
     NSApplication::sharedApplication(mtm)
         .windows()
@@ -166,6 +171,14 @@ fn row_panel(mtm: MainThreadMarker) -> Option<objc2::rc::Retained<NSWindow>> {
 
 fn footprint_panel(mtm: MainThreadMarker) -> Option<objc2::rc::Retained<NSWindow>> {
     panel_of(mtm, "FigSnapFootprint")
+}
+
+fn cells_panel(mtm: MainThreadMarker) -> Option<objc2::rc::Retained<NSWindow>> {
+    panel_of(mtm, "FigSnapCells")
+}
+
+fn visible_cells(mtm: MainThreadMarker) -> bool {
+    cells_panel(mtm).is_some_and(|w| w.isVisible() && w.alphaValue() > 0.5)
 }
 
 fn visible_row(mtm: MainThreadMarker) -> bool {
@@ -228,7 +241,7 @@ fn main() {
             screens.first().map(|s| s.frame)
         ),
     );
-    let screen = screens[0];
+    let screen = screens[0].clone();
     // Events made in-process and never posted: the monitor's translation turns them into the controller's input.
     let made = |kind, x: f64, y: f64| {
         NSEvent::mouseEventWithType_location_modifierFlags_timestamp_windowNumber_context_eventNumber_clickCount_pressure(
@@ -277,7 +290,8 @@ fn main() {
         on_delete: Box::new(|_, _| {}),
     };
     let notch = Rc::new(Notch::new(mtm, geometry, noop, |_| {}));
-    let layouts = snap::DEFAULT_ZONES.to_vec();
+    let layouts = templates::choose::<&str>(&[], &[]);
+    let (full, thirds, quarters) = (0, 2, 3);
     let start = Rect::new(screen.frame.x + 700.0, screen.frame.y + 300.0, 520.0, 360.0);
     let script = Rc::new(Script {
         pressed: Cell::new(start),
@@ -288,17 +302,29 @@ fn main() {
         placed: RefCell::default(),
     });
     let real = platform::AppKit::new(mtm, Some(Rc::clone(&notch)));
-    let display = real.displays()[0];
+    let display = real.displays()[0].0;
     let platform = Hybrid {
         real,
         window: Rc::clone(&script),
     };
-    let c = Controller::new(platform, layouts.clone());
-    let spec_panel = display.panel(&layouts);
-    let cells = display.cells(&layouts);
+    let c = Controller::new(
+        platform,
+        Choice {
+            default: layouts.clone(),
+            screens: Vec::new(),
+        },
+    );
+    let spec_panel = display.panel(layouts.len());
+    let chip = display.chip();
+    let tiles = display.cells(layouts.len());
     let centre_x = display.frame.x + display.frame.w / 2.0;
     let top = display.frame.y;
     let title = |f: Rect| (f.x + f.w / 2.0, f.y + 12.0);
+    // A point in the usable area, in the cell `cell` of the layout `layout`.
+    let in_cell = |layout: usize, cell: usize| {
+        let frame = display.place(layouts[layout].cells[cell]);
+        (frame.x + frame.w / 2.0, frame.y + frame.h / 2.0)
+    };
 
     // Moves the window and the pointer together, as a drag does, in a few steps.
     let drag_to = |pointer: &mut (f64, f64), to: (f64, f64)| {
@@ -319,14 +345,14 @@ fn main() {
         }
     };
 
-    println!("drag onto the second zone and drop");
+    println!("drag onto the thirds, down into the second cell and drop");
     let mut pointer = title(start);
     c.handle(Mouse::Down(pointer));
     r.check(!visible_row(mtm), "nothing shows at the press");
     notch.open();
     r.check(
         notch.is_expanded(),
-        "the notch is open before the zones come (the case to handle)",
+        "the notch is open before the row comes (the case to handle)",
     );
     drag_to(&mut pointer, (centre_x, top + 1.0));
     settle(0.9);
@@ -354,93 +380,200 @@ fn main() {
         );
         r.check(panel.ignoresMouseEvents(), "and lets clicks through");
     }
-    r.check(!visible_footprint(mtm), "no footprint while no zone is lit");
+    r.check(
+        !visible_footprint(mtm) && !visible_cells(mtm),
+        "no cells and no footprint while no layout is chosen",
+    );
     let rest = live_png(mtm);
-    let zone = 1;
-    let on = middle(cells[zone]);
+    let on = middle(tiles[thirds]);
     c.handle(Mouse::Dragged(on));
-    settle(0.3);
+    settle(0.4);
     if let (Some(a), Some(b)) = (rest, live_png(mtm)) {
-        r.check(a != b, "lighting a zone changes what is drawn");
+        r.check(a != b, "pointing at a layout changes what is drawn");
         fs::write(out.join("live-hover.png"), b).expect("write");
     }
-    let before = script.frame.get();
-    let want = display.place(layouts[zone], before);
     r.check(
-        visible_footprint(mtm) && footprint_frame(mtm).is_some_and(|f| same(f, want)),
+        visible_cells(mtm),
+        "its cells show over the screen at once",
+    );
+    if let Some(cells) = cells_panel(mtm) {
+        r.check(
+            same(top_left(mtm, cells.frame()), display.area),
+            &format!(
+                "over the usable area: {:?}, want {:?}",
+                top_left(mtm, cells.frame()),
+                display.area
+            ),
+        );
+        r.check(
+            cells.ignoresMouseEvents() && !cells.canBecomeKeyWindow() && !cells.canBecomeMainWindow(),
+            "they let clicks through and cannot take the focus",
+        );
+        r.check(
+            cells
+                .collectionBehavior()
+                .contains(NSWindowCollectionBehavior::IgnoresCycle),
+            "and stay out of the window cycle",
+        );
+        if let (Some(f), Some(row)) = (footprint_panel(mtm), row_panel(mtm)) {
+            r.check(
+                cells.level() < f.level() && f.level() < row.level() && cells.level() > NSNormalWindowLevel,
+                &format!(
+                    "they sit under the footprint, which sits under the row, over ordinary windows: {} < {} < {}",
+                    cells.level(),
+                    f.level(),
+                    row.level()
+                ),
+            );
+        }
+        fs::write(
+            out.join("live-cells.png"),
+            macos_sys::widgets::view_png(&cells.contentView().expect("view")).unwrap_or_default(),
+        )
+        .expect("write");
+    }
+    r.check(
+        !visible_footprint(mtm),
+        "three cells: nothing is lit while the pointer is on the layout",
+    );
+
+    // Down onto the screen, into the first third: the row shrinks to a chip and the cell lights.
+    let first = display.place(layouts[thirds].cells[0]);
+    pointer = on;
+    drag_to(&mut pointer, in_cell(thirds, 0));
+    settle(0.5);
+    if let Some(panel) = row_panel(mtm) {
+        let f = panel.frame();
+        r.check(
+            near(f.size.width, chip.w) && near(f.size.height, chip.h),
+            &format!(
+                "the row has shrunk to the chip: {} x {}, want {} x {}",
+                f.size.width, f.size.height, chip.w, chip.h
+            ),
+        );
+        r.check(
+            near(f.origin.x + f.size.width / 2.0, centre_x),
+            "which is centred as the row was",
+        );
+        fs::write(out.join("live-chip.png"), live_png(mtm).unwrap_or_default()).expect("write");
+    }
+    r.check(
+        visible_cells(mtm) && visible_footprint(mtm) && footprint_frame(mtm).is_some_and(|f| same(f, first)),
         &format!(
-            "the footprint shows where the window will land: {:?}, want {want:?}",
+            "the cells stay and the first one is lit where the window will land: {:?}, want {first:?}",
             footprint_frame(mtm)
         ),
     );
     if let (Some(f), Some(row)) = (footprint_panel(mtm), row_panel(mtm)) {
         r.check(
             f.ignoresMouseEvents() && !f.canBecomeKeyWindow() && !f.canBecomeMainWindow(),
-            "it lets clicks through and cannot take the focus",
+            "the footprint lets clicks through and cannot take the focus",
         );
         r.check(
             f.level() < row.level() && f.level() > NSNormalWindowLevel,
             &format!(
-                "it sits under the zones and over ordinary windows: {} < {} ",
+                "it sits under the row and over ordinary windows: {} < {} ",
                 f.level(),
                 row.level()
             ),
         );
-        r.check(
-            f.collectionBehavior()
-                .contains(NSWindowCollectionBehavior::IgnoresCycle),
-            "and stays out of the window cycle",
-        );
     }
 
-    // Over another zone, the footprint moves to that zone's frame: gliding, or at once with Reduce Motion.
-    let quarter = 6;
-    let other = display.place(layouts[quarter], before);
-    c.handle(Mouse::Dragged(middle(cells[quarter])));
+    // Over another cell, the footprint moves to that cell's frame: gliding, or at once with Reduce Motion.
+    let want = display.place(layouts[thirds].cells[1]);
+    let before = footprint_frame(mtm).expect("a footprint");
+    c.handle(Mouse::Dragged(in_cell(thirds, 1)));
     let mut seen = Vec::new();
     let began = std::time::Instant::now();
     while began.elapsed().as_secs_f64() < 0.4 {
         settle(0.008);
         seen.extend(footprint_frame(mtm));
     }
-    let between =
-        |f: &Rect| f.h < want.h - 2.0 && f.h > other.h + 2.0 && !same(*f, want) && !same(*f, other);
+    let between = |f: &Rect| {
+        f.x > before.x + 2.0 && f.x < want.x - 2.0 && !same(*f, before) && !same(*f, want)
+    };
     if macos_sys::workspace::display_options().reduce_motion {
         r.check(
-            seen.first().is_some_and(|f| same(*f, other)),
-            "with Reduce Motion it moves to the top left quarter at once",
+            seen.first().is_some_and(|f| same(*f, want)),
+            "with Reduce Motion it moves to the second cell at once",
         );
     } else {
         r.check(
             seen.iter().any(between),
-            "it glides to the top left quarter through the frames between",
+            "it glides to the second cell through the frames between",
         );
     }
     r.check(
-        seen.last().is_some_and(|f| same(*f, other)) && visible_footprint(mtm),
+        seen.last().is_some_and(|f| same(*f, want)) && visible_footprint(mtm),
         &format!("and rests there: {:?}", seen.last()),
     );
-    c.handle(Mouse::Dragged(on));
+    let on_second = in_cell(thirds, 1);
+    c.handle(Mouse::Dragged(in_cell(thirds, 2)));
+    settle(0.3);
+    c.handle(Mouse::Dragged(on_second));
     settle(0.4);
     r.check(
         footprint_frame(mtm).is_some_and(|f| same(f, want)),
-        "back over the right half, it is back there",
+        "back over the second cell, it is back there",
     );
 
-    c.handle(Mouse::Up(on));
+    c.handle(Mouse::Up(on_second));
     settle(0.4);
     r.check(
         script.placed.borrow().len() == 1 && same(script.placed.borrow()[0], want),
         &format!(
-            "the window is placed on the right half, where the footprint was: {:?}",
+            "the window is placed in the second third, where the footprint was: {:?}",
             script.placed.borrow().first()
         ),
     );
     settle(0.5);
     r.check(!visible_row(mtm), "the row is gone after the drop");
-    r.check(footprint_frame(mtm).is_none(), "and so is the footprint");
+    r.check(
+        footprint_frame(mtm).is_none() && !visible_cells(mtm),
+        "and so are the footprint and the cells",
+    );
 
-    println!("drag onto a zone, leave it and release elsewhere");
+    println!("the way back to the top, another layout, and a layout of one cell dropped on in the row");
+    script.frame.set(start);
+    script.placed.borrow_mut().clear();
+    pointer = title(start);
+    c.handle(Mouse::Down(pointer));
+    drag_to(&mut pointer, (centre_x, top + 1.0));
+    settle(0.8);
+    c.handle(Mouse::Dragged(middle(tiles[thirds])));
+    drag_to(&mut pointer, in_cell(thirds, 0));
+    settle(0.5);
+    r.check(visible_cells(mtm) && visible_footprint(mtm), "the cells and a lit one show");
+    // Back up to the top edge: the chip is the row again, with the cells still showing, nothing lit.
+    drag_to(&mut pointer, (centre_x, top + 1.0));
+    settle(0.5);
+    r.check(
+        row_panel(mtm).is_some_and(|w| near(w.frame().size.width, spec_panel.w)),
+        "the row is whole again at the top edge",
+    );
+    r.check(
+        visible_cells(mtm) && footprint_frame(mtm).is_none(),
+        "with the last choice still on the screen and nothing lit",
+    );
+    c.handle(Mouse::Dragged(middle(tiles[quarters])));
+    settle(0.3);
+    r.check(visible_cells(mtm), "pointing at the quarters shows their cells");
+    c.handle(Mouse::Dragged(middle(tiles[full])));
+    settle(0.5);
+    let whole = display.area;
+    r.check(
+        footprint_frame(mtm).is_some_and(|f| same(f, whole)),
+        &format!("on the layout of one cell the whole area is the footprint: {:?}", footprint_frame(mtm)),
+    );
+    c.handle(Mouse::Up(middle(tiles[full])));
+    settle(0.4);
+    r.check(
+        script.placed.borrow().len() == 1 && same(script.placed.borrow()[0], whole),
+        &format!("and a drop there fills it: {:?}", script.placed.borrow().first()),
+    );
+    settle(0.5);
+
+    println!("drag onto a layout, go down, leave and release elsewhere");
     script.frame.set(start);
     script.placed.borrow_mut().clear();
     pointer = title(start);
@@ -448,32 +581,41 @@ fn main() {
     drag_to(&mut pointer, (centre_x, top + 1.0));
     settle(0.8);
     r.check(visible_row(mtm), "the row shows");
-    c.handle(Mouse::Dragged((cells[0].x + 10.0, cells[0].y + 10.0)));
+    c.handle(Mouse::Dragged(middle(tiles[quarters])));
     settle(0.3);
-    r.check(visible_footprint(mtm), "the footprint shows over a zone");
-    // Up into the strip above the zones: they stay, the footprint goes.
-    c.handle(Mouse::Dragged((centre_x, top + 1.0)));
-    settle(0.4);
+    r.check(visible_cells(mtm), "the cells show over a layout");
+    c.handle(Mouse::Up(middle(tiles[quarters])));
+    settle(0.5);
     r.check(
-        visible_row(mtm) && footprint_frame(mtm).is_none(),
-        "above the zones the row stays and the footprint fades away",
+        script.placed.borrow().is_empty() && !visible_row(mtm) && !visible_cells(mtm),
+        "released on a layout of four cells: nothing is placed and everything goes",
     );
-    c.handle(Mouse::Dragged((cells[0].x + 10.0, cells[0].y + 10.0)));
-    settle(0.3);
-    r.check(visible_footprint(mtm), "back over a zone it shows again");
-    pointer = (cells[0].x + 10.0, cells[0].y + 10.0);
-    drag_to(&mut pointer, (centre_x, top + 500.0));
+    script.frame.set(start);
+    pointer = title(start);
+    c.handle(Mouse::Down(pointer));
+    drag_to(&mut pointer, (centre_x, top + 1.0));
+    settle(0.8);
+    c.handle(Mouse::Dragged(middle(tiles[quarters])));
+    drag_to(&mut pointer, in_cell(quarters, 3));
+    settle(0.5);
+    r.check(visible_footprint(mtm), "the footprint shows in a cell");
+    // Off the edge of the screen, to another one: no cell is there, and all of it goes. (The pretend screen has no
+    // menu bar to leave by; `core-window` tests that.)
+    let away = (display.frame.x - 60.0, top + 500.0);
+    drag_to(&mut pointer, away);
     settle(0.6);
-    r.check(!visible_row(mtm), "leaving the row hides it");
-    r.check(footprint_frame(mtm).is_none(), "and the footprint with it");
-    c.handle(Mouse::Up((centre_x, top + 500.0)));
+    r.check(
+        !visible_row(mtm) && !visible_cells(mtm) && footprint_frame(mtm).is_none(),
+        "leaving the screen hides the row, the cells and the footprint",
+    );
+    c.handle(Mouse::Up(away));
     settle(0.3);
     r.check(
         script.placed.borrow().is_empty(),
         "released elsewhere: the window is not touched",
     );
 
-    println!("drags that must not show the zones");
+    println!("drags that must not show the row");
     let silent = |label: &str, r: &mut Report, setup: &dyn Fn()| {
         script.frame.set(start);
         setup();
@@ -527,14 +669,17 @@ fn main() {
     drag_to(&mut pointer, (centre_x, top + 1.0));
     settle(0.8);
     r.check(visible_row(mtm), "the row shows");
-    c.handle(Mouse::Dragged(middle(cells[2])));
+    c.handle(Mouse::Dragged(middle(tiles[full])));
     settle(0.3);
-    r.check(visible_footprint(mtm), "the footprint shows over a zone");
+    r.check(
+        visible_footprint(mtm) && visible_cells(mtm),
+        "the footprint and the cells show over a layout of one cell",
+    );
     c.handle(Mouse::Lost);
     settle(0.6);
     r.check(
-        !visible_row(mtm) && footprint_frame(mtm).is_none(),
-        "a lost release takes both away",
+        !visible_row(mtm) && footprint_frame(mtm).is_none() && !visible_cells(mtm),
+        "a lost release takes all three away",
     );
     r.check(script.placed.borrow().is_empty(), "and places nothing");
 
@@ -548,39 +693,50 @@ fn main() {
         pointer = title(start);
         c.handle(Mouse::Down(pointer));
         drag_to(&mut pointer, (centre_x, top + 40.0));
-        let heights = |seconds: f64| {
+        let sizes = |seconds: f64| {
             let mut seen = Vec::new();
             let began = std::time::Instant::now();
             while began.elapsed().as_secs_f64() < seconds {
                 settle(0.008);
-                seen.push(row_panel(mtm).map_or(0.0, |w| {
+                seen.push(row_panel(mtm).map_or((0.0, 0.0), |w| {
                     if w.isVisible() {
-                        w.frame().size.height
+                        (w.frame().size.width, w.frame().size.height)
                     } else {
-                        0.0
+                        (0.0, 0.0)
                     }
                 }));
             }
             seen
         };
         c.handle(Mouse::Dragged((centre_x, top + 1.0)));
-        let opening = heights(0.8);
-        let full = spec_panel.h;
+        let opening: Vec<f64> = sizes(0.8).iter().map(|s| s.1).collect();
+        let full_height = spec_panel.h;
         let peak = opening.iter().copied().fold(0.0, f64::max);
         r.check(
-            opening.iter().any(|h| *h > 0.0 && *h < full * 0.5),
+            opening.iter().any(|h| *h > 0.0 && *h < full_height * 0.5),
             "it starts small and grows",
         );
         r.check(
-            peak > full * 1.01 && peak < full * 1.1,
-            &format!("with one small overshoot on a spring: peak {peak:.1} of {full}"),
+            peak > full_height * 1.01 && peak < full_height * 1.1,
+            &format!("with one small overshoot on a spring: peak {peak:.1} of {full_height}"),
         );
         r.check(
-            near(*opening.last().unwrap(), full),
+            near(*opening.last().unwrap(), full_height),
             "and comes to rest at its full size",
         );
+        // Onto a layout and down onto the screen: the row eases down to the chip, without a bounce.
+        c.handle(Mouse::Dragged(middle(tiles[thirds])));
+        settle(0.3);
+        c.handle(Mouse::Dragged(in_cell(thirds, 0)));
+        let shrinking = sizes(0.6);
+        let narrowing = shrinking.windows(2).all(|w| w[1].0 <= w[0].0 + 0.5);
+        r.check(narrowing, "going down onto the screen, the row only narrows (ease out, no bounce)");
+        r.check(
+            shrinking.last().is_some_and(|s| near(s.0, chip.w) && near(s.1, chip.h)),
+            "and comes to rest as the chip",
+        );
         c.handle(Mouse::Lost);
-        let closing = heights(0.6);
+        let closing: Vec<f64> = sizes(0.6).iter().map(|s| s.1).collect();
         let falling = closing
             .windows(2)
             .all(|w| w[1] <= w[0] + 0.5 || w[1] == 0.0);

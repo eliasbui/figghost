@@ -83,7 +83,7 @@ fn body_font() -> Retained<NSFont> {
 }
 
 /// The height a block of text needs at `width`.
-fn text_height(text: &str, width: f64) -> f64 {
+pub(crate) fn text_height(text: &str, width: f64) -> f64 {
     let attrs = text_attributes(&body_font(), &NSColor::whiteColor(), Fit::Words, false);
     // SAFETY: the attributes are a font, a colour and a paragraph style under their own keys.
     let bounds = unsafe {
@@ -356,7 +356,7 @@ impl SmartView {
             ),
             &text_attributes(
                 &style::font(11.0, Weight::Regular),
-                &style::white(0.42),
+                &style::white(style::TEXT_TERTIARY),
                 Fit::Tail,
                 false,
             ),

@@ -1,13 +1,10 @@
-/* Dragging a window onto the notch to snap it to halves, thirds, quarters or the whole screen. Styles for the page in web/features/snap.js, using the variables at the top of app.css. */
+/* Dragging a window onto the notch to snap it to halves, thirds, quarters or a layout made from a grid. Styles for the page in web/features/snap.js, using the variables at the top of app.css. */
 .snap-body { display: flex; flex-direction: column; gap: 12px; padding: 2px 12px 12px; }
 .snap-stage { display: grid; place-items: start center; padding-bottom: 16px; border-radius: 10px; background: var(--fill-2); box-shadow: inset 0 0 0 0.5px var(--stroke); overflow: hidden; }
 /* The shape as the notch draws it: black at the screen edge, slate at the bottom, rounded at the bottom only. Sizes follow core-window's snap::CELL, GAP and PAD. */
 .snap-shape { display: flex; flex-direction: column; gap: 8px; padding: 12px; border-radius: 0 0 22px 22px; background: linear-gradient(180deg, #000 0%, #2b2e33 100%); box-shadow: 0 10px 24px -12px rgba(0, 0, 0, 0.6); }
 .snap-row { display: flex; justify-content: center; gap: 8px; }
 .snap-cell { display: flex; flex-direction: column; align-items: center; gap: 5px; box-sizing: border-box; width: 84px; height: 66px; padding-top: 9px; border-radius: 12px; background: rgba(255, 255, 255, 0.1); }
-/* The transparent border keeps the part 3px inside the outline, as the notch draws it. */
-.snap-cell .mini { box-sizing: border-box; width: 50px; height: 31px; border: 3px solid transparent; background: rgba(255, 255, 255, 0.08); box-shadow: 0 0 0 1.25px rgba(255, 255, 255, 0.5); }
-.snap-cell .mini i { background: rgba(255, 255, 255, 0.95); box-shadow: none; }
 .snap-cap { max-width: 76px; overflow: hidden; text-overflow: ellipsis; white-space: nowrap; font: 500 11px/15px var(--font); color: rgba(255, 255, 255, 0.72); }
 .snap-picks { display: grid; grid-template-columns: repeat(auto-fill, minmax(150px, 1fr)); gap: 6px; }
 .snap-pick {
@@ -20,3 +17,28 @@
 .snap-name { min-width: 0; overflow-wrap: anywhere; }
 .snap-foot { display: flex; align-items: center; justify-content: space-between; gap: 12px; }
 .snap-foot .row-desc { margin: 0; }
+
+/* The small screen with the cells of a layout. In the dark shape it is drawn as the notch draws it: the transparent border keeps the cells 3px inside the outline. */
+.snap-mini { position: relative; box-sizing: border-box; flex: none; width: 36px; height: 23px; border-radius: 4px; background: var(--fill); box-shadow: inset 0 0 0 0.75px var(--boundary); overflow: hidden; }
+.snap-mini i { position: absolute; border-radius: 1.5px; background: var(--tint); }
+.snap-mini.big { width: 54px; height: 34px; border-radius: 6px; }
+.snap-pick-mini { display: contents; }
+.snap-cell .snap-mini { width: 50px; height: 31px; border: 3px solid transparent; border-radius: 5px; overflow: visible; background: rgba(255, 255, 255, 0.08); box-shadow: 0 0 0 1.25px rgba(255, 255, 255, 0.5); }
+.snap-cell .snap-mini i { background: rgba(255, 255, 255, 0.95); }
+.snap-actions { display: flex; align-items: center; gap: 8px; flex: none; }
+/* The layouts a person made, and the editor that takes the list's place. */
+.snap-mines { display: flex; flex-direction: column; gap: 6px; }
+.snap-mine { display: flex; align-items: center; gap: 12px; padding: 8px 10px; border-radius: 10px; background: var(--field); box-shadow: inset 0 0 0 1px var(--field-edge); }
+.snap-mine-name { flex: 1; min-width: 0; }
+.snap-mine-name .row-title, .snap-mine-name .row-desc { overflow: hidden; text-overflow: ellipsis; white-space: nowrap; }
+.snap-editor { display: flex; flex-direction: column; gap: 12px; }
+.snap-edit-fields { display: flex; align-items: flex-end; gap: 12px; flex-wrap: wrap; }
+.snap-edit-fields input.text-field { flex: 1 1 200px; width: auto; min-width: 160px; }
+.snap-size { display: flex; flex-direction: column; gap: 4px; font-size: var(--fs-small); color: var(--text-2); }
+.snap-grid { display: grid; gap: 6px; height: 200px; padding: 8px; border-radius: 12px; background: var(--fill-2); box-shadow: inset 0 0 0 0.5px var(--stroke); }
+.snap-region { border: 0; border-radius: 8px; background: var(--field); color: var(--text-2); font: 600 14px var(--font); box-shadow: inset 0 0 0 1px var(--field-edge); }
+.snap-region[aria-pressed="true"] { background: color-mix(in srgb, var(--tint) 18%, var(--field)); color: var(--text); box-shadow: inset 0 0 0 2px var(--tint); }
+.snap-edit-tools { display: flex; gap: 8px; }
+.snap-edit-foot { display: flex; justify-content: flex-end; gap: 8px; }
+.snap-problem { color: var(--bad); font-size: var(--fs-small); }
+.snap-problem:empty { display: none; }

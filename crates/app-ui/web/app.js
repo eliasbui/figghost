@@ -23,15 +23,14 @@ function h(tag, attrs, ...kids) {
   return el;
 }
 
-// Glyphs are Lucide icons (ISC licence, lucide.dev), drawn as a mask so they take the text colour.
-const LUCIDE = {"chart-pie":"<path d=\"M21 12c.552 0 1.005-.449.95-.998a10 10 0 0 0-8.953-8.951c-.55-.055-.998.398-.998.95v8a1 1 0 0 0 1 1z\" /> <path d=\"M21.21 15.89A10 10 0 1 1 8 2.83\" />","settings":"<path d=\"M12.22 2h-.44a2 2 0 0 0-2 2v.18a2 2 0 0 1-1 1.73l-.43.25a2 2 0 0 1-2 0l-.15-.08a2 2 0 0 0-2.73.73l-.22.38a2 2 0 0 0 .73 2.73l.15.1a2 2 0 0 1 1 1.72v.51a2 2 0 0 1-1 1.74l-.15.09a2 2 0 0 0-.73 2.73l.22.38a2 2 0 0 0 2.73.73l.15-.08a2 2 0 0 1 2 0l.43.25a2 2 0 0 1 1 1.73V20a2 2 0 0 0 2 2h.44a2 2 0 0 0 2-2v-.18a2 2 0 0 1 1-1.73l.43-.25a2 2 0 0 1 2 0l.15.08a2 2 0 0 0 2.73-.73l.22-.39a2 2 0 0 0-.73-2.73l-.15-.08a2 2 0 0 1-1-1.74v-.5a2 2 0 0 1 1-1.74l.15-.09a2 2 0 0 0 .73-2.73l-.22-.38a2 2 0 0 0-2.73-.73l-.15.08a2 2 0 0 1-2 0l-.43-.25a2 2 0 0 1-1-1.73V4a2 2 0 0 0-2-2z\" /> <circle cx=\"12\" cy=\"12\" r=\"3\" />","mouse":"<rect x=\"5\" y=\"2\" width=\"14\" height=\"20\" rx=\"7\" /> <path d=\"M12 6v4\" />","clipboard-list":"<rect width=\"8\" height=\"4\" x=\"8\" y=\"2\" rx=\"1\" ry=\"1\" /> <path d=\"M16 4h2a2 2 0 0 1 2 2v14a2 2 0 0 1-2 2H6a2 2 0 0 1-2-2V6a2 2 0 0 1 2-2h2\" /> <path d=\"M12 11h4\" /> <path d=\"M12 16h4\" /> <path d=\"M8 11h.01\" /> <path d=\"M8 16h.01\" />","panel-top":"<rect width=\"18\" height=\"18\" x=\"3\" y=\"3\" rx=\"2\" /> <path d=\"M3 9h18\" />","square-terminal":"<path d=\"m7 11 2-2-2-2\" /> <path d=\"M11 13h4\" /> <rect width=\"18\" height=\"18\" x=\"3\" y=\"3\" rx=\"2\" ry=\"2\" />","columns-2":"<rect width=\"18\" height=\"18\" x=\"3\" y=\"3\" rx=\"2\" /> <path d=\"M12 3v18\" />","info":"<circle cx=\"12\" cy=\"12\" r=\"10\" /> <path d=\"M12 16v-4\" /> <path d=\"M12 8h.01\" />","calendar-days":"<path d=\"M8 2v4\" /> <path d=\"M16 2v4\" /> <rect width=\"18\" height=\"18\" x=\"3\" y=\"4\" rx=\"2\" /> <path d=\"M3 10h18\" /> <path d=\"M8 14h.01\" /> <path d=\"M12 14h.01\" /> <path d=\"M16 14h.01\" /> <path d=\"M8 18h.01\" /> <path d=\"M12 18h.01\" /> <path d=\"M16 18h.01\" />","camera":"<path d=\"M14.5 4h-5L7 7H4a2 2 0 0 0-2 2v9a2 2 0 0 0 2 2h16a2 2 0 0 0 2-2V9a2 2 0 0 0-2-2h-3l-2.5-3z\" /> <circle cx=\"12\" cy=\"13\" r=\"3\" />","text-search":"<path d=\"M21 6H3\" /> <path d=\"M10 12H3\" /> <path d=\"M10 18H3\" /> <circle cx=\"17\" cy=\"15\" r=\"3\" /> <path d=\"m21 19-1.9-1.9\" />","pipette":"<path d=\"m2 22 1-1h3l9-9\" /> <path d=\"M3 21v-3l9-9\" /> <path d=\"m15 6 3.4-3.4a2.1 2.1 0 1 1 3 3L18 9l.4.4a2.1 2.1 0 1 1-3 3l-3.8-3.8a2.1 2.1 0 1 1 3-3l.4.4Z\" />","sparkles":"<path d=\"M9.937 15.5A2 2 0 0 0 8.5 14.063l-6.135-1.582a.5.5 0 0 1 0-.962L8.5 9.936A2 2 0 0 0 9.937 8.5l1.582-6.135a.5.5 0 0 1 .963 0L14.063 8.5A2 2 0 0 0 15.5 9.937l6.135 1.581a.5.5 0 0 1 0 .964L15.5 14.063a2 2 0 0 0-1.437 1.437l-1.582 6.135a.5.5 0 0 1-.963 0z\" /> <path d=\"M20 3v4\" /> <path d=\"M22 5h-4\" /> <path d=\"M4 17v2\" /> <path d=\"M5 18H3\" />","chevron-down":"<path d=\"m6 9 6 6 6-6\" />","chevron-up":"<path d=\"m18 15-6-6-6 6\" />","x":"<path d=\"M18 6 6 18\" /> <path d=\"m6 6 12 12\" />","folder":"<path d=\"M20 20a2 2 0 0 0 2-2V8a2 2 0 0 0-2-2h-7.9a2 2 0 0 1-1.69-.9L9.6 3.9A2 2 0 0 0 7.93 3H4a2 2 0 0 0-2 2v13a2 2 0 0 0 2 2Z\" />","search":"<circle cx=\"11\" cy=\"11\" r=\"8\" /> <path d=\"m21 21-4.3-4.3\" />","plus":"<path d=\"M5 12h14\" /> <path d=\"M12 5v14\" />","power":"<path d=\"M12 2v10\" /> <path d=\"M18.4 6.6a9 9 0 1 1-12.77.04\" />","refresh-cw":"<path d=\"M3 12a9 9 0 0 1 9-9 9.75 9.75 0 0 1 6.74 2.74L21 8\" /> <path d=\"M21 3v5h-5\" /> <path d=\"M21 12a9 9 0 0 1-9 9 9.75 9.75 0 0 1-6.74-2.74L3 16\" /> <path d=\"M8 16H3v5\" />","trash-2":"<path d=\"M3 6h18\" /> <path d=\"M19 6v14c0 1-1 2-2 2H7c-1 0-2-1-2-2V6\" /> <path d=\"M8 6V4c0-1 1-2 2-2h4c1 0 2 1 2 2v2\" /> <line x1=\"10\" x2=\"10\" y1=\"11\" y2=\"17\" /> <line x1=\"14\" x2=\"14\" y1=\"11\" y2=\"17\" />"};
-const GLYPHS = {"chart.pie.fill":"chart-pie","gearshape.fill":"settings","computermouse.fill":"mouse","doc.on.clipboard.fill":"clipboard-list","rectangle.topthird.inset.filled":"panel-top","terminal.fill":"square-terminal","rectangle.split.2x1.fill":"columns-2","info.circle.fill":"info","calendar":"calendar-days","camera.viewfinder":"camera","text.magnifyingglass":"text-search","eyedropper.halffull":"pipette","sparkles":"sparkles","chevron.down":"chevron-down","chevron.up":"chevron-up","xmark":"x","close":"x","folder":"folder","magnifyingglass":"search","plus":"plus","power":"power","refresh":"refresh-cw","trash":"trash-2"};
+// Glyphs are SF Symbols drawn by the system (window.__symbols, see settings/page.rs), used as a mask so they
+// take the text colour.
+const SYMBOL_ALIASES = { close: 'xmark', refresh: 'arrow.clockwise' };
 const missingSymbols = new Set();
 function icon(name, cls) {
-  const body = LUCIDE[GLYPHS[name]];
-  if (!body) missingSymbols.add(name);
-  const svg = body && `<svg xmlns='http://www.w3.org/2000/svg' width='24' height='24' viewBox='0 0 24 24' fill='none' stroke='black' stroke-width='1.9' stroke-linecap='round' stroke-linejoin='round'>${body}</svg>`;
-  return h('span', { class: 'glyph' + (cls ? ' ' + cls : ''), 'aria-hidden': 'true', style: svg ? `--glyph:url("data:image/svg+xml,${encodeURIComponent(svg)}")` : 'visibility:hidden' });
+  const src = (window.__symbols || {})[SYMBOL_ALIASES[name] || name];
+  if (!src) missingSymbols.add(name);
+  return h('span', { class: 'glyph' + (cls ? ' ' + cls : ''), 'aria-hidden': 'true', style: src ? `--glyph:url("${src}")` : 'visibility:hidden' });
 }
 /** The app's own icon (window.__appIcon, drawn from Figghost.icns). */
 function appIcon(cls) { return h('img', { class: cls, src: window.__appIcon, alt: '' }); }
@@ -81,6 +80,7 @@ const I18N = {
     'login.approval': 'Allow Figghost in System Settings, under Login Items, to finish.', 'login.unavailable': 'Available when Figghost runs as an app from a folder such as Applications.',
     'login.open': 'Open Login Items',
     'showlaunch.title': 'Open this window at start', 'showlaunch.desc': 'Show settings each time you open the app yourself. Never at login.',
+    'hello.title': 'Say hello at start', 'hello.desc': 'Each time you open Figghost yourself, its ghost comes out of the notch and blinks. Never at login or in the background, and only while the notch is on.',
     'lang.title': 'Language', 'lang.desc': 'This window changes at once. Menus and the notch change after a restart.',
     'lang.auto': 'Automatic', 'lang.en': 'English', 'lang.vi': 'Tiếng Việt',
     'lang.restart': 'Restart Figghost to use the new language in menus and the notch.', 'lang.restart.btn': 'Restart now',
@@ -181,6 +181,7 @@ const I18N = {
     'login.approval': 'Hãy cho phép Figghost trong Cài đặt hệ thống, mục Mục đăng nhập, để hoàn tất.', 'login.unavailable': 'Chỉ dùng được khi Figghost chạy như một ứng dụng đặt trong thư mục như Applications.',
     'login.open': 'Mở Mục đăng nhập',
     'showlaunch.title': 'Mở cửa sổ này khi khởi động', 'showlaunch.desc': 'Hiện Cài đặt mỗi khi bạn tự mở ứng dụng. Không bao giờ khi đăng nhập.',
+    'hello.title': 'Chào khi mở ứng dụng', 'hello.desc': 'Mỗi khi bạn tự mở Figghost, chú ma chui ra từ notch rồi nháy mắt. Không chạy khi đăng nhập hay khi chạy nền, và chỉ khi notch đang bật.',
     'lang.title': 'Ngôn ngữ', 'lang.desc': 'Cửa sổ này đổi ngay. Menu và notch đổi sau khi khởi động lại.',
     'lang.auto': 'Tự động', 'lang.en': 'English', 'lang.vi': 'Tiếng Việt',
     'lang.restart': 'Hãy khởi động lại Figghost để dùng ngôn ngữ mới trong menu và notch.', 'lang.restart.btn': 'Khởi động lại',
@@ -779,6 +780,7 @@ function pageGeneral() {
     card(
       loginRow,
       toggleRow('general.show_on_launch', t('showlaunch.title'), t('showlaunch.desc')),
+      toggleRow('general.launch_effect', t('hello.title'), t('hello.desc'), { when: () => S.notch.enabled }),
       toggleRow('general.menu_icon', t('menuicon.title'), t('menuicon.desc'))),
     sectionTitle(t('sec.appearance')),
     card(
@@ -1453,7 +1455,87 @@ function updateRow() {
   return el;
 }
 
+// About: what the app is, where it comes from and under what licence it is used.
+// The licence text is the one in the LICENSE file of the repository, line for line; a unit test keeps them equal.
+const MIT_LICENSE = [
+  'MIT License',
+  '',
+  'Copyright (c) 2026 Doanh Thai Bui',
+  '',
+  'Permission is hereby granted, free of charge, to any person obtaining a copy',
+  'of this software and associated documentation files (the "Software"), to deal',
+  'in the Software without restriction, including without limitation the rights',
+  'to use, copy, modify, merge, publish, distribute, sublicense, and/or sell',
+  'copies of the Software, and to permit persons to whom the Software is',
+  'furnished to do so, subject to the following conditions:',
+  '',
+  'The above copyright notice and this permission notice shall be included in all',
+  'copies or substantial portions of the Software.',
+  '',
+  'THE SOFTWARE IS PROVIDED "AS IS", WITHOUT WARRANTY OF ANY KIND, EXPRESS OR',
+  'IMPLIED, INCLUDING BUT NOT LIMITED TO THE WARRANTIES OF MERCHANTABILITY,',
+  'FITNESS FOR A PARTICULAR PURPOSE AND NONINFRINGEMENT. IN NO EVENT SHALL THE',
+  'AUTHORS OR COPYRIGHT HOLDERS BE LIABLE FOR ANY CLAIM, DAMAGES OR OTHER',
+  'LIABILITY, WHETHER IN AN ACTION OF CONTRACT, TORT OR OTHERWISE, ARISING FROM,',
+  'OUT OF OR IN CONNECTION WITH THE SOFTWARE OR THE USE OR OTHER DEALINGS IN THE',
+  'SOFTWARE.',
+];
+
+Object.assign(I18N.en, {
+  'about.sec.what': 'About Figghost',
+  'about.what.title': 'One light app for the small tools of a Mac',
+  'about.what.body': 'Smooth mouse-wheel scrolling, a clipboard history, a panel that grows out of the notch with a file shelf, media, a focus timer, your calendar and your coding agents, sound for each app and window snapping live in one place. Screenshots, screen recordings, a colour picker, Smart Select and more can be switched on when you want them.',
+  'about.native.title': 'Native, and kept on this Mac',
+  'about.native.body': 'It is written in Rust on AppKit, with no browser engine in the app itself; only this settings window is a web page. It idles light, comes in English and Vietnamese, and everything it keeps stays on this Mac.',
+  'about.sec.history': 'How it came to be',
+  'about.why.title': 'Why it exists',
+  'about.why.body': 'Smooth scrolling, a clipboard history and a notch toolbox usually come as separate apps: Mos, Maccy and OneNotch gave it its ideas, and SoundSource and CleanShot X those of the sound and capture tools. Figghost brings them into one app with one permission prompt, one login item and one settings window. Their ideas inspired it; its code and artwork are its own.',
+  'about.versions.title': 'Versions',
+  'about.v.0_2': 'Version 0.2, 15 October 2026', 'about.v.0_2.body': 'Sound for each app, screenshots, scrolling capture and screen recordings with an editor, the settings window, AI agents on the notch, Smart Select, a calendar, lyrics, snapping to the notch, a menu bar icon hider and Copy Stack.',
+  'about.v.0_4': 'Versions 0.3 and 0.4, 16 October 2026', 'about.v.0_4.body': 'Every surface rebuilt on Liquid Glass, and the clipboard mascot.',
+  'about.v.0_5': 'Version 0.5, 19 October 2026', 'about.v.0_5.body': 'Mole: the health, clean-up and uninstall tools of the Mac on a page of their own.',
+  'about.v.0_6': 'Version 0.6, 19 October 2026', 'about.v.0_6.body': 'Updating from inside the app: a daily look for a new version, the download and the install, with what is new shown first.',
+  'about.v.0_7': 'Version 0.7, 19 October 2026', 'about.v.0_7.body': 'A redesigned notch, and the Drag wheel, which converts files and runs tools on them while you drag.',
+  'about.v.0_8': 'Version 0.8, 19 October 2026', 'about.v.0_8.body': 'A new app icon and a sidebar with a name beside every icon.',
+  'about.sec.license': 'Licence',
+  'about.license.title': 'MIT License',
+  'about.license.body': 'Figghost is free, open source software under the MIT License, copyright 2026 Doanh Thai Bui. You may use it for any purpose, at home or at work, copy it, change it, share it and even sell what you make from it. The one condition is that the copyright notice and the licence text stay with every copy or substantial part of it. It comes without any warranty: the authors are not liable for what it does on your Mac.',
+  'about.license.show': 'Show the licence text', 'about.license.hide': 'Hide the licence text',
+  'about.others.title': 'Other licences',
+  'about.others.body': 'The font Inter is bundled as the fallback of this window, under the SIL Open Font License 1.1 (copyright 2020 The Inter Project Authors); its text is in Resources/Inter-OFL.txt inside the app, and that of Figghost in Resources/LICENSE.txt. The icons of the interface are SF Symbols, which macOS draws itself and which are not part of Figghost. The Rust libraries it is built from keep their own licences.',
+});
+Object.assign(I18N.vi, {
+  'about.sec.what': 'Giới thiệu Figghost',
+  'about.what.title': 'Một ứng dụng nhẹ cho các công cụ nhỏ của máy Mac',
+  'about.what.body': 'Cuộn chuột mượt, lịch sử clipboard, một bảng mở ra từ notch với khay tệp, nhạc đang phát, đồng hồ tập trung, lịch và các tác tử lập trình của bạn, âm thanh riêng cho từng ứng dụng và ghim cửa sổ, tất cả nằm chung một chỗ. Chụp màn hình, quay màn hình, chọn màu, Smart Select và nhiều thứ khác có thể bật khi bạn cần.',
+  'about.native.title': 'Bản địa, và ở lại trên máy này',
+  'about.native.body': 'Ứng dụng viết bằng Rust trên AppKit, không có trình duyệt nhúng trong chính ứng dụng; chỉ cửa sổ cài đặt này là một trang web. Nó chạy nhẹ, có tiếng Anh và tiếng Việt, và mọi thứ nó lưu đều ở lại trên máy Mac này.',
+  'about.sec.history': 'Vì sao có Figghost',
+  'about.why.title': 'Lý do ra đời',
+  'about.why.body': 'Cuộn mượt, lịch sử clipboard và hộp công cụ notch thường là các ứng dụng riêng lẻ: Mos, Maccy và OneNotch gợi ý tưởng cho nó, còn SoundSource và CleanShot X gợi ý cho phần âm thanh và chụp màn hình. Figghost gom chúng vào một ứng dụng với một lần xin quyền, một mục khởi động cùng máy và một cửa sổ cài đặt. Ý tưởng lấy cảm hứng từ các ứng dụng đó; mã nguồn và hình ảnh là của riêng Figghost.',
+  'about.versions.title': 'Các phiên bản',
+  'about.v.0_2': 'Phiên bản 0.2, 15/10/2026', 'about.v.0_2.body': 'Âm thanh riêng cho từng ứng dụng, chụp màn hình, chụp cuộn và quay màn hình có trình chỉnh sửa, cửa sổ cài đặt, tác tử AI trên notch, Smart Select, lịch, lời bài hát, ghim cửa sổ lên notch, ẩn biểu tượng thanh menu và Copy Stack.',
+  'about.v.0_4': 'Phiên bản 0.3 và 0.4, 16/10/2026', 'about.v.0_4.body': 'Dựng lại mọi bề mặt trên Liquid Glass, và linh vật của clipboard.',
+  'about.v.0_5': 'Phiên bản 0.5, 19/10/2026', 'about.v.0_5.body': 'Mole: các công cụ kiểm tra sức khỏe, dọn dẹp và gỡ ứng dụng của máy Mac trên một trang riêng.',
+  'about.v.0_6': 'Phiên bản 0.6, 19/10/2026', 'about.v.0_6.body': 'Cập nhật ngay trong ứng dụng: mỗi ngày tự tìm bản mới, tải và cài, có hiện trước những gì mới.',
+  'about.v.0_7': 'Phiên bản 0.7, 19/10/2026', 'about.v.0_7.body': 'Notch được thiết kế lại, và Vòng kéo thả giúp đổi định dạng tệp và chạy công cụ trên tệp ngay khi bạn đang kéo.',
+  'about.v.0_8': 'Phiên bản 0.8, 19/10/2026', 'about.v.0_8.body': 'Biểu tượng ứng dụng mới và thanh bên có tên bên cạnh mỗi biểu tượng.',
+  'about.sec.license': 'Giấy phép',
+  'about.license.title': 'Giấy phép MIT',
+  'about.license.body': 'Figghost là phần mềm mã nguồn mở, miễn phí, theo Giấy phép MIT, bản quyền 2026 Doanh Thai Bui. Bạn được dùng cho mọi mục đích, ở nhà hay ở nơi làm việc, sao chép, sửa đổi, chia sẻ và thậm chí bán sản phẩm bạn làm ra từ nó. Điều kiện duy nhất là thông báo bản quyền và nội dung giấy phép phải đi kèm mọi bản sao hoặc phần đáng kể của phần mềm. Phần mềm được cung cấp nguyên trạng, không bảo hành: tác giả không chịu trách nhiệm về những gì nó làm trên máy Mac của bạn.',
+  'about.license.show': 'Xem nội dung giấy phép', 'about.license.hide': 'Ẩn nội dung giấy phép',
+  'about.others.title': 'Các giấy phép khác',
+  'about.others.body': 'Phông Inter đi kèm làm phông dự phòng cho cửa sổ này, theo SIL Open Font License 1.1 (bản quyền 2020 The Inter Project Authors); nội dung giấy phép nằm ở Resources/Inter-OFL.txt trong ứng dụng, còn của Figghost ở Resources/LICENSE.txt. Các biểu tượng của giao diện là SF Symbols do macOS tự vẽ, không thuộc về Figghost. Các thư viện Rust dùng để xây dựng ứng dụng giữ giấy phép riêng của chúng.',
+});
+
 function pageAbout() {
+  const text = h('pre', { class: 'license', hidden: true, text: MIT_LICENSE.join('\n') });
+  const toggle = h('button', { class: 'btn small', 'aria-expanded': 'false', text: t('about.license.show'), onclick: () => {
+    text.hidden = !text.hidden;
+    toggle.setAttribute('aria-expanded', String(!text.hidden));
+    toggle.textContent = t(text.hidden ? 'about.license.show' : 'about.license.hide');
+  } });
+  const version = (key) => row(t('about.' + key), t('about.' + key + '.body'), null);
   return [
     h('section', { class: 'hero card' },
       appIcon('hero-mark'),
@@ -1465,6 +1547,18 @@ function pageAbout() {
       row(t('update.news.title'), t('update.news.desc'), h('div', { class: 'row-actions' }, button(t('update.news.show'), () => send({ t: 'action', name: 'show_whats_new' }), { small: true }), switchEl('update.whats_new', t('update.news.title')))),
       row(t('about.privacy'), t('about.privacy.val'), null),
       row(t('data.title'), S.app.config_dir, button(t('data.open'), () => send({ t: 'action', name: 'open_config' }), { icon: 'folder', small: true }))),
+    sectionTitle(t('about.sec.what')),
+    card(row(t('about.what.title'), t('about.what.body'), null), row(t('about.native.title'), t('about.native.body'), null)),
+    sectionTitle(t('about.sec.history')),
+    card(row(t('about.why.title'), t('about.why.body'), null)),
+    card(
+      row(t('about.versions.title'), null, null),
+      ...['0_2', '0_4', '0_5', '0_6', '0_7', '0_8'].map((v) => version('v.' + v))),
+    sectionTitle(t('about.sec.license')),
+    card(
+      row(t('about.license.title'), t('about.license.body'), toggle),
+      text,
+      row(t('about.others.title'), t('about.others.body'), null)),
     card(row(t('about.quit'), t('about.quit.desc'), button(t('about.quit'), () => send({ t: 'action', name: 'quit' }), { icon: 'power', small: true, danger: true }))),
   ];
 }
@@ -1513,7 +1607,7 @@ function renderNavItems() {
     if (id === 'general') return 1;
     if (['scroll', 'clipboard', 'tiling'].includes(id)) return 2;
     if (['notch', 'agents', 'calendar'].includes(id)) return 3;
-    if (['smart', 'capture', 'vision'].includes(id)) return 4;
+    if (['smart', 'translate', 'capture', 'vision'].includes(id)) return 4;
     return 5;
   };
   const sorted = [...PAGES].sort((a, b) => groupOf(a.id) - groupOf(b.id));
@@ -1768,6 +1862,17 @@ window.__selftest = function () {
 
     // The update row follows what the app reports: a button to look, then the version it found and what became of it.
     go('about');
+    // The About page says what the app is, where it comes from and under what licence it is used.
+    expect(['about.sec.what', 'about.sec.history', 'about.sec.license'].every((key) => $('#scroller').textContent.includes(t(key))), 'About has its sections');
+    expect($('#scroller').textContent.includes(t('about.license.title')) && $('#scroller').textContent.includes('Doanh Thai Bui'), 'and names the licence and its holder');
+    expect(['0_2', '0_4', '0_5', '0_6', '0_7', '0_8'].every((v) => $('#scroller').textContent.includes(t('about.v.' + v + '.body'))), 'and lists the versions');
+    const licence = $('.license');
+    expect(licence && licence.hidden && licence.textContent.includes('Permission is hereby granted'), 'the licence text is there but hidden');
+    const showLicence = [...document.querySelectorAll('.btn')].find((b) => b.textContent === t('about.license.show'));
+    showLicence.click();
+    expect(!licence.hidden && showLicence.textContent === t('about.license.hide') && showLicence.getAttribute('aria-expanded') === 'true', 'the button shows it');
+    showLicence.click();
+    expect(licence.hidden, 'and hides it again');
     const btn = (label) => [...document.querySelectorAll('.btn')].find((b) => b.textContent === label);
     const visible = (label) => { const b = btn(label); return !!b && b.style.display !== 'none'; };
     const pressed = (name) => sent.some((m) => m.t === 'action' && m.name === name);

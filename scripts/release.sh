@@ -82,7 +82,7 @@ git push -q origin main "v$VERSION"
     fi
     echo
     echo "The app is signed ad hoc and not notarized; the cask removes the quarantine flag after installing it."
-    echo "Accessibility access is tied to the code signature, so it has to be granted again after an update."
+    echo "Accessibility access stays granted through updates, because the signature names the app instead of one build; the update from a version that was signed per build asks for it once more."
 } >"$WORK/notes.md"
 gh release create "v$VERSION" "$ZIP" --repo "$REPO" --title "Figghost $VERSION" --notes-file "$WORK/notes.md"
 

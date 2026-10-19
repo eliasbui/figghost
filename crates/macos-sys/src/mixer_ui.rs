@@ -5,22 +5,24 @@
 use crate::{
     notch::Page,
     panel::Key,
+    style::{self, Tone},
     widgets::{ActionTarget, PageRoot},
 };
 use objc2::{
     MainThreadMarker, MainThreadOnly, define_class, msg_send, rc::Retained, runtime::AnyObject, sel,
 };
 use objc2_app_kit::{
-    NSBorderType, NSButton, NSColor, NSControlSize, NSControlStateValueOff, NSControlStateValueOn,
-    NSFont, NSImage, NSImageView, NSLineBreakMode, NSMenu, NSMenuItem, NSPopUpButton, NSScrollView,
-    NSScrollerStyle, NSSlider, NSTextAlignment, NSTextField, NSView, NSWorkspace,
+    NSBezelStyle, NSBorderType, NSButton, NSButtonType, NSColor, NSControlSize,
+    NSControlStateValueOff, NSControlStateValueOn, NSFont, NSImage, NSImageView, NSLineBreakMode,
+    NSMenu, NSMenuItem, NSPopUpButton, NSScrollView, NSScrollerStyle, NSSlider, NSTextAlignment,
+    NSTextField, NSView, NSWorkspace,
 };
 use objc2_foundation::{NSPoint, NSRect, NSSize, NSString};
 use std::{cell::RefCell, collections::HashMap, rc::Rc};
 
 const MARGIN: f64 = 16.0;
 const FOOTER_HEIGHT: f64 = 24.0;
-const TOP_ROWS: [f64; 4] = [22.0, 24.0, 26.0, 24.0];
+const TOP_ROWS: [f64; 7] = [22.0, 24.0, 26.0, 24.0, 24.0, 24.0, 24.0];
 const ROW_HEIGHT: f64 = 34.0;
 const ICON: f64 = 20.0;
 const SMALL_FONT: f64 = 11.0;
@@ -35,6 +37,9 @@ pub struct MixerTexts {
     pub boost: String,
     pub night: String,
     pub width: String,
+    pub spatial: String,
+    pub angle: String,
+    pub orbit: String,
     pub mute: String,
     pub app_eq: String,
 }
@@ -77,6 +82,12 @@ pub struct MixerModel {
     pub night: bool,
     /// Slider position, 0 to 1 (0.5 is unchanged).
     pub width: f64,
+    /// 3D amount, 0 to 1.
+    pub spatial: f64,
+    /// Slider position, 0 to 1 (0.5 is straight ahead).
+    pub angle: f64,
+    /// Slider position, 0 to 1 (0.5 is not turning).
+    pub orbit: f64,
     pub rows: Vec<MixerRow>,
 }
 
@@ -90,6 +101,9 @@ pub struct MixerCallbacks {
     pub on_boost: Box<dyn Fn(f64)>,
     pub on_night: Box<dyn Fn(bool)>,
     pub on_width: Box<dyn Fn(f64)>,
+    pub on_spatial: Box<dyn Fn(f64)>,
+    pub on_angle: Box<dyn Fn(f64)>,
+    pub on_orbit: Box<dyn Fn(f64)>,
     pub on_volume: RowChange<f64>,
     pub on_mute: RowChange<bool>,
     pub on_output: RowChange<usize>,
@@ -174,8 +188,39 @@ fn slider(mtm: MainThreadMarker, frame: NSRect, target: &ActionTarget) -> Retain
     };
     slider.setControlSize(NSControlSize::Small);
     slider.setContinuous(true);
+    // White, as the notch draws its own controls, rather than the accent of a settings window.
+    slider.setTrackFillColor(Some(&style::white(style::TEXT)));
     slider.setFrame(frame);
     slider
+}
+
+/// A speaker that an app's row is muted with: crossed out while muted. A symbol says it in less room than a
+/// checkbox and a word, and `title` still names it for VoiceOver and in its tooltip.
+fn mute_button(
+    mtm: MainThreadMarker,
+    title: &str,
+    frame: NSRect,
+    target: &ActionTarget,
+) -> Retained<NSButton> {
+    let symbol = |name: &str| {
+        NSImage::imageWithSystemSymbolName_accessibilityDescription(
+            &NSString::from_str(name),
+            Some(&NSString::from_str(title)),
+        )
+    };
+    let button = NSButton::initWithFrame(mtm.alloc(), frame);
+    // SAFETY: as in `checkbox`.
+    unsafe {
+        button.setTarget(Some(target_object(target)));
+        button.setAction(Some(sel!(fire:)));
+    }
+    // A toggle shows its alternate image while it is on, which is while the app is muted.
+    button.setButtonType(NSButtonType::Toggle);
+    button.setBordered(false);
+    button.setImage(symbol("speaker.wave.2.fill").as_deref());
+    button.setAlternateImage(symbol("speaker.slash.fill").as_deref());
+    button.setToolTip(Some(&NSString::from_str(title)));
+    button
 }
 
 fn popup(
@@ -186,6 +231,8 @@ fn popup(
 ) -> Retained<NSPopUpButton> {
     let popup = NSPopUpButton::initWithFrame_pullsDown(mtm.alloc(), frame, false);
     popup.setControlSize(NSControlSize::Small);
+    // The badge bezel (once called inline) is a small capsule, the shape of the chips on the other pages.
+    popup.setBezelStyle(NSBezelStyle::Badge);
     popup.setFont(Some(&NSFont::systemFontOfSize(SMALL_FONT)));
     for item in items {
         popup.addItemWithTitle(&NSString::from_str(item));
@@ -237,6 +284,9 @@ struct Header {
     boost: Retained<NSSlider>,
     night: Retained<NSButton>,
     width: Retained<NSSlider>,
+    spatial: Retained<NSSlider>,
+    angle: Retained<NSSlider>,
+    orbit: Retained<NSSlider>,
     _targets: Vec<Retained<ActionTarget>>,
 }
 
@@ -446,6 +496,30 @@ impl MixerView {
         );
         targets.push(width_target);
 
+        let mut three_d = |index: usize, text: &str, report: fn(&MixerCallbacks, f64)| {
+            let top = row(TOP_ROWS[index]);
+            let name = label(
+                mtm,
+                text,
+                NSRect::new(NSPoint::new(MARGIN, top + 4.0), NSSize::new(150.0, 16.0)),
+                0.8,
+            );
+            let (control, target) = self.slider_with(
+                NSRect::new(
+                    NSPoint::new(170.0, top),
+                    NSSize::new(200.0, TOP_ROWS[index]),
+                ),
+                report,
+            );
+            targets.push(target);
+            self.root.addSubview(&name);
+            self.root.addSubview(&control);
+            control
+        };
+        let spatial = three_d(4, &texts.spatial, |c, v| (c.on_spatial)(v));
+        let angle = three_d(5, &texts.angle, |c, v| (c.on_angle)(v));
+        let orbit = three_d(6, &texts.orbit, |c, v| (c.on_orbit)(v));
+
         self.root.addSubview(&enabled);
         self.root.addSubview(&device);
         self.root.addSubview(&volume_label);
@@ -467,6 +541,9 @@ impl MixerView {
             boost,
             night,
             width: width_slider,
+            spatial,
+            angle,
+            orbit,
             _targets: targets,
         }
     }
@@ -600,10 +677,10 @@ impl MixerView {
                     (callbacks.on_mute)(&key, button.state() == NSControlStateValueOn);
                 }
             });
-            let made = checkbox(
+            let made = mute_button(
                 mtm,
                 &self.texts.mute,
-                NSRect::new(NSPoint::new(344.0, 6.0), NSSize::new(56.0, 22.0)),
+                NSRect::new(NSPoint::new(360.0, 5.0), NSSize::new(24.0, 24.0)),
                 &target,
             );
             *slot.borrow_mut() = Some(made.clone());
@@ -662,6 +739,12 @@ impl MixerView {
             .percent
             .setStringValue(&NSString::from_str(&row.percent));
         views.mute.setState(on_off(row.muted));
+        let ink = if row.muted {
+            Tone::Red.color()
+        } else {
+            style::white(style::TEXT_SECONDARY)
+        };
+        views.mute.setContentTintColor(Some(&ink));
         set_items(&views.output, outputs);
         views.output.selectItemAtIndex(row.output as isize);
         for (index, _) in eq_options.iter().enumerate() {
@@ -695,6 +778,9 @@ impl MixerView {
             h.boost.setDoubleValue(model.boost);
             h.night.setState(on_off(model.night));
             h.width.setDoubleValue(model.width);
+            h.spatial.setDoubleValue(model.spatial);
+            h.angle.setDoubleValue(model.angle);
+            h.orbit.setDoubleValue(model.orbit);
         }
 
         let same_rows = {

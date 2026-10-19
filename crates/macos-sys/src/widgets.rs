@@ -56,6 +56,31 @@ pub fn symbol_png(name: &str, points: f64, scale: f64) -> Option<Vec<u8>> {
     png_at(&image, image.size(), scale)
 }
 
+/// The same symbol as a `data:` URL, the only way a page that may load nothing can show it.
+pub fn symbol_data_url(name: &str, points: f64, scale: f64) -> Option<String> {
+    symbol_png(name, points, scale).map(|png| format!("data:image/png;base64,{}", base64(&png)))
+}
+
+/// Standard base64 with padding, for the images and fonts the web pages carry inline.
+pub fn base64(bytes: &[u8]) -> String {
+    const TABLE: &[u8; 64] = b"ABCDEFGHIJKLMNOPQRSTUVWXYZabcdefghijklmnopqrstuvwxyz0123456789+/";
+    let mut out = String::with_capacity(bytes.len().div_ceil(3) * 4);
+    for chunk in bytes.chunks(3) {
+        let n = chunk
+            .iter()
+            .enumerate()
+            .fold(0u32, |n, (i, &b)| n | u32::from(b) << (16 - 8 * i));
+        for i in 0..4 {
+            if i <= chunk.len() {
+                out.push(char::from(TABLE[(n >> (18 - 6 * i) & 63) as usize]));
+            } else {
+                out.push('=');
+            }
+        }
+    }
+    out
+}
+
 /// Encoded image data (PNG, ICNS or any format NSImage reads) drawn `points` on its longer side at `scale`
 /// pixels per point, as PNG bytes; `None` for data that is not an image.
 pub fn image_png(data: &[u8], points: f64, scale: f64) -> Option<Vec<u8>> {
@@ -165,9 +190,14 @@ define_class!(
     impl PageRoot {
         #[unsafe(method(drawRect:))]
         fn draw_rect(&self, _dirty: NSRect) {
+            // The keys a hint names work only while this window has the keyboard, so the hint shows only then:
+            // a notch opened by hovering stays quiet.
+            if !self.window().is_some_and(|window| window.isKeyWindow()) {
+                return;
+            }
             let attrs = text_attributes(
                 &NSFont::systemFontOfSize(10.5),
-                &NSColor::colorWithWhite_alpha(1.0, 0.38),
+                &white(style::TEXT_TERTIARY),
                 Fit::Clip,
                 true,
             );

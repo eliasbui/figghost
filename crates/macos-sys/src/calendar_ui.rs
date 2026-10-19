@@ -205,7 +205,7 @@ fn draw_item(item: &Item, width: f64, height: f64) {
                 &attrs(
                     10.5,
                     Weight::Semibold,
-                    &white(style::TEXT_TERTIARY + 0.14),
+                    &white(style::TEXT_TERTIARY),
                     Fit::Clip,
                 ),
             );
@@ -220,7 +220,7 @@ fn draw_item(item: &Item, width: f64, height: f64) {
                 &attrs(
                     10.5,
                     Weight::Regular,
-                    &white(style::TEXT_TERTIARY + 0.12),
+                    &white(style::TEXT_TERTIARY),
                     Fit::Tail,
                 ),
             );
@@ -293,7 +293,7 @@ fn draw_item(item: &Item, width: f64, height: f64) {
                     rect(24.0, y + 23.0, TIME_WIDTH, 13.0),
                     &text_attributes(
                         &style::digits(10.5, Weight::Regular),
-                        &white(style::TEXT_TERTIARY + 0.1),
+                        &white(style::TEXT_TERTIARY),
                         Fit::Clip,
                         false,
                     ),
@@ -377,7 +377,7 @@ fn draw_item(item: &Item, width: f64, height: f64) {
                 &attrs(
                     11.0,
                     Weight::Regular,
-                    &white(style::TEXT_TERTIARY + 0.1),
+                    &white(style::TEXT_TERTIARY),
                     Fit::Tail,
                 ),
             );

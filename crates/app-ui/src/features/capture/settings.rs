@@ -103,7 +103,9 @@ pub fn set_shortcut(config: &mut Config, target: &str, value: &str) -> Option<Re
         .map(Kind::key)
         .chain(ACTIONS)
         .find(|k| *k == what)?;
-    config.shortcuts.insert(key.to_owned(), value.trim().to_owned());
+    config
+        .shortcuts
+        .insert(key.to_owned(), value.trim().to_owned());
     Some(Ok(()))
 }
 
@@ -155,11 +157,25 @@ mod tests {
             "cmd+shift+8"
         );
         assert!(set_shortcut(&mut config, "capture:nothing", "cmd+k").is_none());
-        assert!(shortcuts(&config).iter().all(|(t, _)| t != "capture:again"), "an action is off until it has a key");
-        assert!(set_shortcut(&mut config, "capture:again", "cmd+shift+9").unwrap().is_ok());
-        assert!(set_shortcut(&mut config, "capture:folder", "cmd+shift+0").unwrap().is_ok());
+        assert!(
+            shortcuts(&config).iter().all(|(t, _)| t != "capture:again"),
+            "an action is off until it has a key"
+        );
+        assert!(
+            set_shortcut(&mut config, "capture:again", "cmd+shift+9")
+                .unwrap()
+                .is_ok()
+        );
+        assert!(
+            set_shortcut(&mut config, "capture:folder", "cmd+shift+0")
+                .unwrap()
+                .is_ok()
+        );
         assert!(shortcuts(&config).contains(&("capture:again".into(), "cmd+shift+9".into())));
-        assert_eq!(state(&config, &Value::Null)["shortcuts"]["folder"], "cmd+shift+0");
+        assert_eq!(
+            state(&config, &Value::Null)["shortcuts"]["folder"],
+            "cmd+shift+0"
+        );
         assert!(set_shortcut(&mut config, "tiling:left", "cmd+k").is_none());
     }
 

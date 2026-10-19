@@ -41,4 +41,4 @@ xattr -dr com.apple.quarantine "$APP" 2>/dev/null || true
 
 echo "install: $APP"
 echo "install: open it, then grant Accessibility when it asks (smooth scrolling, paste, window snapping)"
-echo "install: that grant is lost on every update, because the app is signed ad hoc"
+echo "install: the grant stays through later updates; if an older copy was already in the list, remove it there first"

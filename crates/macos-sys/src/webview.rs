@@ -13,10 +13,10 @@ use objc2::{
 use objc2_app_kit::{
     NSAppearance, NSAppearanceCustomization, NSAppearanceNameAqua, NSAppearanceNameDarkAqua,
     NSApplication, NSAutoresizingMaskOptions, NSBackingStoreType, NSBitmapImageFileType,
-    NSBitmapImageRep, NSColor, NSEvent, NSEventMask, NSEventType, NSGlassEffectView, NSGlassEffectViewStyle,
-    NSImage, NSPanel, NSScreen, NSStatusWindowLevel, NSView, NSVisualEffectBlendingMode, NSVisualEffectMaterial, NSVisualEffectState,
-    NSVisualEffectView, NSWindow, NSWindowDelegate, NSWindowStyleMask, NSWindowTitleVisibility,
-    NSWorkspace,
+    NSBitmapImageRep, NSColor, NSEvent, NSEventMask, NSEventType, NSGlassEffectView,
+    NSGlassEffectViewStyle, NSImage, NSPanel, NSScreen, NSStatusWindowLevel, NSView,
+    NSVisualEffectBlendingMode, NSVisualEffectMaterial, NSVisualEffectState, NSVisualEffectView,
+    NSWindow, NSWindowDelegate, NSWindowStyleMask, NSWindowTitleVisibility, NSWorkspace,
 };
 use objc2_foundation::{
     NSDictionary, NSError, NSNotification, NSNumber, NSObject, NSObjectProtocol, NSPoint, NSRect,
@@ -578,8 +578,8 @@ impl Drop for WebWindow {
 }
 
 /// The width of the panel under the menu bar item; its height follows the page.
-const TRAY_WIDTH: f64 = 348.0;
-const TRAY_RADIUS: f64 = 28.0;
+const TRAY_WIDTH: f64 = 276.0;
+const TRAY_RADIUS: f64 = 18.0;
 /// The gap between the menu bar and the panel, and between the panel and the edge of the screen.
 const TRAY_GAP: f64 = 6.0;
 const TRAY_MARGIN: f64 = 8.0;
@@ -633,10 +633,9 @@ impl TrayPanel {
         self.panel.setFrame_display(frame, true);
     }
 
-    /// Shows the panel under `anchor` (the menu bar item's window, in screen coordinates). A press in the
-    /// window numbered `keep` does not close it: that is the item itself, which closes the panel by its own
-    /// click.
-    pub fn show_under(&self, mtm: MainThreadMarker, anchor: NSRect, keep: isize) {
+    /// Shows the panel under `anchor` (the menu bar item's window, in screen coordinates). A press on `anchor`
+    /// does not close it: that is the item itself, which closes the panel by its own click.
+    pub fn show_under(&self, mtm: MainThreadMarker, anchor: NSRect) {
         let mid = NSPoint::new(anchor.origin.x + anchor.size.width / 2.0, anchor.origin.y);
         let screen = NSScreen::screens(mtm)
             .iter()
@@ -664,7 +663,7 @@ impl TrayPanel {
         self.panel.setFrame_display(frame, true);
         self.panel.orderFrontRegardless();
         self.shown.set(true);
-        self.watch(mtm, keep);
+        self.watch(mtm, anchor);
     }
 
     pub fn hide(&self) {
@@ -674,7 +673,7 @@ impl TrayPanel {
     }
 
     /// Closes the panel on a press outside it (in any app) or on Escape.
-    fn watch(&self, mtm: MainThreadMarker, keep: isize) {
+    fn watch(&self, mtm: MainThreadMarker, anchor: NSRect) {
         self.unwatch();
         let panel = Weak::from_retained(&self.panel);
         let own = self.panel.windowNumber();
@@ -690,12 +689,26 @@ impl TrayPanel {
             | NSEventMask::RightMouseDown
             | NSEventMask::OtherMouseDown
             | NSEventMask::KeyDown;
+        // Where the pointer is, not which window the press is for: the system gives the menu bar item another
+        // window number to the monitors of other apps than to this one, and a press that closed the panel
+        // before the item's click came would only have it opened again by that click.
+        let on_item = move || {
+            let at = NSEvent::mouseLocation();
+            at.x >= anchor.origin.x
+                && at.x < anchor.origin.x + anchor.size.width
+                && at.y >= anchor.origin.y
+                && at.y < anchor.origin.y + anchor.size.height
+        };
         let outside = {
             let close = close.clone();
             RcBlock::new(move |event: NonNull<NSEvent>| {
                 // SAFETY: AppKit passes a live event for the duration of the call.
                 let event = unsafe { event.as_ref() };
-                if event.r#type() != NSEventType::KeyDown || event.keyCode() == KEY_ESCAPE {
+                if event.r#type() == NSEventType::KeyDown {
+                    if event.keyCode() == KEY_ESCAPE {
+                        close();
+                    }
+                } else if !on_item() {
                     close();
                 }
             })
@@ -705,17 +718,20 @@ impl TrayPanel {
             let e = unsafe { event.as_ref() };
             let number = e.windowNumber();
             let key = e.r#type() == NSEventType::KeyDown;
-            if (!key && number != own && number != keep) || (key && e.keyCode() == KEY_ESCAPE) {
+            if (!key && number != own && !on_item()) || (key && e.keyCode() == KEY_ESCAPE) {
                 close();
             }
             event.as_ptr()
         });
         let mut tokens = self.monitors.borrow_mut();
-        if let Some(token) = NSEvent::addGlobalMonitorForEventsMatchingMask_handler(mask, &outside) {
+        if let Some(token) = NSEvent::addGlobalMonitorForEventsMatchingMask_handler(mask, &outside)
+        {
             tokens.push(token);
         }
         // SAFETY: the block returns the event it was given, which AppKit then delivers as usual.
-        if let Some(token) = unsafe { NSEvent::addLocalMonitorForEventsMatchingMask_handler(mask, &inside) } {
+        if let Some(token) =
+            unsafe { NSEvent::addLocalMonitorForEventsMatchingMask_handler(mask, &inside) }
+        {
             tokens.push(token);
         }
         let _ = mtm;

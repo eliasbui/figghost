@@ -52,6 +52,9 @@ unsafe extern "C" {
         value: *mut CFTypeRef,
     ) -> i32;
     fn AXUIElementGetPid(element: AXUIElementRef, pid: *mut i32) -> i32;
+    fn AXUIElementPerformAction(element: AXUIElementRef, action: CFStringRef) -> i32;
+    // Not documented, but every window manager uses it: the number the window server gave the window.
+    fn _AXUIElementGetWindow(element: AXUIElementRef, window: *mut u32) -> i32;
     fn AXUIElementCopyElementAtPosition(
         application: AXUIElementRef,
         x: f32,
@@ -165,6 +168,33 @@ impl Element {
         let mut pid = 0;
         // SAFETY: `self.0` is a live element and `pid` is a valid out pointer.
         (unsafe { AXUIElementGetPid(self.0, &mut pid) } == 0).then_some(pid)
+    }
+
+    /// The number the window server gives the window this element is, which is how the system's list of windows names
+    /// it. `None` for an element that is not a window.
+    pub fn window_id(&self) -> Option<u32> {
+        let mut id = 0;
+        // SAFETY: `self.0` is a live element and `id` is a valid out pointer.
+        (unsafe { _AXUIElementGetWindow(self.0, &mut id) } == 0 && id != 0).then_some(id)
+    }
+
+    /// Asks the element to do `action`, such as `AXRaise`. Whether the app then does it is up to the app.
+    pub fn perform(&self, action: &str) -> bool {
+        // SAFETY: element and action are live; the action name is a valid CFString.
+        unsafe { AXUIElementPerformAction(self.0, name(action).as_concrete_TypeRef()) == 0 }
+    }
+
+    /// Sets a boolean attribute such as `AXFrontmost`.
+    pub fn set_flag(&self, attribute: &str, on: bool) -> bool {
+        let value = CFBoolean::from(on);
+        // SAFETY: element and value are live; the attribute name is a valid CFString.
+        unsafe {
+            AXUIElementSetAttributeValue(
+                self.0,
+                name(attribute).as_concrete_TypeRef(),
+                value.as_concrete_TypeRef().cast(),
+            ) == 0
+        }
     }
 
     pub fn flag(&self, attribute: &str) -> Option<bool> {

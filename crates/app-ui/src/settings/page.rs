@@ -1,7 +1,7 @@
 //! Assembles the settings page: one HTML string with the styles and the script inlined, so nothing is
 //! read from disk or the network at run time.
 
-use macos_sys::widgets::{image_png, symbol_png};
+use macos_sys::widgets::{base64, image_png, symbol_png};
 use serde_json::{Map, Value, json};
 
 const INDEX: &str = include_str!("../../web/index.html");
@@ -11,6 +11,7 @@ const SCRIPT: &str = include_str!("../../web/app.js");
 /// `app.js` reads them), styles, and the sample data of its part of the state.
 const FEATURE_SCRIPTS: &[&str] = &[
     include_str!("../../web/features/smart.js"),
+    include_str!("../../web/features/translate.js"),
     include_str!("../../web/features/capture.js"),
     include_str!("../../web/features/vision.js"),
     include_str!("../../web/features/lyrics.js"),
@@ -24,6 +25,7 @@ const FEATURE_SCRIPTS: &[&str] = &[
 ];
 const FEATURE_STYLES: &[&str] = &[
     include_str!("../../web/features/smart.css"),
+    include_str!("../../web/features/translate.css"),
     include_str!("../../web/features/capture.css"),
     include_str!("../../web/features/vision.css"),
     include_str!("../../web/features/lyrics.css"),
@@ -74,6 +76,10 @@ const FEATURE_FIXTURES: &[(&str, &str)] = &[
         include_str!("../../web/features/wheel.fixture.json"),
     ),
     ("mole", include_str!("../../web/features/mole.fixture.json")),
+    (
+        "translate",
+        include_str!("../../web/features/translate.fixture.json"),
+    ),
 ];
 
 /// The SF Symbols the page draws (app.js `icon()`): page icons and button glyphs. The page's self-test fails
@@ -86,6 +92,7 @@ const SYMBOLS: &[&str] = &[
     "terminal.fill",
     "magnifyingglass",
     "text.magnifyingglass",
+    "character.bubble",
     "camera.viewfinder",
     "eyedropper.halffull",
     "calendar",
@@ -153,26 +160,6 @@ fn assets() -> String {
     )
 }
 
-/// The same as `settings::base64`, which this file cannot reach when the preview example includes it.
-fn base64(bytes: &[u8]) -> String {
-    const TABLE: &[u8; 64] = b"ABCDEFGHIJKLMNOPQRSTUVWXYZabcdefghijklmnopqrstuvwxyz0123456789+/";
-    let mut out = String::with_capacity(bytes.len().div_ceil(3) * 4);
-    for chunk in bytes.chunks(3) {
-        let n = chunk
-            .iter()
-            .enumerate()
-            .fold(0u32, |n, (i, &b)| n | u32::from(b) << (16 - 8 * i));
-        for i in 0..4 {
-            if i <= chunk.len() {
-                out.push(char::from(TABLE[(n >> (18 - 6 * i) & 63) as usize]));
-            } else {
-                out.push('=');
-            }
-        }
-    }
-    out
-}
-
 pub fn html() -> String {
     let script = format!("{}\n{}\n{SCRIPT}", assets(), FEATURE_SCRIPTS.join("\n"));
     let style = format!("{}{STYLE}\n{}", font_faces(), FEATURE_STYLES.join("\n"));
@@ -226,6 +213,19 @@ mod tests {
             );
         }
         assert!(image_png(APP_ICON, 64.0, SCALE).is_some(), "the app icon");
+    }
+
+    #[test]
+    fn the_licence_on_the_about_page_is_the_licence_file_line_for_line() {
+        let licence = include_str!("../../../../LICENSE");
+        let lines: Vec<&str> = licence.lines().filter(|l| !l.trim().is_empty()).collect();
+        assert!(lines.len() > 10 && lines[0] == "MIT License");
+        for line in lines {
+            assert!(
+                SCRIPT.contains(&format!("'{line}'")),
+                "the About page does not have this line of LICENSE: {line}"
+            );
+        }
     }
 
     #[test]

@@ -172,10 +172,7 @@ fn draw(px: f64) {
     // Ghost transform: optically centered on the tile with generous proportions.
     let ghost_scale = 6.2;
     let place = objc2_foundation::NSAffineTransform::transform();
-    place.translateXBy_yBy(
-        512.0 - 51.5 * ghost_scale,
-        512.0 - 54.5 * ghost_scale - 2.0,
-    );
+    place.translateXBy_yBy(512.0 - 51.5 * ghost_scale, 512.0 - 54.5 * ghost_scale - 2.0);
     place.scaleBy(ghost_scale);
 
     // Primary floating drop shadow under the ghost.

@@ -234,6 +234,7 @@ pub fn state(config: &Config, env: &Env) -> Value {
         "general": {
             "language": config.language,
             "show_on_launch": config.show_settings_on_launch,
+            "launch_effect": config.launch_effect,
             "menu_icon": config.menu_icon,
             "theme": config.theme,
         },
@@ -479,6 +480,10 @@ fn set(config: &mut Config, path: &str, value: &Value) -> Outcome {
             config.show_settings_on_launch = flag(value)?;
             Ok(Effect::None)
         }
+        "general.launch_effect" => {
+            config.launch_effect = flag(value)?;
+            Ok(Effect::None)
+        }
         "launch_at_login" => Ok(Effect::LoginItem(flag(value)?)),
         "mouse.smooth" => {
             m.smooth = flag(value)?;
@@ -561,7 +566,10 @@ fn set(config: &mut Config, path: &str, value: &Value) -> Outcome {
             Ok(Effect::Notch)
         }
         "notch.hud" => {
-            config.notch.hud = one_of(value, &["notch", "glass", "corner", "bar", "island", "side", "tile"])?;
+            config.notch.hud = one_of(
+                value,
+                &["notch", "glass", "corner", "bar", "island", "side", "tile"],
+            )?;
             Ok(Effect::Hud)
         }
         "notch.motion" => {
@@ -587,19 +595,39 @@ fn set(config: &mut Config, path: &str, value: &Value) -> Outcome {
             Ok(Effect::Notch)
         }
         "notch.width" => {
-            config.notch.width = crate::config::size_or_auto(&json!(number(value, 0.0, 1000.0)?.round() as u64), 480, 1000, 0);
+            config.notch.width = crate::config::size_or_auto(
+                &json!(number(value, 0.0, 1000.0)?.round() as u64),
+                480,
+                1000,
+                0,
+            );
             Ok(Effect::Notch)
         }
         "notch.height" => {
-            config.notch.height = crate::config::size_or_auto(&json!(number(value, 0.0, 900.0)?.round() as u64), 260, 900, 0);
+            config.notch.height = crate::config::size_or_auto(
+                &json!(number(value, 0.0, 900.0)?.round() as u64),
+                260,
+                900,
+                0,
+            );
             Ok(Effect::Notch)
         }
         "notch.rest_width" => {
-            config.notch.rest_width = crate::config::size_or_auto(&json!(number(value, 0.0, 400.0)?.round() as u64), 120, 400, 0);
+            config.notch.rest_width = crate::config::size_or_auto(
+                &json!(number(value, 0.0, 400.0)?.round() as u64),
+                120,
+                400,
+                0,
+            );
             Ok(Effect::Notch)
         }
         "notch.rest_height" => {
-            config.notch.rest_height = crate::config::size_or_auto(&json!(number(value, 0.0, 48.0)?.round() as u64), 20, 48, 0);
+            config.notch.rest_height = crate::config::size_or_auto(
+                &json!(number(value, 0.0, 48.0)?.round() as u64),
+                20,
+                48,
+                0,
+            );
             Ok(Effect::Notch)
         }
         "notch.hover_delay_ms" => {
@@ -1447,7 +1475,16 @@ mod tests {
     fn every_feature_has_its_part_in_the_state_the_page_renders() {
         let state = state(&Config::default(), &env());
         for id in [
-            "smart", "capture", "vision", "lyrics", "calendar", "snap", "menubar", "stack", "wheel",
+            "smart",
+            "capture",
+            "vision",
+            "lyrics",
+            "calendar",
+            "snap",
+            "menubar",
+            "stack",
+            "wheel",
+            "translate",
         ] {
             assert!(state[id].is_object(), "{id} is missing from the state");
             assert!(state[id]["enabled"].is_boolean(), "{id} has no switch");

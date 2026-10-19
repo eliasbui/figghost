@@ -57,6 +57,26 @@ impl Window {
         self.0.flag("AXFullScreen").unwrap_or(false)
     }
 
+    /// The number the window server gives this window, which is how the system's list of windows names it.
+    pub fn id(&self) -> Option<u32> {
+        self.0.window_id()
+    }
+
+    pub fn title(&self) -> Option<String> {
+        self.0.string("AXTitle")
+    }
+
+    /// Brings the window in front of the others: its app first, then the window within it. The app takes the
+    /// keyboard, as it does when a person clicks the window.
+    pub fn raise(&self) -> bool {
+        let app = self.0.pid().and_then(Element::application);
+        let front = app
+            .as_ref()
+            .is_some_and(|app| app.set_flag("AXFrontmost", true));
+        let main = self.0.set_flag("AXMain", true);
+        self.0.perform("AXRaise") || front || main
+    }
+
     /// Size, then position, then size again: moving a window to another screen can clamp the first size,
     /// and some apps only accept the final size once the window sits where it will live.
     pub fn set_frame(&self, frame: Frame) -> bool {

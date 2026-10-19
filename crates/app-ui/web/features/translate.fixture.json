@@ -1,0 +1,7 @@
+{
+  "enabled": true,
+  "shortcut": "ctrl+opt+cmd+t",
+  "translate_to": "auto",
+  "languages": [{ "code": "en", "name": "English" }, { "code": "vi", "name": "Tiếng Việt" }],
+  "accessibility": true
+}

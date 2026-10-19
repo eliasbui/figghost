@@ -7,6 +7,8 @@ use std::sync::atomic::{AtomicBool, AtomicU32, Ordering};
 /// Highest volume: four times, +12 dB, for audio that is too quiet even at full system volume.
 pub const MAX_GAIN: f32 = 4.0;
 const MAX_WIDTH: f32 = 2.0;
+/// Fastest orbit of the spatial stage, in degrees per second.
+pub const MAX_ORBIT: f32 = 90.0;
 
 struct AtomicF32(AtomicU32);
 
@@ -46,6 +48,12 @@ pub struct Params {
     /// Magic Boost amount, 0 to 1.
     boost: AtomicF32,
     night: AtomicBool,
+    /// Spatial 3D amount, 0 (off) to 1.
+    spatial: AtomicF32,
+    /// Where the spatial stage points, in degrees: 0 is straight ahead, positive turns to the right.
+    angle: AtomicF32,
+    /// How fast the spatial stage keeps turning, in degrees per second.
+    orbit: AtomicF32,
     /// Bumped after every change that needs filters or the compressor rebuilt.
     revision: AtomicU32,
 }
@@ -61,6 +69,9 @@ impl Default for Params {
             eq_gains: std::array::from_fn(|_| AtomicF32::new(0.0)),
             boost: AtomicF32::new(0.0),
             night: AtomicBool::new(false),
+            spatial: AtomicF32::new(0.0),
+            angle: AtomicF32::new(0.0),
+            orbit: AtomicF32::new(0.0),
             revision: AtomicU32::new(0),
         }
     }
@@ -146,6 +157,31 @@ impl Params {
         self.changed();
     }
 
+    pub fn spatial(&self) -> f32 {
+        self.spatial.get()
+    }
+
+    pub fn set_spatial(&self, spatial: f32) {
+        self.spatial.set(sane(spatial, 0.0, 1.0, 0.0));
+    }
+
+    pub fn angle(&self) -> f32 {
+        self.angle.get()
+    }
+
+    pub fn set_angle(&self, degrees: f32) {
+        self.angle.set(sane(degrees, -180.0, 180.0, 0.0));
+    }
+
+    pub fn orbit(&self) -> f32 {
+        self.orbit.get()
+    }
+
+    pub fn set_orbit(&self, degrees_per_second: f32) {
+        self.orbit
+            .set(sane(degrees_per_second, -MAX_ORBIT, MAX_ORBIT, 0.0));
+    }
+
     /// True when these settings leave the audio exactly as it was, so nothing needs to process it.
     pub fn is_neutral(&self) -> bool {
         self.volume() == 1.0
@@ -155,6 +191,7 @@ impl Params {
             && (!self.eq_enabled() || self.eq_gains() == [0.0; BANDS])
             && self.boost() == 0.0
             && !self.night()
+            && self.spatial() == 0.0
     }
 }
 

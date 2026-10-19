@@ -111,7 +111,8 @@ impl Default for NotchConfig {
             shadow: true,
             motion: "spring".into(),
             open_on_hover: true,
-            hover_delay_ms: 120,
+            // About what other notch apps wait, so a pointer that only passes by does not open it.
+            hover_delay_ms: 300,
             width: 0,
             height: 0,
             rest_width: 0,
@@ -134,9 +135,13 @@ impl Default for NotchConfig {
 /// `value` when it is one of `words`, else the default.
 /// A size in points: 0 for automatic, otherwise kept between `least` and `most`.
 pub fn size_or_auto(value: &serde_json::Value, least: u64, most: u64, default: u32) -> u32 {
-    value
-        .as_u64()
-        .map_or(default, |n| if n == 0 { 0 } else { n.clamp(least, most) as u32 })
+    value.as_u64().map_or(default, |n| {
+        if n == 0 {
+            0
+        } else {
+            n.clamp(least, most) as u32
+        }
+    })
 }
 
 fn word(value: &serde_json::Value, words: &[&str], default: &str) -> String {
@@ -215,7 +220,11 @@ impl From<serde_json::Value> for NotchConfig {
             live_agents: flag("live_agents", d.live_agents),
             waveform: word(&v["waveform"], &["live", "animated"], &d.waveform),
             shortcut: v["shortcut"].as_str().unwrap_or("").trim().to_owned(),
-            hud: word(&v["hud"], &["notch", "glass", "corner", "bar", "island", "side", "tile"], &d.hud),
+            hud: word(
+                &v["hud"],
+                &["notch", "glass", "corner", "bar", "island", "side", "tile"],
+                &d.hud,
+            ),
         }
     }
 }
@@ -329,6 +338,9 @@ pub struct Config {
     pub language: String,
     /// Open the settings window every time the app is started by hand (never when started at login).
     pub show_settings_on_launch: bool,
+    /// Each time the app is started by hand, its ghost comes out of the notch and blinks (never at login, never
+    /// when started in the background, and only with the notch on).
+    pub launch_effect: bool,
     /// The icon in the menu bar. Without it, opening the app again (Finder, Spotlight) shows the settings.
     pub menu_icon: bool,
     /// The settings window's appearance: `auto` follows the system, or `light` or `dark`.
@@ -355,6 +367,7 @@ pub struct Config {
     pub mascot: crate::features::mascot::Config,
     pub update: crate::update::Config,
     pub wheel: crate::features::wheel::Config,
+    pub translate: crate::features::translate::Config,
     /// Replace the system volume indicator with one in the notch. Needs Accessibility access.
     pub volume_hud: bool,
     /// Unpinned items kept in history.
@@ -371,6 +384,7 @@ impl Default for Config {
             version: CONFIG_VERSION,
             language: "auto".into(),
             show_settings_on_launch: true,
+            launch_effect: true,
             menu_icon: true,
             theme: "auto".into(),
             mouse: Settings::default(),
@@ -392,6 +406,7 @@ impl Default for Config {
             mascot: crate::features::mascot::Config::default(),
             update: crate::update::Config::default(),
             wheel: crate::features::wheel::Config::default(),
+            translate: crate::features::translate::Config::default(),
             volume_hud: false,
             history_limit: 500,
             ignored_apps: Vec::new(),

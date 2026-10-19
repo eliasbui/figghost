@@ -1,8 +1,11 @@
 //! Draws every page of the open notch into PNGs, with sample content, without showing anything on screen.
-//! `cargo run -p macos-sys --example render_notch -- /tmp/notch`
+//! `cargo run -p macos-sys --example render_notch -- /tmp/notch [--hardware]`
+//!
+//! `--hardware` draws them as on a screen with a camera cutout (185 by 32, as `render_closed` uses), where the
+//! header sits beside the cutout when it fits there.
 
 use macos_sys::{
-    MainThreadMarker,
+    MainThreadMarker, NSSize,
     agents_ui::{
         AgentsCallbacks, AgentsDisplay, AgentsView, ApprovalCardData, SessionData, TokensData,
         UsageData,
@@ -87,9 +90,14 @@ fn sample_rows() -> Vec<Row> {
 fn main() {
     let mtm = MainThreadMarker::new().expect("main thread");
     let dir = PathBuf::from(env::args().nth(1).unwrap_or_else(|| "/tmp/notch".into()));
+    let hardware = env::args().any(|a| a == "--hardware");
     fs::create_dir_all(&dir).expect("output directory");
     app::run_accessory(mtm, move || {
-        let geometry = NotchGeometry::detect(mtm).expect("a screen");
+        let mut geometry = NotchGeometry::detect(mtm).expect("a screen");
+        if hardware {
+            geometry.notch = NSSize::new(185.0, 32.0);
+            geometry.hardware = true;
+        }
         let noop = AppCallbacks {
             on_query: Box::new(|_, _| {}),
             on_activate: Box::new(|_, _, _| {}),

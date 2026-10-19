@@ -20,6 +20,7 @@ pub mod mole;
 pub mod smart;
 pub mod snap;
 pub mod stack;
+pub mod translate;
 pub mod vision;
 pub mod wheel;
 
@@ -54,6 +55,7 @@ pub struct Features {
     pub mascot: Option<Rc<mascot::Feature>>,
     pub wheel: Option<Rc<wheel::Feature>>,
     pub mole: Option<Rc<mole::Feature>>,
+    pub translate: Option<Rc<translate::Feature>>,
 }
 
 impl Features {
@@ -72,6 +74,7 @@ impl Features {
             stack: stack::attach(env),
             mascot: mascot::attach(env),
             mole: mole::attach(env),
+            translate: translate::attach(env),
         }
     }
 
@@ -110,6 +113,9 @@ impl Features {
         }
         if let Some(f) = &self.mole {
             out.insert("mole", f.runtime());
+        }
+        if let Some(f) = &self.translate {
+            out.insert("translate", f.runtime());
         }
         out
     }
@@ -157,6 +163,10 @@ impl Features {
                 .wheel
                 .as_ref()
                 .map_or(Ok(()), |f| f.configure(&config.wheel)),
+            "translate" => self
+                .translate
+                .as_ref()
+                .map_or(Ok(()), |f| f.configure(&config.translate)),
             _ => Ok(()),
         }
     }
@@ -193,6 +203,9 @@ impl Features {
         if let Some(f) = &self.wheel {
             f.suspend_hotkeys();
         }
+        if let Some(f) = &self.translate {
+            f.suspend_hotkeys();
+        }
     }
 
     pub fn resume_hotkeys(&self, config: &Config) {
@@ -225,6 +238,9 @@ impl Features {
         }
         if let Some(f) = &self.wheel {
             f.resume_hotkeys(&config.wheel);
+        }
+        if let Some(f) = &self.translate {
+            f.resume_hotkeys(&config.translate);
         }
     }
 
@@ -280,6 +296,11 @@ impl Features {
         {
             return Some(result);
         }
+        if let Some(f) = &self.translate
+            && let Some(result) = f.action(name, &mut config.translate)
+        {
+            return Some(result);
+        }
         if let Some(f) = &self.mole
             && let Some(result) = f.action(name)
         {
@@ -320,6 +341,9 @@ impl Features {
         }
         if let Some(f) = &self.wheel {
             entries.extend(wheel::Feature::menu_entries(f));
+        }
+        if let Some(f) = &self.translate {
+            entries.extend(translate::Feature::menu_entries(f));
         }
         if let Some(f) = &self.mole {
             entries.extend(mole::Feature::menu_entries(f));
@@ -376,6 +400,10 @@ pub fn state(
         wheel::settings::state(&config.wheel, runtime.get("wheel").unwrap_or(&none)),
     );
     root.insert(
+        "translate".into(),
+        translate::settings::state(&config.translate, runtime.get("translate").unwrap_or(&none)),
+    );
+    root.insert(
         "mole".into(),
         mole::settings::state(runtime.get("mole").unwrap_or(&none)),
     );
@@ -413,6 +441,8 @@ pub fn set(config: &mut Config, path: &str, value: &Value) -> Option<Result<&'st
         "wheel" => {
             wheel::settings::set(&mut config.wheel, rest, value).map(|r| r.map(|()| "wheel"))
         }
+        "translate" => translate::settings::set(&mut config.translate, rest, value)
+            .map(|r| r.map(|()| "translate")),
         _ => None,
     }
 }
@@ -421,8 +451,17 @@ pub fn set(config: &mut Config, path: &str, value: &Value) -> Option<Result<&'st
 pub fn shortcut_owner(target: &str) -> Option<&'static str> {
     let head = target.split(':').next()?;
     [
-        "smart", "capture", "vision", "lyrics", "calendar", "snap", "menubar", "stack", "mascot",
+        "smart",
+        "capture",
+        "vision",
+        "lyrics",
+        "calendar",
+        "snap",
+        "menubar",
+        "stack",
+        "mascot",
         "wheel",
+        "translate",
     ]
     .into_iter()
     .find(|id| *id == head)
@@ -441,6 +480,7 @@ pub fn shortcuts(config: &Config) -> Vec<(String, String)> {
     all.extend(stack::settings::shortcuts(&config.stack));
     all.extend(mascot::settings::shortcuts(&config.mascot));
     all.extend(wheel::settings::shortcuts(&config.wheel));
+    all.extend(translate::settings::shortcuts(&config.translate));
     all
 }
 
@@ -471,6 +511,8 @@ pub fn set_shortcut(
             .map(|r| r.map(|()| "mascot")),
         "wheel" => wheel::settings::set_shortcut(&mut config.wheel, target, value)
             .map(|r| r.map(|()| "wheel")),
+        "translate" => translate::settings::set_shortcut(&mut config.translate, target, value)
+            .map(|r| r.map(|()| "translate")),
         _ => None,
     }
 }

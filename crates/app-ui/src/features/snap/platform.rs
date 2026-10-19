@@ -1,10 +1,11 @@
-//! The AppKit side of the controller: the real screens, windows and panel.
+//! The AppKit side of the controller: the real screens, windows and panels.
 
 use super::controller::{Held, Platform, Pressed};
 use crate::i18n;
 use core_window::{
-    Layout, Rect,
-    snap::{self, Display, Point},
+    Rect,
+    snap::{Display, Point, View},
+    templates::Template,
 };
 use macos_sys::{MainThreadMarker, app, notch::Notch, permissions, snap_ui, window::Frame};
 use std::rc::Rc;
@@ -45,8 +46,22 @@ impl Held for Window {
 pub struct AppKit {
     mtm: MainThreadMarker,
     panel: snap_ui::ZonesPanel,
+    cells: snap_ui::CellsOverlay,
     footprint: snap_ui::Footprint,
     notch: Option<Rc<Notch>>,
+}
+
+/// The name a layout goes by in the row: the one a person gave it, or the built-in one in the language of the app.
+pub fn name_of(template: &Template) -> String {
+    template
+        .name
+        .clone()
+        .unwrap_or_else(|| i18n::current().snap_template(&template.id).to_owned())
+}
+
+/// The parts of a small screen the cells of a layout fill.
+fn parts(template: &Template) -> Vec<[f64; 4]> {
+    template.cells.iter().map(|c| c.part()).collect()
 }
 
 impl AppKit {
@@ -54,20 +69,22 @@ impl AppKit {
         Self {
             mtm,
             panel: snap_ui::ZonesPanel::new(mtm),
+            cells: snap_ui::CellsOverlay::new(mtm),
             footprint: snap_ui::Footprint::new(mtm),
             notch,
         }
     }
 
-    fn spec(display: &Display, layouts: &[Layout]) -> snap_ui::ZonesSpec {
-        let panel = display.panel(layouts);
-        let language = i18n::current();
-        snap_ui::ZonesSpec {
-            label: language.snap_zones(layouts),
+    /// The row of `templates` as the panel draws it, and where it hangs from.
+    pub fn row_spec(display: &Display, templates: &[Template]) -> (snap_ui::ZonesSpec, (f64, f64)) {
+        let panel = display.panel(templates.len());
+        let names: Vec<String> = templates.iter().map(name_of).collect();
+        let spec = snap_ui::ZonesSpec {
+            label: i18n::current().snap_row(&names),
             width: panel.w,
             height: panel.h,
             cells: display
-                .cells(layouts)
+                .cells(templates.len())
                 .into_iter()
                 .map(|c| Frame {
                     x: c.x - panel.x,
@@ -76,18 +93,31 @@ impl AppKit {
                     h: c.h,
                 })
                 .collect(),
-            glyphs: layouts
-                .iter()
-                .map(|l| {
-                    let g = snap::glyph(*l);
-                    [g.x, g.y, g.w, g.h]
-                })
-                .collect(),
-            names: layouts
-                .iter()
-                .map(|l| language.snap_short(*l).to_owned())
-                .collect(),
-        }
+            glyphs: templates.iter().map(parts).collect(),
+            names,
+            chip: None,
+        };
+        (spec, (panel.x, panel.y))
+    }
+
+    /// The chip the row shrinks to once `template` is chosen, and where it hangs from.
+    pub fn chip_spec(display: &Display, template: &Template) -> (snap_ui::ZonesSpec, (f64, f64)) {
+        let chip = display.chip();
+        let name = name_of(template);
+        let spec = snap_ui::ZonesSpec {
+            label: i18n::current().snap_chosen(&name),
+            width: chip.w,
+            height: chip.h,
+            cells: Vec::new(),
+            glyphs: Vec::new(),
+            names: Vec::new(),
+            chip: Some(snap_ui::ChipSpec {
+                parts: parts(template),
+                name,
+                top: display.inset,
+            }),
+        };
+        (spec, (chip.x, chip.y))
     }
 }
 
@@ -96,14 +126,19 @@ impl Platform for AppKit {
         permissions::accessibility_trusted(false)
     }
 
-    fn displays(&self) -> Vec<Display> {
+    fn displays(&self) -> Vec<(Display, String)> {
         snap_ui::displays(self.mtm)
             .into_iter()
-            .map(|d| Display {
-                frame: rect(d.frame),
-                area: rect(d.area),
-                cutout: d.cutout,
-                inset: d.inset,
+            .map(|d| {
+                (
+                    Display {
+                        frame: rect(d.frame),
+                        area: rect(d.area),
+                        cutout: d.cutout,
+                        inset: d.inset,
+                    },
+                    d.name,
+                )
             })
             .collect()
     }
@@ -121,14 +156,13 @@ impl Platform for AppKit {
         })
     }
 
-    fn show(&self, display: &Display, layouts: &[Layout], hover: Option<usize>) {
-        let panel = display.panel(layouts);
-        self.panel
-            .show((panel.x, panel.y), &Self::spec(display, layouts), hover);
-    }
-
-    fn set_hover(&self, hover: Option<usize>) {
-        self.panel.set_hover(hover);
+    fn show(&self, display: &Display, templates: &[Template], view: View) {
+        let chosen = view.chosen.and_then(|i| templates.get(i));
+        let (spec, at) = match chosen {
+            Some(template) if view.compact => Self::chip_spec(display, template),
+            _ => Self::row_spec(display, templates),
+        };
+        self.panel.show(at, &spec, view.hover, view.chosen);
     }
 
     fn hide(&self) {
@@ -139,6 +173,16 @@ impl Platform for AppKit {
         match target {
             Some(r) => self.footprint.show(frame(r)),
             None => self.footprint.hide(),
+        }
+    }
+
+    fn cells(&self, shown: Option<(Rect, Vec<Rect>)>) {
+        match shown {
+            Some((area, cells)) => {
+                let cells: Vec<Frame> = cells.into_iter().map(frame).collect();
+                self.cells.show(frame(area), &cells);
+            }
+            None => self.cells.hide(),
         }
     }
 

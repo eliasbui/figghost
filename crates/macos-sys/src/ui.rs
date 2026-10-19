@@ -58,6 +58,8 @@ const TILE_RADIUS: f64 = 16.0;
 const STRIP_PAGE: isize = 4;
 /// Where the search field of the strip starts: after the three dots of the notch's header.
 const STRIP_SEARCH_X: f64 = 70.0;
+/// What the strip's search field leaves free at its right for the page icons of the notch's header: up to eight.
+const STRIP_TOOLS: f64 = 16.0 + crate::switcher::width_for(8) + 8.0;
 
 /// How the rows look: the flat list of the cursor popup, the vertical cards of the notch, or the notch's strip of
 /// cards that scrolls sideways.
@@ -903,7 +905,7 @@ impl ListView {
             let color = if selected {
                 NSColor::colorWithWhite_alpha(1.0, 0.8)
             } else {
-                NSColor::colorWithWhite_alpha(1.0, 0.45)
+                NSColor::colorWithWhite_alpha(1.0, style::TEXT_TERTIARY)
             };
             let attrs = text_attributes(
                 // SAFETY: extern static weight constant.
@@ -996,6 +998,22 @@ impl ClipView {
     pub fn clear_query(&self) {
         self.search.setStringValue(&NSString::from_str(""));
         self.sync_chips();
+    }
+
+    /// The notch strip's search field shares the header row, between the three dots and the page icons; `whole`
+    /// gives it the row to itself, for when the notch puts those beside the cutout instead.
+    pub fn set_search_row(&self, whole: bool) {
+        let mut frame = self.search.frame();
+        let (x, right) = if whole {
+            (MARGIN + 4.0, MARGIN + 4.0)
+        } else {
+            (STRIP_SEARCH_X, STRIP_TOOLS)
+        };
+        frame.origin.x = x;
+        frame.size.width = self.root.frame().size.width - x - right;
+        if frame != self.search.frame() {
+            self.search.setFrame(frame);
+        }
     }
 
     /// Selects the chip of the filter that is in the search text, or "All" when there is none.
@@ -1345,10 +1363,9 @@ impl ClipUi {
             size.height - top_inset - MARGIN
         };
         let search_frame = if strip {
-            let tools = 16.0 + crate::switcher::width_for(8) + 8.0;
             NSRect::new(
                 NSPoint::new(STRIP_SEARCH_X, search_top - SEARCH_HEIGHT),
-                NSSize::new(size.width - STRIP_SEARCH_X - tools, SEARCH_HEIGHT),
+                NSSize::new(size.width - STRIP_SEARCH_X - STRIP_TOOLS, SEARCH_HEIGHT),
             )
         } else {
             NSRect::new(

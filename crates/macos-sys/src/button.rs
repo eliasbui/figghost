@@ -384,11 +384,7 @@ impl TouchButton {
             x += title_width;
         }
         if detail_width > 0.0 {
-            let dim = if solid {
-                black(0.45)
-            } else {
-                white(0.45)
-            };
+            let dim = if solid { black(0.45) } else { white(0.45) };
             draw_text(
                 &detail,
                 NSRect::new(

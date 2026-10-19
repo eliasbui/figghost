@@ -81,15 +81,19 @@ impl Feature {
         let text = crate::i18n::current().mole_menu();
         let quick = |title: &'static str, symbol: &'static str, action: &'static str| {
             let this = Rc::clone(this);
-            Entry::Item(
-                Item::new(title, move || {
-                    if !action.is_empty() {
-                        let _ = this.action(action);
-                    }
-                    crate::settings::show_page("mole");
-                })
-                .symbol(symbol),
-            )
+            let item = Item::new(title, move || {
+                if !action.is_empty() {
+                    let _ = this.action(action);
+                }
+                crate::settings::show_page("mole");
+            })
+            .symbol(symbol);
+            // The panel under the icon has the one that only opens the page, not four more to choose between.
+            Entry::Item(if action.is_empty() {
+                item
+            } else {
+                item.menu_only()
+            })
         };
         vec![Entry::Submenu {
             title: text[0].to_owned(),

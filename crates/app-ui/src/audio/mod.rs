@@ -11,7 +11,7 @@ use crate::{
     config::Config,
     i18n::{self, Language},
 };
-use core_audio_fx::Preset;
+use core_audio_fx::{MAX_ORBIT, Preset};
 use macos_sys::{
     MainThreadMarker, app,
     mixer_ui::{MixerCallbacks, MixerModel, MixerRow, MixerTexts, MixerView},
@@ -120,6 +120,9 @@ pub fn mixer_model(s: &Snapshot, text: Language) -> MixerModel {
         boost: f64::from(s.effects.boost),
         night: s.effects.night,
         width: f64::from(s.effects.width) / 2.0,
+        spatial: f64::from(s.effects.spatial),
+        angle: f64::from(s.effects.angle) / 360.0 + 0.5,
+        orbit: f64::from(s.effects.orbit) / f64::from(2.0 * MAX_ORBIT) + 0.5,
         rows,
     }
 }
@@ -192,6 +195,37 @@ fn callbacks(
                     (position * 2.0) as f32
                 };
                 engine.update_effects(|fx| fx.width = width);
+                done();
+            })
+        },
+        on_spatial: {
+            let (engine, done) = (e(), after(refresh));
+            Box::new(move |position| {
+                engine.update_effects(|fx| fx.spatial = position as f32);
+                done();
+            })
+        },
+        on_angle: {
+            let (engine, done) = (e(), after(refresh));
+            Box::new(move |position| {
+                let angle = if (position - 0.5).abs() < 0.02 {
+                    0.0
+                } else {
+                    ((position - 0.5) * 360.0) as f32
+                };
+                engine.update_effects(|fx| fx.angle = angle);
+                done();
+            })
+        },
+        on_orbit: {
+            let (engine, done) = (e(), after(refresh));
+            Box::new(move |position| {
+                let orbit = if (position - 0.5).abs() < 0.02 {
+                    0.0
+                } else {
+                    ((position - 0.5) * 2.0) as f32 * MAX_ORBIT
+                };
+                engine.update_effects(|fx| fx.orbit = orbit);
                 done();
             })
         },
@@ -275,6 +309,9 @@ impl AudioFeature {
             boost: text.audio_boost().into(),
             night: text.audio_night().into(),
             width: text.audio_width().into(),
+            spatial: text.audio_spatial().into(),
+            angle: text.audio_angle().into(),
+            orbit: text.audio_orbit().into(),
             mute: text.audio_mute().into(),
             app_eq: text.audio_app_eq().into(),
         };

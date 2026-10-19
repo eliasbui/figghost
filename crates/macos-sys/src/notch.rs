@@ -59,6 +59,8 @@ const STRIP_BODY: f64 = 254.0;
 pub const TAB_BAR_HEIGHT: f64 = 32.0;
 /// Space between the left edge of the open notch and the page icons.
 const SWITCHER_INSET: f64 = 16.0;
+/// Room kept between the header and the cutout when the header sits beside it.
+const BAND_GAP: f64 = 8.0;
 /// Width of the resting shape on a screen without a hardware notch.
 pub const PILL_WIDTH: f64 = 200.0;
 const HOT_ZONE_HEIGHT: f64 = 4.0;
@@ -212,7 +214,7 @@ impl Default for Style {
             shadow: true,
             motion: Motion::Spring,
             open_on_hover: true,
-            hover_delay: 0.12,
+            hover_delay: 0.3,
             rest: Rest::Notch,
             hide_in_capture: false,
             haptics: true,
@@ -2113,6 +2115,10 @@ impl Inner {
         if focus {
             self.panel.makeKeyAndOrderFront(None);
             self.settle_focus();
+            // A page shows its key hints only while the notch has the keyboard (widgets::PageRoot).
+            for page in self.pages.borrow().iter() {
+                page.root.setNeedsDisplay(true);
+            }
         }
     }
 
@@ -2176,17 +2182,62 @@ impl Inner {
         // The content is centred on the surface, so the shape's left edge is at this x of the content: the header
         // rides the edges of the shape as it grows.
         let left = (content.width - shape_width) / 2.0;
-        let y = content.height - geometry.top_inset() - 4.0 - switcher::HEIGHT;
+        let band = self.header_in_band();
+        // Beside the cutout the header is centred on its height; otherwise it is the row right below it.
+        let y = if band {
+            content.height - (geometry.notch.height + switcher::HEIGHT) / 2.0
+        } else {
+            content.height - geometry.top_inset() - 2.0 - switcher::HEIGHT
+        };
         self.orb
             .setFrameOrigin(NSPoint::new(left + SWITCHER_INSET, y));
         let width = self.switcher.frame().size.width;
         self.switcher
             .setFrameOrigin(NSPoint::new(left + shape_width - SWITCHER_INSET - width, y));
+        self.view.set_search_row(band);
+    }
+
+    /// The width of the open shape: the widest visible page's, never narrower than the user chose. The shape keeps
+    /// it from tab to tab, so only its height follows the page.
+    fn open_width(&self) -> f64 {
+        let pages = self.pages.borrow();
+        let widest = self
+            .order
+            .borrow()
+            .iter()
+            .filter_map(|&i| pages.get(i))
+            .map(|p| {
+                p.size
+                    .map_or_else(|| p.root.frame().size.width, |s| s.width)
+            })
+            .fold(EXPANDED_SIZE.width, f64::max);
+        widest.max(self.style.borrow().min_width)
+    }
+
+    /// Whether the header (the three dots and the page icons) sits in the band beside the cutout of a screen with a
+    /// notch, instead of in a row below it. A page then starts right under the cutout and the open shape has no
+    /// empty band across its top, as Apple asks of the Dynamic Island. Only when both fit on their side of it.
+    fn header_in_band(&self) -> bool {
+        let geometry = self.geometry.get();
+        let side = (self.open_width() - geometry.notch.width) / 2.0 - SWITCHER_INSET - BAND_GAP;
+        geometry.hardware
+            && switcher::width_for(self.order.borrow().len()) <= side
+            && switcher::ORB_WIDTH <= side
+    }
+
+    /// What lies above a page's root: the cutout, and the header row unless the header sits beside the cutout.
+    fn header_height(&self) -> f64 {
+        let top = self.geometry.get().top_inset();
+        if self.header_in_band() {
+            top
+        } else {
+            top + TAB_BAR_HEIGHT
+        }
     }
 
     /// The size of the open shape on a page.
     fn page_size(&self, index: usize) -> NSSize {
-        let top = self.geometry.get().top_inset() + TAB_BAR_HEIGHT;
+        let top = self.header_height();
         self.pages.borrow().get(index).map_or(EXPANDED_SIZE, |p| {
             p.size.unwrap_or_else(|| {
                 let root = p.root.frame().size;
@@ -2195,13 +2246,13 @@ impl Inner {
         })
     }
 
-    /// The size of the open shape on a page: the page's own, no narrower than the width the user chose.
+    /// The size of the open shape on a page: as wide on every page (`open_width`), as tall as this page needs and
+    /// no shorter than the user chose.
     fn shape_size(&self, index: usize) -> NSSize {
         let size = self.page_size(index);
-        let style = self.style.borrow();
         NSSize::new(
-            size.width.max(style.min_width),
-            size.height.max(style.min_height),
+            self.open_width(),
+            size.height.max(self.style.borrow().min_height),
         )
     }
 
@@ -2334,6 +2385,8 @@ impl Inner {
         drop(pages);
         *self.order.borrow_mut() = order;
         self.sync_switcher();
+        // The number of tabs decides whether the header fits beside the cutout, and with it the height of a page.
+        self.sync_content();
     }
 
     /// Replaces the background for the material in use.
@@ -2619,7 +2672,7 @@ impl Notch {
         clip.addSubview(&content);
         content.addSubview(&ui.view.root);
 
-        let header_y = EXPANDED_SIZE.height - geometry.top_inset() - 4.0 - switcher::HEIGHT;
+        let header_y = EXPANDED_SIZE.height - geometry.top_inset() - 2.0 - switcher::HEIGHT;
         let switcher = PageSwitcher::new(mtm, NSPoint::new(SWITCHER_INSET, header_y));
         content.addSubview(&switcher);
         let orb = NotchOrb::new(mtm, NSPoint::new(SWITCHER_INSET, header_y));
@@ -2848,6 +2901,8 @@ impl Notch {
 
     /// Area a page must fill when its open shape is `size` (`Page::size`): the shape below the tab bar.
     pub fn page_frame_for(&self, size: NSSize) -> NSRect {
+        // Always the room below a header row, whatever the number of tabs is while the pages are being added: when the
+        // header ends up beside the cutout, the shape is that much shorter instead.
         let top = self.inner.geometry.get().top_inset() + TAB_BAR_HEIGHT;
         NSRect::new(NSPoint::ZERO, NSSize::new(size.width, size.height - top))
     }
@@ -2931,7 +2986,8 @@ impl Notch {
         }
         let was_open = inner.is_open();
         let before = inner.surface.frame();
-        let size = inner.page_size(page);
+        // The shape the page opens to on screen, as wide as on every other page.
+        let size = inner.shape_size(page);
         let before_size = inner.open_size.replace(size);
         let open_pose = Pose {
             size,
@@ -2953,7 +3009,9 @@ impl Notch {
         if let Some(shown) = inner.pages.borrow().get(page) {
             shown.root.setAlphaValue(1.0);
             // Not part way through sliding in.
-            shown.root.setFrameOrigin(inner.page_origin(size));
+            shown
+                .root
+                .setFrameOrigin(inner.page_origin(inner.page_size(page)));
         }
         // The fillets reach out of the surface by `FLARE` on each side.
         let bounds = NSRect::new(

@@ -767,19 +767,19 @@ impl MediaView {
         let track = sample.map(|s| &s.track);
         let (title, artist, status, tone, symbol) = match track {
             Some(t) => {
+                // Written as words are, not in small capitals: the line is read, not scanned.
                 let state = if t.playing {
-                    &texts.media_playing
+                    texts.media_playing.clone()
                 } else {
-                    &texts.media_paused
-                }
-                .to_uppercase();
+                    texts.media_paused.clone()
+                };
                 (
                     t.title.clone(),
                     t.artist.clone(),
                     if t.app_name.is_empty() {
                         state
                     } else {
-                        format!("{}  -  {state}", t.app_name.to_uppercase())
+                        format!("{}  -  {state}", t.app_name)
                     },
                     app_tone(&t.app),
                     if t.playing { "pause.fill" } else { "play.fill" },

@@ -268,7 +268,7 @@ define_class!(
                 draw_text(
                     &row.age,
                     NSRect::new(NSPoint::new(right - age_width, middle - 8.0), NSSize::new(age_width, 16.0)),
-                    &attrs(11.0, Weight::Regular, style::TEXT_TERTIARY + 0.1, Fit::Clip),
+                    &attrs(11.0, Weight::Regular, style::TEXT_TERTIARY, Fit::Clip),
                 );
             }
         }
@@ -339,7 +339,7 @@ define_class!(
                 draw_text(
                     &row.reset,
                     NSRect::new(NSPoint::new(right + value_width, middle - 8.0), NSSize::new(reset_width, 16.0)),
-                    &attrs(11.0, Weight::Regular, style::TEXT_TERTIARY + 0.1, Fit::Tail),
+                    &attrs(11.0, Weight::Regular, style::TEXT_TERTIARY, Fit::Tail),
                 );
             }
         }
@@ -390,7 +390,7 @@ define_class!(
                     NSRect::new(NSPoint::new(width - week_width, middle - 8.0), NSSize::new(week_width, 16.0)),
                     &text_attributes(
                         &style::font(11.0, Weight::Regular),
-                        &white(style::TEXT_TERTIARY + 0.1),
+                        &white(style::TEXT_TERTIARY),
                         Fit::Tail,
                         false,
                     ),
@@ -741,7 +741,7 @@ define_class!(
             draw_text(
                 &self.ivars().text.borrow(),
                 NSRect::new(NSPoint::new(0.0, 3.0), NSSize::new(bounds.size.width, bounds.size.height - 4.0)),
-                &attrs(10.5, Weight::Semibold, style::TEXT_TERTIARY + 0.04, Fit::Tail),
+                &attrs(10.5, Weight::Semibold, style::TEXT_TERTIARY, Fit::Tail),
             );
         }
     }

@@ -2,7 +2,7 @@
 //! volume slider maps to a gain, how the audio processes of the system group into apps, and how a tap's
 //! frames reach the device's channels.
 
-use core_audio_fx::{BANDS, MAX_BAND_DB, MAX_GAIN, Params, Preset, Processor};
+use core_audio_fx::{BANDS, MAX_BAND_DB, MAX_GAIN, MAX_ORBIT, Params, Preset, Processor};
 use serde::{Deserialize, Serialize};
 use std::collections::BTreeMap;
 
@@ -60,6 +60,12 @@ pub struct Effects {
     pub night: bool,
     /// Stereo width: 0 is mono, 1 unchanged, 2 twice as wide.
     pub width: f32,
+    /// Spatial 3D for headphones, 0 (off) to 1.
+    pub spatial: f32,
+    /// Where the 3D stage points, -180 to 180 degrees.
+    pub angle: f32,
+    /// How fast the 3D stage keeps turning, degrees per second.
+    pub orbit: f32,
 }
 
 impl Default for Effects {
@@ -70,6 +76,9 @@ impl Default for Effects {
             boost: 0.0,
             night: false,
             width: 1.0,
+            spatial: 0.0,
+            angle: 0.0,
+            orbit: 0.0,
         }
     }
 }
@@ -122,6 +131,9 @@ impl AudioConfig {
         let e = &mut self.effects;
         e.boost = clamp(e.boost, 0.0, 1.0, 0.0);
         e.width = clamp(e.width, 0.0, 2.0, 1.0);
+        e.spatial = clamp(e.spatial, 0.0, 1.0, 0.0);
+        e.angle = clamp(e.angle, -180.0, 180.0, 0.0);
+        e.orbit = clamp(e.orbit, -MAX_ORBIT, MAX_ORBIT, 0.0);
         for gain in &mut e.custom_eq {
             *gain = clamp(*gain, -MAX_BAND_DB, MAX_BAND_DB, 0.0);
         }
@@ -199,6 +211,9 @@ pub fn apply_device(effects: &Effects, device: &DeviceAudio, params: &Params) {
     params.set_volume(device.volume);
     params.set_muted(device.muted);
     params.set_width(effects.width);
+    params.set_spatial(effects.spatial);
+    params.set_angle(effects.angle);
+    params.set_orbit(effects.orbit);
     set_eq(params, eq_curve(&effects.eq, &effects.custom_eq));
     if params.boost() != effects.boost {
         params.set_boost(effects.boost);

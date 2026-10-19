@@ -1,19 +1,20 @@
-//! Draws the drop zones of window snapping over a pretend desktop into PNG files, without showing anything on
-//! screen: the zones are drawn from their own view, then composed over a backdrop with a menu bar, a Dock, the
-//! window being dragged, the cutout on a notched screen and, while a zone is lit, the footprint where the window
-//! will land. One whole screen per zone of the default list (`zone-*.png`), then close-ups of the shape at two
-//! pixels per point (`close-*.png`). The captions mirror `app-ui/src/features/snap/text.rs`; `app-ui/snap_check`
-//! draws the live panel with the real ones.
+//! Draws window snapping over a pretend desktop into PNG files, without showing anything on screen: the row of
+//! layouts, or the chip it shrinks to, is drawn from its own view, then composed over a backdrop with a menu bar, a
+//! Dock, the window being dragged, the cutout on a notched screen, the cells of the chosen layout and, while one is
+//! lit, the footprint where the window will land. One whole screen per step of the drag (`step-*.png`), then
+//! close-ups of the shape at two pixels per point (`close-*.png`). The names mirror `app-ui/src/features/snap/text.rs`;
+//! `app-ui/snap_check` draws the live panel with the real ones.
 //! `cargo run -p macos-sys --example render_snap -- /tmp/snap`
 
 use block2::RcBlock;
 use core_window::{
-    Layout, Rect,
-    snap::{self, Display},
+    Rect,
+    snap::Display,
+    templates::{self, Template},
 };
 use macos_sys::{
     MainThreadMarker,
-    snap_ui::{self, ZonesPanel, ZonesSpec},
+    snap_ui::{self, CellsOverlay, ChipSpec, ZonesPanel, ZonesSpec},
     style,
     window::Frame,
 };
@@ -30,33 +31,61 @@ const MENU_BAR: f64 = 24.0;
 const DOCK: f64 = 76.0;
 
 /// The short names of `text.rs`, English then Vietnamese.
-fn caption(layout: Layout, vietnamese: bool) -> &'static str {
-    let (en, vi) = match layout {
-        Layout::Left => ("Left", "Trái"),
-        Layout::Right => ("Right", "Phải"),
-        Layout::Top => ("Top", "Trên"),
-        Layout::Bottom => ("Bottom", "Dưới"),
-        Layout::TopLeft => ("Top left", "Trên trái"),
-        Layout::TopRight => ("Top right", "Trên phải"),
-        Layout::BottomLeft => ("Bottom left", "Dưới trái"),
-        Layout::BottomRight => ("Bottom right", "Dưới phải"),
-        Layout::Maximize => ("Full", "Tối đa"),
-        Layout::Center => ("Center", "Giữa"),
-        Layout::FirstThird => ("Left third", "1/3 trái"),
-        Layout::CenterThird => ("Center third", "1/3 giữa"),
-        Layout::LastThird => ("Right third", "1/3 phải"),
+fn caption(id: &str, vietnamese: bool) -> String {
+    let (en, vi) = match id {
+        "full" => ("Full screen", "Tối đa"),
+        "halves" => ("Halves", "Chia đôi"),
+        "rows" => ("Rows", "Hai hàng"),
+        "thirds" => ("Thirds", "Chia ba"),
+        "quarters" => ("Quarters", "Bốn góc"),
+        "main_left" => ("Wide left", "Rộng trái"),
+        "main_right" => ("Wide right", "Rộng phải"),
+        "left_stack" => ("1 + 2", "1 + 2"),
+        "right_stack" => ("2 + 1", "2 + 1"),
+        "grid_six" => ("Six", "Sáu ô"),
+        _ => ("", ""),
     };
-    if vietnamese { vi } else { en }
+    if vietnamese { vi } else { en }.to_owned()
 }
 
-fn spec(display: &Display, layouts: &[Layout], vietnamese: bool) -> ZonesSpec {
-    let panel = display.panel(layouts);
-    ZonesSpec {
-        label: "Snap zones".into(),
+fn name(template: &Template, vietnamese: bool) -> String {
+    template
+        .name
+        .clone()
+        .unwrap_or_else(|| caption(&template.id, vietnamese))
+}
+
+fn parts(template: &Template) -> Vec<[f64; 4]> {
+    template.cells.iter().map(|c| c.part()).collect()
+}
+
+/// What the shape shows: the row of layouts, or the chip of the one chosen when `compact`.
+fn spec(display: &Display, scene: &Scene) -> (ZonesSpec, Rect) {
+    let chosen = scene.chosen.map(|i| &scene.templates[i]);
+    if let (true, Some(template)) = (scene.compact, chosen) {
+        let chip = display.chip();
+        let spec = ZonesSpec {
+            label: "Chosen layout".into(),
+            width: chip.w,
+            height: chip.h,
+            cells: Vec::new(),
+            glyphs: Vec::new(),
+            names: Vec::new(),
+            chip: Some(ChipSpec {
+                parts: parts(template),
+                name: name(template, scene.vietnamese),
+                top: display.inset,
+            }),
+        };
+        return (spec, chip);
+    }
+    let panel = display.panel(scene.templates.len());
+    let spec = ZonesSpec {
+        label: "Snap layouts".into(),
         width: panel.w,
         height: panel.h,
         cells: display
-            .cells(layouts)
+            .cells(scene.templates.len())
             .into_iter()
             .map(|c| Frame {
                 x: c.x - panel.x,
@@ -65,18 +94,15 @@ fn spec(display: &Display, layouts: &[Layout], vietnamese: bool) -> ZonesSpec {
                 h: c.h,
             })
             .collect(),
-        glyphs: layouts
+        glyphs: scene.templates.iter().map(parts).collect(),
+        names: scene
+            .templates
             .iter()
-            .map(|l| {
-                let g = snap::glyph(*l);
-                [g.x, g.y, g.w, g.h]
-            })
+            .map(|t| name(t, scene.vietnamese))
             .collect(),
-        names: layouts
-            .iter()
-            .map(|l| caption(*l, vietnamese).to_owned())
-            .collect(),
-    }
+        chip: None,
+    };
+    (spec, panel)
 }
 
 /// The pretend screen, with the usable area between the menu bar and the Dock.
@@ -91,8 +117,12 @@ fn display(notched: bool) -> Display {
 }
 
 struct Scene {
-    layouts: Vec<Layout>,
+    templates: Vec<Template>,
+    /// The layout under the pointer in the row, the one whose cells show, the lit cell, and whether the row is a chip.
     hover: Option<usize>,
+    chosen: Option<usize>,
+    cell: Option<usize>,
+    compact: bool,
     notched: bool,
     dark: bool,
     vietnamese: bool,
@@ -110,14 +140,38 @@ fn color(r: f64, g: f64, b: f64, a: f64) -> objc2::rc::Retained<NSColor> {
     NSColor::colorWithSRGBRed_green_blue_alpha(r, g, b, a)
 }
 
+fn image(png: &[u8]) -> objc2::rc::Retained<NSImage> {
+    let data = objc2_foundation::NSData::with_bytes(png);
+    NSImage::initWithData(objc2::AnyThread::alloc(), &data).expect("image")
+}
+
+fn frame_of(r: Rect) -> Frame {
+    Frame {
+        x: r.x,
+        y: r.y,
+        w: r.w,
+        h: r.h,
+    }
+}
+
 /// Draws `region` of the scene (top-left coordinates of the screen) at `scale` pixels per point.
-fn render(zones_png: &[u8], scene: &Scene, region: Rect, scale: f64) -> Vec<u8> {
+fn render(
+    shape_png: &[u8],
+    shape: Rect,
+    cells_png: Option<&[u8]>,
+    scene: &Scene,
+    region: Rect,
+    scale: f64,
+) -> Vec<u8> {
     let d = display(scene.notched);
-    let panel = d.panel(&scene.layouts);
-    let landing = scene.hover.map(|i| d.place(scene.layouts[i], d.area));
-    let data = objc2_foundation::NSData::with_bytes(zones_png);
-    let zones = NSImage::initWithData(objc2::AnyThread::alloc(), &data).expect("zones image");
+    let landing = scene
+        .chosen
+        .zip(scene.cell)
+        .map(|(t, c)| d.place(scene.templates[t].cells[c]));
+    let shape_image = image(shape_png);
+    let cells_image = cells_png.map(image);
     let (dark, notched, cutout) = (scene.dark, scene.notched, d.cutout);
+    let area = d.area;
     let size = NSSize::new(region.w * scale, region.h * scale);
     let draw = RcBlock::new(move |_: NSRect| {
         let place = NSAffineTransform::transform();
@@ -163,7 +217,10 @@ fn render(zones_png: &[u8], scene: &Scene, region: Rect, scale: f64) -> Vec<u8> 
             18.0,
             &style::white(if dark { 0.2 } else { 0.45 }),
         );
-        // Where the window will land, over every window and under the zones.
+        // The cells of the chosen layout, over every window; then the lit one, under the shape.
+        if let Some(cells) = &cells_image {
+            cells.drawInRect(cocoa(area));
+        }
         if let Some(r) = landing {
             snap_ui::paint_footprint(cocoa(r));
         }
@@ -177,8 +234,8 @@ fn render(zones_png: &[u8], scene: &Scene, region: Rect, scale: f64) -> Vec<u8> 
                 32.0,
             )));
         }
-        // The zones hang from the top edge.
-        zones.drawInRect(cocoa(panel));
+        // The shape hangs from the top edge.
+        shape_image.drawInRect(cocoa(shape));
         Bool::YES
     });
     let image = NSImage::imageWithSize_flipped_drawingHandler(size, false, &draw);
@@ -192,87 +249,109 @@ fn render(zones_png: &[u8], scene: &Scene, region: Rect, scale: f64) -> Vec<u8> 
     .to_vec()
 }
 
+/// How much of the pretend screen a picture holds.
+#[derive(Clone, Copy)]
+enum Shot {
+    Screen,
+    Close,
+    Top,
+}
+
 fn main() {
     let mtm = MainThreadMarker::new().expect("main thread");
     NSApplication::sharedApplication(mtm)
         .setActivationPolicy(NSApplicationActivationPolicy::Accessory);
     let dir = PathBuf::from(env::args().nth(1).unwrap_or_else(|| "/tmp/snap".into()));
     fs::create_dir_all(&dir).expect("output directory");
-    let panel_view = ZonesPanel::new(mtm);
-    let write = |name: String, scene: &Scene, close_up: bool| {
+    let row_view = ZonesPanel::new(mtm);
+    let cells_view = CellsOverlay::new(mtm);
+    let write = |file: String, scene: &Scene, shot: Shot| {
         let d = display(scene.notched);
-        let png = panel_view
-            .snapshot_png(&spec(&d, &scene.layouts, scene.vietnamese), scene.hover)
-            .expect("zones png");
-        let out = if close_up {
+        let (spec, shape) = spec(&d, scene);
+        let png = row_view
+            .snapshot_png(&spec, scene.hover, scene.chosen)
+            .expect("shape png");
+        let cells_png = scene.chosen.and_then(|t| {
+            let cells: Vec<Frame> = scene.templates[t]
+                .cells
+                .iter()
+                .map(|c| frame_of(d.place(*c)))
+                .collect();
+            cells_view.snapshot_png(frame_of(d.area), &cells)
+        });
+        let out = match shot {
             // The shape with a margin, cut from the top of the screen.
-            let p = d.panel(&scene.layouts);
-            let region = Rect::new(p.x - 60.0, 0.0, p.w + 120.0, p.h + 50.0);
-            render(&png, scene, region, 2.0)
-        } else {
-            render(&png, scene, d.frame, 1.0)
+            Shot::Close => {
+                let region = Rect::new(shape.x - 60.0, 0.0, shape.w + 120.0, shape.h + 50.0);
+                render(&png, shape, cells_png.as_deref(), scene, region, 2.0)
+            }
+            // The top of the screen, wide: the shape and the cells under it.
+            Shot::Top => {
+                let region = Rect::new(0.0, 0.0, SCREEN.0, 520.0);
+                render(&png, shape, cells_png.as_deref(), scene, region, 1.0)
+            }
+            Shot::Screen => render(&png, shape, cells_png.as_deref(), scene, d.frame, 1.0),
         };
-        let path = dir.join(format!("{name}.png"));
+        let path = dir.join(format!("{file}.png"));
         fs::write(&path, out).expect("write png");
         println!("{}", path.display());
     };
-    let ten = snap::DEFAULT_ZONES.to_vec();
-    for (i, layout) in ten.iter().enumerate() {
-        let scene = Scene {
-            layouts: ten.clone(),
-            hover: Some(i),
-            notched: true,
-            dark: i % 2 == 1,
-            vietnamese: false,
-        };
-        write(format!("zone-{i:02}-{}", layout.key()), &scene, false);
-    }
+    let seven = templates::choose::<&str>(&[], &[]);
+    let nine = templates::choose(
+        &[
+            "full",
+            "halves",
+            "rows",
+            "thirds",
+            "quarters",
+            "main_left",
+            "main_right",
+            "left_stack",
+            "right_stack",
+        ],
+        &[],
+    );
+    let scene = |templates: &[Template],
+                 hover: Option<usize>,
+                 chosen: Option<usize>,
+                 cell: Option<usize>,
+                 compact: bool,
+                 notched: bool,
+                 dark: bool,
+                 vietnamese: bool| Scene {
+        templates: templates.to_vec(),
+        hover,
+        chosen,
+        cell,
+        compact,
+        notched,
+        dark,
+        vietnamese,
+    };
+    // The drag, step by step, on a notched screen: the row, a layout under the pointer with its cells on the screen,
+    // then the pointer on the screen with the row shrunk to a chip and one cell lit.
+    write("step-1-row".into(), &scene(&seven, None, None, None, false, true, false, false), Shot::Screen);
+    write("step-2-hover-thirds".into(), &scene(&seven, Some(2), Some(2), None, false, true, false, false), Shot::Screen);
+    write("step-3-cell".into(), &scene(&seven, None, Some(2), Some(1), true, true, false, false), Shot::Screen);
+    write("step-3-cell-dark".into(), &scene(&seven, None, Some(3), Some(3), true, true, true, false), Shot::Screen);
+    write("step-2-hover-quarters-dark".into(), &scene(&seven, Some(3), Some(3), None, false, true, true, false), Shot::Screen);
+    write("step-2-hover-full".into(), &scene(&seven, Some(0), Some(0), None, false, true, false, false), Shot::Screen);
     let close_ups = [
-        ("close-rest", ten.clone(), None, true, false, false),
-        ("close-hover-full", ten.clone(), Some(2), true, true, false),
-        (
-            "close-hover-quarter",
-            ten.clone(),
-            Some(8),
-            true,
-            false,
-            false,
-        ),
-        ("close-vietnamese", ten.clone(), Some(4), true, true, true),
-        ("close-notchless", ten.clone(), Some(0), false, false, false),
-        (
-            "close-all-twelve",
-            snap::OFFERED.to_vec(),
-            Some(7),
-            false,
-            true,
-            false,
-        ),
-        (
-            "close-quarters-only",
-            ten[6..].to_vec(),
-            Some(1),
-            true,
-            false,
-            false,
-        ),
-        (
-            "close-two",
-            vec![Layout::Left, Layout::Right],
-            Some(0),
-            true,
-            true,
-            false,
-        ),
+        ("close-rest", scene(&seven, None, None, None, false, true, false, false)),
+        ("close-hover-halves", scene(&seven, Some(1), Some(1), None, false, true, true, false)),
+        ("close-outlined", scene(&seven, None, Some(2), None, false, true, true, false)),
+        ("close-chip", scene(&seven, None, Some(2), Some(0), true, true, true, false)),
+        ("close-chip-notchless", scene(&seven, None, Some(4), Some(0), true, false, false, false)),
+        ("close-vietnamese", scene(&seven, Some(4), Some(4), None, false, true, true, true)),
+        ("close-notchless", scene(&seven, Some(0), Some(0), None, false, false, false, false)),
+        ("close-nine-two-rows", scene(&nine, Some(7), Some(7), None, false, true, true, false)),
+        ("close-one", scene(&seven[..1], Some(0), Some(0), None, false, true, false, false)),
     ];
-    for (name, layouts, hover, notched, dark, vietnamese) in close_ups {
-        let scene = Scene {
-            layouts,
-            hover,
-            notched,
-            dark,
-            vietnamese,
-        };
-        write(name.into(), &scene, true);
+    for (file, scene) in close_ups {
+        write(file.into(), &scene, Shot::Close);
     }
+    // The pictures of the README: the row with a layout under the pointer, and the cells with the chip.
+    write("readme-row".into(), &scene(&seven, None, Some(2), None, false, false, false, false), Shot::Close);
+    write("readme-row-hover".into(), &scene(&seven, Some(2), Some(2), None, false, false, false, false), Shot::Close);
+    write("readme-cells".into(), &scene(&seven, None, Some(2), Some(1), true, true, false, false), Shot::Top);
 }

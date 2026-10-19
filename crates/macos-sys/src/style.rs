@@ -15,10 +15,11 @@ use std::{cell::RefCell, collections::HashMap};
 // One palette, one set of shapes, one set of times. Everything the app draws on a dark surface reads its
 // numbers from here, so a change of look is a change to this block and to the two primitives below it.
 
-/// Ink: the three levels of white text and symbols are drawn in.
+/// Ink: the three levels of white text and symbols are drawn in. On black the faintest is 5.3:1, above the
+/// 4.5:1 that text under 18 pt needs.
 pub const TEXT: f64 = 0.97;
 pub const TEXT_SECONDARY: f64 = 0.62;
-pub const TEXT_TERTIARY: f64 = 0.40;
+pub const TEXT_TERTIARY: f64 = 0.50;
 /// Controls that rest on a surface: a chip, a small button, a tab that is not the chosen one.
 pub const CONTROL: f64 = 0.11;
 pub const CONTROL_HOVER: f64 = 0.19;
@@ -146,9 +147,11 @@ pub fn fill_circle(rect: NSRect, color: &NSColor) {
 /// A vertical two-stop gradient inside a rounded shape: light at the top, darker towards the bottom.
 pub fn gradient_rounded(rect: NSRect, radius: f64, top: f64, bottom: f64) {
     let path = NSBezierPath::bezierPathWithRoundedRect_xRadius_yRadius(rect, radius, radius);
-    let Some(gradient) =
-        NSGradient::initWithStartingColor_endingColor(NSGradient::alloc(), &white(top), &white(bottom))
-    else {
+    let Some(gradient) = NSGradient::initWithStartingColor_endingColor(
+        NSGradient::alloc(),
+        &white(top),
+        &white(bottom),
+    ) else {
         return;
     };
     // -90° draws from the top of the shape to its bottom.
@@ -258,7 +261,12 @@ pub fn small_symbol(name: &str, size: f64, color: &NSColor) -> Option<Retained<N
     symbol_variant(name, size, color, true)
 }
 
-fn symbol_variant(name: &str, size: f64, color: &NSColor, small: bool) -> Option<Retained<NSImage>> {
+fn symbol_variant(
+    name: &str,
+    size: f64,
+    color: &NSColor,
+    small: bool,
+) -> Option<Retained<NSImage>> {
     let srgb = color
         .colorUsingColorSpace(&objc2_app_kit::NSColorSpace::sRGBColorSpace())
         .unwrap_or_else(|| color.retain());

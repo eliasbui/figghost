@@ -1,5 +1,6 @@
 //! The macOS side of dragging a window onto the notch: the pointer events of every app, the window under the
-//! pointer, the drop zones and the screens they hang from, and the footprint that shows where the window will land.
+//! pointer, the row of layouts and the screens it hangs from, the cells of the chosen layout over the screen, and the
+//! footprint that shows where the window will land.
 //! What a drag means lives in `core-window`; this file only looks and draws. All positions are in the coordinates
 //! of `window::Frame` (origin at the top-left of the primary screen, y down) unless a name says Cocoa.
 
@@ -42,9 +43,19 @@ const FRAME_SECONDS: f64 = 1.0 / 120.0;
 const REST_HEIGHT: f64 = 6.0;
 /// The bottom corners of the shape; its top edge is cut off by the top of the screen.
 const SHAPE_RADIUS: f64 = 22.0;
-/// The small screen in a zone, 16 by 10 like most displays, and how far below the top of the zone it sits.
+/// The small screen in a layout's tile, 16 by 10 like most displays, and how far below the top of the tile it sits.
 const GLYPH: (f64, f64) = (50.0, 31.0);
 const GLYPH_TOP: f64 = 9.0;
+/// The small screen in the chip the row shrinks to, and the space round it.
+const CHIP_GLYPH: (f64, f64) = (30.0, 19.0);
+const CHIP_MARGIN: f64 = 14.0;
+/// The height of the line in the chip, as core-window's `snap::CHIP`.
+const CHIP_LINE: f64 = 26.0;
+/// The shape changes size, from the row to the chip and back, in this time.
+const RESIZE_SECONDS: f64 = 0.22;
+/// A space between the cells drawn over the screen, so that where one ends and the next begins shows.
+const CELL_GAP: f64 = 4.0;
+const CELL_RADIUS: f64 = 14.0;
 /// The footprint glides to another zone's frame quickly enough to keep up with the pointer.
 const GLIDE_SECONDS: f64 = 0.18;
 const FADE_IN_SECONDS: f64 = 0.12;
@@ -54,9 +65,10 @@ const FOOTPRINT_RADIUS: f64 = 12.0;
 
 // ---------------------------------------------------------------- screens and coordinates
 
-/// One screen: where it is, the usable part, and what the zones must clear at its top.
-#[derive(Debug, Clone, Copy, PartialEq)]
+/// One screen: its name, where it is, the usable part, and what the row must clear at its top.
+#[derive(Debug, Clone, PartialEq)]
 pub struct DisplayInfo {
+    pub name: String,
     pub frame: Frame,
     pub area: Frame,
     pub cutout: f64,
@@ -83,7 +95,8 @@ fn top_left(primary_height: f64, r: NSRect) -> Frame {
 /// pointer on the real screens never reaches it.
 pub fn displays(mtm: MainThreadMarker) -> Vec<DisplayInfo> {
     let height = primary_height(mtm);
-    let info = |screen: NSRect, area: NSRect, geometry: NotchGeometry| DisplayInfo {
+    let info = |name: String, screen: NSRect, area: NSRect, geometry: NotchGeometry| DisplayInfo {
+        name,
         frame: top_left(height, screen),
         area: top_left(height, area),
         cutout: geometry.notch.width,
@@ -91,7 +104,7 @@ pub fn displays(mtm: MainThreadMarker) -> Vec<DisplayInfo> {
     };
     if std::env::var_os("FIGGHOST_NOTCH_OFFSCREEN").is_some() {
         return NotchGeometry::detect(mtm)
-            .map(|g| vec![info(g.screen, g.screen, g)])
+            .map(|g| vec![info("Test screen".into(), g.screen, g.screen, g)])
             .unwrap_or_default();
     }
     NSScreen::screens(mtm)
@@ -112,7 +125,12 @@ pub fn displays(mtm: MainThreadMarker) -> Vec<DisplayInfo> {
                     hardware: false,
                 }
             };
-            info(s.frame(), s.visibleFrame(), geometry)
+            info(
+                s.localizedName().to_string(),
+                s.frame(),
+                s.visibleFrame(),
+                geometry,
+            )
         })
         .collect()
 }
@@ -246,25 +264,41 @@ impl Held {
     }
 }
 
-// ---------------------------------------------------------------- the drop zones
+// ---------------------------------------------------------------- the row of layouts
 
-/// What the shape shows. Cells are relative to the shape's own top-left corner.
+/// What the shape shows: the row of layouts to choose from, or the chip the row shrinks to. Cells are relative to
+/// the shape's own top-left corner.
 #[derive(Debug, Clone, PartialEq)]
 pub struct ZonesSpec {
-    /// What the shape is, for assistive technology: the names of the zones in order.
+    /// What the shape is, for assistive technology: the names of the layouts in order.
     pub label: String,
     pub width: f64,
     pub height: f64,
+    /// The tile of each layout.
     pub cells: Vec<Frame>,
-    /// For each cell, the part of a small screen the layout fills, as fractions: x, y, width, height.
-    pub glyphs: Vec<[f64; 4]>,
-    /// For each cell, the short name written under its small screen.
+    /// For each layout, the part of a small screen each of its cells fills, as fractions: x, y, width, height.
+    pub glyphs: Vec<Vec<[f64; 4]>>,
+    /// For each layout, the short name written under its small screen.
     pub names: Vec<String>,
+    /// The chip a chosen layout shrinks the row to. `None` for the row.
+    pub chip: Option<ChipSpec>,
+}
+
+/// The chip: the small screen of the chosen layout and its name.
+#[derive(Debug, Clone, PartialEq)]
+pub struct ChipSpec {
+    /// The part of the small screen each cell of the layout fills, as fractions: x, y, width, height.
+    pub parts: Vec<[f64; 4]>,
+    pub name: String,
+    /// The height of the strip at the top that the cutout takes; the line of the chip is below it.
+    pub top: f64,
 }
 
 pub struct ViewIvars {
     spec: RefCell<ZonesSpec>,
     hover: Cell<Option<usize>>,
+    /// The layout whose cells show over the screen, outlined in its tile while the pointer is elsewhere.
+    selected: Cell<Option<usize>>,
 }
 
 define_class!(
@@ -304,8 +338,10 @@ impl ZonesView {
                 cells: Vec::new(),
                 glyphs: Vec::new(),
                 names: Vec::new(),
+                chip: None,
             }),
             hover: Cell::new(None),
+            selected: Cell::new(None),
         };
         // SAFETY: designated initializer with valid arguments on the main thread.
         unsafe {
@@ -342,22 +378,39 @@ impl ZonesView {
             // the opposite of the notch's.
             gradient.drawInBezierPath_angle(&path, 270.0);
         }
+        if let Some(chip) = &spec.chip {
+            paint_chip(bounds, chip);
+            return;
+        }
         let hover = self.ivars().hover.get();
+        let selected = self.ivars().selected.get();
         let font = style::font(11.0, Weight::Medium);
         for (i, cell) in spec.cells.iter().enumerate() {
             let rect = NSRect::new(NSPoint::new(cell.x, cell.y), NSSize::new(cell.w, cell.h));
             let active = hover == Some(i);
-            // The zone the window will land on is solid white with dark ink, its part in the accent colour of the
-            // footprint on the screen; the others rest as translucent controls.
+            // The layout the pointer is on is solid white with dark ink, its cells in the accent colour of the
+            // footprint on the screen; the others rest as translucent controls, and the one whose cells are on the
+            // screen while the pointer is elsewhere keeps an outline.
             let fill = style::white(if active { 1.0 } else { style::CONTROL });
             style::fill_rounded(rect, BUTTON_RADIUS, &fill);
+            if selected == Some(i) && !active {
+                style::stroke_rounded(rect, BUTTON_RADIUS, &NSColor::controlAccentColor(), 1.5);
+            }
             let (ink, part) = if active {
                 (style::black(0.85), NSColor::controlAccentColor())
             } else {
                 (style::white(style::TEXT), style::white(style::TEXT))
             };
-            if let Some(glyph) = spec.glyphs.get(i) {
-                draw_glyph(rect, *glyph, &ink, &part);
+            if let Some(parts) = spec.glyphs.get(i) {
+                let (w, h) = GLYPH;
+                let screen = NSRect::new(
+                    NSPoint::new(
+                        rect.origin.x + (rect.size.width - w) / 2.0,
+                        rect.origin.y + GLYPH_TOP,
+                    ),
+                    NSSize::new(w, h),
+                );
+                draw_glyph(screen, parts, &ink, &part);
             }
             if let Some(name) = spec.names.get(i) {
                 let color = if active {
@@ -379,30 +432,56 @@ impl ZonesView {
     }
 }
 
-/// A small screen with the part a layout fills, at the top of a zone.
-fn draw_glyph(cell: NSRect, part: [f64; 4], ink: &NSColor, fill: &NSColor) {
-    let (w, h) = GLYPH;
+/// The chip, centred on its line below the strip the cutout takes.
+fn paint_chip(bounds: NSRect, chip: &ChipSpec) {
     let screen = NSRect::new(
-        NSPoint::new(
-            cell.origin.x + (cell.size.width - w) / 2.0,
-            cell.origin.y + GLYPH_TOP,
-        ),
-        NSSize::new(w, h),
+        NSPoint::new(CHIP_MARGIN, chip.top + (CHIP_LINE - CHIP_GLYPH.1) / 2.0),
+        NSSize::new(CHIP_GLYPH.0, CHIP_GLYPH.1),
     );
+    draw_glyph(
+        screen,
+        &chip.parts,
+        &style::white(style::TEXT),
+        &style::white(style::TEXT),
+    );
+    let font = style::font(12.0, Weight::Medium);
+    let text = NSRect::new(
+        NSPoint::new(
+            screen.origin.x + screen.size.width + 9.0,
+            chip.top + (CHIP_LINE - 16.0) / 2.0,
+        ),
+        NSSize::new(
+            (bounds.size.width - screen.size.width - CHIP_MARGIN * 2.0 - 9.0).max(0.0),
+            16.0,
+        ),
+    );
+    let attrs = widgets::text_attributes(&font, &style::white(0.9), Fit::Tail, false);
+    widgets::draw_text(&chip.name, text, &attrs);
+}
+
+/// A small screen with the part each cell of a layout fills, in `screen`: an outline, and the cells inside it with a
+/// hair of space between them when there is more than one.
+fn draw_glyph(screen: NSRect, parts: &[[f64; 4]], ink: &NSColor, fill: &NSColor) {
     style::fill_rounded(screen, 5.0, &ink.colorWithAlphaComponent(0.08));
     style::stroke_rounded(screen, 5.0, &ink.colorWithAlphaComponent(0.5), 1.25);
     let inner = NSRect::new(
         NSPoint::new(screen.origin.x + 3.0, screen.origin.y + 3.0),
-        NSSize::new(w - 6.0, h - 6.0),
+        NSSize::new(screen.size.width - 6.0, screen.size.height - 6.0),
     );
-    let filled = NSRect::new(
-        NSPoint::new(
-            inner.origin.x + part[0] * inner.size.width,
-            inner.origin.y + part[1] * inner.size.height,
-        ),
-        NSSize::new(part[2] * inner.size.width, part[3] * inner.size.height),
-    );
-    style::fill_rounded(filled, 2.5, fill);
+    let space = if parts.len() > 1 { 0.75 } else { 0.0 };
+    for part in parts {
+        let rect = NSRect::new(
+            NSPoint::new(
+                inner.origin.x + part[0] * inner.size.width + space,
+                inner.origin.y + part[1] * inner.size.height + space,
+            ),
+            NSSize::new(
+                (part[2] * inner.size.width - 2.0 * space).max(0.5),
+                (part[3] * inner.size.height - 2.0 * space).max(0.5),
+            ),
+        );
+        style::fill_rounded(rect, 2.0, fill);
+    }
 }
 
 define_class!(
@@ -486,6 +565,8 @@ impl Inner {
         )
     }
 
+    /// Moves the panel from where it is to `open` at height `to_height`, hanging from the top edge of `open`, and its
+    /// opacity to `alpha`. The width follows, since the row becomes a chip and back.
     fn animate(
         &self,
         open: NSRect,
@@ -495,7 +576,7 @@ impl Inner {
         alpha: f64,
         done: impl Fn() + 'static,
     ) {
-        let from_height = self.panel.frame().size.height;
+        let from = self.panel.frame();
         let from_alpha = self.panel.alphaValue();
         let (started, weak) = (Instant::now(), self.me.clone());
         *self.anim.borrow_mut() = Some(app::every(FRAME_SECONDS, move || {
@@ -503,10 +584,17 @@ impl Inner {
                 return;
             };
             let t = (started.elapsed().as_secs_f64() / seconds).min(1.0);
-            let h = lerp(from_height, to_height, curve(t));
-            inner
-                .panel
-                .setFrame_display(Inner::frame_with_height(open, h.max(1.0)), true);
+            let k = curve(t);
+            let h = lerp(from.size.height, to_height, k).max(1.0);
+            let w = lerp(from.size.width, open.size.width, k);
+            let x = lerp(from.origin.x, open.origin.x, k);
+            inner.panel.setFrame_display(
+                NSRect::new(
+                    NSPoint::new(x, open.origin.y + open.size.height - h),
+                    NSSize::new(w, h),
+                ),
+                true,
+            );
             inner
                 .panel
                 .setAlphaValue(lerp(from_alpha, alpha, style::ease_out(t)));
@@ -518,8 +606,8 @@ impl Inner {
     }
 }
 
-/// The row of drop zones, a non-activating panel that grows out of the top edge of a screen. It never takes
-/// focus and passes every click through.
+/// The row of layouts, a non-activating panel that grows out of the top edge of a screen. It never takes focus
+/// and passes every click through.
 pub struct ZonesPanel {
     inner: Rc<Inner>,
 }
@@ -540,11 +628,19 @@ impl ZonesPanel {
         Self { inner }
     }
 
-    /// Shows the row hanging from the top edge at `top_left` (the corner of the shape in `Frame` coordinates),
-    /// with the zone `hover` lit. Called again with the same place it only moves the highlight.
-    pub fn show(&self, top_left: (f64, f64), spec: &ZonesSpec, hover: Option<usize>) {
+    /// Shows the shape hanging from the top edge at `top_left` (the corner of the shape in `Frame` coordinates),
+    /// with the layout `hover` lit and the layout `selected` outlined. Called again with the same place and the same
+    /// spec it only moves the highlight; with another spec, the row or the chip, the shape moves to the new size.
+    pub fn show(
+        &self,
+        top_left: (f64, f64),
+        spec: &ZonesSpec,
+        hover: Option<usize>,
+        selected: Option<usize>,
+    ) {
         let inner = &self.inner;
         inner.view.ivars().hover.set(hover);
+        inner.view.ivars().selected.set(selected);
         let open = NSRect::new(
             NSPoint::new(
                 top_left.0,
@@ -569,21 +665,21 @@ impl ZonesPanel {
             inner.panel.orderFrontRegardless();
             return;
         }
-        if !inner.panel.isVisible() {
+        // Grown out of the edge when it first appears; eased from one shape to the other afterwards.
+        let appearing = !inner.panel.isVisible();
+        if appearing {
             inner.panel.setAlphaValue(0.0);
             inner
                 .panel
                 .setFrame_display(Inner::frame_with_height(open, REST_HEIGHT), false);
             inner.panel.orderFrontRegardless();
         }
-        inner.animate(
-            open,
-            open.size.height,
-            OPEN_SECONDS,
-            style::spring,
-            1.0,
-            || {},
-        );
+        let (seconds, curve): (f64, fn(f64) -> f64) = if appearing {
+            (OPEN_SECONDS, style::spring)
+        } else {
+            (RESIZE_SECONDS, style::ease_out)
+        };
+        inner.animate(open, open.size.height, seconds, curve, 1.0, || {});
     }
 
     /// Moves the highlight without touching the rest.
@@ -628,13 +724,19 @@ impl ZonesPanel {
         self.inner.panel.frame()
     }
 
-    /// Draws the zones with the zone `hover` lit into PNG bytes without showing anything: the view is laid out at
+    /// Draws the shape with the layout `hover` lit into PNG bytes without showing anything: the view is laid out at
     /// its full size and drawn from there, at two pixels per point as a Retina screen shows it. Transparent outside
     /// the shape. For checking the design.
-    pub fn snapshot_png(&self, spec: &ZonesSpec, hover: Option<usize>) -> Option<Vec<u8>> {
+    pub fn snapshot_png(
+        &self,
+        spec: &ZonesSpec,
+        hover: Option<usize>,
+        selected: Option<usize>,
+    ) -> Option<Vec<u8>> {
         let view = &self.inner.view;
         view.adopt(spec);
         view.ivars().hover.set(hover);
+        view.ivars().selected.set(selected);
         view.setFrameSize(NSSize::new(spec.width, spec.height));
         let bounds = view.bounds();
         // SAFETY: a plain RGBA bitmap with valid dimensions.
@@ -821,6 +923,162 @@ impl Footprint {
 }
 
 impl Drop for Footprint {
+    fn drop(&mut self) {
+        self.glide.anim.borrow_mut().take();
+        self.glide.panel.orderOut(None);
+        self.glide.panel.close();
+    }
+}
+
+// ---------------------------------------------------------------- the cells of the chosen layout
+
+pub struct CellsIvars {
+    /// The cells in the view's own coordinates, with the origin at the bottom left.
+    cells: RefCell<Vec<NSRect>>,
+}
+
+define_class!(
+    // SAFETY: NSView allows subclassing; the ivars are only touched on the main thread and need no Drop.
+    #[unsafe(super(NSView))]
+    #[thread_kind = MainThreadOnly]
+    #[name = "FigSnapCells"]
+    #[ivars = CellsIvars]
+    struct CellsView;
+
+    impl CellsView {
+        #[unsafe(method(isOpaque))]
+        fn is_opaque(&self) -> bool {
+            false
+        }
+
+        #[unsafe(method(drawRect:))]
+        fn draw_rect(&self, _dirty: NSRect) {
+            for cell in self.ivars().cells.borrow().iter() {
+                paint_cell(*cell);
+            }
+        }
+    }
+);
+
+/// One cell as it rests: a faint shade with a light line inside a dark one, so that it shows on a light desktop and
+/// on a dark one alike, with a space between it and the next cell.
+fn paint_cell(cell: NSRect) {
+    let inset = |r: NSRect, by: f64| {
+        NSRect::new(
+            NSPoint::new(r.origin.x + by, r.origin.y + by),
+            NSSize::new(r.size.width - 2.0 * by, r.size.height - 2.0 * by),
+        )
+    };
+    let rect = inset(cell, CELL_GAP / 2.0);
+    style::fill_rounded(rect, CELL_RADIUS, &style::black(0.14));
+    style::stroke_rounded(rect, CELL_RADIUS, &style::black(0.3), 3.0);
+    style::stroke_rounded(
+        inset(rect, 1.0),
+        CELL_RADIUS - 1.0,
+        &style::white(0.75),
+        1.5,
+    );
+}
+
+/// The cells of the chosen layout over the part of the screen they fill, under the footprint that lights one of
+/// them and over every ordinary window. It never takes focus, passes every click through and stays out of the
+/// window cycle.
+pub struct CellsOverlay {
+    mtm: MainThreadMarker,
+    view: Retained<CellsView>,
+    glide: Rc<Glide>,
+}
+
+impl CellsOverlay {
+    pub fn new(mtm: MainThreadMarker) -> Self {
+        let panel = SnapPanel::new(mtm);
+        // Under the footprint, which is one level higher, and the row, which is two.
+        panel.setLevel(NSMainMenuWindowLevel);
+        let view: Retained<CellsView> = {
+            let ivars = CellsIvars {
+                cells: RefCell::new(Vec::new()),
+            };
+            // SAFETY: designated initializer with valid arguments on the main thread.
+            unsafe {
+                msg_send![super(mtm.alloc::<CellsView>().set_ivars(ivars)), initWithFrame: NSRect::ZERO]
+            }
+        };
+        panel.setContentView(Some(&view));
+        let glide = Rc::new_cyclic(|me| Glide {
+            panel,
+            target: Cell::new(None),
+            anim: RefCell::new(None),
+            me: me.clone(),
+        });
+        Self { mtm, view, glide }
+    }
+
+    /// Shows `cells` over `area`, both in `Frame` coordinates. Already showing, only the cells change; it fades in
+    /// and out otherwise.
+    pub fn show(&self, area: Frame, cells: &[Frame]) {
+        let to = NSRect::new(
+            NSPoint::new(area.x, primary_height(self.mtm) - (area.y + area.h)),
+            NSSize::new(area.w, area.h),
+        );
+        *self.view.ivars().cells.borrow_mut() = cells
+            .iter()
+            .map(|c| {
+                NSRect::new(
+                    NSPoint::new(c.x - area.x, area.h - (c.y - area.y) - c.h),
+                    NSSize::new(c.w, c.h),
+                )
+            })
+            .collect();
+        self.view.setNeedsDisplay(true);
+        let glide = &self.glide;
+        if glide.target.replace(Some(to)) == Some(to) && glide.panel.isVisible() {
+            return;
+        }
+        let panel = &glide.panel;
+        panel.setFrame_display(to, true);
+        if !panel.isVisible() {
+            panel.setAlphaValue(0.0);
+            panel.orderFrontRegardless();
+        }
+        glide.animate(to, 1.0, FADE_IN_SECONDS, || {});
+    }
+
+    /// Fades the cells away where they are.
+    pub fn hide(&self) {
+        let glide = &self.glide;
+        if glide.target.take().is_none() {
+            return;
+        }
+        let weak = glide.me.clone();
+        glide.animate(glide.panel.frame(), 0.0, FADE_OUT_SECONDS, move || {
+            if let Some(glide) = weak.upgrade() {
+                glide.panel.orderOut(None);
+            }
+        });
+    }
+
+    pub fn is_shown(&self) -> bool {
+        self.glide.target.get().is_some()
+    }
+
+    /// Draws the cells in `area`-sized PNG bytes without showing anything, at two pixels per point, on a clear
+    /// background. For checking the design.
+    pub fn snapshot_png(&self, area: Frame, cells: &[Frame]) -> Option<Vec<u8>> {
+        *self.view.ivars().cells.borrow_mut() = cells
+            .iter()
+            .map(|c| {
+                NSRect::new(
+                    NSPoint::new(c.x - area.x, area.h - (c.y - area.y) - c.h),
+                    NSSize::new(c.w, c.h),
+                )
+            })
+            .collect();
+        self.view.setFrameSize(NSSize::new(area.w, area.h));
+        widgets::view_png(&self.view)
+    }
+}
+
+impl Drop for CellsOverlay {
     fn drop(&mut self) {
         self.glide.anim.borrow_mut().take();
         self.glide.panel.orderOut(None);
