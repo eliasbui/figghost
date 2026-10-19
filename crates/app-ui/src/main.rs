@@ -34,7 +34,7 @@ use context::AppContext;
 use features::{AttachEnv, Features};
 use focus::FocusFeature;
 use live_media::LiveMedia;
-use macos_sys::{MainThreadMarker, app, hello, status_item::StatusMenu};
+use macos_sys::{MainThreadMarker, app, hello, status_item::StatusMenu, workspace};
 use media::MediaFeature;
 use mouse::Mouse;
 use settings::SettingsFeature;
@@ -209,6 +209,15 @@ impl Shell {
         let settings = SettingsFeature::new(Rc::clone(&ctx));
         let on_settings = Rc::clone(&settings);
         app::set_settings_handler(move || on_settings.show());
+        let on_update = Rc::clone(&update);
+        app::set_menu_handler("updates", move || on_update.check_from_menu());
+        let on_news = Rc::clone(&update);
+        app::set_menu_handler("whats_new", move || on_news.show_whats_new());
+        let config_home = ctx.home.clone();
+        app::set_menu_handler("config", move || {
+            let _ = std::fs::create_dir_all(&config_home);
+            workspace::open_path(&config_home);
+        });
         let on_reopen = Rc::clone(&settings);
         let reopen = app::on_reopen(mtm, move || on_reopen.show());
         let status = Rc::new(menu::build(&ctx, &settings));

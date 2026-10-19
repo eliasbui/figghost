@@ -56,7 +56,8 @@ pub fn run_hook(
     {
         return 0;
     }
-    let asks = event.kind == EventKind::PermissionRequest;
+    let asks = matches!(event.kind, EventKind::PermissionRequest | EventKind::Question);
+    let question = event.kind == EventKind::Question;
     let wait = if asks { HARD_WAIT } else { ACK_WAIT };
     if stream.set_read_timeout(Some(wait)).is_err() {
         return 0;
@@ -67,7 +68,13 @@ pub fn run_hook(
     }
     if asks
         && let Ok(reply) = wire::decode_reply(&line)
-        && let Some(output) = wire::hook_stdout(&reply)
+        && let Some(output) = if question {
+            value
+                .get("tool_input")
+                .and_then(|input| wire::question_stdout(&reply, input))
+        } else {
+            wire::hook_stdout(&reply)
+        }
     {
         let _ = writeln!(stdout, "{output}");
     }

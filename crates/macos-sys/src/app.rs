@@ -14,19 +14,24 @@ use objc2_foundation::{
     NSAppleEventManager, NSNotification, NSNotificationCenter, NSObject, NSObjectProtocol,
     NSRunLoop, NSRunLoopCommonModes, NSString, NSTimer,
 };
-use std::{cell::RefCell, ptr::NonNull, rc::Rc, time::Instant};
+use std::{cell::RefCell, collections::HashMap, ptr::NonNull, rc::Rc, time::Instant};
 
 const APP_NAME: &str = "Figghost";
 
 thread_local! {
-    /// What the "Settings..." menu item does; set by the app once its settings window exists.
-    static SETTINGS_HANDLER: RefCell<Option<Rc<dyn Fn()>>> = const { RefCell::new(None) };
+    /// What the items of the application menu do, by name ("settings", "updates", "whats_new", "config"); set by
+    /// the app once what they open exists.
+    static MENU_HANDLERS: RefCell<HashMap<&'static str, Rc<dyn Fn()>>> = RefCell::new(HashMap::new());
     /// The targets of the menu items; AppKit holds targets weakly.
     static MENU_TARGETS: RefCell<Vec<Retained<ActionTarget>>> = const { RefCell::new(Vec::new()) };
 }
 
+pub fn set_menu_handler(name: &'static str, handler: impl Fn() + 'static) {
+    MENU_HANDLERS.with(|slots| slots.borrow_mut().insert(name, Rc::new(handler)));
+}
+
 pub fn set_settings_handler(handler: impl Fn() + 'static) {
-    SETTINGS_HANDLER.with(|slot| *slot.borrow_mut() = Some(Rc::new(handler)));
+    set_menu_handler("settings", handler);
 }
 
 /// Runs AppKit as an accessory app: no Dock icon, and it never becomes the active app on its own,
@@ -93,16 +98,21 @@ fn install_main_menu(mtm: MainThreadMarker, app: &NSApplication) {
         menu
     };
 
-    let settings = plain(&text.menu_settings, ",", sel!(fire:));
-    let target = ActionTarget::new(mtm, || {
-        let handler = SETTINGS_HANDLER.with(|slot| slot.borrow().clone());
-        if let Some(handler) = handler {
-            handler();
-        }
-    });
-    // SAFETY: `fire:` is implemented by ActionTarget; the target is kept alive in MENU_TARGETS.
-    unsafe { settings.setTarget(Some(&target)) };
-    MENU_TARGETS.with(|targets| targets.borrow_mut().push(target));
+    // An item that runs the handler of `name`, looked up at the click, so the app may set it after the menu.
+    let custom = |title: &str, key: &str, name: &'static str| {
+        let item = plain(title, key, sel!(fire:));
+        let target = ActionTarget::new(mtm, move || {
+            let handler = MENU_HANDLERS.with(|slots| slots.borrow().get(name).cloned());
+            if let Some(handler) = handler {
+                handler();
+            }
+        });
+        // SAFETY: `fire:` is implemented by ActionTarget; the target is kept alive in MENU_TARGETS.
+        unsafe { item.setTarget(Some(&target)) };
+        MENU_TARGETS.with(|targets| targets.borrow_mut().push(target));
+        item
+    };
+    let settings = custom(&text.menu_settings, ",", "settings");
     let hide_others = plain(&text.menu_hide_others, "h", sel!(hideOtherApplications:));
     hide_others
         .setKeyEquivalentModifierMask(NSEventModifierFlags::Command | NSEventModifierFlags::Option);
@@ -114,8 +124,11 @@ fn install_main_menu(mtm: MainThreadMarker, app: &NSApplication) {
                 "",
                 sel!(orderFrontStandardAboutPanel:),
             ),
+            custom(&text.menu_updates, "", "updates"),
+            custom(&text.menu_whats_new, "", "whats_new"),
             NSMenuItem::separatorItem(mtm),
             settings,
+            custom(&text.menu_config, "", "config"),
             NSMenuItem::separatorItem(mtm),
             plain(&format!("{} {APP_NAME}", text.menu_hide), "h", sel!(hide:)),
             hide_others,

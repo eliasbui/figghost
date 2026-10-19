@@ -1,6 +1,6 @@
 //! Which sessions exist and what each is doing, built from the events the hooks report.
 
-use crate::event::{Agent, EventKind, HookEvent};
+use crate::event::{Agent, EventKind, HookEvent, Question};
 use std::cmp::Reverse;
 
 /// A session that reports nothing for this long while "working" is more likely stuck or closed than busy.
@@ -58,6 +58,8 @@ pub struct Approval {
     pub cwd: String,
     pub tool: String,
     pub detail: String,
+    /// The questions to put to the user when the agent asked with choices.
+    pub questions: Vec<Question>,
     pub requested_ms: i64,
 }
 
@@ -126,7 +128,7 @@ impl Tracker {
                     .retain(|a| !(a.agent == event.agent && a.session_id == event.session_id));
                 Effect::None
             }
-            EventKind::PermissionRequest => {
+            EventKind::PermissionRequest | EventKind::Question => {
                 let session = self.session_mut(event);
                 session.state = State::Waiting;
                 session.note.clone_from(&event.detail);
@@ -140,6 +142,7 @@ impl Tracker {
                     cwd,
                     tool: event.tool.clone().unwrap_or_default(),
                     detail: event.detail.clone().unwrap_or_default(),
+                    questions: event.questions.clone(),
                     requested_ms: event.at_ms,
                 });
                 self.trim();
@@ -299,8 +302,29 @@ mod tests {
             tool: None,
             detail: None,
             message: None,
+            questions: Vec::new(),
             at_ms,
         }
+    }
+
+    #[test]
+    fn a_question_with_choices_waits_like_a_command_and_keeps_its_choices() {
+        let mut t = Tracker::default();
+        let effect = t.apply(&HookEvent {
+            questions: vec![Question {
+                header: "Pick".into(),
+                question: "Which?".into(),
+                options: vec!["A".into(), "B".into()],
+                multi: false,
+            }],
+            detail: Some("Which?".into()),
+            ..event(EventKind::Question, "q", 1)
+        });
+        let Effect::Approval(id) = effect else {
+            panic!()
+        };
+        assert_eq!(t.approval(id).unwrap().questions[0].options, ["A", "B"]);
+        assert_eq!(state_of(&t, "q"), State::Waiting);
     }
 
     fn request(session: &str, command: &str, at_ms: i64) -> HookEvent {

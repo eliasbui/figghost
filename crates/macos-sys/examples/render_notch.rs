@@ -187,6 +187,7 @@ fn main() {
             notch.page_frame(),
             AgentsCallbacks {
                 on_decide: Box::new(|_, _| {}),
+                on_pick: Box::new(|_, _| {}),
                 on_refresh: Box::new(|| {}),
             },
         );
@@ -244,6 +245,8 @@ fn main() {
             detail: "shop  -  just now".into(),
             allow: "Allow".into(),
             deny: "Deny".into(),
+            choices: Vec::new(),
+            confirm: true,
         };
         let display = |approval: Option<ApprovalCardData>,
                        more: &str,

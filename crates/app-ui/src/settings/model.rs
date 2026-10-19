@@ -1336,9 +1336,11 @@ mod tests {
             hotkey(&mut config, "clipboard", "cmd+§").unwrap_err().code,
             "invalid_shortcut"
         );
-        // Function keys are allowed on their own.
-        hotkey(&mut config, "clipboard", "f13").unwrap();
-        assert_eq!(config.hotkey, "f13");
+        // A function key needs a modifier too.
+        assert_eq!(
+            hotkey(&mut config, "clipboard", "f13").unwrap_err().code,
+            "needs_modifier"
+        );
     }
 
     #[test]

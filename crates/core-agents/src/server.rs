@@ -175,7 +175,7 @@ fn serve(mut stream: UnixStream, handler: &Handler, wait: Duration) {
     let Some(event) = read_request(&stream) else {
         return;
     };
-    if event.kind != EventKind::PermissionRequest {
+    if !matches!(event.kind, EventKind::PermissionRequest | EventKind::Question) {
         handler(event, None);
         let _ = stream.write_all(wire::encode_reply(&Reply::Pass).as_bytes());
         return;
@@ -222,6 +222,7 @@ mod tests {
             tool: Some("Bash".into()),
             detail: Some("ls".into()),
             message: None,
+            questions: Vec::new(),
             at_ms: 1,
         }
     }

@@ -30,6 +30,7 @@ const REFRESH_SIZE: f64 = 24.0;
 const COMMAND_LINES: usize = 3;
 const COMMAND_LINE_HEIGHT: f64 = 16.0;
 const CARD_PAD: f64 = 16.0;
+const CHOICE_GAP: f64 = 6.0;
 
 /// A command or edit that waits for an answer.
 #[derive(Debug, Clone)]
@@ -42,6 +43,16 @@ pub struct ApprovalCardData {
     pub detail: String,
     pub allow: String,
     pub deny: String,
+    /// The choices of a question, one button each; empty for a command.
+    pub choices: Vec<ChoiceData>,
+    /// Whether the allow button is there: a command has it, a question only when it takes several choices.
+    pub confirm: bool,
+}
+
+#[derive(Debug, Clone)]
+pub struct ChoiceData {
+    pub label: String,
+    pub selected: bool,
 }
 
 #[derive(Debug, Clone)]
@@ -94,6 +105,8 @@ pub struct AgentsDisplay {
 pub struct AgentsCallbacks {
     /// An answer for the command with this id: true to allow it.
     pub on_decide: Box<dyn Fn(u64, bool)>,
+    /// The choice with this number was pressed on the question with this id.
+    pub on_pick: Box<dyn Fn(u64, usize)>,
     /// The usage limits are to be read again.
     pub on_refresh: Box<dyn Fn()>,
 }
@@ -171,16 +184,21 @@ define_class!(
                     false,
                 ),
             );
-            let mono = NSFont::userFixedPitchFontOfSize(12.5)
-                .unwrap_or_else(|| style::font(12.5, Weight::Regular));
-            let per_line = (width / text_width("M", &mono).max(1.0)).floor() as usize;
+            // A command is code in a fixed-width font; a question is a sentence.
+            let body = if data.choices.is_empty() {
+                NSFont::userFixedPitchFontOfSize(12.5)
+                    .unwrap_or_else(|| style::font(12.5, Weight::Regular))
+            } else {
+                style::font(13.0, Weight::Medium)
+            };
+            let per_line = (width / text_width("M", &body).max(1.0)).floor() as usize;
             draw_text(
                 &fit_command(&data.command, per_line, COMMAND_LINES),
                 NSRect::new(
                     NSPoint::new(CARD_PAD, 34.0),
                     NSSize::new(width, COMMAND_LINE_HEIGHT * COMMAND_LINES as f64 + 2.0),
                 ),
-                &text_attributes(&mono, &white(0.96), Fit::Wrap, false),
+                &text_attributes(&body, &white(0.96), Fit::Wrap, false),
             );
             draw_text(
                 &data.detail,
@@ -196,14 +214,17 @@ define_class!(
     unsafe impl NSObjectProtocol for ApprovalCard {}
 );
 
-/// The height a card needs: heading, the command lines, the detail line and the buttons.
-const CARD_HEIGHT: f64 = 34.0
-    + COMMAND_LINE_HEIGHT * COMMAND_LINES as f64
-    + 8.0
-    + 14.0
-    + 12.0
-    + BUTTON_HEIGHT
-    + CARD_PAD;
+/// The height a card needs: heading, the command lines, the detail line, a button for each choice, and the
+/// buttons that answer.
+fn card_height(data: &ApprovalCardData) -> f64 {
+    34.0 + COMMAND_LINE_HEIGHT * COMMAND_LINES as f64
+        + 8.0
+        + 14.0
+        + 12.0
+        + data.choices.len() as f64 * (BUTTON_HEIGHT + CHOICE_GAP)
+        + BUTTON_HEIGHT
+        + CARD_PAD
+}
 
 pub struct ListIvars {
     rows: RefCell<Vec<SessionData>>,
@@ -489,21 +510,41 @@ impl AgentsView {
         self.first.set(display.approval.as_ref().map(|a| a.id));
 
         if let Some(approval) = &display.approval {
+            let card_height = card_height(approval);
             let card = {
                 let this = mtm.alloc::<ApprovalCard>().set_ivars(CardIvars {
                     data: RefCell::new(Some(approval.clone())),
                 });
                 let frame = NSRect::new(
-                    NSPoint::new(MARGIN, top - cursor - CARD_HEIGHT),
-                    NSSize::new(inner, CARD_HEIGHT),
+                    NSPoint::new(MARGIN, top - cursor - card_height),
+                    NSSize::new(inner, card_height),
                 );
                 // SAFETY: designated initializer with valid arguments on the main thread.
                 let card: Retained<ApprovalCard> =
                     unsafe { msg_send![super(this), initWithFrame: frame] };
                 card
             };
-            let buttons_top = CARD_HEIGHT - CARD_PAD - BUTTON_HEIGHT;
-            let half = (inner - 2.0 * CARD_PAD - GAP) / 2.0;
+            let buttons_top = card_height - CARD_PAD - BUTTON_HEIGHT;
+            let full = inner - 2.0 * CARD_PAD;
+            let half = if approval.confirm { (full - GAP) / 2.0 } else { full };
+            // The choices stack above the buttons that answer, in the order of the question.
+            let choices_top = buttons_top - approval.choices.len() as f64 * (BUTTON_HEIGHT + CHOICE_GAP);
+            for (n, choice) in approval.choices.iter().enumerate() {
+                let button = TouchButton::new(
+                    mtm,
+                    NSRect::new(
+                        NSPoint::new(CARD_PAD, choices_top + n as f64 * (BUTTON_HEIGHT + CHOICE_GAP)),
+                        NSSize::new(full, BUTTON_HEIGHT),
+                    ),
+                    Look::Rect,
+                );
+                button.set_symbol(if choice.selected { "checkmark" } else { "circle" });
+                button.set_title(&choice.label);
+                button.set_selected(choice.selected);
+                let (shared, id) = (Rc::clone(&self.callbacks), approval.id);
+                button.set_on_click(move || (shared.on_pick)(id, n));
+                card.addSubview(&button);
+            }
             let deny = TouchButton::new(
                 mtm,
                 NSRect::new(
@@ -512,9 +553,8 @@ impl AgentsView {
                 ),
                 Look::Rect,
             );
-            deny.set_symbol("xmark");
             deny.set_title(&approval.deny);
-            deny.set_tone(Some(Tone::Red));
+            deny.set_tone(if approval.choices.is_empty() { Some(Tone::Red) } else { None });
             let allow = TouchButton::new(
                 mtm,
                 NSRect::new(
@@ -526,16 +566,19 @@ impl AgentsView {
             allow.set_symbol("checkmark");
             allow.set_title(&approval.allow);
             allow.set_selected(true);
+            deny.set_symbol(if approval.choices.is_empty() { "xmark" } else { "terminal" });
             let id = approval.id;
             let shared = Rc::clone(&self.callbacks);
             deny.set_on_click(move || (shared.on_decide)(id, false));
             let shared = Rc::clone(&self.callbacks);
             allow.set_on_click(move || (shared.on_decide)(id, true));
             card.addSubview(&deny);
-            card.addSubview(&allow);
+            if approval.confirm {
+                card.addSubview(&allow);
+            }
             self.root.addSubview(&card);
             added.push(Retained::into_super(card));
-            cursor += CARD_HEIGHT + 8.0;
+            cursor += card_height + 8.0;
             if !display.more_waiting.is_empty() {
                 let more = new_view(|| {
                     let this = mtm.alloc::<HeadingLabel>().set_ivars(HeadingIvars {

@@ -536,7 +536,7 @@ function onRecordKey(e) {
   if (e.altKey) mods.push('opt');
   if (e.shiftKey) mods.push('shift');
   if (e.metaKey) mods.push('cmd');
-  if (!mods.length && !/^f\d+$/.test(key)) return toast(t('fault.needs_modifier'));
+  if (!mods.length) return toast(t('fault.needs_modifier'));
   send({ t: 'hotkey', target: rec.target, value: [...mods, key].join('+') });
   stopRecording();
 }

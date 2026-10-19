@@ -43,6 +43,8 @@ pub enum EventKind {
     PromptSubmit,
     /// A command or edit is about to ask the user; the hook may answer for them.
     PermissionRequest,
+    /// A question with choices that the agent put to the user (Claude Code's AskUserQuestion).
+    Question,
     Notification,
     /// A tool finished, which also means a pending question was answered, wherever it was answered.
     ToolDone,
@@ -85,7 +87,50 @@ pub struct HookEvent {
     /// The text of a notification.
     #[serde(default)]
     pub message: Option<String>,
+    /// The questions of a `Question` event.
+    #[serde(default, skip_serializing_if = "Vec::is_empty")]
+    pub questions: Vec<Question>,
     pub at_ms: i64,
+}
+
+/// One question of AskUserQuestion with the labels of its choices.
+#[derive(Debug, Clone, PartialEq, Eq, Serialize, Deserialize)]
+pub struct Question {
+    pub header: String,
+    pub question: String,
+    pub options: Vec<String>,
+    #[serde(default)]
+    pub multi: bool,
+}
+
+const QUESTIONS_MAX: usize = 4;
+const OPTIONS_MAX: usize = 4;
+
+/// The questions of an AskUserQuestion input; empty when the input has none a person could answer.
+fn parse_questions(input: Option<&Value>) -> Vec<Question> {
+    let list = input
+        .and_then(|i| i.get("questions"))
+        .and_then(Value::as_array);
+    list.into_iter()
+        .flatten()
+        .take(QUESTIONS_MAX)
+        .filter_map(|q| {
+            let text = |key: &str| q.get(key).and_then(Value::as_str).unwrap_or_default();
+            let options: Vec<String> = q
+                .get("options")?
+                .as_array()?
+                .iter()
+                .take(OPTIONS_MAX)
+                .filter_map(|o| o.get("label")?.as_str().map(|l| clip(l, 80)))
+                .collect();
+            (!text("question").is_empty() && !options.is_empty()).then(|| Question {
+                header: clip(text("header"), 30),
+                question: clip(text("question"), MESSAGE_CHARS),
+                options,
+                multi: q.get("multiSelect").and_then(Value::as_bool).unwrap_or(false),
+            })
+        })
+        .collect()
 }
 
 /// At most `max` characters, with "..." when something was cut.
@@ -141,7 +186,23 @@ pub fn parse_event(agent: Agent, raw: &Value, now_ms: i64) -> Option<HookEvent> 
             .filter(|t| !t.is_empty())
             .map(str::to_owned)
     };
-    let kind = EventKind::from_hook_name(name);
+    let mut kind = EventKind::from_hook_name(name);
+    let mut questions = Vec::new();
+    // The question has its own card; the permission prompt that may follow it is the terminal's to ask.
+    if raw.get("tool_name").and_then(Value::as_str) == Some("AskUserQuestion") {
+        kind = match (name, kind) {
+            ("PreToolUse", _) => {
+                questions = parse_questions(raw.get("tool_input"));
+                if questions.is_empty() {
+                    EventKind::Other
+                } else {
+                    EventKind::Question
+                }
+            }
+            (_, EventKind::PermissionRequest) => EventKind::Other,
+            (_, kind) => kind,
+        };
+    }
     let tool = if kind == EventKind::Notification {
         text("notification_type")
     } else {
@@ -155,8 +216,9 @@ pub fn parse_event(agent: Agent, raw: &Value, now_ms: i64) -> Option<HookEvent> 
         detail: if kind == EventKind::PermissionRequest {
             summarize_input(raw.get("tool_input"))
         } else {
-            None
+            questions.first().map(|q| q.question.clone())
         },
+        questions,
         tool,
         message: if kind == EventKind::Notification {
             text("message").map(|m| clip(&m, MESSAGE_CHARS))
@@ -190,6 +252,25 @@ mod tests {
             (event.session_id.as_str(), event.cwd.as_str(), event.at_ms),
             ("abc", "/Users/me/app", 7)
         );
+    }
+
+    #[test]
+    fn ask_user_question_becomes_a_question_and_its_permission_prompt_is_left_alone() {
+        let input = json!({ "questions": [
+            { "question": "Which?", "header": "Pick", "multiSelect": true,
+              "options": [ { "label": "A", "description": "x" }, { "label": "B", "description": "y" } ] }
+        ] });
+        let raw = json!({ "hook_event_name": "PreToolUse", "session_id": "s", "cwd": "/w",
+            "tool_name": "AskUserQuestion", "tool_input": input });
+        let event = parse_event(Agent::Claude, &raw, 0).unwrap();
+        assert_eq!(event.kind, EventKind::Question);
+        assert_eq!(event.questions[0].options, ["A", "B"]);
+        assert!(event.questions[0].multi);
+        let prompt = json!({ "hook_event_name": "PermissionRequest", "session_id": "s", "cwd": "/w",
+            "tool_name": "AskUserQuestion", "tool_input": input });
+        assert_eq!(parse_event(Agent::Claude, &prompt, 0).unwrap().kind, EventKind::Other);
+        let empty = json!({ "hook_event_name": "PreToolUse", "tool_name": "AskUserQuestion", "tool_input": {} });
+        assert_eq!(parse_event(Agent::Claude, &empty, 0).unwrap().kind, EventKind::Other);
     }
 
     #[test]

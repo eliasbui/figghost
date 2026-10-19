@@ -39,10 +39,18 @@ const REQUEST: Subscription = Subscription {
     timeout: REQUEST_TIMEOUT_SECONDS,
 };
 
+/// The question with choices is held by Claude Code until the hook answers it or lets it be asked.
+const QUESTION: Subscription = Subscription {
+    event: "PreToolUse",
+    matcher: Some("AskUserQuestion"),
+    timeout: REQUEST_TIMEOUT_SECONDS,
+};
+
 const CLAUDE: &[Subscription] = &[
     quick("SessionStart", None),
     quick("UserPromptSubmit", None),
     REQUEST,
+    QUESTION,
     quick("PostToolUse", Some("*")),
     quick("Notification", Some("*")),
     quick("Stop", None),
@@ -487,7 +495,7 @@ mod tests {
         assert_eq!(
             report,
             Report {
-                added: 8,
+                added: 9,
                 updated: 0,
                 unchanged: 0
             }
@@ -539,7 +547,7 @@ mod tests {
             Report {
                 added: 0,
                 updated: 0,
-                unchanged: 8
+                unchanged: 9
             }
         );
         assert_eq!(doc, once);
@@ -559,7 +567,7 @@ mod tests {
             report,
             Report {
                 added: 0,
-                updated: 8,
+                updated: 9,
                 unchanged: 0
             }
         );
@@ -582,7 +590,7 @@ mod tests {
         let original = user_settings();
         let mut doc = original.clone();
         install_hooks(&mut doc, Agent::Claude, EXE).unwrap();
-        assert_eq!(remove_hooks(&mut doc), 8);
+        assert_eq!(remove_hooks(&mut doc), 9);
         assert_eq!(doc, original);
         assert_eq!(status(&doc, Agent::Claude).installed, 0);
         assert_eq!(remove_hooks(&mut doc), 0);
@@ -708,7 +716,7 @@ mod tests {
         fs::set_permissions(&path, fs::Permissions::from_mode(0o600)).unwrap();
 
         let report = install_file(&path, Agent::Claude, EXE).unwrap();
-        assert_eq!(report.added, 8);
+        assert_eq!(report.added, 9);
         assert_eq!(
             fs::read_to_string(dir.join("settings.json.figghost-backup")).unwrap(),
             original
@@ -726,7 +734,7 @@ mod tests {
             original
         );
 
-        assert_eq!(remove_file(&path).unwrap(), 8);
+        assert_eq!(remove_file(&path).unwrap(), 9);
         assert_eq!(read_json(&path).unwrap(), user_settings());
         let leftovers: Vec<_> = fs::read_dir(&dir)
             .unwrap()

@@ -235,6 +235,12 @@ impl UpdateFeature {
         self.check(Ask::Manual);
     }
 
+    /// The menu item: the popup shows how the check goes, which the button of the settings page does in place.
+    pub fn check_from_menu(&self) {
+        self.show_popup();
+        self.check_now();
+    }
+
     /// The yes to an offered version.
     pub fn install_available(&self) {
         let release = match &*self.phase.borrow() {

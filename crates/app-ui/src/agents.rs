@@ -21,7 +21,8 @@ use core_agents::{
 use macos_sys::{
     MainThreadMarker,
     agents_ui::{
-        AgentsCallbacks, AgentsDisplay, AgentsView, ApprovalCardData, SessionData, TokensData,
+        AgentsCallbacks, AgentsDisplay, AgentsView, ApprovalCardData, ChoiceData, SessionData,
+        TokensData,
         UsageData,
     },
     app,
@@ -88,9 +89,56 @@ fn short_name(agent: Agent) -> &'static str {
     }
 }
 
-/// The card for a command that waits for an answer.
-pub fn approval_card(language: Language, approval: &Approval, now: i64) -> ApprovalCardData {
+/// How far the user is through the questions of one request: the answers so far and, for a question that takes
+/// several choices, the ones ticked.
+#[derive(Debug, Default, Clone, PartialEq, Eq)]
+pub struct Progress {
+    pub answers: Vec<String>,
+    pub ticked: Vec<usize>,
+}
+
+/// The card for a command that waits for an answer, or for the question the user is at.
+pub fn approval_card(
+    language: Language,
+    approval: &Approval,
+    progress: &Progress,
+    now: i64,
+) -> ApprovalCardData {
     let name = approval.agent.name();
+    let detail = format!(
+        "{}  -  {}",
+        approval.project(),
+        ago(language, now, approval.requested_ms)
+    );
+    if let Some(question) = approval.questions.get(progress.answers.len()) {
+        let of = match approval.questions.len() {
+            1 => String::new(),
+            n => format!(" {}/{n}", progress.answers.len() + 1),
+        };
+        let heading = if question.header.is_empty() {
+            format!("{name}{of}")
+        } else {
+            format!("{name} - {}{of}", question.header)
+        };
+        return ApprovalCardData {
+            id: approval.id,
+            heading,
+            command: question.question.clone(),
+            detail,
+            allow: language.agents_done().to_owned(),
+            deny: language.agents_terminal().to_owned(),
+            choices: question
+                .options
+                .iter()
+                .enumerate()
+                .map(|(n, label)| ChoiceData {
+                    label: label.clone(),
+                    selected: progress.ticked.contains(&n),
+                })
+                .collect(),
+            confirm: question.multi,
+        };
+    }
     ApprovalCardData {
         id: approval.id,
         heading: if approval.tool.is_empty() {
@@ -99,13 +147,11 @@ pub fn approval_card(language: Language, approval: &Approval, now: i64) -> Appro
             language.agents_wants(name, &approval.tool)
         },
         command: approval.detail.clone(),
-        detail: format!(
-            "{}  -  {}",
-            approval.project(),
-            ago(language, now, approval.requested_ms)
-        ),
+        detail,
         allow: language.agents_allow().to_owned(),
         deny: language.agents_deny().to_owned(),
+        choices: Vec::new(),
+        confirm: true,
     }
 }
 
@@ -397,6 +443,8 @@ pub struct AgentsFeature {
     settings: RefCell<AgentsConfig>,
     tracker: RefCell<Tracker>,
     tickets: RefCell<HashMap<u64, Ticket>>,
+    /// Where the user is in each question request that is open.
+    progress: RefCell<HashMap<u64, Progress>>,
     server: RefCell<Option<Server>>,
     ticker: RefCell<Option<app::Timer>>,
     limits: RefCell<UsageCache>,
@@ -429,7 +477,7 @@ impl AgentsFeature {
             std::env::var_os("HOME"),
         );
         let feature = Rc::new_cyclic(|me: &Weak<AgentsFeature>| {
-            let (decider, refresher) = (me.clone(), me.clone());
+            let (decider, picker, refresher) = (me.clone(), me.clone(), me.clone());
             let view = AgentsView::new(
                 mtm,
                 notch.page_frame(),
@@ -437,6 +485,11 @@ impl AgentsFeature {
                     on_decide: Box::new(move |id, allow| {
                         if let Some(feature) = decider.upgrade() {
                             feature.decide(id, allow);
+                        }
+                    }),
+                    on_pick: Box::new(move |id, choice| {
+                        if let Some(feature) = picker.upgrade() {
+                            feature.pick(id, choice);
                         }
                     }),
                     on_refresh: Box::new(move || {
@@ -458,6 +511,7 @@ impl AgentsFeature {
                 settings: RefCell::new(config.clone()),
                 tracker: RefCell::default(),
                 tickets: RefCell::default(),
+                progress: RefCell::default(),
                 server: RefCell::default(),
                 ticker: RefCell::default(),
                 limits: RefCell::default(),
@@ -609,6 +663,7 @@ impl AgentsFeature {
             .map(|a| a.id)
             .collect();
         self.tickets.borrow_mut().retain(|id, _| open.contains(id));
+        self.progress.borrow_mut().retain(|id, _| open.contains(id));
         self.sync_ticker();
         self.update_badge();
         self.render();
@@ -778,7 +833,19 @@ impl AgentsFeature {
     }
 
     fn decide(&self, id: u64, allow: bool) {
-        let ticket = self.tickets.borrow_mut().remove(&id);
+        let asks = self
+            .tracker
+            .borrow()
+            .approval(id)
+            .is_some_and(|a| !a.questions.is_empty());
+        if asks {
+            // Allow is "Done" on a question that takes several choices; deny is leaving it to the terminal.
+            return if allow {
+                self.confirm(id)
+            } else {
+                self.finish(id, Reply::Pass, "left to the terminal")
+            };
+        }
         let reply = if allow {
             Reply::Allow
         } else {
@@ -786,10 +853,92 @@ impl AgentsFeature {
                 message: i18n::current().agents_denied_message().to_owned(),
             }
         };
+        self.finish(id, reply, if allow { "allowed" } else { "denied" });
+    }
+
+    /// A choice of the question the user is at: it answers a single-choice question, and ticks or unticks one
+    /// of a question that takes several.
+    fn pick(&self, id: u64, choice: usize) {
+        let (label, multi) = {
+            let tracker = self.tracker.borrow();
+            let Some(approval) = tracker.approval(id) else {
+                return;
+            };
+            let step = self.progress.borrow().get(&id).map_or(0, |p| p.answers.len());
+            let Some(question) = approval.questions.get(step) else {
+                return;
+            };
+            let Some(label) = question.options.get(choice) else {
+                return;
+            };
+            (label.clone(), question.multi)
+        };
+        if multi {
+            let mut progress = self.progress.borrow_mut();
+            let ticked = &mut progress.entry(id).or_default().ticked;
+            match ticked.iter().position(|&n| n == choice) {
+                Some(at) => {
+                    ticked.remove(at);
+                }
+                None => ticked.push(choice),
+            }
+            drop(progress);
+            self.render();
+        } else {
+            self.answer(id, label);
+        }
+    }
+
+    /// "Done" on a question that takes several choices: the ticked ones, in the order of the question.
+    fn confirm(&self, id: u64) {
+        let labels: Vec<String> = {
+            let tracker = self.tracker.borrow();
+            let progress = self.progress.borrow();
+            let Some(progress) = progress.get(&id) else {
+                return;
+            };
+            let Some(question) = tracker
+                .approval(id)
+                .and_then(|a| a.questions.get(progress.answers.len()))
+            else {
+                return;
+            };
+            let mut ticked = progress.ticked.clone();
+            ticked.sort_unstable();
+            ticked.iter().filter_map(|&n| question.options.get(n).cloned()).collect()
+        };
+        if !labels.is_empty() {
+            self.answer(id, labels.join(", "));
+        }
+    }
+
+    /// Takes the answer to the question the user is at, and sends them all once the last one is in.
+    fn answer(&self, id: u64, answer: String) {
+        let (done, total) = {
+            let total = match self.tracker.borrow().approval(id) {
+                Some(a) => a.questions.len(),
+                None => return,
+            };
+            let mut progress = self.progress.borrow_mut();
+            let progress = progress.entry(id).or_default();
+            progress.answers.push(answer);
+            progress.ticked.clear();
+            (progress.answers.clone(), total)
+        };
+        if done.len() >= total {
+            self.finish(id, Reply::Answers { answers: done }, "answered");
+        } else {
+            self.render();
+        }
+    }
+
+    /// Gives the agent the reply for a request and takes the request off the page.
+    fn finish(&self, id: u64, reply: Reply, what: &str) {
+        let ticket = self.tickets.borrow_mut().remove(&id);
+        self.progress.borrow_mut().remove(&id);
         let delivered = ticket.is_some_and(|ticket| ticket.answer(reply));
         trace::log(&format!(
-            "agents: question {id} {} ({})",
-            if allow { "allowed" } else { "denied" },
+            "agents: question {id} {what} ({})",
             if delivered {
                 "delivered"
             } else {
@@ -941,7 +1090,10 @@ impl AgentsFeature {
             let tracker = self.tracker.borrow();
             let waiting = tracker.approvals();
             (
-                waiting.first().map(|a| approval_card(language, a, now)),
+                waiting.first().map(|a| {
+                    let progress = self.progress.borrow().get(&a.id).cloned().unwrap_or_default();
+                    approval_card(language, a, &progress, now)
+                }),
                 match waiting.len() {
                     0 | 1 => String::new(),
                     n => language.agents_more_waiting(n - 1),
@@ -1125,6 +1277,7 @@ mod tests {
             tool: Some("Bash".into()),
             detail: Some("rm -rf build".into()),
             message: None,
+            questions: Vec::new(),
             at_ms: 1_000,
         });
         let Effect::Approval(id) = effect else {
@@ -1135,14 +1288,39 @@ mod tests {
 
     #[test]
     fn a_card_names_the_agent_the_tool_the_command_and_where() {
-        let card = approval_card(Language::English, &approval(), 1_000 + 120_000);
+        let card = approval_card(Language::English, &approval(), &Progress::default(), 1_000 + 120_000);
         assert_eq!(card.heading, "Claude Code wants to use Bash");
         assert_eq!(card.command, "rm -rf build");
         assert_eq!(card.detail, "shop  -  2 minutes ago");
         assert_eq!((card.allow.as_str(), card.deny.as_str()), ("Allow", "Deny"));
-        let vi = approval_card(Language::Vietnamese, &approval(), 1_000);
+        let vi = approval_card(Language::Vietnamese, &approval(), &Progress::default(), 1_000);
         assert_eq!(vi.heading, "Claude Code muốn dùng Bash");
         assert_eq!(vi.allow, "Cho phép");
+    }
+
+    #[test]
+    fn a_question_card_has_a_button_per_choice_and_follows_the_progress() {
+        let mut a = approval();
+        a.questions = ["First?", "Second?"]
+            .map(|question| core_agents::event::Question {
+                header: "Pick".into(),
+                question: question.into(),
+                options: vec!["A".into(), "B".into()],
+                multi: false,
+            })
+            .to_vec();
+        let first = approval_card(Language::English, &a, &Progress::default(), 1_000);
+        assert_eq!(first.heading, "Claude Code - Pick 1/2");
+        assert_eq!(first.command, "First?");
+        assert_eq!(first.choices.len(), 2);
+        assert!(!first.confirm, "a single choice answers by itself");
+        let seen = Progress {
+            answers: vec!["A".into()],
+            ticked: vec![1],
+        };
+        let second = approval_card(Language::English, &a, &seen, 1_000);
+        assert_eq!(second.command, "Second?");
+        assert!(second.choices[1].selected && !second.choices[0].selected);
     }
 
     #[test]
@@ -1150,7 +1328,7 @@ mod tests {
         let mut a = approval();
         a.tool.clear();
         assert_eq!(
-            approval_card(Language::English, &a, 1_000).heading,
+            approval_card(Language::English, &a, &Progress::default(), 1_000).heading,
             "Claude Code is asking for permission"
         );
     }
@@ -1364,14 +1542,14 @@ mod tests {
             AgentStatus {
                 found: true,
                 installed: 0,
-                wanted: 8,
+                wanted: 9,
                 error: None
             }
         );
         let report = sandbox.files.install(Agent::Claude, EXE).unwrap();
-        assert_eq!(report.added, 8);
+        assert_eq!(report.added, 9);
         let status = sandbox.files.status().claude;
-        assert_eq!((status.installed, status.wanted), (8, 8));
+        assert_eq!((status.installed, status.wanted), (9, 9));
         // The other tools' hooks and the rest of the file are still there.
         let now = sandbox.settings();
         assert_eq!(now["model"], original["model"]);
@@ -1380,7 +1558,7 @@ mod tests {
             now["hooks"]["PermissionRequest"][0],
             original["hooks"]["PermissionRequest"][0]
         );
-        assert_eq!(sandbox.files.remove(Agent::Claude).unwrap(), 8);
+        assert_eq!(sandbox.files.remove(Agent::Claude).unwrap(), 9);
         assert_eq!(sandbox.settings(), original);
         assert_eq!(sandbox.files.status().claude.installed, 0);
     }

@@ -611,9 +611,7 @@ pub fn parse_hotkey(text: &str) -> Result<HotkeySpec, String> {
         }
     }
     let key_code = key.ok_or("no key given")?;
-    let is_function_key =
-        (96..=122).contains(&key_code) || [64, 79, 80, 90, 105, 106, 107, 113].contains(&key_code);
-    if modifiers == 0 && !is_function_key {
+    if modifiers == 0 {
         return Err("needs at least one modifier".into());
     }
     Ok(HotkeySpec {
@@ -721,13 +719,8 @@ mod tests {
             }
         );
         assert_eq!(parse_hotkey(" ctrl + opt + space ").unwrap().key_code, 49);
-        assert_eq!(
-            parse_hotkey("f13").unwrap(),
-            HotkeySpec {
-                key_code: 105,
-                modifiers: 0
-            }
-        );
+        assert!(parse_hotkey("f13").is_err());
+        assert_eq!(parse_hotkey("opt+f13").unwrap().key_code, 105);
         assert!(parse_hotkey("c").is_err());
         assert!(parse_hotkey("cmd+").is_err());
         assert!(parse_hotkey("cmd+a+b").is_err());

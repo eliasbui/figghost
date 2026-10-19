@@ -34,9 +34,14 @@ button { font: inherit; color: inherit; cursor: default; }
 .switch::after { content: ""; position: absolute; top: 2px; left: 2px; width: 14px; height: 14px; border-radius: 50%; background: #fff; box-shadow: 0 1px 3px rgba(0,0,0,.3); transition: transform .12s ease-out; }
 .switch.on { background: var(--tint); } .switch.on::after { transform: translateX(12px); }
 .tools { display: grid; grid-template-columns: repeat(6, 1fr); gap: 2px; }
-.tool { display: grid; place-items: center; height: 34px; padding: 0; border: 0; border-radius: 9px; background: none; color: var(--text-2); transition: background .12s, color .12s; }
-.tool:hover { background: var(--fill); color: var(--text); }
+.tool { position: relative; display: grid; place-items: center; height: 34px; padding: 0; border: 0; border-radius: 9px; background: none; color: var(--text-2); }
+/* The hover fill fades by opacity only, which the compositor does without repainting the glass glyph mask each frame. */
+.tool::before { content: ""; position: absolute; inset: 0; border-radius: inherit; background: var(--fill); opacity: 0; transition: opacity .1s; }
+.tool:hover { color: var(--text); }
+.tool:hover::before { opacity: 1; }
+.tool .ic { position: relative; }
 .tool.live, .tool.live:hover { background: var(--bad); color: #fff; }
+.tool.live::before { display: none; }
 /* The name of the tool under the pointer; the line is always there, so the panel does not change height. */
 .cap { height: 16px; margin-top: 2px; font-size: 11px; line-height: 16px; text-align: center; color: var(--text-3); white-space: nowrap; overflow: hidden; text-overflow: ellipsis; }
 @media (prefers-reduced-motion: reduce) { * { transition: none !important; } }

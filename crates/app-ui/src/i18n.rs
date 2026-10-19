@@ -236,6 +236,22 @@ impl Language {
         }
     }
 
+    /// The button that leaves a question to the agent's own terminal prompt.
+    pub fn agents_terminal(self) -> &'static str {
+        match self {
+            Language::English => "Answer in terminal",
+            Language::Vietnamese => "Trả lời ở terminal",
+        }
+    }
+
+    /// The button that sends the choices ticked on a question that takes several.
+    pub fn agents_done(self) -> &'static str {
+        match self {
+            Language::English => "Done",
+            Language::Vietnamese => "Xong",
+        }
+    }
+
     pub fn agents_deny(self) -> &'static str {
         match self {
             Language::English => "Deny",
@@ -629,6 +645,9 @@ impl Language {
                 focus_minutes: "phút".into(),
                 menu_about: "Giới thiệu".into(),
                 menu_settings: "Cài đặt...".into(),
+                menu_updates: "Kiểm tra cập nhật...".into(),
+                menu_whats_new: "Có gì mới".into(),
+                menu_config: "Mở thư mục cấu hình".into(),
                 menu_hide: "Ẩn".into(),
                 menu_hide_others: "Ẩn các ứng dụng khác".into(),
                 menu_show_all: "Hiện tất cả".into(),
@@ -778,6 +797,8 @@ mod tests {
                 language.agents_asks("Codex"),
                 language.agents_allow().to_owned(),
                 language.agents_deny().to_owned(),
+                language.agents_terminal().to_owned(),
+                language.agents_done().to_owned(),
                 language.agents_denied_message().to_owned(),
                 language.agents_more_waiting(2),
                 language.agents_sessions().to_owned(),
@@ -868,6 +889,9 @@ mod tests {
                 &labels.focus_minutes,
                 &labels.menu_about,
                 &labels.menu_settings,
+                &labels.menu_updates,
+                &labels.menu_whats_new,
+                &labels.menu_config,
                 &labels.menu_hide,
                 &labels.menu_hide_others,
                 &labels.menu_show_all,

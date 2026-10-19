@@ -15,6 +15,10 @@ pub enum Reply {
     Deny {
         message: String,
     },
+    /// The chosen labels of a `Question`, one per question in order; several choices of one are joined by ", ".
+    Answers {
+        answers: Vec<String>,
+    },
     /// No answer: the agent asks the user itself, as if no hook existed.
     Pass,
 }
@@ -45,10 +49,28 @@ pub fn hook_stdout(reply: &Reply) -> Option<String> {
     let decision = match reply {
         Reply::Allow => json!({ "behavior": "allow" }),
         Reply::Deny { message } => json!({ "behavior": "deny", "message": message }),
-        Reply::Pass => return None,
+        Reply::Pass | Reply::Answers { .. } => return None,
     };
     Some(
         json!({ "hookSpecificOutput": { "hookEventName": "PermissionRequest", "decision": decision } })
+            .to_string(),
+    )
+}
+
+/// What the hook program prints for a `Question`: the tool goes ahead with the answers filled in, so the agent
+/// does not ask in the terminal. `input` is the tool input the agent sent.
+pub fn question_stdout(reply: &Reply, input: &serde_json::Value) -> Option<String> {
+    let Reply::Answers { answers } = reply else {
+        return None;
+    };
+    let mut given = serde_json::Map::new();
+    for (question, answer) in input.get("questions")?.as_array()?.iter().zip(answers) {
+        given.insert(question.get("question")?.as_str()?.to_owned(), json!(answer));
+    }
+    let mut updated = input.clone();
+    updated["answers"] = serde_json::Value::Object(given);
+    Some(
+        json!({ "hookSpecificOutput": { "hookEventName": "PreToolUse", "permissionDecision": "allow", "updatedInput": updated } })
             .to_string(),
     )
 }
@@ -68,8 +90,21 @@ mod tests {
             tool: Some("Bash".into()),
             detail: Some("ls".into()),
             message: None,
+            questions: Vec::new(),
             at_ms: 5,
         }
+    }
+
+    #[test]
+    fn answers_fill_the_tool_input_for_the_agent() {
+        let input = json!({ "questions": [ { "question": "Which?", "options": [] } ] });
+        let out = question_stdout(&Reply::Answers { answers: vec!["A".into()] }, &input).unwrap();
+        let out: Value = serde_json::from_str(&out).unwrap();
+        let hook = &out["hookSpecificOutput"];
+        assert_eq!(hook["permissionDecision"], "allow");
+        assert_eq!(hook["updatedInput"]["answers"]["Which?"], "A");
+        assert_eq!(hook["updatedInput"]["questions"], input["questions"]);
+        assert!(question_stdout(&Reply::Pass, &input).is_none());
     }
 
     #[test]
