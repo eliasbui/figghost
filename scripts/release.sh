@@ -73,7 +73,13 @@ trap 'rm -rf "$WORK"' EXIT
     echo
     echo "Changes:"
     echo
-    git log --format='- %s' ${PREVIOUS:+"$PREVIOUS..v$VERSION"}
+    # The update popup shows this list. docs/releases/<version>.md, a list written for the people who use the
+    # app, takes the place of the commit subjects when it exists.
+    if [ -f "docs/releases/$VERSION.md" ]; then
+        cat "docs/releases/$VERSION.md"
+    else
+        git log --format='- %s' ${PREVIOUS:+"$PREVIOUS..v$VERSION"}
+    fi
     echo
     echo "The app is signed ad hoc and not notarized; the cask removes the quarantine flag after installing it."
     echo "Accessibility access is tied to the code signature, so it has to be granted again after an update."
