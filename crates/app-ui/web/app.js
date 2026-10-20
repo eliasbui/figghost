@@ -1911,11 +1911,12 @@ function navSearch() {
       }
     }
   });
-  // Command-F finds, as in any Mac window. Bound once: the shell is rebuilt when the language changes.
+  // Command-F finds, as in any Mac window, and Command-K does the same for those who reach for it first. Bound once: the
+  // shell is rebuilt when the language changes.
   if (!navSearch.bound) {
     navSearch.bound = true;
     document.addEventListener('keydown', (e) => {
-      if (e.metaKey && !e.shiftKey && !e.altKey && !e.ctrlKey && e.code === 'KeyF') {
+      if (e.metaKey && !e.shiftKey && !e.altKey && !e.ctrlKey && (e.code === 'KeyF' || e.code === 'KeyK')) {
         e.preventDefault();
         const field = $('#side-search');
         if (field) { field.focus(); field.select(); }

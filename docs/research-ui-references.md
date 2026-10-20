@@ -81,7 +81,7 @@ Trạng thái (20/10/2026): hai ý đầu (kính thật ở sidebar, thẻ đặ
 
 ### 5.2 Điều hướng (sidebar)
 
-Trạng thái (20/10/2026): ý 1 (nhóm có tên) đã có ở 1.4.2 (năm nhóm và tab con). Màu icon: 1.4.0 chọn ô icon màu theo nhóm; HIG cho phép màu cố định khi có mục đích, và nhóm là một mục đích. Chưa làm: chấm trạng thái, khối cần chú ý (con ma ở chân sidebar nay báo quyền Trợ năng bằng thức hoặc ngủ), Cmd+K, nhớ trang giữa các lần mở, ẩn trang của tính năng đang tắt.
+Trạng thái (20/10/2026): ý 1 (nhóm có tên) đã có ở 1.4.2 (năm nhóm và tab con). Màu icon: 1.4.0 chọn ô icon màu theo nhóm; HIG cho phép màu cố định khi có mục đích, và nhóm là một mục đích. Chưa làm: chấm trạng thái, khối cần chú ý (con ma ở chân sidebar nay báo quyền Trợ năng bằng thức hoặc ngủ), bảng lệnh Cmd+K dạng lớp phủ (phím Cmd+K đã đưa con trỏ vào ô tìm như Cmd+F), nhớ trang giữa các lần mở, ẩn trang Cài đặt của tính năng đang tắt. Làm khác ý 6: tab của notch thuộc tính năng đang tắt không còn nằm trong thanh tab (xem `Notch::set_page_dormant`), nên notch mặc định có bảy tab như bản 1.4.2 và tab hiện ra khi bật tính năng.
 
 1. Nhãn nhóm, thu gọn được và nhớ trạng thái. Gợi ý theo `groupOf` hiện có: Trang chủ (General, Shortcuts); Hằng ngày (Scrolling, Clipboard, Always on top, Cursor, Window snapping); Notch (Notch, AI agents, Calendar); Công cụ (Smart Select, Translate, Capture, Colour picker); Thêm (Drag wheel, Mole, About). Tiếng Anh: Home, Everyday, Notch, Tools, More.
 2. Chấm trạng thái ở mỗi mục: bật, tắt, cần quyền. Dùng đúng `--good`, `--warn`.
