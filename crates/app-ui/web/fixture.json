@@ -27,14 +27,16 @@
     "material": "glass", "hud": "notch", "hud_position": "auto", "shadow": true, "motion": "spring", "open_on_hover": true, "hover_delay_ms": 300, "width": 0, "height": 0, "rest_width": 0, "rest_height": 0,
     "rest": "notch", "hide_in_capture": false, "haptics": true, "display": "auto", "open_page": "activity",
     "pages": [
-      { "id": "clipboard", "title": "Clipboard", "on": true },
-      { "id": "shelf", "title": "Shelf", "on": true },
-      { "id": "media", "title": "Media", "on": true },
-      { "id": "focus", "title": "Focus", "on": true },
-      { "id": "agents", "title": "Agents", "on": true },
-      { "id": "calendar", "title": "Calendar", "on": true },
-      { "id": "sound", "title": "Sound", "on": false },
-      { "id": "system", "title": "System", "on": true }
+      { "id": "clipboard", "title": "Clipboard", "on": true, "waiting": false },
+      { "id": "shelf", "title": "Shelf", "on": true, "waiting": false },
+      { "id": "media", "title": "Media", "on": true, "waiting": false },
+      { "id": "focus", "title": "Focus", "on": true, "waiting": false },
+      { "id": "agents", "title": "Agents", "on": true, "waiting": false },
+      { "id": "calendar", "title": "Calendar", "on": true, "waiting": false },
+      { "id": "dayprogress", "title": "Day progress", "on": true, "waiting": false },
+      { "id": "weather", "title": "Weather", "on": true, "waiting": true },
+      { "id": "system", "title": "System", "on": true, "waiting": false },
+      { "id": "sound", "title": "Sound", "on": false, "waiting": false }
     ],
     "live_media": true, "live_agents": true, "waveform": "live", "shortcut": "", "hardware": false,
     "screens": ["Built-in Retina Display", "Sidecar"]

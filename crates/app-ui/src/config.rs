@@ -45,13 +45,14 @@ impl TilingConfig {
 }
 
 /// The tabs of the notch, in their default order.
-pub const NOTCH_PAGES: [&str; 14] = [
+pub const NOTCH_PAGES: [&str; 15] = [
     "clipboard",
     "shelf",
     "media",
     "focus",
     "agents",
     "calendar",
+    "dayprogress",
     "notes",
     "launcher",
     "weather",
@@ -401,6 +402,7 @@ pub struct Config {
     pub prs: crate::features::prs::Config,
     pub pomodoro: crate::features::pomodoro::Config,
     pub screentime: crate::features::screentime::Config,
+    pub dayprogress: crate::features::dayprogress::Config,
     pub system: crate::features::system::Config,
     /// Replace the system volume indicator with one in the notch. Needs Accessibility access.
     pub volume_hud: bool,
@@ -453,6 +455,7 @@ impl Default for Config {
             prs: crate::features::prs::Config::default(),
             pomodoro: crate::features::pomodoro::Config::default(),
             screentime: crate::features::screentime::Config::default(),
+            dayprogress: crate::features::dayprogress::Config::default(),
             system: crate::features::system::Config::default(),
             volume_hud: false,
             history_limit: 500,
@@ -508,6 +511,7 @@ impl Config {
                 cfg.prs = cfg.prs.sanitized();
                 cfg.pomodoro = cfg.pomodoro.sanitized();
                 cfg.screentime = cfg.screentime.sanitized();
+                cfg.dayprogress = cfg.dayprogress.sanitized();
                 cfg.system = cfg.system.sanitized();
                 if !["auto", "light", "dark"].contains(&cfg.theme.as_str()) {
                     cfg.theme = "auto".into();

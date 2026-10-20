@@ -1144,6 +1144,8 @@ struct Inner {
     pages: RefCell<Vec<Page>>,
     /// The visible pages, in tab order (indices into `pages`).
     order: RefCell<Vec<usize>>,
+    /// The ids of pages whose tab is left out of the strip for now (`Notch::set_page_dormant`).
+    dormant: RefCell<Vec<String>>,
     /// The size the open shape moves to: that of the page it opens on, or the one chosen last.
     open_size: Cell<NSSize>,
     /// The size of `content`: as large as the largest page, which every page is centred at the top of.
@@ -2369,26 +2371,49 @@ impl Inner {
     /// Recomputes the visible pages from the style.
     fn sync_order(&self) {
         let wanted = self.style.borrow().pages.clone();
+        let dormant = self.dormant.borrow();
         let pages = self.pages.borrow();
+        let awake = |index: usize| !dormant.iter().any(|id| *id == pages[index].id);
         let order: Vec<usize> = if wanted.is_empty() {
-            (0..pages.len()).collect()
+            let all: Vec<usize> = (0..pages.len()).filter(|&i| awake(i)).collect();
+            // A tab nobody can reach is worse than one the user did not ask for.
+            if all.is_empty() && !pages.is_empty() {
+                vec![0]
+            } else {
+                all
+            }
         } else {
             let mut order: Vec<usize> = wanted
                 .iter()
                 .filter_map(|id| pages.iter().position(|p| p.id == id))
+                .filter(|&i| awake(i))
                 .collect();
             order.dedup();
-            // A tab nobody can reach is worse than one the user did not ask for.
             if order.is_empty() {
                 order.push(0);
             }
             order
         };
-        drop(pages);
+        drop((pages, dormant));
         *self.order.borrow_mut() = order;
         self.sync_switcher();
         // The number of tabs decides whether the header fits beside the cutout, and with it the height of a page.
         self.sync_content();
+    }
+
+    /// After the visible pages changed on their own: lays the strip out again, and moves off a tab that is gone.
+    fn reorder(&self) {
+        self.sync_order();
+        if !self.page_visible(self.active.get()) {
+            let first = self.order.borrow().first().copied().unwrap_or(0);
+            if self.is_open() {
+                self.select_page(first);
+            } else {
+                self.active.set(first);
+            }
+        }
+        self.relayout(self.geometry.get());
+        self.move_to(self.shape.get());
     }
 
     /// Replaces the background for the material in use.
@@ -2706,6 +2731,7 @@ impl Notch {
             orb_menu: RefCell::new(None),
             pages: RefCell::new(Vec::new()),
             order: RefCell::new(Vec::new()),
+            dormant: RefCell::new(Vec::new()),
             open_size: Cell::new(EXPANDED_SIZE),
             content_size: Cell::new(EXPANDED_SIZE),
             known_sizes: RefCell::new(Vec::new()),
@@ -2951,6 +2977,36 @@ impl Notch {
             )
         };
         self.page_observers.borrow_mut().push(token);
+    }
+
+    /// Takes the tab of a page out of the strip, or puts it back where it was, without touching what the person chose in
+    /// `Style::pages`: the tab of a feature that is switched off has nothing to show. A dormant page is not opened by
+    /// `open_page`, as with a page the user hid, and an open notch that is on it moves to the first tab.
+    pub fn set_page_dormant(&self, id: &str, dormant: bool) {
+        {
+            let mut list = self.inner.dormant.borrow_mut();
+            let at = list.iter().position(|d| d == id);
+            match (dormant, at) {
+                (true, None) => list.push(id.to_owned()),
+                (false, Some(i)) => {
+                    list.remove(i);
+                }
+                _ => return,
+            }
+        }
+        self.inner.reorder();
+    }
+
+    /// The ids of the pages whose tab is in the strip, in the order of the strip.
+    pub fn tab_ids(&self) -> Vec<&'static str> {
+        let pages = self.inner.pages.borrow();
+        self.inner
+            .order
+            .borrow()
+            .iter()
+            .filter_map(|&i| pages.get(i))
+            .map(|p| p.id)
+            .collect()
     }
 
     /// The ids and titles of the tabs, in the order they were added, for the settings page.

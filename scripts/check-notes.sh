@@ -1,6 +1,6 @@
 #!/bin/sh
 # Starts the real program on a private instance with three notes in its notes folder and checks, through its
-# trace, what the Notes tab does: with the feature off it shows a notice and reads nothing, and with it on it opens
+# trace, what the Notes tab does: with the feature off its tab is not in the strip and nothing is read, and with it on it opens
 # on the notes that are there, and a blank note that was started and left leaves no file. The notch is placed outside
 # every screen and the settings window stays closed. Nothing of the real settings or notes is touched.
 #
@@ -47,11 +47,11 @@ stop() {
     PID=""
 }
 
-# Off: the tab opens and says so, and the notes are not read.
+# Off: the tab is not in the strip, so it cannot be opened, and the notes are not read.
 run '{ "enabled": false }' off
 sleep 5
 if kill -0 "$PID" 2>/dev/null; then pass "the program runs with the Notes tab off"; else fail "the program exited"; cat "$WORK/off.log"; exit 1; fi
-if [ "$(count 'off' "$WORK/off.log")" -ge 1 ]; then pass "an off tab opens and says so"; else fail "the tab was never shown"; fi
+if grep -q "FIGGHOST_NOTCH_OPEN: the tab notes is not in the strip" "$WORK/off.log"; then pass "an off tab is not in the strip, so it cannot be opened"; else fail "an off tab was in the strip"; fi
 if [ "$(count 'opened' "$WORK/off.log")" -eq 0 ]; then pass "an off tab reads no notes"; else fail "an off tab opened the notes"; fi
 stop
 

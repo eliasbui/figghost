@@ -335,7 +335,14 @@ fn notch_state(config: &Config, env: &Env) -> Value {
                 .filter(|id| !shown.contains(id))
                 .map(|id| (*id, false)),
         )
-        .map(|(id, on)| json!({ "id": id, "title": title_of(id), "on": on }))
+        .map(|(id, on)| {
+            json!({
+                "id": id,
+                "title": title_of(id),
+                "on": on,
+                "waiting": crate::features::tab_waits(id, config),
+            })
+        })
         .collect();
     json!({
         "enabled": n.enabled,
@@ -572,11 +579,39 @@ fn set(config: &mut Config, path: &str, value: &Value) -> Outcome {
             Ok(Effect::Notch)
         }
         "notch.hud" => {
-            config.notch.hud = one_of(value, &["notch", "glass", "corner", "bar", "island", "side", "tile", "ring", "equalizer", "wide"])?;
+            config.notch.hud = one_of(
+                value,
+                &[
+                    "notch",
+                    "glass",
+                    "corner",
+                    "bar",
+                    "island",
+                    "side",
+                    "tile",
+                    "ring",
+                    "equalizer",
+                    "wide",
+                ],
+            )?;
             Ok(Effect::Hud)
         }
         "notch.hud_position" => {
-            config.notch.hud_position = one_of(value, &["auto", "top-left", "top", "top-right", "left", "center", "right", "bottom-left", "bottom", "bottom-right"])?;
+            config.notch.hud_position = one_of(
+                value,
+                &[
+                    "auto",
+                    "top-left",
+                    "top",
+                    "top-right",
+                    "left",
+                    "center",
+                    "right",
+                    "bottom-left",
+                    "bottom",
+                    "bottom-right",
+                ],
+            )?;
             Ok(Effect::Hud)
         }
         "notch.motion" => {
@@ -1517,6 +1552,28 @@ mod tests {
     }
 
     #[test]
+    fn the_tab_list_says_which_tabs_wait_for_their_feature() {
+        let mut config = Config::default();
+        config.weather.enabled = true;
+        let state = state(&config, &env());
+        let pages = state["notch"]["pages"].as_array().unwrap();
+        let waiting = |id: &str| {
+            pages
+                .iter()
+                .find(|page| page["id"] == id)
+                .unwrap_or_else(|| panic!("{id} is not listed"))["waiting"]
+                .as_bool()
+        };
+        assert_eq!(waiting("weather"), Some(false), "an on feature has its tab");
+        assert_eq!(waiting("system"), Some(true), "an off one waits");
+        assert_eq!(
+            waiting("clipboard"),
+            Some(false),
+            "a tab with no feature never waits"
+        );
+    }
+
+    #[test]
     fn every_feature_has_its_part_in_the_state_the_page_renders() {
         let state = state(&Config::default(), &env());
         for id in [
@@ -1541,6 +1598,7 @@ mod tests {
             "prs",
             "pomodoro",
             "screentime",
+            "dayprogress",
             "system",
         ] {
             assert!(state[id].is_object(), "{id} is missing from the state");

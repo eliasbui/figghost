@@ -160,7 +160,7 @@ const I18N = {
     'key.filters.val': '@image @link @code @file @pin',
 
     'notch.panel.title': 'Notch panel', 'notch.panel.desc': 'Move the pointer to the top edge of the screen to open it. Off removes it entirely.',
-    'notch.preview': 'Hover the top edge', 'sec.tabs': 'Tabs', 'tab.clipboard': 'Clipboard', 'tab.clipboard.desc': 'The same list as the popup, with search.',
+    'notch.preview': 'Hover the top edge', 'sec.tabs': 'Tabs', 'tab.waiting': 'Not in the notch yet: its tab appears when its feature is turned on, under Notch tabs.', 'tab.clipboard': 'Clipboard', 'tab.clipboard.desc': 'The same list as the popup, with search.',
     'tab.shelf': 'Shelf', 'tab.shelf.desc': 'Drop files to keep them handy and drag them out again. Right-click a file to compress it or convert an image. Only references are stored.', 'tab.media': 'Media', 'tab.media.desc': 'Previous, play and next for whatever is playing; track details for Music and Spotify.',
     'tab.focus': 'Focus', 'tab.focus.desc': 'A countdown for work sessions: 15, 25, 45 or 60 minutes. The notch opens and a sound plays when time is up.',
     'sec.volume': 'Volume', 'vol.title': 'Volume indicator in the notch', 'vol.desc': 'Replaces the system volume display. Needs Accessibility. Shift + Option moves in finer steps.',
@@ -281,7 +281,7 @@ const I18N = {
     'key.filters.val': '@image @link @code @file @pin',
 
     'notch.panel.title': 'Bảng notch', 'notch.panel.desc': 'Đưa con trỏ lên mép trên màn hình để mở. Tắt thì bảng biến mất hoàn toàn.',
-    'notch.preview': 'Rê chuột lên mép trên', 'sec.tabs': 'Các tab', 'tab.clipboard': 'Clipboard', 'tab.clipboard.desc': 'Cùng danh sách như cửa sổ nhỏ, có tìm kiếm.',
+    'notch.preview': 'Rê chuột lên mép trên', 'sec.tabs': 'Các tab', 'tab.waiting': 'Chưa có trong notch: tab hiện ra khi bật tính năng của nó, ở mục Tab của notch.', 'tab.clipboard': 'Clipboard', 'tab.clipboard.desc': 'Cùng danh sách như cửa sổ nhỏ, có tìm kiếm.',
     'tab.shelf': 'Khay', 'tab.shelf.desc': 'Thả tệp vào để giữ tạm và kéo ra lại. Nhấp chuột phải vào tệp để nén hoặc đổi định dạng ảnh. Chỉ lưu đường dẫn tham chiếu.', 'tab.media': 'Media', 'tab.media.desc': 'Trước, phát và sau cho ứng dụng đang phát; thông tin bài hát cho Music và Spotify.',
     'tab.focus': 'Tập trung', 'tab.focus.desc': 'Đồng hồ đếm ngược cho phiên làm việc: 15, 25, 45 hoặc 60 phút. Notch tự mở và có âm báo khi hết giờ.',
     'sec.volume': 'Âm lượng', 'vol.title': 'Chỉ báo âm lượng trong notch', 'vol.desc': 'Thay màn hình âm lượng của hệ thống. Cần quyền Trợ năng. Shift + Option để chỉnh từng bước nhỏ.',
@@ -812,7 +812,7 @@ function metricsStrip() {
   };
   const tabs = () => {
     const pages = (S.notch && S.notch.pages) || [];
-    return [pages.filter((x) => x.on).length, pages.length];
+    return [pages.filter((x) => x.on && !x.waiting).length, pages.length];
   };
   const tile = (glyph, labelKey, fill) => {
     const value = h('div', { class: 'metric-val' });
@@ -1250,7 +1250,7 @@ function notchStage() {
   reg(() => {
     notch.className = 'notch mat-' + S.notch.material;
     stage.className = 'notch-stage mo-' + S.notch.motion;
-    tabs.replaceChildren(...S.notch.pages.filter((p) => p.on).slice(0, 6).map((p) => h('span', { text: tabTitle(p) })));
+    tabs.replaceChildren(...S.notch.pages.filter((p) => p.on && !p.waiting).slice(0, 6).map((p) => h('span', { text: tabTitle(p) })));
   });
   return stage;
 }
@@ -1317,7 +1317,8 @@ function tabRow(page) {
     up.disabled = at() <= 0;
     down.disabled = at() >= pages().length - 1;
   });
-  return row(title, I18N.en['tab.' + page.id + '.desc'] ? t('tab.' + page.id + '.desc') : null, [h('span', { class: 'tab-order' }, up, down), toggle]);
+  const desc = page.waiting ? t('tab.waiting') : (I18N.en['tab.' + page.id + '.desc'] ? t('tab.' + page.id + '.desc') : null);
+  return row(title, desc, [h('span', { class: 'tab-order' }, up, down), toggle]);
 }
 
 // The sizes of the notch as ready-made styles. 0 is automatic: what each tab needs, or the default pill.
@@ -1462,7 +1463,7 @@ function pageNotch() {
       selectRow({
         path: 'notch.open_page', title: t('notch.openpage.title'), desc: t('notch.openpage.desc'), when: on,
         options: () => [{ value: 'activity', label: t('notch.openpage.activity') }, { value: 'last', label: t('notch.openpage.last') }]
-          .concat(S.notch.pages.filter((p) => p.on).map((p) => ({ value: p.id, label: tabTitle(p) }))),
+          .concat(S.notch.pages.filter((p) => p.on && !p.waiting).map((p) => ({ value: p.id, label: tabTitle(p) }))),
       }),
       toggleRow('notch.haptics', t('notch.haptics.title'), t('notch.haptics.desc'), { when: on }),
       row(t('notch.shortcut.title'), t('notch.shortcut.desc'), hotkeyButton('notch', { allowClear: true, label: t('notch.shortcut.title') }), { when: on })),
@@ -1778,7 +1779,7 @@ const CATEGORIES = [
   { id: 'general', icon: 'gearshape.fill', pages: ['general', 'mole', 'about'] },
   { id: 'scroll', icon: 'computermouse.fill', pages: ['scroll', 'cursor', 'wheel'] },
   { id: 'notch', icon: 'rectangle.topthird.inset.filled', pages: ['notch', 'islands', 'musicwidget'] },
-  { id: 'tabs', icon: 'square.grid.2x2.fill', pages: ['calendar', 'agents', 'notes', 'launcher', 'weather', 'prs', 'pomodoro', 'screentime', 'system'] },
+  { id: 'tabs', icon: 'square.grid.2x2.fill', pages: ['calendar', 'dayprogress', 'agents', 'notes', 'launcher', 'weather', 'prs', 'pomodoro', 'screentime', 'system'] },
   { id: 'clipboard', icon: 'doc.on.clipboard.fill', pages: ['clipboard', 'smart', 'translate', 'capture', 'vision', 'utilities'] },
   { id: 'tiling', icon: 'rectangle.split.2x1.fill', pages: ['tiling', 'pin', 'keys'] },
 ];

@@ -138,6 +138,10 @@ fn open_for_test(ctx: &AppContext) {
         eprintln!("FIGGHOST_NOTCH_OPEN: no tab named {id}");
         return;
     };
+    if !notch.page_shown(index) {
+        eprintln!("FIGGHOST_NOTCH_OPEN: the tab {id} is not in the strip");
+        return;
+    }
     let opening = Rc::clone(&notch);
     app::after(1.0, move || opening.open_page(index));
     app::after(7.0, move || notch.close());

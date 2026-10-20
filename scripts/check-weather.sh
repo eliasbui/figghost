@@ -46,7 +46,7 @@ stop() {
 run '{ "enabled": false, "place": { "name": "Hanoi", "latitude": 21.0245, "longitude": 105.84117 } }' off
 sleep 5
 if kill -0 "$PID" 2>/dev/null; then pass "the program runs with the Weather tab off"; else fail "the program exited"; cat "$WORK/off.log"; exit 1; fi
-if [ "$(count 'nothing to fetch' "$WORK/off.log")" -ge 1 ]; then pass "an off tab opens and says so"; else fail "the tab was never shown"; fi
+if grep -q "FIGGHOST_NOTCH_OPEN: the tab weather is not in the strip" "$WORK/off.log"; then pass "an off tab is not in the strip, so it cannot be opened"; else fail "an off tab was in the strip"; fi
 if [ "$(count 'asking' "$WORK/off.log")" -eq 0 ]; then pass "an off tab asks the internet nothing"; else fail "an off tab went online"; fi
 stop
 

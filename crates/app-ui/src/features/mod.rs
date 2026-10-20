@@ -15,27 +15,28 @@ use std::{
     io::{self, Read},
     path::Path,
     process::{Command, Stdio},
-    rc::Rc,
+    rc::{Rc, Weak},
     time::{Duration, Instant},
 };
 
 pub mod calendar;
 pub mod capture;
 pub mod cursor;
+pub mod dayprogress;
 pub mod islands;
 pub mod launcher;
 pub mod lyrics;
 pub mod mascot;
 pub mod menubar;
-pub mod musicwidget;
 pub mod mole;
+pub mod musicwidget;
 pub mod notes;
 pub mod pin;
 pub mod pomodoro;
 pub mod prs;
+pub mod screentime;
 pub mod smart;
 pub mod snap;
-pub mod screentime;
 pub mod stack;
 pub mod system;
 pub mod translate;
@@ -43,6 +44,34 @@ pub mod utilities;
 pub mod vision;
 pub mod weather;
 pub mod wheel;
+
+/// The tabs of the notch that have a place in the strip only while their feature is on, so that a tab which would only
+/// say "this is off" is not there to be opened. Each follows the `enabled` of its own feature.
+const OPT_IN_TABS: [&str; 8] = [
+    "notes",
+    "launcher",
+    "weather",
+    "prs",
+    "pomodoro",
+    "screentime",
+    "dayprogress",
+    "system",
+];
+
+/// Whether this tab is out of the strip for now because its feature is off.
+pub fn tab_waits(id: &str, config: &Config) -> bool {
+    match id {
+        "notes" => !config.notes.enabled,
+        "launcher" => !config.launcher.enabled,
+        "weather" => !config.weather.enabled,
+        "prs" => !config.prs.enabled,
+        "pomodoro" => !config.pomodoro.enabled,
+        "screentime" => !config.screentime.enabled,
+        "dayprogress" => !config.dayprogress.enabled,
+        "system" => !config.system.enabled,
+        _ => false,
+    }
+}
 
 /// Writes `text` to `path` through a file of its own and then renames it over the target, so that a crash or a full
 /// disk never leaves half of what was there.
@@ -160,14 +189,17 @@ pub struct Features {
     pub pomodoro: Option<Rc<pomodoro::Feature>>,
     pub prs: Option<Rc<prs::Feature>>,
     pub screentime: Option<Rc<screentime::Feature>>,
+    pub dayprogress: Option<Rc<dayprogress::Feature>>,
     pub system: Option<Rc<system::Feature>>,
+    /// Where the tabs of the features that are off are taken out of the strip and put back.
+    notch: Option<Weak<Notch>>,
 }
 
 impl Features {
     pub fn attach(env: &AttachEnv) -> Self {
         // The wheel opens images in the capture editor, so it is given the capture feature.
         let capture = capture::attach(env);
-        Self {
+        let features = Self {
             smart: smart::attach(env),
             wheel: wheel::attach(env, capture.as_ref()),
             capture,
@@ -191,8 +223,16 @@ impl Features {
             pomodoro: pomodoro::attach(env),
             prs: prs::attach(env),
             screentime: screentime::attach(env),
+            dayprogress: dayprogress::attach(env),
             system: system::attach(env),
+            notch: env.notch.map(Rc::downgrade),
+        };
+        if let Some(notch) = env.notch {
+            for id in OPT_IN_TABS {
+                notch.set_page_dormant(id, tab_waits(id, env.config));
+            }
         }
+        features
     }
 
     /// Facts only the running app knows, by feature id, for the settings state.
@@ -272,6 +312,16 @@ impl Features {
 
     /// Applies the settings of one feature after a change.
     pub fn configure(&self, id: &str, config: &Config) -> Result<(), Fault> {
+        let result = self.configure_feature(id, config);
+        if OPT_IN_TABS.contains(&id)
+            && let Some(notch) = self.notch.as_ref().and_then(Weak::upgrade)
+        {
+            notch.set_page_dormant(id, tab_waits(id, config));
+        }
+        result
+    }
+
+    fn configure_feature(&self, id: &str, config: &Config) -> Result<(), Fault> {
         match id {
             "smart" => self
                 .smart
@@ -289,10 +339,15 @@ impl Features {
                 .lyrics
                 .as_ref()
                 .map_or(Ok(()), |f| f.configure(&config.lyrics)),
-            "calendar" => self
-                .calendar
-                .as_ref()
-                .map_or(Ok(()), |f| f.configure(&config.calendar)),
+            "calendar" => {
+                // The Day progress tab leaves out the calendars that this one leaves out.
+                if let Some(f) = &self.dayprogress {
+                    f.set_excluded(&config.calendar.excluded);
+                }
+                self.calendar
+                    .as_ref()
+                    .map_or(Ok(()), |f| f.configure(&config.calendar))
+            }
             "snap" => self
                 .snap
                 .as_ref()
@@ -361,6 +416,10 @@ impl Features {
                 .screentime
                 .as_ref()
                 .map_or(Ok(()), |f| f.configure(&config.screentime)),
+            "dayprogress" => self
+                .dayprogress
+                .as_ref()
+                .map_or(Ok(()), |f| f.configure(&config.dayprogress)),
             "system" => self
                 .system
                 .as_ref()
@@ -731,9 +790,16 @@ pub fn state(
     );
     root.insert(
         "screentime".into(),
-        screentime::settings::state(&config.screentime, runtime.get("screentime").unwrap_or(&none)),
+        screentime::settings::state(
+            &config.screentime,
+            runtime.get("screentime").unwrap_or(&none),
+        ),
     );
     root.insert("system".into(), system::settings::state(&config.system));
+    root.insert(
+        "dayprogress".into(),
+        dayprogress::settings::state(&config.dayprogress),
+    );
     root.insert(
         "mole".into(),
         mole::settings::state(runtime.get("mole").unwrap_or(&none)),
@@ -788,21 +854,21 @@ pub fn set(config: &mut Config, path: &str, value: &Value) -> Option<Result<&'st
         "notes" => {
             notes::settings::set(&mut config.notes, rest, value).map(|r| r.map(|()| "notes"))
         }
-        "launcher" => {
-            launcher::settings::set(&mut config.launcher, rest, value).map(|r| r.map(|()| "launcher"))
-        }
+        "launcher" => launcher::settings::set(&mut config.launcher, rest, value)
+            .map(|r| r.map(|()| "launcher")),
         "weather" => {
             weather::settings::set(&mut config.weather, rest, value).map(|r| r.map(|()| "weather"))
         }
         "prs" => prs::settings::set(&mut config.prs, rest, value).map(|r| r.map(|()| "prs")),
-        "pomodoro" => {
-            pomodoro::settings::set(&mut config.pomodoro, rest, value).map(|r| r.map(|()| "pomodoro"))
-        }
+        "pomodoro" => pomodoro::settings::set(&mut config.pomodoro, rest, value)
+            .map(|r| r.map(|()| "pomodoro")),
         "screentime" => screentime::settings::set(&mut config.screentime, rest, value)
             .map(|r| r.map(|()| "screentime")),
         "system" => {
             system::settings::set(&mut config.system, rest, value).map(|r| r.map(|()| "system"))
         }
+        "dayprogress" => dayprogress::settings::set(&mut config.dayprogress, rest, value)
+            .map(|r| r.map(|()| "dayprogress")),
         _ => None,
     }
 }
@@ -894,6 +960,40 @@ pub fn set_shortcut(
 mod tests {
     use super::*;
     use crate::config::parse_hotkey;
+
+    #[test]
+    fn the_tab_of_a_feature_waits_for_it_to_be_switched_on() {
+        let mut config = Config::default();
+        for id in OPT_IN_TABS {
+            assert!(
+                tab_waits(id, &config),
+                "{id} is off by default, so its tab waits"
+            );
+        }
+        config.weather.enabled = true;
+        assert!(!tab_waits("weather", &config), "an on feature has its tab");
+        assert!(tab_waits("system", &config), "and the others still wait");
+        for id in [
+            "clipboard",
+            "shelf",
+            "media",
+            "focus",
+            "agents",
+            "calendar",
+            "sound",
+            "nonsense",
+        ] {
+            assert!(!tab_waits(id, &config), "{id} is not an opt-in tab");
+        }
+    }
+
+    #[test]
+    fn every_opt_in_tab_is_a_tab_of_the_notch_and_none_is_listed_twice() {
+        for (i, id) in OPT_IN_TABS.iter().enumerate() {
+            assert!(crate::config::NOTCH_PAGES.contains(id), "{id} is not a tab");
+            assert!(!OPT_IN_TABS[i + 1..].contains(id), "{id} is listed twice");
+        }
+    }
 
     #[test]
     fn a_command_is_run_for_what_it_prints_and_stopped_when_it_is_slow() {

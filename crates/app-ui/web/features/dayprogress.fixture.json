@@ -1,0 +1,6 @@
+{
+  "enabled": true,
+  "wake": 7,
+  "bed": 23,
+  "reminders": true
+}
