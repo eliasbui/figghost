@@ -28,8 +28,8 @@ Danh sách tính năng chính thức của Notchy (notchy.dev, trang chủ liệ
 | Xem nhanh bài đang phát khi rê chuột lên viên thuốc, có nút điều khiển | Notchy | Chưa | Vừa | 4 |
 | Mixer âm lượng từng app, EQ | Notchy | Có (Sound) | | |
 | Chuyển thiết bị phát âm thanh bằng một cú chạm | Notchy, Seam | Một phần (đổi đầu ra theo từng app) | Dễ | 3 |
-| Pin AirPods từng bên, kết nối một chạm | Notchy, Seam | Chưa | Vừa | 3 |
-| Pin Magic Mouse, Keyboard, Trackpad, tai nghe Bluetooth | Notchy, Atoll | Chưa | Vừa | 3 |
+| Pin AirPods từng bên, kết nối một chạm | Notchy, Seam | Một phần (tab Devices đọc pin từng bên tai và hộp sạc theo các khóa của `system_profiler`, chưa thấy trên máy này vì không có AirPods; chưa có nút kết nối một chạm) | Vừa | 3 |
+| Pin Magic Mouse, Keyboard, Trackpad, tai nghe Bluetooth | Notchy, Atoll | Có (tab Devices, tắt theo mặc định; mức pin mà thiết bị báo cho hệ thống, hỏi `system_profiler` khi tab mở và nửa phút một lần khi tab hiện; thiết bị không báo thì không có số; không cần quyền) | | Xong |
 | Đảo Bluetooth kết nối và ngắt | Boring Notch, Atoll | Có | | |
 | Thích bài trong Apple Music, đổi tốc độ video trong trình duyệt | Notchy | Chưa | Khó | - |
 
@@ -138,7 +138,7 @@ Danh sách tính năng chính thức của Notchy (notchy.dev, trang chủ liệ
 
 1. Lô 1, đã xong: đảo hệ thống (sạc và pin, Caps Lock, camera và micro, ổ USB, tải xong) và tiện ích (giữ máy thức, tắt micro, khóa bàn phím). Dùng chung một chỗ đặt `notch.set_activity` (`features/islands::show_for`), nên mỗi đảo chỉ cần logic phát hiện và một dòng cài đặt. Còn thiếu của lô này: nút Reveal in Finder trên đảo tải xong và nút Eject trên đảo ổ đĩa, cả hai cần đảo nhận một cú bấm riêng (hiện bấm vào đảo chỉ mở notch).
 2. Lô 2: đã xong ghi chú nhanh (tab Notes), app ghim và chạy Shortcuts (tab Launcher), tạm tắt notch (Tiện ích). Còn lại: bảng lệnh, snippet, HUD phím bấm, mở notch bằng nhấn đúp phím.
-3. Lô 3: đã xong số liệu hệ thống (tab System) và thời tiết (tab Weather). Còn lại: pin thiết bị và AirPods, chuyển thiết bị âm thanh.
+3. Lô 3: đã xong số liệu hệ thống (tab System), thời tiết (tab Weather) và pin thiết bị Bluetooth (tab Devices). Còn lại: nút kết nối một chạm, chuyển thiết bị âm thanh.
 4. Lô 4: đã xong thời gian dùng màn hình (tab Screen Time), Pomodoro đầy đủ (tab Pomodoro) và hàng đợi pull request (tab Pull requests). Đã xong thêm tiến độ trong ngày (tab Day progress). Còn lại: nhắc việc nhanh (Todo), vòng sức khỏe và nghỉ mắt, gương camera, teleprompter, xem nhanh bài đang phát.
 5. Lô 5: cử chỉ vuốt, AirDrop và ảnh chụp tự vào shelf, tìm chữ trong ảnh clipboard, ẩn khỏi chia sẻ màn hình, ẩn notch phần cứng, API cục bộ và `figghost://`, hồ sơ dashboard, nhiều màn hình.
 

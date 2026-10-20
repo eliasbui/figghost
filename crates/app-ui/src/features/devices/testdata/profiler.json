@@ -1,0 +1,66 @@
+{
+  "SPBluetoothDataType": [
+    {
+      "controller_properties": {
+        "controller_address": "00:00:00:00:00:00",
+        "controller_chipset": "BCM_4388C2",
+        "controller_discoverable": "attrib_off",
+        "controller_firmwareVersion": "0.0.0.0",
+        "controller_productID": "0x4A3E",
+        "controller_state": "attrib_on",
+        "controller_supportedServices": "0x1390039 < HFP AVRCP A2DP HID LEA AACP GATT SerialPort SCO >",
+        "controller_transport": "PCIe",
+        "controller_vendorID": "0x004C (Apple)"
+      },
+      "device_connected": [
+        {
+          "Sample Mouse 1": {
+            "device_address": "00:00:00:00:00:01",
+            "device_minorType": "Mouse",
+            "device_services": "0x400020 < HID BLE >"
+          }
+        },
+        {
+          "Sample Headset 2": {
+            "device_address": "00:00:00:00:00:02",
+            "device_batteryLevelMain": "100%",
+            "device_minorType": "Headset",
+            "device_services": "0x800019 < HFP AVRCP A2DP ACL >"
+          }
+        }
+      ],
+      "device_not_connected": [
+        {
+          "Paired Headset 1": {
+            "device_address": "00:00:00:00:00:10",
+            "device_minorType": "Headset",
+            "device_batteryLevelMain": "40%"
+          }
+        },
+        {
+          "Paired Device 2": {
+            "device_address": "00:00:00:00:00:11",
+            "device_rssi": "-58",
+            "device_batteryLevelMain": "40%"
+          }
+        },
+        {
+          "Paired Device 3": {
+            "device_address": "00:00:00:00:00:12",
+            "device_batteryLevelMain": "40%"
+          }
+        },
+        {
+          "Paired Headset 4": {
+            "device_address": "00:00:00:00:00:13",
+            "device_firmwareVersion": "2.4.0",
+            "device_minorType": "Headset",
+            "device_productID": "0x000A",
+            "device_vendorID": "0x05D6",
+            "device_batteryLevelMain": "40%"
+          }
+        }
+      ]
+    }
+  ]
+}

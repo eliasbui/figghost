@@ -34,6 +34,7 @@ const FEATURE_SCRIPTS: &[&str] = &[
     include_str!("../../web/features/pomodoro.js"),
     include_str!("../../web/features/screentime.js"),
     include_str!("../../web/features/dayprogress.js"),
+    include_str!("../../web/features/devices.js"),
     include_str!("../../web/features/system.js"),
 ];
 const FEATURE_STYLES: &[&str] = &[
@@ -144,6 +145,10 @@ const FEATURE_FIXTURES: &[(&str, &str)] = &[
         include_str!("../../web/features/dayprogress.fixture.json"),
     ),
     (
+        "devices",
+        include_str!("../../web/features/devices.fixture.json"),
+    ),
+    (
         "system",
         include_str!("../../web/features/system.fixture.json"),
     ),
@@ -186,6 +191,7 @@ const SYMBOLS: &[&str] = &[
     "square.grid.2x2.fill",
     "hourglass",
     "sun.horizon.fill",
+    "headphones",
     "timer",
     "arrow.triangle.pull",
 ];

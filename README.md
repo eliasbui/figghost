@@ -87,7 +87,7 @@ The Shelf tab keeps dropped files as references to where they live. Right-click 
 
 ### Notch panel (like OneNotch)
 
-Seven tabs, eight more that join them when their feature is turned on (System, Notes, Launcher, Weather, Pull requests, Pomodoro, Screen Time and Day progress), window snapping, an optional volume indicator, lyrics, live activities in the closed shape, and a size you choose (compact, standard, wide or custom).
+Seven tabs, nine more that join them when their feature is turned on (System, Notes, Launcher, Weather, Pull requests, Pomodoro, Screen Time, Day progress and Devices), window snapping, an optional volume indicator, lyrics, live activities in the closed shape, and a size you choose (compact, standard, wide or custom).
 
 ![The Media tab of the notch with a cover, the title and playback buttons](docs/images/notch-media.png)
 
@@ -122,6 +122,10 @@ The Weather tab shows the weather of one city: now, the next six hours and the n
 The Day progress tab shows how much of the day has gone, as a large percentage and a line from the morning to bedtime (7 AM and 11 PM, both yours to choose). Today's events lie along the line as bars in the colour of their calendar (all-day events are left out), the one that is on now brighter, each reminder due at a time of day is a dot on it, and under it are what is on now and what comes next with how far off it is. It reads the calendars the Calendar tab reads, leaving out those that tab leaves out, and asks for nothing more: when the calendar is not allowed yet it says so instead of showing an empty day. It is off until it is turned on in Settings, under Notch tabs, Day progress; it looks at the day when the tab opens and again every half minute while the tab shows, and keeps nothing on disk.
 
 ![The Day progress tab of the notch](docs/images/notch-dayprogress.png)
+
+The Devices tab shows the charge of the Bluetooth devices that are connected, a card for each with its symbol, its name and a gauge: a mouse, keyboard, trackpad, controller, speaker or headphones, and a pair of earbuds with each bud and its case. A device at or under the level you choose (10, 15, 20 or 30 percent) gets a warning colour and the word Low. A device shows a charge only when it reports one to the Mac, which many keyboards, mice and speakers do not; those are listed without one. The Mac is asked, through its own `system_profiler` (run with fixed arguments and no shell, off the main thread and stopped after a few seconds), when the tab opens and every half minute while it shows, and never otherwise. It needs no permission and nothing is stored. It is off until it is turned on in Settings, under Notch tabs, Devices.
+
+![The Devices tab of the notch](docs/images/notch-devices.png)
 
 ![The Notch page of the settings with the size styles and behaviour switches](docs/images/settings-notch.png)
 

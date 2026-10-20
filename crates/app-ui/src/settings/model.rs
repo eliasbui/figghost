@@ -1599,6 +1599,7 @@ mod tests {
             "pomodoro",
             "screentime",
             "dayprogress",
+            "devices",
             "system",
         ] {
             assert!(state[id].is_object(), "{id} is missing from the state");
