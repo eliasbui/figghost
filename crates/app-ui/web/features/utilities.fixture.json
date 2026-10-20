@@ -1,0 +1,15 @@
+{
+  "enabled": true,
+  "awake_display": true,
+  "awake_minutes": 60,
+  "lock_seconds": 60,
+  "snooze_minutes": 30,
+  "shortcuts": { "awake": "", "mic": "ctrl+opt+cmd+m", "lock": "ctrl+opt+cmd+k", "snooze": "" },
+  "awake": true,
+  "awake_left": 2520,
+  "locked": false,
+  "snoozed": false,
+  "snooze_left": null,
+  "mic_muted": false,
+  "accessibility": true
+}

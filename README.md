@@ -29,7 +29,7 @@ Figghost is written in Rust with a pure AppKit shell (the `objc2` crates). The s
 
 ### The notch, with a tab for each tool
 
-A black shape grows out of the top edge of the screen when the pointer reaches it: clipboard, shelf, media, focus, AI agents, calendar and sound, each a tab. Closed, it shows what is playing and what your coding agents are doing.
+A black shape grows out of the top edge of the screen when the pointer reaches it: clipboard, shelf, media, focus, AI agents, calendar, notes, launcher, weather, pull requests, pomodoro, screen time, sound and system, each a tab. Closed, it shows what is playing and what your coding agents are doing.
 
 ![The notch opening on each tab in turn: clipboard, shelf, media, focus, AI agents with usage limits, an approval request and the calendar](docs/images/notch-tabs.gif)
 
@@ -87,9 +87,37 @@ The Shelf tab keeps dropped files as references to where they live. Right-click 
 
 ### Notch panel (like OneNotch)
 
-Seven tabs, window snapping, an optional volume indicator, lyrics, live activities in the closed shape, and a size you choose (compact, standard, wide or custom).
+Fourteen tabs, window snapping, an optional volume indicator, lyrics, live activities in the closed shape, and a size you choose (compact, standard, wide or custom).
 
 ![The Media tab of the notch with a cover, the title and playback buttons](docs/images/notch-media.png)
+
+The System tab shows the processor core by core (the frugal cores and the fast ones apart), the memory as apps, wired and compressed with its pressure and the swap, the network with a minute of history, the graphics processor, the room on the startup disk, the heat, and the health of the battery on a Mac that has one. It is off until it is turned on in Settings, under Notch tabs, System, where each card can be left out. It reads the system only while the tab is showing, once a second or as often as chosen, so an idle app does no work for it.
+
+![The System tab of the notch](docs/images/notch-system.png)
+
+The Notes tab is a scratchpad: a list of notes at the left and an editor at the right. Every note is a plain text file in a folder of its own (`notes` in the data directory), so any other app can read it; what is typed is saved a moment after the last key, a deleted note goes to the Trash, and a note left empty leaves no file. It is off until it is turned on in Settings, under Notch tabs, Notes.
+
+![The Notes tab of the notch](docs/images/notch-notes.png)
+
+The Launcher tab is a grid of up to twelve tiles for the apps, folders and Apple Shortcuts you pin in Settings, under Notch tabs, Launcher. A tile does something only when it is pressed: an app is found by its bundle identifier where it is now, a folder opens in the Finder, and a Shortcut is run by its name with the system's `shortcuts` command (given the name as an argument, never through a shell); the notch goes away after it. It is off until it is turned on, and has nothing pinned until you pin something.
+
+![The Launcher tab of the notch](docs/images/notch-launcher.png)
+
+The Screen Time tab shows how long each app was in front today and over the last seven days, as a total and a list with a bar for each, by app or by the group an app says it belongs to (Productivity, Developer tools, Utilities, and so on). Every five seconds, while someone is at the Mac, the app in front is given that time; time stops counting when the keyboard and pointer have been still for the time you choose (1, 2 or 5 minutes). Only the name and bundle identifier of the app and the seconds are kept, for thirty days, in the file `screentime.json` of the data directory: no window title, no text, no screen, no key, no permission, and nothing leaves the Mac. It is off until it is turned on in Settings, under Notch tabs, Screen Time.
+
+![The Screen Time tab of the notch](docs/images/notch-screentime.png)
+
+The Pomodoro tab alternates work sessions and breaks: a ring fills as a stage passes with the clock in it, the dots of the round show how many sessions are done, and a long break ends each round (the lengths and the number of sessions in a round are yours to choose). While a stage runs, the time left sits in the closed notch, and when it ends there is a sound and the notch opens on the tab for a few seconds (each can be switched off; the next stage can start by itself). The tab counts the sessions done today, the days in a row and the last seven days, in the file `pomodoro.json` of the data directory for thirty days, and a shortcut starts and pauses it from any app. It is a tab beside Focus, which stays the plain countdown it was, and is off until it is turned on in Settings, under Notch tabs, Pomodoro.
+
+![The Pomodoro tab of the notch](docs/images/notch-pomodoro.png)
+
+The Pull requests tab lists the review requests that wait for you on GitHub and GitLab, newest first, with who wrote each and how long ago, and a dot on the tab's icon while there are some; pressing a row opens it in the browser. Figghost never sees your password or token: it asks the `gh` and `glab` command-line tools you already signed in with (found in Homebrew's and the usual places, run with fixed arguments and no shell), reads only requests that have a title, a project, a number, a time and an https address, opens only that address, and writes nothing to disk. It looks soon after the app starts and then at the interval you choose (5, 10, 30 or 60 minutes) while it is on, and the settings page says whether each tool is installed and signed in. It is off until it is turned on in Settings, under Notch tabs, Pull requests.
+
+![The Pull requests tab of the notch](docs/images/notch-prs.png)
+
+The Weather tab shows the weather of one city: now, the next six hours and the next five days, in Celsius or Fahrenheit. It is the only tab that goes online, so it is off until it is turned on and a city is chosen in Settings, under Notch tabs, Weather. The forecast comes from Open-Meteo, which needs no account or key, through the system's `curl`; what is sent is the name typed when searching for a city and then the coordinates of the city chosen, never the location of the Mac, and it asks only while the tab is open and no more than once in ten minutes.
+
+![The Weather tab of the notch](docs/images/notch-weather.png)
 
 ![The Notch page of the settings with the size styles and behaviour switches](docs/images/settings-notch.png)
 
@@ -165,6 +193,20 @@ Checks the health of the Mac and frees disk space with the Mole command line too
 
 ![The Mole page with the health score and the maintenance actions](docs/images/settings-mole.png)
 
+### Live islands
+
+Small notices that come out of the closed notch for a moment: Caps Lock turning on or off, the charger plugged in or out, a battery that is full (at a level you choose) or low, a drive that arrives or leaves (and an Eject entry for each drive in the menu bar panel), a finished download in the Downloads folder, and an app starting to use the camera or the microphone. Each one can be switched off on its own and shown as a sample; nothing reads what is on the screen or what is typed (off by default).
+
+![The closed notch with eighteen live islands: Caps Lock, power, battery, drives, a download, camera and microphone, keep awake, microphone muted and the keyboard lock](docs/images/live-islands.png)
+
+![The Live islands page of the settings](docs/images/settings-islands.png)
+
+### Utilities
+
+Keep the Mac awake for 15 minutes to 4 hours or until you stop it, mute the microphone itself so every app hears nothing, lock the keyboard while you wipe it (Command and Escape unlock it at once, and it unlocks by itself after the time you set), and snooze the notch for 5 minutes to 2 hours or until you wake it, so that it does not open when the pointer reaches the top of the screen while you present or play (a click on it, and a coding agent that waits for an answer, still open it). Each has a place in the menu bar panel, a shortcut that works in any app and a notice on the notch (off by default).
+
+![The Utilities page in Vietnamese](docs/images/settings-utilities-vi.png)
+
 ### And the rest
 
 - Clipboard mascot: a small character that plays a story each time something is copied (off by default).
@@ -206,7 +248,13 @@ The app icon is drawn by code: `cargo run -p macos-sys --example make_icon -- X.
 
 ## Design
 
-The settings window is a macOS window on Liquid Glass. The sidebar is a glass pane below the window's three buttons, with a field that finds a page by name; the content is glass cards of grouped sections, a label and its control on each row, over a soft backdrop, and the General and About pages open on a hero card in the app's blue. Controls follow the system: they take the accent colour the user chose in System Settings, a state takes its own system colour (green when something is on or granted), buttons are 24 points tall and pop-up buttons and fields 24 or 28, section headers are 13 pt bold, and every icon, in this window and in the menu bar panel, is an SF Symbol drawn by the system. In the notch, text is white at three levels on black, the faintest still 5.3:1; a page shows its key hints only while the notch has the keyboard, and on a screen with a camera cutout the header sits beside the cutout when it fits, so the open shape has no empty band across its top. Only what the user touches moves, briefly for feedback and with springs for things that travel. Contrast was measured, not guessed: text is at least 4.5:1 and the edge of an off control at least 3:1 on the worst backdrops, in both themes. Every effect has a fallback for Reduce transparency, Increase contrast and Reduce motion, focus is always visible, every control has a name, and the whole window works from the keyboard. All tokens are CSS variables at the top of `crates/app-ui/web/app.css`.
+The settings window has a world of its own on top of the system's: the ghost's night. Its look follows what the 2026 Apple Design Award apps share, a single made-up place that every part of the window belongs to, with the platform's own controls inside it. The sky behind the page follows the hour (dawn, day, dusk, and a night with stars in the dark theme); titles, the names of sections and what the ghost says are handwritten in Patrick Hand, which is used for nothing else; the ghost is the guide of every page (a bubble with what the page is for, a hop and another line when it is clicked), the sign of whether the app has the access it needs (awake, or asleep with closed eyes, and the words say the same) and the character of every empty list, and the big one in the General hero follows the pointer with its eyes. Nothing in it is the only sign of anything, so it holds for people who cannot tell the colours apart, and every animation stops under Reduce motion. [docs/design.md](docs/design.md) says how it is made and how to add to it.
+
+![The General page in the dark theme at night, with the ghost beside its page title and in the hero](docs/images/ghost-world-general-dark.png)
+
+![The General page in the light theme by day](docs/images/ghost-world-general-light.png)
+
+The window itself is a macOS window on Liquid Glass. The sidebar is a glass pane below the window's three buttons, with a field that finds a page by name; the content is glass cards of grouped sections, a label and its control on each row, over a soft backdrop, and the General and About pages open on a hero card in the app's blue. Controls follow the system: they take the accent colour the user chose in System Settings, a state takes its own system colour (green when something is on or granted), buttons are 24 points tall and pop-up buttons and fields 24 or 28, section headers are 13 pt bold, and every icon, in this window and in the menu bar panel, is an SF Symbol drawn by the system. In the notch, text is white at three levels on black, the faintest still 5.3:1; a page shows its key hints only while the notch has the keyboard, and on a screen with a camera cutout the header sits beside the cutout when it fits, so the open shape has no empty band across its top. Only what the user touches moves, briefly for feedback and with springs for things that travel. Contrast was measured, not guessed: text is at least 4.5:1 and the edge of an off control at least 3:1 on the worst backdrops, in both themes. Every effect has a fallback for Reduce transparency, Increase contrast and Reduce motion, focus is always visible, every control has a name, and the whole window works from the keyboard. All tokens are CSS variables at the top of `crates/app-ui/web/app.css`.
 
 ## Configuration
 
@@ -225,7 +273,7 @@ The shell uses AppKit through `objc2`, not GPUI or Tauri. The search field must 
 ## Next steps
 
 1. Try the unverified items in [docs/verification.md](docs/verification.md) on real hardware, starting with the ones that need real input or a real screen: Smart Select and screen capture from their shortcuts, the colour picker, Copy Stack, dragging a window to the notch, the menu bar icons, a calendar alert, lyrics with a playing track, physical volume keys, Telex and VNI typing, a notched display, launch at login.
-2. From the OneNotch list, what is left: object removal, the system live activities (charging, Bluetooth, Focus), lock screen presence, gestures on the notch and a notch on every display.
+2. From the OneNotch list, what is left: object removal, the Focus live activity, lock screen presence, gestures on the notch and a notch on every display. What the other notch apps have that Figghost does not, with what is possible and in what order, is in [docs/feature-gap.md](docs/feature-gap.md) (in Vietnamese).
 3. A Developer ID signature and notarization, which also pins the permissions to a certificate instead of to the app's name.
 4. What to take from Raycast and PowerToys, and which of it is possible on macOS from an ad-hoc signed app, is in [docs/research-raycast-powertoys.md](docs/research-raycast-powertoys.md).
 
@@ -237,5 +285,6 @@ The repository layout, the programs in `crates/*/examples` that check the app, a
 
 MIT, see [LICENSE](LICENSE).
 
-The settings window is set in SF Pro, the system's own font, so it reads as the rest of macOS does. Inter is bundled as the fallback for a machine without it, under the SIL Open Font License 1.1: see
-[crates/app-ui/assets/Inter-OFL.txt](crates/app-ui/assets/Inter-OFL.txt).
+The settings window is set in SF Pro, the system's own font, so it reads as the rest of macOS does. Inter is bundled as the fallback for a machine without it, and Patrick Hand for the handwriting of titles, section names and the ghost's speech, both under the SIL Open Font License 1.1: see
+[crates/app-ui/assets/Inter-OFL.txt](crates/app-ui/assets/Inter-OFL.txt) and
+[crates/app-ui/assets/PatrickHand-OFL.txt](crates/app-ui/assets/PatrickHand-OFL.txt).

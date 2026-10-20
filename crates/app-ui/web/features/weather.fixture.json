@@ -1,0 +1,8 @@
+{
+  "enabled": true,
+  "units": "metric",
+  "place": "Hanoi, Vietnam",
+  "searching": false,
+  "found": [{ "label": "Hue, Thua Thien Hue, Vietnam" }, { "label": "Hue, Indiana, United States" }],
+  "problem": ""
+}

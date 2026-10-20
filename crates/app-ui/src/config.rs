@@ -45,13 +45,20 @@ impl TilingConfig {
 }
 
 /// The tabs of the notch, in their default order.
-pub const NOTCH_PAGES: [&str; 7] = [
+pub const NOTCH_PAGES: [&str; 14] = [
     "clipboard",
     "shelf",
     "media",
     "focus",
     "agents",
     "calendar",
+    "notes",
+    "launcher",
+    "weather",
+    "prs",
+    "pomodoro",
+    "screentime",
+    "system",
     "sound",
 ];
 
@@ -386,6 +393,15 @@ pub struct Config {
     pub pin: crate::features::pin::Config,
     pub cursor: crate::features::cursor::Config,
     pub musicwidget: crate::features::musicwidget::Config,
+    pub islands: crate::features::islands::Config,
+    pub utilities: crate::features::utilities::Config,
+    pub notes: crate::features::notes::Config,
+    pub launcher: crate::features::launcher::Config,
+    pub weather: crate::features::weather::Config,
+    pub prs: crate::features::prs::Config,
+    pub pomodoro: crate::features::pomodoro::Config,
+    pub screentime: crate::features::screentime::Config,
+    pub system: crate::features::system::Config,
     /// Replace the system volume indicator with one in the notch. Needs Accessibility access.
     pub volume_hud: bool,
     /// Unpinned items kept in history.
@@ -429,6 +445,15 @@ impl Default for Config {
             pin: crate::features::pin::Config::default(),
             cursor: crate::features::cursor::Config::default(),
             musicwidget: crate::features::musicwidget::Config::default(),
+            islands: crate::features::islands::Config::default(),
+            utilities: crate::features::utilities::Config::default(),
+            notes: crate::features::notes::Config::default(),
+            launcher: crate::features::launcher::Config::default(),
+            weather: crate::features::weather::Config::default(),
+            prs: crate::features::prs::Config::default(),
+            pomodoro: crate::features::pomodoro::Config::default(),
+            screentime: crate::features::screentime::Config::default(),
+            system: crate::features::system::Config::default(),
             volume_hud: false,
             history_limit: 500,
             ignored_apps: Vec::new(),
@@ -475,6 +500,15 @@ impl Config {
                     .clamp(*AGENT_WAIT_RANGE.start(), *AGENT_WAIT_RANGE.end());
                 cfg.audio = cfg.audio.sanitized();
                 cfg.capture = cfg.capture.sanitized();
+                cfg.islands = cfg.islands.sanitized();
+                cfg.utilities = cfg.utilities.sanitized();
+                cfg.notes = cfg.notes.sanitized();
+                cfg.launcher = cfg.launcher.sanitized();
+                cfg.weather = cfg.weather.sanitized();
+                cfg.prs = cfg.prs.sanitized();
+                cfg.pomodoro = cfg.pomodoro.sanitized();
+                cfg.screentime = cfg.screentime.sanitized();
+                cfg.system = cfg.system.sanitized();
                 if !["auto", "light", "dark"].contains(&cfg.theme.as_str()) {
                     cfg.theme = "auto".into();
                 }

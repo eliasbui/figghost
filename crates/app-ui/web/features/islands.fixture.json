@@ -1,0 +1,12 @@
+{
+  "enabled": true,
+  "caps_lock": true,
+  "power": true,
+  "drives": true,
+  "downloads": true,
+  "privacy": true,
+  "full_at": 100,
+  "low_at": 20,
+  "seconds": 3.6,
+  "has_battery": true
+}

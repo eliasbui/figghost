@@ -9,23 +9,113 @@ use crate::{
 };
 use macos_sys::{MainThreadMarker, notch::Notch, status_item::Entry};
 use serde_json::{Map, Value};
-use std::{collections::HashMap, path::Path, rc::Rc};
+use std::{
+    collections::HashMap,
+    fs,
+    io::{self, Read},
+    path::Path,
+    process::{Command, Stdio},
+    rc::Rc,
+    time::{Duration, Instant},
+};
 
 pub mod calendar;
 pub mod capture;
 pub mod cursor;
+pub mod islands;
+pub mod launcher;
 pub mod lyrics;
 pub mod mascot;
 pub mod menubar;
 pub mod musicwidget;
 pub mod mole;
+pub mod notes;
 pub mod pin;
+pub mod pomodoro;
+pub mod prs;
 pub mod smart;
 pub mod snap;
+pub mod screentime;
 pub mod stack;
+pub mod system;
 pub mod translate;
+pub mod utilities;
 pub mod vision;
+pub mod weather;
 pub mod wheel;
+
+/// Writes `text` to `path` through a file of its own and then renames it over the target, so that a crash or a full
+/// disk never leaves half of what was there.
+pub(crate) fn write_atomically(path: &Path, text: &str) -> io::Result<()> {
+    if let Some(dir) = path.parent() {
+        fs::create_dir_all(dir)?;
+    }
+    let partial = path.with_extension("json.part");
+    fs::write(&partial, text)?;
+    fs::rename(&partial, path).inspect_err(|_| {
+        let _ = fs::remove_file(&partial);
+    })
+}
+
+/// Why a command gave no answer.
+#[derive(Debug, Clone, Copy, PartialEq, Eq)]
+pub(crate) enum Ran {
+    /// It did not finish in the time given, and was stopped.
+    Slow,
+    /// It is not there, or it said it failed.
+    Failed,
+}
+
+/// Runs a command and gives back what it printed, if it finishes within `seconds`; otherwise stops it. What it
+/// prints is read as it comes, so that a command with much to say does not wait for a reader that is not there.
+pub(crate) fn run_bounded(program: &str, args: &[&str], seconds: u64) -> Result<String, Ran> {
+    run_bounded_with(program, args, &[], seconds)
+}
+
+/// The same with some environment variables added for the command.
+pub(crate) fn run_bounded_with(
+    program: &str,
+    args: &[&str],
+    envs: &[(&str, &str)],
+    seconds: u64,
+) -> Result<String, Ran> {
+    let mut child = Command::new(program)
+        .args(args)
+        .envs(envs.iter().copied())
+        .stdin(Stdio::null())
+        .stdout(Stdio::piped())
+        .stderr(Stdio::null())
+        .spawn()
+        .map_err(|_| Ran::Failed)?;
+    let mut stdout = child.stdout.take().ok_or(Ran::Failed)?;
+    let reader = std::thread::spawn(move || {
+        let mut text = Vec::new();
+        let _ = stdout.by_ref().take(1 << 20).read_to_end(&mut text);
+        text
+    });
+    let deadline = Instant::now() + Duration::from_secs(seconds);
+    loop {
+        match child.try_wait() {
+            Ok(Some(status)) => {
+                let text = reader.join().unwrap_or_default();
+                return if status.success() {
+                    Ok(String::from_utf8_lossy(&text).into_owned())
+                } else {
+                    Err(Ran::Failed)
+                };
+            }
+            Ok(None) if Instant::now() < deadline => {
+                std::thread::sleep(Duration::from_millis(40));
+            }
+            Ok(None) => {
+                let _ = child.kill();
+                let _ = child.wait();
+                return Err(Ran::Slow);
+            }
+            Err(_) => return Err(Ran::Failed),
+        }
+    }
+}
 
 /// What a feature may need when it starts. Each feature reads the fields it needs.
 #[allow(dead_code)]
@@ -62,6 +152,15 @@ pub struct Features {
     pub pin: Option<Rc<pin::Feature>>,
     pub cursor: Option<Rc<cursor::Feature>>,
     pub musicwidget: Option<Rc<musicwidget::Feature>>,
+    pub islands: Option<Rc<islands::Feature>>,
+    pub utilities: Option<Rc<utilities::Feature>>,
+    pub notes: Option<Rc<notes::Feature>>,
+    pub launcher: Option<Rc<launcher::Feature>>,
+    pub weather: Option<Rc<weather::Feature>>,
+    pub pomodoro: Option<Rc<pomodoro::Feature>>,
+    pub prs: Option<Rc<prs::Feature>>,
+    pub screentime: Option<Rc<screentime::Feature>>,
+    pub system: Option<Rc<system::Feature>>,
 }
 
 impl Features {
@@ -84,6 +183,15 @@ impl Features {
             pin: pin::attach(env),
             cursor: cursor::attach(env),
             musicwidget: musicwidget::attach(env),
+            islands: islands::attach(env),
+            utilities: utilities::attach(env),
+            notes: notes::attach(env),
+            launcher: launcher::attach(env),
+            weather: weather::attach(env),
+            pomodoro: pomodoro::attach(env),
+            prs: prs::attach(env),
+            screentime: screentime::attach(env),
+            system: system::attach(env),
         }
     }
 
@@ -134,6 +242,30 @@ impl Features {
         }
         if let Some(f) = &self.musicwidget {
             out.insert("musicwidget", f.runtime());
+        }
+        if let Some(f) = &self.islands {
+            out.insert("islands", f.runtime());
+        }
+        if let Some(f) = &self.utilities {
+            out.insert("utilities", f.runtime());
+        }
+        if let Some(f) = &self.notes {
+            out.insert("notes", f.runtime());
+        }
+        if let Some(f) = &self.launcher {
+            out.insert("launcher", f.runtime());
+        }
+        if let Some(f) = &self.weather {
+            out.insert("weather", f.runtime());
+        }
+        if let Some(f) = &self.pomodoro {
+            out.insert("pomodoro", f.runtime());
+        }
+        if let Some(f) = &self.prs {
+            out.insert("prs", f.runtime());
+        }
+        if let Some(f) = &self.screentime {
+            out.insert("screentime", f.runtime());
         }
         out
     }
@@ -197,6 +329,42 @@ impl Features {
                 .musicwidget
                 .as_ref()
                 .map_or(Ok(()), |f| f.configure(&config.musicwidget)),
+            "islands" => self
+                .islands
+                .as_ref()
+                .map_or(Ok(()), |f| f.configure(&config.islands)),
+            "utilities" => self
+                .utilities
+                .as_ref()
+                .map_or(Ok(()), |f| f.configure(&config.utilities)),
+            "notes" => self
+                .notes
+                .as_ref()
+                .map_or(Ok(()), |f| f.configure(&config.notes)),
+            "launcher" => self
+                .launcher
+                .as_ref()
+                .map_or(Ok(()), |f| f.configure(&config.launcher)),
+            "weather" => self
+                .weather
+                .as_ref()
+                .map_or(Ok(()), |f| f.configure(&config.weather)),
+            "pomodoro" => self
+                .pomodoro
+                .as_ref()
+                .map_or(Ok(()), |f| f.configure(&config.pomodoro)),
+            "prs" => self
+                .prs
+                .as_ref()
+                .map_or(Ok(()), |f| f.configure(&config.prs)),
+            "screentime" => self
+                .screentime
+                .as_ref()
+                .map_or(Ok(()), |f| f.configure(&config.screentime)),
+            "system" => self
+                .system
+                .as_ref()
+                .map_or(Ok(()), |f| f.configure(&config.system)),
             _ => Ok(()),
         }
     }
@@ -239,6 +407,12 @@ impl Features {
         if let Some(f) = &self.pin {
             f.suspend_hotkeys();
         }
+        if let Some(f) = &self.utilities {
+            f.suspend_hotkeys();
+        }
+        if let Some(f) = &self.pomodoro {
+            f.suspend_hotkeys();
+        }
     }
 
     pub fn resume_hotkeys(&self, config: &Config) {
@@ -277,6 +451,12 @@ impl Features {
         }
         if let Some(f) = &self.pin {
             f.resume_hotkeys(&config.pin);
+        }
+        if let Some(f) = &self.utilities {
+            f.resume_hotkeys(&config.utilities);
+        }
+        if let Some(f) = &self.pomodoro {
+            f.resume_hotkeys(&config.pomodoro);
         }
     }
 
@@ -347,6 +527,46 @@ impl Features {
         {
             return Some(result);
         }
+        if let Some(f) = &self.islands
+            && let Some(result) = f.action(name, &mut config.islands)
+        {
+            return Some(result);
+        }
+        if let Some(f) = &self.utilities
+            && let Some(result) = f.action(name, &mut config.utilities)
+        {
+            return Some(result);
+        }
+        if let Some(f) = &self.notes
+            && let Some(result) = f.action(name)
+        {
+            return Some(result);
+        }
+        if let Some(f) = &self.launcher
+            && let Some(result) = f.action(name, &mut config.launcher)
+        {
+            return Some(result);
+        }
+        if let Some(f) = &self.weather
+            && let Some(result) = f.action(name, &mut config.weather)
+        {
+            return Some(result);
+        }
+        if let Some(f) = &self.pomodoro
+            && let Some(result) = f.action(name)
+        {
+            return Some(result);
+        }
+        if let Some(f) = &self.prs
+            && let Some(result) = f.action(name)
+        {
+            return Some(result);
+        }
+        if let Some(f) = &self.screentime
+            && let Some(result) = f.action(name)
+        {
+            return Some(result);
+        }
         if let Some(f) = &self.cursor
             && let Some(result) = f.action(name, &mut config.cursor)
         {
@@ -401,6 +621,15 @@ impl Features {
         }
         if let Some(f) = &self.mole {
             entries.extend(mole::Feature::menu_entries(f));
+        }
+        if let Some(f) = &self.islands {
+            entries.extend(islands::Feature::menu_entries(f));
+        }
+        if let Some(f) = &self.utilities {
+            entries.extend(utilities::Feature::menu_entries(f));
+        }
+        if let Some(f) = &self.pomodoro {
+            entries.extend(pomodoro::Feature::menu_entries(f));
         }
         entries
     }
@@ -473,6 +702,39 @@ pub fn state(
         ),
     );
     root.insert(
+        "islands".into(),
+        islands::settings::state(&config.islands, runtime.get("islands").unwrap_or(&none)),
+    );
+    root.insert(
+        "utilities".into(),
+        utilities::settings::state(&config.utilities, runtime.get("utilities").unwrap_or(&none)),
+    );
+    root.insert(
+        "notes".into(),
+        notes::settings::state(&config.notes, runtime.get("notes").unwrap_or(&none)),
+    );
+    root.insert(
+        "launcher".into(),
+        launcher::settings::state(&config.launcher, runtime.get("launcher").unwrap_or(&none)),
+    );
+    root.insert(
+        "weather".into(),
+        weather::settings::state(&config.weather, runtime.get("weather").unwrap_or(&none)),
+    );
+    root.insert(
+        "prs".into(),
+        prs::settings::state(&config.prs, runtime.get("prs").unwrap_or(&none)),
+    );
+    root.insert(
+        "pomodoro".into(),
+        pomodoro::settings::state(&config.pomodoro, runtime.get("pomodoro").unwrap_or(&none)),
+    );
+    root.insert(
+        "screentime".into(),
+        screentime::settings::state(&config.screentime, runtime.get("screentime").unwrap_or(&none)),
+    );
+    root.insert("system".into(), system::settings::state(&config.system));
+    root.insert(
         "mole".into(),
         mole::settings::state(runtime.get("mole").unwrap_or(&none)),
     );
@@ -518,6 +780,29 @@ pub fn set(config: &mut Config, path: &str, value: &Value) -> Option<Result<&'st
         }
         "musicwidget" => musicwidget::settings::set(&mut config.musicwidget, rest, value)
             .map(|r| r.map(|()| "musicwidget")),
+        "islands" => {
+            islands::settings::set(&mut config.islands, rest, value).map(|r| r.map(|()| "islands"))
+        }
+        "utilities" => utilities::settings::set(&mut config.utilities, rest, value)
+            .map(|r| r.map(|()| "utilities")),
+        "notes" => {
+            notes::settings::set(&mut config.notes, rest, value).map(|r| r.map(|()| "notes"))
+        }
+        "launcher" => {
+            launcher::settings::set(&mut config.launcher, rest, value).map(|r| r.map(|()| "launcher"))
+        }
+        "weather" => {
+            weather::settings::set(&mut config.weather, rest, value).map(|r| r.map(|()| "weather"))
+        }
+        "prs" => prs::settings::set(&mut config.prs, rest, value).map(|r| r.map(|()| "prs")),
+        "pomodoro" => {
+            pomodoro::settings::set(&mut config.pomodoro, rest, value).map(|r| r.map(|()| "pomodoro"))
+        }
+        "screentime" => screentime::settings::set(&mut config.screentime, rest, value)
+            .map(|r| r.map(|()| "screentime")),
+        "system" => {
+            system::settings::set(&mut config.system, rest, value).map(|r| r.map(|()| "system"))
+        }
         _ => None,
     }
 }
@@ -538,6 +823,8 @@ pub fn shortcut_owner(target: &str) -> Option<&'static str> {
         "wheel",
         "translate",
         "pin",
+        "utilities",
+        "pomodoro",
     ]
     .into_iter()
     .find(|id| *id == head)
@@ -558,6 +845,8 @@ pub fn shortcuts(config: &Config) -> Vec<(String, String)> {
     all.extend(wheel::settings::shortcuts(&config.wheel));
     all.extend(translate::settings::shortcuts(&config.translate));
     all.extend(pin::settings::shortcuts(&config.pin));
+    all.extend(utilities::settings::shortcuts(&config.utilities));
+    all.extend(pomodoro::settings::shortcuts(&config.pomodoro));
     all
 }
 
@@ -593,6 +882,10 @@ pub fn set_shortcut(
         "pin" => {
             pin::settings::set_shortcut(&mut config.pin, target, value).map(|r| r.map(|()| "pin"))
         }
+        "utilities" => utilities::settings::set_shortcut(&mut config.utilities, target, value)
+            .map(|r| r.map(|()| "utilities")),
+        "pomodoro" => pomodoro::settings::set_shortcut(&mut config.pomodoro, target, value)
+            .map(|r| r.map(|()| "pomodoro")),
         _ => None,
     }
 }
@@ -601,6 +894,30 @@ pub fn set_shortcut(
 mod tests {
     use super::*;
     use crate::config::parse_hotkey;
+
+    #[test]
+    fn a_command_is_run_for_what_it_prints_and_stopped_when_it_is_slow() {
+        assert_eq!(
+            run_bounded("/bin/echo", &["hello"], 5),
+            Ok("hello\n".to_owned())
+        );
+        assert_eq!(run_bounded("/usr/bin/false", &[], 5), Err(Ran::Failed));
+        assert_eq!(
+            run_bounded("/this/is/not/a/program", &[], 5),
+            Err(Ran::Failed)
+        );
+        let started = Instant::now();
+        assert_eq!(run_bounded("/bin/sleep", &["30"], 1), Err(Ran::Slow));
+        assert!(
+            started.elapsed() < Duration::from_secs(5),
+            "it was stopped, not waited for"
+        );
+        // More than a megabyte is too much to read: the command is cut off and counts as failed, not waited for.
+        assert_eq!(run_bounded("/usr/bin/yes", &[], 5), Err(Ran::Failed));
+        // One with much to say, within that, is read as it comes.
+        let long = run_bounded("/usr/bin/seq", &["1", "20000"], 5).unwrap();
+        assert_eq!(long.lines().count(), 20_000, "all of it came");
+    }
 
     /// Every shortcut that is on by default, across the clipboard, the window layouts and the features, is a
     /// different key combination: two tasks must never claim the same one.

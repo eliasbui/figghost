@@ -81,6 +81,12 @@ pub mod symbols {
         COLOR_PICKER = "eyedropper",
         MENU_BAR_ICONS = "menubar.rectangle",
         COPY_STACK = "square.stack.3d.up",
+        EJECT = "eject",
+        AWAKE = "cup.and.saucer",
+        SNOOZE = "moon.zzz",
+        POMODORO = "timer",
+        MIC_MUTE = "mic.slash",
+        KEYBOARD = "keyboard",
     }
 }
 

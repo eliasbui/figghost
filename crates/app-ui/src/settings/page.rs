@@ -25,6 +25,15 @@ const FEATURE_SCRIPTS: &[&str] = &[
     include_str!("../../web/features/mascot.js"),
     include_str!("../../web/features/wheel.js"),
     include_str!("../../web/features/mole.js"),
+    include_str!("../../web/features/islands.js"),
+    include_str!("../../web/features/utilities.js"),
+    include_str!("../../web/features/notes.js"),
+    include_str!("../../web/features/launcher.js"),
+    include_str!("../../web/features/weather.js"),
+    include_str!("../../web/features/prs.js"),
+    include_str!("../../web/features/pomodoro.js"),
+    include_str!("../../web/features/screentime.js"),
+    include_str!("../../web/features/system.js"),
 ];
 const FEATURE_STYLES: &[&str] = &[
     include_str!("../../web/features/smart.css"),
@@ -42,6 +51,11 @@ const FEATURE_STYLES: &[&str] = &[
     include_str!("../../web/features/mascot.css"),
     include_str!("../../web/features/wheel.css"),
     include_str!("../../web/features/mole.css"),
+    include_str!("../../web/features/islands.css"),
+    include_str!("../../web/features/utilities.css"),
+    include_str!("../../web/features/weather.css"),
+    include_str!("../../web/features/launcher.css"),
+    include_str!("../../web/features/prs.css"),
 ];
 const FEATURE_FIXTURES: &[(&str, &str)] = &[
     (
@@ -95,6 +109,42 @@ const FEATURE_FIXTURES: &[(&str, &str)] = &[
         "translate",
         include_str!("../../web/features/translate.fixture.json"),
     ),
+    (
+        "islands",
+        include_str!("../../web/features/islands.fixture.json"),
+    ),
+    (
+        "utilities",
+        include_str!("../../web/features/utilities.fixture.json"),
+    ),
+    (
+        "notes",
+        include_str!("../../web/features/notes.fixture.json"),
+    ),
+    (
+        "launcher",
+        include_str!("../../web/features/launcher.fixture.json"),
+    ),
+    (
+        "weather",
+        include_str!("../../web/features/weather.fixture.json"),
+    ),
+    (
+        "prs",
+        include_str!("../../web/features/prs.fixture.json"),
+    ),
+    (
+        "pomodoro",
+        include_str!("../../web/features/pomodoro.fixture.json"),
+    ),
+    (
+        "screentime",
+        include_str!("../../web/features/screentime.fixture.json"),
+    ),
+    (
+        "system",
+        include_str!("../../web/features/system.fixture.json"),
+    ),
 ];
 
 /// The SF Symbols the page draws (app.js `icon()`): page icons and button glyphs. The page's self-test fails
@@ -127,6 +177,14 @@ const SYMBOLS: &[&str] = &[
     "chevron.up",
     "chevron.down",
     "chart.pie.fill",
+    "checkmark.shield",
+    "cpu",
+    "note.text",
+    "cloud.sun.fill",
+    "square.grid.2x2.fill",
+    "hourglass",
+    "timer",
+    "arrow.triangle.pull",
 ];
 /// Symbols are drawn this many points on their longer side, for Retina screens; CSS fits them to their box.
 const SYMBOL_POINTS: f64 = 16.0;
@@ -147,20 +205,36 @@ const FONTS: &[(&[u8], &str)] = &[
     ),
 ];
 
-/// The two `@font-face` rules, with the fonts themselves inline. The ranges are the ones the subsets were
-/// cut for, so a character outside them (a key symbol such as `⌥`) comes from the system font instead.
-fn font_faces() -> String {
-    FONTS
+/// Patrick Hand, the hand-written face of the titles, the section names and what the ghost says: the same two
+/// subsets of one regular weight, bundled under the SIL Open Font License (`assets/PatrickHand-OFL.txt`).
+const HAND_FONTS: &[(&[u8], &str)] = &[
+    (
+        include_bytes!("../../assets/PatrickHand-latin.woff2"),
+        "U+0000-00FF,U+0131,U+0152-0153,U+02BB-02BC,U+02C6,U+02DA,U+02DC,U+0304,U+0308,U+0329,U+2000-206F,U+20AC,U+2122,U+2191,U+2193,U+2212,U+2215,U+FEFF,U+FFFD",
+    ),
+    (
+        include_bytes!("../../assets/PatrickHand-vietnamese.woff2"),
+        "U+0102-0103,U+0110-0111,U+0128-0129,U+0168-0169,U+01A0-01A1,U+01AF-01B0,U+0300-0301,U+0303-0304,U+0308-0309,U+0323,U+0329,U+1EA0-1EF9,U+20AB",
+    ),
+];
+
+/// The `@font-face` rules of one family, with the fonts themselves inline. The ranges are the ones the subsets
+/// were cut for, so a character outside them (a key symbol such as `⌥`) comes from the system font instead.
+fn faces(family: &str, weight: &str, fonts: &[(&[u8], &str)]) -> String {
+    fonts
         .iter()
         .map(|(bytes, range)| {
             format!(
-                "@font-face {{ font-family: Inter; font-style: normal; font-weight: 100 900; \
-                 src: url(data:font/woff2;base64,{}) format('woff2'); unicode-range: {}; }}\n",
-                base64(bytes),
-                range
+                "@font-face {{ font-family: \"{family}\"; font-style: normal; font-weight: {weight}; \
+                 src: url(data:font/woff2;base64,{}) format('woff2'); unicode-range: {range}; }}\n",
+                base64(bytes)
             )
         })
         .collect()
+}
+
+fn font_faces() -> String {
+    faces("Inter", "100 900", FONTS) + &faces("Patrick Hand", "400", HAND_FONTS)
 }
 
 /// `window.__symbols` (name to a white PNG) and `window.__appIcon`, drawn by the system since the page may

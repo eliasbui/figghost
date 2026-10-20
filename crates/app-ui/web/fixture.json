@@ -33,7 +33,8 @@
       { "id": "focus", "title": "Focus", "on": true },
       { "id": "agents", "title": "Agents", "on": true },
       { "id": "calendar", "title": "Calendar", "on": true },
-      { "id": "sound", "title": "Sound", "on": false }
+      { "id": "sound", "title": "Sound", "on": false },
+      { "id": "system", "title": "System", "on": true }
     ],
     "live_media": true, "live_agents": true, "waveform": "live", "shortcut": "", "hardware": false,
     "screens": ["Built-in Retina Display", "Sidecar"]

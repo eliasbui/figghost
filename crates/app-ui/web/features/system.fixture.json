@@ -1,0 +1,8 @@
+{
+  "enabled": true,
+  "seconds": 1,
+  "processor": true,
+  "memory": true,
+  "network": true,
+  "details": true
+}

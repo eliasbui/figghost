@@ -1,0 +1,11 @@
+{
+  "enabled": true,
+  "github": true,
+  "gitlab": true,
+  "drafts": false,
+  "minutes": 10,
+  "github_tool": "ready",
+  "gitlab_tool": "signed_out",
+  "checking": false,
+  "count": 3
+}

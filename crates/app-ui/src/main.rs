@@ -124,6 +124,25 @@ fn greets(config: &Config, args: &[String], at_login: bool) -> bool {
         && !args.iter().any(|a| a == "--background")
 }
 
+/// For tests: `FIGGHOST_NOTCH_OPEN=<tab id>` opens the notch on that tab a second after the app is up and closes it
+/// six seconds later, so that what a tab does while it shows, and stops doing when it closes, can be watched in the
+/// trace (`scripts/check-system.sh`).
+fn open_for_test(ctx: &AppContext) {
+    let Some(notch) = ctx.clipboard.as_ref().and_then(|c| c.notch.clone()) else {
+        return;
+    };
+    let Ok(id) = std::env::var("FIGGHOST_NOTCH_OPEN") else {
+        return;
+    };
+    let Some(index) = notch.page_ids().iter().position(|(page, _)| *page == id) else {
+        eprintln!("FIGGHOST_NOTCH_OPEN: no tab named {id}");
+        return;
+    };
+    let opening = Rc::clone(&notch);
+    app::after(1.0, move || opening.open_page(index));
+    app::after(7.0, move || notch.close());
+}
+
 impl Shell {
     fn build(mtm: MainThreadMarker, home: PathBuf, config: Config) -> Shell {
         // Only meaningful while the launch event is being handled.
@@ -245,6 +264,7 @@ impl Shell {
             permissions_popup.show();
         }
         update.start();
+        open_for_test(&ctx);
         Shell {
             mouse,
             clipboard,

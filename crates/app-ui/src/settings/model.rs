@@ -1016,6 +1016,14 @@ mod tests {
             today_cost: Some(0.5),
             week_cost: Some(1.0),
         }];
+        // The places a search found only exist while the settings page is looking at one.
+        e.runtime
+            .insert("weather", json!({ "found": [{ "label": "Hue, Vietnam" }] }));
+        config.launcher.items = vec![crate::features::launcher::logic::Item {
+            kind: crate::features::launcher::logic::Kind::App,
+            target: "com.apple.Notes".into(),
+            name: "Notes".into(),
+        }];
         let real = state(&config, &e);
         let (mut a, mut b) = (Vec::new(), Vec::new());
         key_paths(&sample, "", &mut a);
@@ -1525,6 +1533,15 @@ mod tests {
             "pin",
             "cursor",
             "musicwidget",
+            "islands",
+            "utilities",
+            "notes",
+            "launcher",
+            "weather",
+            "prs",
+            "pomodoro",
+            "screentime",
+            "system",
         ] {
             assert!(state[id].is_object(), "{id} is missing from the state");
             assert!(state[id]["enabled"].is_boolean(), "{id} has no switch");

@@ -1,0 +1,12 @@
+{
+  "enabled": true,
+  "items": [
+    { "kind": "app", "name": "Notes" },
+    { "kind": "folder", "name": "Documents" },
+    { "kind": "shortcut", "name": "Morning routine" }
+  ],
+  "full": false,
+  "listing": false,
+  "shortcuts": ["Morning routine", "Resize images", "Send to my phone"],
+  "problem": ""
+}

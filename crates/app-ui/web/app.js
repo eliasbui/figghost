@@ -35,6 +35,39 @@ function icon(name, cls) {
 /** The app's own icon (window.__appIcon, drawn from Figghost.icns). */
 function appIcon(cls) { return h('img', { class: cls, src: window.__appIcon, alt: '' }); }
 
+// The ghost, drawn by hand: the guide of every page and the sign of whether the app has the access it needs. Its
+// colours and its movement are in the "Ghost world" part of app.css; `asleep` on its wrapper closes its eyes.
+const GHOST_BODY = 'M13 63 C12 52 11 40 11.5 31 C12.5 16 21 7 32.5 7 C44 7 52.5 16 53 31 C53.5 41 52.5 52 51 63 C49 62 46.5 59.5 44 61 C41.5 62.5 40 66.5 37 65.5 C34.5 64.6 34 60.5 31.5 60.5 C29 60.5 28.5 65 25.5 65.7 C22.5 66.2 21.5 62 19 61 C16.5 60 14.5 62.5 13 63 Z';
+const GHOST_SVG =
+  '<svg class="ghost" viewBox="0 0 64 72" focusable="false"><path class="g-body" d="' + GHOST_BODY + '"/>' +
+  '<g class="eyes-open"><ellipse class="g-ink" cx="25" cy="31" rx="3.1" ry="4.6"/><ellipse class="g-ink" cx="40" cy="31" rx="3.1" ry="4.6"/></g>' +
+  '<g class="eyes-shut"><path class="g-line" d="M21.5 32 Q25 35 28.5 32"/><path class="g-line" d="M36.5 32 Q40 35 43.5 32"/></g>' +
+  '<ellipse class="g-cheek" cx="19.5" cy="39.5" rx="3.6" ry="2.2"/><ellipse class="g-cheek" cx="45.5" cy="39.5" rx="3.6" ry="2.2"/>' +
+  '<path class="g-line" d="M29.5 40 Q32.5 43.6 35.5 40"/><text class="z g-ink" x="48" y="14" font-size="13">z</text></svg>';
+// The big ghost of the hero: white eyes with pupils that look where the pointer is (--px and --py, in pixels).
+const SPIRIT_SVG =
+  '<svg class="spirit" viewBox="0 0 64 72" focusable="false"><path class="g-body" d="' + GHOST_BODY + '"/>' +
+  '<ellipse class="eye-white" cx="25" cy="30" rx="5.6" ry="6.6"/><ellipse class="eye-white" cx="41" cy="30" rx="5.6" ry="6.6"/>' +
+  '<circle class="pupil" cx="25" cy="31" r="2.7"/><circle class="pupil" cx="41" cy="31" r="2.7"/>' +
+  '<ellipse class="g-cheek" cx="17.5" cy="40.5" rx="3.6" ry="2.2"/><ellipse class="g-cheek" cx="48.5" cy="40.5" rx="3.6" ry="2.2"/>' +
+  '<path class="g-line" d="M28.5 41.5 Q33 46.5 37.5 41.5"/></svg>';
+// The filter that wobbles the outline of the ghost and nothing else. It is defined once, in the shell.
+const WOBBLE_SVG = '<svg width="0" height="0" focusable="false"><filter id="wobble" x="-5%" y="-5%" width="110%" height="110%"><feTurbulence type="fractalNoise" baseFrequency="0.03" numOctaves="2" seed="4" result="n"/><feDisplacementMap in="SourceGraphic" in2="n" scale="1.6" xChannelSelector="R" yChannelSelector="G"/></filter></svg>';
+function ghost(cls) { return h('span', { class: 'ghost-wrap' + (cls ? ' ' + cls : ''), 'aria-hidden': 'true', html: GHOST_SVG }); }
+
+// The ghosts blink now and then. A timer rather than an endless animation: between blinks nothing runs at all.
+function blinkSoon() {
+  setTimeout(() => {
+    if (document.visibilityState === 'visible' && !document.documentElement.classList.contains('reduce-motion')) {
+      const eyes = document.querySelectorAll('.ghost .eyes-open');
+      for (const e of eyes) e.classList.add('blink');
+      setTimeout(() => { for (const e of eyes) e.classList.remove('blink'); }, 150);
+    }
+    blinkSoon();
+  }, 3500 + Math.random() * 5000);
+}
+blinkSoon();
+
 function throttleBy(key, ms, fn) {
   const slots = (throttleBy.slots = throttleBy.slots || new Map());
   const slot = slots.get(key) || { last: 0, timer: 0, args: null };
@@ -50,7 +83,9 @@ function throttleBy(key, ms, fn) {
 const I18N = {
   en: {
     'side.search': 'Search settings', 'side.clear': 'Clear search', 'side.none': 'No settings found',
-    'cat.general': 'General', 'cat.scroll': 'Mouse & Cursor', 'cat.notch': 'Notch & Island', 'cat.clipboard': 'Clipboard & Tools', 'cat.tiling': 'Window & Keys',
+    'guide.label': 'The ghost', 'guide.q1': 'Boo.', 'guide.q2': 'I live in your notch.', 'guide.q3': 'Nothing extraneous here.', 'guide.q4': 'Ask me again later.',
+    'metric.features': 'Features on', 'metric.tabs': 'Notch tabs', 'metric.clips': 'Copied items', 'metric.access': 'Accessibility',
+    'cat.general': 'General', 'cat.scroll': 'Mouse & Cursor', 'cat.notch': 'Notch & Island', 'cat.tabs': 'Notch tabs', 'cat.clipboard': 'Clipboard & Tools', 'cat.tiling': 'Window & Keys',
     'nav.general': 'General', 'nav.keys': 'Shortcuts', 'nav.scroll': 'Scrolling', 'nav.clipboard': 'Clipboard', 'nav.notch': 'Notch', 'nav.agents': 'AI agents', 'nav.tiling': 'Window snapping', 'nav.about': 'About',
     'page.general': 'General', 'page.general.sub': 'Startup, language and permissions.',
     'page.keys': 'Shortcuts', 'page.keys.sub': 'The keys Figghost listens to, in one place. Click a shortcut, then press the new keys.',
@@ -169,7 +204,9 @@ const I18N = {
   },
   vi: {
     'side.search': 'Tìm chức năng', 'side.clear': 'Xóa tìm kiếm', 'side.none': 'Không có mục nào',
-    'cat.general': 'Cài đặt chung', 'cat.scroll': 'Chuột & Thao tác', 'cat.notch': 'Notch & Tiện ích', 'cat.clipboard': 'Bảng tạm & Công cụ', 'cat.tiling': 'Cửa sổ & Phím tắt',
+    'guide.label': 'Con ma', 'guide.q1': 'Hú.', 'guide.q2': 'Tôi sống trong notch của bạn.', 'guide.q3': 'Ở đây không có gì thừa.', 'guide.q4': 'Lát nữa hỏi lại nhé.',
+    'metric.features': 'Đang bật', 'metric.tabs': 'Tab của notch', 'metric.clips': 'Mục đã chép', 'metric.access': 'Trợ năng',
+    'cat.general': 'Cài đặt chung', 'cat.scroll': 'Chuột & Thao tác', 'cat.notch': 'Notch & Tiện ích', 'cat.tabs': 'Tab của notch', 'cat.clipboard': 'Bảng tạm & Công cụ', 'cat.tiling': 'Cửa sổ & Phím tắt',
     'nav.general': 'Chung', 'nav.keys': 'Phím tắt', 'nav.scroll': 'Cuộn chuột', 'nav.clipboard': 'Clipboard', 'nav.notch': 'Notch', 'nav.agents': 'Tác tử AI', 'nav.tiling': 'Chia cửa sổ', 'nav.about': 'Giới thiệu',
     'page.general': 'Chung', 'page.general.sub': 'Khởi động, ngôn ngữ và quyền truy cập.',
     'page.keys': 'Phím tắt', 'page.keys.sub': 'Mọi phím Figghost dùng, gom về một chỗ. Nhấn vào một phím tắt rồi bấm tổ hợp phím mới.',
@@ -766,7 +803,50 @@ function pill(textFn, goodFn) {
   return el;
 }
 
+/** The figures under the hero of the General page. Every one is read from the state the page already has. */
+function metricsStrip() {
+  const features = () => {
+    const flags = ['mouse.smooth', 'notch.enabled', 'agents.enabled', 'tiling.enabled'].map((path) => !!get(path));
+    for (const p of PLUGINS) if (p.build && S[p.id] && typeof S[p.id].enabled === 'boolean') flags.push(S[p.id].enabled);
+    return [flags.filter(Boolean).length, flags.length];
+  };
+  const tabs = () => {
+    const pages = (S.notch && S.notch.pages) || [];
+    return [pages.filter((x) => x.on).length, pages.length];
+  };
+  const tile = (glyph, labelKey, fill) => {
+    const value = h('div', { class: 'metric-val' });
+    const el = h('section', { class: 'card metric' },
+      h('div', { class: 'metric-top' }, icon(glyph), h('span', { class: 'metric-label', text: t(labelKey) })),
+      value);
+    reg(() => fill(value, el));
+    return el;
+  };
+  const ratio = (pair) => (value) => value.replaceChildren(String(pair()[0]), h('small', { text: '/ ' + pair()[1] }));
+  return h('div', { class: 'metrics' },
+    tile('sparkles', 'metric.features', ratio(features)),
+    tile('rectangle.topthird.inset.filled', 'metric.tabs', ratio(tabs)),
+    tile('doc.on.clipboard.fill', 'metric.clips', (value) => { value.textContent = String((S.clipboard && S.clipboard.count) || 0); }),
+    tile('checkmark.shield', 'metric.access', (value, el) => {
+      value.classList.add('word');
+      value.textContent = S.env.accessibility ? t('access.granted') : t('access.missing');
+      el.classList.toggle('warn', !S.env.accessibility);
+    }));
+}
+
 function pageGeneral() {
+  const spirit = h('span', { class: 'hero-spirit', 'aria-hidden': 'true', html: SPIRIT_SVG });
+  const look = (e) => {
+    if (!spirit.isConnected) { window.removeEventListener('pointermove', look); return; }
+    const box = spirit.getBoundingClientRect();
+    const dx = e.clientX - (box.left + box.width / 2);
+    const dy = e.clientY - (box.top + box.height * 0.45);
+    const reach = Math.min(2.6, Math.hypot(dx, dy) / 60);
+    const angle = Math.atan2(dy, dx);
+    spirit.style.setProperty('--px', (Math.cos(angle) * reach).toFixed(2));
+    spirit.style.setProperty('--py', (Math.sin(angle) * reach).toFixed(2));
+  };
+  window.addEventListener('pointermove', look);
   const hero = h('section', { class: 'hero hero-ghost card' },
     appIcon('hero-mark'),
     h('div', { class: 'hero-body' },
@@ -774,7 +854,8 @@ function pageGeneral() {
       h('p', { text: t('hero.tagline') }),
       h('div', { class: 'chips' },
         h('span', { class: 'chip', text: t('chip.version', { v: S.app.version }) }),
-        pill(() => (S.env.accessibility ? t('chip.access.ok') : t('chip.access.no')), () => S.env.accessibility))));
+        pill(() => (S.env.accessibility ? t('chip.access.ok') : t('chip.access.no')), () => S.env.accessibility))),
+    spirit);
 
   // Launch at login depends on how the app was installed, so its row has more states than a plain switch.
   const loginOn = () => S.env.login === 'enabled' || S.env.login === 'needs_approval';
@@ -813,6 +894,7 @@ function pageGeneral() {
 
   return [
     hero,
+    metricsStrip(),
     h('div', { class: 'tiles-grid' },
       featureTile('scroll', 'mouse.smooth'), featureTile('notch', 'notch.enabled'),
       featureTile('agents', 'agents.enabled'), featureTile('tiling', 'tiling.enabled')),
@@ -1695,8 +1777,9 @@ function pageAbout() {
 const CATEGORIES = [
   { id: 'general', icon: 'gearshape.fill', pages: ['general', 'mole', 'about'] },
   { id: 'scroll', icon: 'computermouse.fill', pages: ['scroll', 'cursor', 'wheel'] },
-  { id: 'notch', icon: 'rectangle.topthird.inset.filled', pages: ['notch', 'calendar', 'agents', 'musicwidget'] },
-  { id: 'clipboard', icon: 'doc.on.clipboard.fill', pages: ['clipboard', 'smart', 'translate', 'capture', 'vision'] },
+  { id: 'notch', icon: 'rectangle.topthird.inset.filled', pages: ['notch', 'islands', 'musicwidget'] },
+  { id: 'tabs', icon: 'square.grid.2x2.fill', pages: ['calendar', 'agents', 'notes', 'launcher', 'weather', 'prs', 'pomodoro', 'screentime', 'system'] },
+  { id: 'clipboard', icon: 'doc.on.clipboard.fill', pages: ['clipboard', 'smart', 'translate', 'capture', 'vision', 'utilities'] },
   { id: 'tiling', icon: 'rectangle.split.2x1.fill', pages: ['tiling', 'pin', 'keys'] },
 ];
 
@@ -1741,12 +1824,12 @@ let shellSyncs = [];
 let pageSyncs = [];
 
 function accessPill() {
-  const dot = h('span', { class: 'dot' });
+  const mark = ghost('mini');
   const label = h('span');
-  const el = h('button', { class: 'status-pill', onclick: () => (S.env.accessibility ? go('general') : send({ t: 'action', name: 'open_accessibility' })) }, dot, label);
+  const el = h('button', { class: 'status-pill', onclick: () => (S.env.accessibility ? go('general') : send({ t: 'action', name: 'open_accessibility' })) }, mark, label);
   reg(() => {
     label.textContent = S.env.accessibility ? t('chip.access.ok') : t('chip.access.no');
-    dot.classList.toggle('good', !!S.env.accessibility);
+    mark.classList.toggle('asleep', !S.env.accessibility);
   });
   return el;
 }
@@ -1849,6 +1932,7 @@ function renderNavItems() {
       'data-name': t('cat.' + cat.id),
       onclick: () => {
         const target = cat.lastPage || cat.pages[0];
+        go.rise = true;
         go(target);
         reveal(searchWords);
       },
@@ -1873,10 +1957,34 @@ function renderSubtabs(cat, activeId) {
       class: 'subtab' + (isCur ? ' active' : ''),
       'aria-pressed': String(isCur),
       'aria-label': t('nav.' + pid),
-      onclick: () => go(pid),
+      onclick: () => { go.rise = true; go(pid); },
     }, t('nav.' + pid));
   });
   container.replaceChildren(h('div', { class: 'subtabs-bar' }, ...pills));
+}
+
+/** What the ghost says about a page: its first sentence, which is what the page is for. */
+function guideLine(pageId) {
+  const sub = t('page.' + pageId + '.sub');
+  const end = sub.search(/[.!?](\s|$)/);
+  return end > 0 && end < sub.length - 1 ? sub.slice(0, end + 1) : sub;
+}
+
+let quipTimer = 0;
+let quipNext = 0;
+/** A click on the ghost: it hops and says something else for a moment, then goes back to the page. */
+function poke() {
+  const bubble = $('.bubble');
+  const say = $('#guide-text');
+  const ghostButton = $('.guide-ghost');
+  if (!bubble || !say || !ghostButton) return;
+  say.textContent = t('guide.q' + ((quipNext++ % 4) + 1));
+  bubble.classList.add('quip');
+  ghostButton.classList.remove('hop');
+  void ghostButton.offsetWidth;
+  ghostButton.classList.add('hop');
+  clearTimeout(quipTimer);
+  quipTimer = setTimeout(() => { bubble.classList.remove('quip'); say.textContent = guideLine(current); }, 3200);
 }
 
 function buildShell() {
@@ -1885,6 +1993,7 @@ function buildShell() {
     h('div', { id: 'app' },
       h('aside', { id: 'sidebar', class: 'glass' },
         h('div', { class: 'dragzone', 'data-drag': '' }),
+        h('span', { class: 'wordmark', 'aria-hidden': 'true', text: 'figghost' }),
         navSearch(),
         h('nav', { id: 'nav', 'aria-label': 'Figghost' },
           ...renderNavItems(),
@@ -1895,10 +2004,14 @@ function buildShell() {
         h('header', { class: 'page-head' },
           h('h1', { class: 'page-title', id: 'title' }),
           h('div', { id: 'subtabs', class: 'page-subtabs' }),
-          h('p', { class: 'page-sub', id: 'subtitle' })),
+          h('p', { class: 'page-sub', id: 'subtitle' }),
+          h('div', { class: 'guide' },
+            h('p', { class: 'bubble' }, h('span', { class: 'bubble-text', id: 'guide-text' })),
+            h('button', { class: 'guide-ghost', 'aria-label': t('guide.label'), onclick: poke }, ghost()))),
         h('div', { id: 'scroller' }))),
     h('div', { id: 'toast', 'aria-live': 'polite' }),
-    h('div', { id: 'modal' }));
+    h('div', { id: 'modal' }),
+    h('div', { class: 'defs', 'aria-hidden': 'true', html: WOBBLE_SVG }));
 }
 
 function go(id) {
@@ -1914,8 +2027,15 @@ function go(id) {
   const sub = $('#subtitle');
   if (sub) sub.textContent = t('page.' + page.id + '.sub');
   renderSubtabs(cat, current);
+  const say = $('#guide-text');
+  if (say && !say.parentElement.classList.contains('quip')) say.textContent = guideLine(page.id);
+  if (say) say.parentElement.title = t('page.' + page.id + '.sub');
   const scroller = $('#scroller');
-  pageSyncs = scoped(() => scroller.replaceChildren(h('div', { class: 'page' }, [].concat(page.build(), slotsFor(page.id)))));
+  // A page rises into place only when a person chose it; a page that is built for any other reason (the first one, a
+  // new language, a check or a picture) is simply there, so nothing waits on an animation clock.
+  const rise = go.rise === true;
+  go.rise = false;
+  pageSyncs = scoped(() => scroller.replaceChildren(h('div', { class: 'page' + (rise ? ' rise' : '') }, [].concat(page.build(), slotsFor(page.id)))));
   scroller.scrollTop = 0;
   for (const item of document.querySelectorAll('.nav-item')) {
     if (item.dataset.page === cat.id) item.setAttribute('aria-current', 'page'); else item.removeAttribute('aria-current');
@@ -1939,8 +2059,17 @@ function applyLanguage() {
   rebuild();
 }
 
+/** The sky behind the page follows the hour. A state may name one (S.env.sky), which previews use. */
+function applySky() {
+  const hour = new Date().getHours();
+  const sky = (S && S.env && S.env.sky) || (hour < 5 ? 'night' : hour < 9 ? 'dawn' : hour < 17 ? 'day' : hour < 20 ? 'dusk' : 'night');
+  document.documentElement.dataset.sky = sky;
+}
+setInterval(applySky, 10 * 60 * 1000);
+
 function applyDisplay() {
   if (!S) return;
+  applySky();
   const list = document.documentElement.classList;
   list.toggle('reduce-transparency', !!S.env.reduce_transparency);
   list.toggle('reduce-motion', !!S.env.reduce_motion);

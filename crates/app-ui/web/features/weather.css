@@ -1,0 +1,8 @@
+/* Weather. Styles for the page in web/features/weather.js, using the variables at the top of app.css. */
+.weather-search { display: flex; gap: 8px; align-items: center; width: 100%; }
+.weather-search input.text-field { flex: 1 1 auto; width: auto; min-width: 0; }
+.weather-found { width: 100%; }
+.weather-results { display: flex; flex-direction: column; gap: 4px; width: 100%; }
+.weather-result { display: flex; justify-content: space-between; align-items: center; gap: 10px; padding: 4px 0; }
+.weather-label { color: var(--text); font-size: var(--fs-small); }
+.weather-status { min-height: 1.2em; }
