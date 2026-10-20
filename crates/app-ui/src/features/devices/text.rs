@@ -33,6 +33,14 @@ impl Language {
         }
     }
 
+    /// Under the gauge of a device that has stopped reporting its charge: when it last did.
+    pub fn devices_remembered(self, ago: &str) -> String {
+        match self {
+            Language::English => format!("Reported {ago}"),
+            Language::Vietnamese => format!("Báo lần cuối {ago}"),
+        }
+    }
+
     /// "Updated just now", with how many devices there are that the page has no room for.
     pub fn devices_footer(self, ago: &str, hidden: usize) -> String {
         let updated = match self {

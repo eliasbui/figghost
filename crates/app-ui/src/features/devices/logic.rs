@@ -55,6 +55,89 @@ impl Gadget {
 #[derive(Debug, Clone, Copy, PartialEq, Eq)]
 pub struct Unreadable;
 
+/// How long the charge a device has stopped reporting is still shown, in milliseconds.
+pub const KEEP_MS: i64 = 2 * 3600 * 1000;
+/// How many devices are remembered; a longer list is not a Mac's.
+const MAX_MEMORY: usize = 50;
+
+/// A device as shown: what it reports now, or if it reports nothing, what it last reported.
+#[derive(Debug, Clone, PartialEq, Eq)]
+pub struct Seen {
+    pub gadget: Gadget,
+    /// When the charge shown was reported, if it is not one from the look just made.
+    pub since: Option<i64>,
+}
+
+/// What a device last said about its charge. Some say it only now and then: a headset may report it when it connects
+/// and not again for an hour, and a card that came and went between "100%" and "does not report" would read as broken.
+#[derive(Debug, Clone, PartialEq, Eq)]
+pub struct Memory {
+    name: String,
+    kind: Kind,
+    charge: [Option<u8>; 4],
+    at: i64,
+}
+
+impl Gadget {
+    fn charge(&self) -> [Option<u8>; 4] {
+        [self.main, self.left, self.right, self.case]
+    }
+}
+
+/// The devices of a look with what they said before filled in for those that now say nothing, for no longer than
+/// `KEEP_MS`. A device that reports anything is shown as it reports and remembered as that; `memory` is brought up to date
+/// and loses what is too old.
+pub fn with_memory(gadgets: Vec<Gadget>, memory: &mut Vec<Memory>, now: i64) -> Vec<Seen> {
+    memory.retain(|m| now - m.at <= KEEP_MS);
+    let seen = gadgets
+        .into_iter()
+        .map(|gadget| {
+            let at = memory
+                .iter()
+                .position(|m| m.name == gadget.name && m.kind == gadget.kind);
+            if gadget.reports_a_charge() {
+                let fresh = Memory {
+                    name: gadget.name.clone(),
+                    kind: gadget.kind,
+                    charge: gadget.charge(),
+                    at: now,
+                };
+                match at {
+                    Some(i) => memory[i] = fresh,
+                    None => memory.push(fresh),
+                }
+                return Seen {
+                    gadget,
+                    since: None,
+                };
+            }
+            match at.map(|i| &memory[i]) {
+                Some(old) => {
+                    let [main, left, right, case] = old.charge;
+                    Seen {
+                        gadget: Gadget {
+                            main,
+                            left,
+                            right,
+                            case,
+                            ..gadget
+                        },
+                        since: Some(old.at),
+                    }
+                }
+                None => Seen {
+                    gadget,
+                    since: None,
+                },
+            }
+        })
+        .collect();
+    // The oldest go first when there are too many.
+    memory.sort_by_key(|m| std::cmp::Reverse(m.at));
+    memory.truncate(MAX_MEMORY);
+    seen
+}
+
 /// A charge: "85%" or a bare number, from 0 to 100. Anything else is no charge.
 fn percent(value: &Value) -> Option<u8> {
     let number = match value {
@@ -294,6 +377,133 @@ mod tests {
             .collect();
         let text = json!({ "SPBluetoothDataType": [{ "device_connected": many }] }).to_string();
         assert_eq!(parse(&text).unwrap().len(), MAX_DEVICES);
+    }
+
+    fn quiet(name: &str, kind: Kind) -> Gadget {
+        Gadget {
+            name: name.into(),
+            kind,
+            main: None,
+            left: None,
+            right: None,
+            case: None,
+        }
+    }
+
+    fn loud(name: &str, kind: Kind, main: u8) -> Gadget {
+        Gadget {
+            main: Some(main),
+            ..quiet(name, kind)
+        }
+    }
+
+    #[test]
+    fn a_charge_a_device_has_stopped_reporting_is_shown_for_a_while_with_the_time_it_was_reported()
+    {
+        let mut memory = Vec::new();
+        let first = with_memory(
+            vec![
+                loud("Cans", Kind::Headphones, 100),
+                quiet("Mouse", Kind::Mouse),
+            ],
+            &mut memory,
+            1_000,
+        );
+        assert_eq!(first[0].since, None, "what a device reports now is fresh");
+        assert_eq!(
+            first[1],
+            Seen {
+                gadget: quiet("Mouse", Kind::Mouse),
+                since: None
+            },
+            "a device that never reported has nothing to show"
+        );
+        let later = with_memory(
+            vec![quiet("Cans", Kind::Headphones), quiet("Mouse", Kind::Mouse)],
+            &mut memory,
+            1_000 + 10 * 60_000,
+        );
+        assert_eq!(later[0].gadget.main, Some(100), "it keeps what it said");
+        assert_eq!(later[0].since, Some(1_000), "and says when it said it");
+        assert_eq!(later[1].gadget.main, None);
+        let new = with_memory(
+            vec![loud("Cans", Kind::Headphones, 80)],
+            &mut memory,
+            2_000_000,
+        );
+        assert_eq!(
+            (new[0].gadget.main, new[0].since),
+            (Some(80), None),
+            "a new report replaces the old one"
+        );
+        let after = with_memory(
+            vec![quiet("Cans", Kind::Headphones)],
+            &mut memory,
+            2_000_000 + 60_000,
+        );
+        assert_eq!(
+            (after[0].gadget.main, after[0].since),
+            (Some(80), Some(2_000_000))
+        );
+    }
+
+    #[test]
+    fn a_charge_that_is_too_old_is_forgotten_and_a_different_device_does_not_inherit_one() {
+        let mut memory = Vec::new();
+        with_memory(vec![loud("Cans", Kind::Headphones, 60)], &mut memory, 0);
+        let edge = with_memory(vec![quiet("Cans", Kind::Headphones)], &mut memory, KEEP_MS);
+        assert_eq!(
+            edge[0].gadget.main,
+            Some(60),
+            "right at the limit it is still shown"
+        );
+        let past = with_memory(
+            vec![quiet("Cans", Kind::Headphones)],
+            &mut memory,
+            KEEP_MS + 1,
+        );
+        assert_eq!(
+            (past[0].gadget.main, past[0].since),
+            (None, None),
+            "past it, it is forgotten"
+        );
+        assert!(memory.is_empty(), "and no longer kept");
+        let mut memory = Vec::new();
+        with_memory(vec![loud("Cans", Kind::Headphones, 60)], &mut memory, 0);
+        let other = with_memory(
+            vec![
+                quiet("Cans", Kind::Speaker),
+                quiet("Other", Kind::Headphones),
+            ],
+            &mut memory,
+            1,
+        );
+        assert!(
+            other
+                .iter()
+                .all(|s| s.gadget.main.is_none() && s.since.is_none()),
+            "another name or kind has nothing"
+        );
+    }
+
+    #[test]
+    fn a_pair_of_earbuds_is_remembered_as_a_whole_and_the_memory_is_bounded() {
+        let mut memory = Vec::new();
+        let buds = Gadget {
+            left: Some(82),
+            right: Some(76),
+            case: Some(54),
+            ..quiet("Buds", Kind::Headphones)
+        };
+        with_memory(vec![buds.clone()], &mut memory, 5);
+        let seen = with_memory(vec![quiet("Buds", Kind::Headphones)], &mut memory, 6);
+        assert_eq!(seen[0].gadget, buds);
+        assert_eq!(seen[0].since, Some(5));
+        let many: Vec<Gadget> = (0..80)
+            .map(|i| loud(&format!("Device {i}"), Kind::Other, 50))
+            .collect();
+        with_memory(many, &mut memory, 7);
+        assert!(memory.len() <= MAX_MEMORY);
     }
 
     #[test]

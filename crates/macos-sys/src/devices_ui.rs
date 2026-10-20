@@ -13,7 +13,7 @@ use objc2_foundation::{NSMutableDictionary, NSPoint, NSRect, NSSize, NSString};
 use std::{cell::RefCell, rc::Rc};
 
 /// The size of the area the tab fills below the header.
-pub const PAGE_SIZE: NSSize = NSSize::new(580.0, 236.0);
+pub const PAGE_SIZE: NSSize = NSSize::new(580.0, 260.0);
 /// Cards in a row, and how many the page has room for.
 pub const COLUMNS: usize = 3;
 pub const MAX_CARDS: usize = 6;
@@ -21,7 +21,9 @@ pub const MAX_CARDS: usize = 6;
 const MARGIN: f64 = 24.0;
 const GAP: f64 = 10.0;
 const TOP: f64 = 16.0;
-const CARD_HEIGHT: f64 = 92.0;
+const CARD_HEIGHT: f64 = 100.0;
+/// Where the line of words under a gauge begins, below the top of a card.
+const NOTE_TOP: f64 = 80.0;
 /// The room kept at the bottom for the footer.
 const FOOTER_ROOM: f64 = 34.0;
 const INSET: f64 = 14.0;
@@ -41,9 +43,13 @@ pub struct Card {
     pub symbol: &'static str,
     pub name: String,
     pub readings: Vec<Reading>,
-    /// The words under the gauge: "Low", or that the device says nothing about its charge.
+    /// The word beside the symbol of a device that is low.
+    pub warning: String,
+    /// The words under the gauge: that the device says nothing about its charge, or when it last did.
     pub note: String,
     pub low: bool,
+    /// The charge shown is one the device reported earlier and has not repeated, so it is drawn dimmer.
+    pub stale: bool,
 }
 
 #[derive(Debug, Clone, Default, PartialEq, Eq)]
@@ -83,14 +89,19 @@ fn width_of(text: &str, attributes: &Attributes) -> f64 {
     unsafe { NSString::from_str(text).sizeWithAttributes(Some(attributes)) }.width
 }
 
-fn gauge(x: f64, top: f64, width: f64, percent: u8, low: bool, height: f64) {
+fn gauge(x: f64, top: f64, width: f64, reading: &Reading, dim: bool, height: f64) {
     let bar = NSRect::new(NSPoint::new(x, height - top - 6.0), NSSize::new(width, 6.0));
     style::fill_capsule(bar, &white(0.12));
-    let share = f64::from(percent.min(100)) / 100.0;
+    let share = f64::from(reading.percent.min(100)) / 100.0;
     // Even an empty one shows a sliver, so that the gauge is seen to be there.
     let fill = NSRect::new(bar.origin, NSSize::new((width * share).max(6.0), 6.0));
-    let tone = if low { Tone::Orange } else { Tone::Green };
-    style::fill_capsule(fill, &tone.color());
+    let tone = if reading.low {
+        Tone::Orange
+    } else {
+        Tone::Green
+    };
+    let strength = if dim { 0.45 } else { 1.0 };
+    style::fill_capsule(fill, &tone.color().colorWithAlphaComponent(strength));
 }
 
 fn paint_card(card: &Card, x: f64, top: f64, width: f64, height: f64) {
@@ -124,7 +135,7 @@ fn paint_card(card: &Card, x: f64, top: f64, width: f64, height: f64) {
             false,
         );
         put(
-            &card.note,
+            &card.warning,
             (x + INSET + 30.0, top + 18.0, inner - 30.0 - 60.0, 14.0),
             &word,
             height,
@@ -135,7 +146,7 @@ fn paint_card(card: &Card, x: f64, top: f64, width: f64, height: f64) {
         let text = format!("{}%", r.percent);
         let big = text_attributes(
             &style::digits(20.0, Weight::Semibold),
-            &white(style::TEXT),
+            &white(if card.stale { 0.62 } else { style::TEXT }),
             Fit::Clip,
             false,
         );
@@ -149,7 +160,7 @@ fn paint_card(card: &Card, x: f64, top: f64, width: f64, height: f64) {
     }
     put(
         &card.name,
-        (x + INSET, top + 42.0, inner, 16.0),
+        (x + INSET, top + 40.0, inner, 16.0),
         &attrs(12.0, Weight::Medium, style::TEXT, Fit::Tail),
         height,
     );
@@ -157,20 +168,14 @@ fn paint_card(card: &Card, x: f64, top: f64, width: f64, height: f64) {
         [] => {
             style::fill_capsule(
                 NSRect::new(
-                    NSPoint::new(x + INSET, height - top - 68.0 - 6.0),
+                    NSPoint::new(x + INSET, height - top - 62.0 - 6.0),
                     NSSize::new(inner, 6.0),
                 ),
                 &white(0.06),
             );
-            put(
-                &card.note,
-                (x + INSET, top + 76.0, inner, 13.0),
-                &attrs(10.5, Weight::Regular, style::TEXT_TERTIARY, Fit::Tail),
-                height,
-            );
         }
         [only] if only.label.is_empty() => {
-            gauge(x + INSET, top + 68.0, inner, only.percent, only.low, height);
+            gauge(x + INSET, top + 62.0, inner, only, card.stale, height);
         }
         parts => {
             // Earbuds: a small gauge for each part with its label and figure above it.
@@ -184,10 +189,18 @@ fn paint_card(card: &Card, x: f64, top: f64, width: f64, height: f64) {
                 } else {
                     format!("{} {}%", r.label, r.percent)
                 };
-                put(&label, (px, top + 60.0, each, 12.0), &small, height);
-                gauge(px, top + 74.0, each, r.percent, r.low, height);
+                put(&label, (px, top + 58.0, each, 11.0), &small, height);
+                gauge(px, top + 70.0, each, r, card.stale, height);
             }
         }
+    }
+    if !card.note.is_empty() {
+        put(
+            &card.note,
+            (x + INSET, top + NOTE_TOP, inner, 13.0),
+            &attrs(10.5, Weight::Regular, style::TEXT_TERTIARY, Fit::Tail),
+            height,
+        );
     }
 }
 

@@ -14,7 +14,7 @@ use crate::{
     settings::model::Fault,
     trace,
 };
-use logic::{Gadget, Kind, LOW_AT, parse};
+use logic::{Gadget, Kind, LOW_AT, Memory, Seen, parse, with_memory};
 use macos_sys::{
     app,
     devices_ui::{Card, DevicesDisplay, DevicesView, MAX_CARDS, PAGE_SIZE, Reading},
@@ -77,7 +77,7 @@ enum Known {
     /// Nothing yet: the first look is on its way.
     Nothing,
     Read {
-        gadgets: Vec<Gadget>,
+        gadgets: Vec<Seen>,
         /// Milliseconds since 1970.
         at: i64,
     },
@@ -93,6 +93,8 @@ pub struct Feature {
     view: Rc<DevicesView>,
     config: RefCell<Config>,
     known: RefCell<Known>,
+    /// What each device last said about its charge, for those that say it only now and then. Kept in memory only.
+    memory: RefCell<Vec<Memory>>,
     busy: Cell<bool>,
     /// Bumped by every look and when the feature is switched off; an answer that finds another number is not wanted.
     generation: Cell<u64>,
@@ -109,6 +111,7 @@ pub fn attach(env: &AttachEnv) -> Option<Rc<Feature>> {
         view: Rc::clone(&view),
         config: RefCell::new(env.config.devices.clone().sanitized()),
         known: RefCell::new(Known::Nothing),
+        memory: RefCell::default(),
         busy: Cell::new(false),
         generation: Cell::new(0),
         ticker: RefCell::default(),
@@ -145,6 +148,7 @@ impl Feature {
             self.generation.set(self.generation.get() + 1);
             self.busy.set(false);
             *self.known.borrow_mut() = Known::Nothing;
+            self.memory.borrow_mut().clear();
             self.ticker.borrow_mut().take();
         }
         if !was.enabled && config.enabled && self.showing.get() {
@@ -213,8 +217,11 @@ impl Feature {
             )),
             Err(problem) => trace::log(&format!("devices: could not read ({problem:?})")),
         }
+        let now = now_ms();
+        let outcome =
+            outcome.map(|gadgets| with_memory(gadgets, &mut self.memory.borrow_mut(), now));
         let old = self.known.replace(Known::Nothing);
-        *self.known.borrow_mut() = learn(old, outcome, now_ms());
+        *self.known.borrow_mut() = learn(old, outcome, now);
         self.render();
     }
 
@@ -233,7 +240,7 @@ impl Feature {
 
 /// What is known once an answer has arrived. A failure never takes away what was read before: the time it was read at
 /// says how old it is.
-fn learn(known: Known, outcome: Result<Vec<Gadget>, Problem>, now: i64) -> Known {
+fn learn(known: Known, outcome: Result<Vec<Seen>, Problem>, now: i64) -> Known {
     match (outcome, known) {
         (Ok(gadgets), _) => Known::Read { gadgets, at: now },
         (Err(_), old @ Known::Read { .. }) => old,
@@ -254,7 +261,8 @@ fn symbol_of(kind: Kind) -> &'static str {
     }
 }
 
-fn card(language: Language, gadget: &Gadget, low_at: u8) -> Card {
+fn card(language: Language, seen: &Seen, low_at: u8, now: i64) -> Card {
+    let gadget = &seen.gadget;
     let low = |percent: u8| percent <= low_at;
     let mut readings = Vec::new();
     for (label, percent, counts) in [
@@ -272,19 +280,23 @@ fn card(language: Language, gadget: &Gadget, low_at: u8) -> Card {
         }
     }
     let is_low = gadget.lowest().is_some_and(low);
+    let note = match seen.since {
+        Some(at) => language.devices_remembered(&ago(language, now, at)),
+        None if !gadget.reports_a_charge() => language.devices_silent().to_owned(),
+        None => String::new(),
+    };
     Card {
         symbol: symbol_of(gadget.kind),
         name: gadget.name.clone(),
-        note: if is_low {
-            language.devices_low()
-        } else if !gadget.reports_a_charge() {
-            language.devices_silent()
+        warning: if is_low {
+            language.devices_low().to_owned()
         } else {
-            ""
-        }
-        .to_owned(),
+            String::new()
+        },
+        note,
         readings,
         low: is_low,
+        stale: seen.since.is_some(),
     }
 }
 
@@ -310,7 +322,7 @@ fn display(language: Language, config: &Config, known: &Known, now: i64) -> Devi
             cards: gadgets
                 .iter()
                 .take(MAX_CARDS)
-                .map(|g| card(language, g, config.low_at))
+                .map(|g| card(language, g, config.low_at, now))
                 .collect(),
             footer: language.devices_footer(
                 &ago(language, now, *at),
@@ -326,6 +338,8 @@ mod tests {
     use super::*;
 
     const LANGUAGES: [Language; 2] = [Language::English, Language::Vietnamese];
+    /// The moment of every look in these tests, in milliseconds.
+    const NOW: i64 = 1_000_000;
 
     fn gadget(name: &str, kind: Kind, main: Option<u8>) -> Gadget {
         Gadget {
@@ -338,10 +352,17 @@ mod tests {
         }
     }
 
+    fn seen(gadget: Gadget) -> Seen {
+        Seen {
+            gadget,
+            since: None,
+        }
+    }
+
     fn read(gadgets: Vec<Gadget>) -> Known {
         Known::Read {
-            gadgets,
-            at: 1_000_000,
+            gadgets: gadgets.into_iter().map(seen).collect(),
+            at: NOW,
         }
     }
 
@@ -385,10 +406,21 @@ mod tests {
     #[test]
     fn a_card_shows_the_charge_a_device_reports_and_says_so_when_it_reports_none() {
         for language in LANGUAGES {
-            let full = card(language, &gadget("Cans", Kind::Headphones, Some(100)), 20);
+            let full = card(
+                language,
+                &seen(gadget("Cans", Kind::Headphones, Some(100))),
+                20,
+                NOW,
+            );
             assert_eq!(
-                (full.low, full.note.as_str(), full.symbol),
-                (false, "", "headphones")
+                (
+                    full.low,
+                    full.note.as_str(),
+                    full.warning.as_str(),
+                    full.symbol,
+                    full.stale
+                ),
+                (false, "", "", "headphones", false)
             );
             assert_eq!(
                 full.readings,
@@ -398,8 +430,8 @@ mod tests {
                     low: false
                 }]
             );
-            let silent = card(language, &gadget("Mouse", Kind::Mouse, None), 20);
-            assert!(silent.readings.is_empty() && !silent.low);
+            let silent = card(language, &seen(gadget("Mouse", Kind::Mouse, None)), 20, NOW);
+            assert!(silent.readings.is_empty() && !silent.low && !silent.stale);
             assert_eq!(silent.note, language.devices_silent());
         }
     }
@@ -408,12 +440,22 @@ mod tests {
     fn a_device_is_low_at_and_under_the_level_and_the_card_says_so_in_words() {
         for language in LANGUAGES {
             for (percent, low) in [(0, true), (19, true), (20, true), (21, false), (100, false)] {
-                let card = card(language, &gadget("Mouse", Kind::Mouse, Some(percent)), 20);
+                let card = card(
+                    language,
+                    &seen(gadget("Mouse", Kind::Mouse, Some(percent))),
+                    20,
+                    NOW,
+                );
                 assert_eq!(card.low, low, "{percent}");
-                assert_eq!(card.note == language.devices_low(), low, "{percent}");
+                assert_eq!(card.warning == language.devices_low(), low, "{percent}");
                 assert_eq!(card.readings[0].low, low, "{percent}");
             }
-            let at_ten = card(language, &gadget("Mouse", Kind::Mouse, Some(15)), 10);
+            let at_ten = card(
+                language,
+                &seen(gadget("Mouse", Kind::Mouse, Some(15))),
+                10,
+                NOW,
+            );
             assert!(!at_ten.low, "the level is the person's to choose");
         }
     }
@@ -424,17 +466,17 @@ mod tests {
         buds.left = Some(80);
         buds.right = Some(12);
         buds.case = Some(3);
-        let card = card(Language::English, &buds, 20);
-        let labels: Vec<&str> = card.readings.iter().map(|r| r.label.as_str()).collect();
+        let low = card(Language::English, &seen(buds.clone()), 20, NOW);
+        let labels: Vec<&str> = low.readings.iter().map(|r| r.label.as_str()).collect();
         assert_eq!(labels, ["L", "R", "Case"]);
-        assert!(card.low, "one bud is low");
+        assert!(low.low, "one bud is low");
         assert_eq!(
-            card.readings.iter().map(|r| r.low).collect::<Vec<_>>(),
+            low.readings.iter().map(|r| r.low).collect::<Vec<_>>(),
             [false, true, false],
             "the case is never marked"
         );
         buds.right = Some(70);
-        let fine = super::card(Language::English, &buds, 20);
+        let fine = card(Language::English, &seen(buds), 20, NOW);
         assert!(
             !fine.low,
             "a case that is nearly flat does not make earbuds low"
@@ -443,8 +485,34 @@ mod tests {
     }
 
     #[test]
+    fn a_remembered_charge_is_drawn_as_old_and_says_when_it_was_reported() {
+        let remembered = Seen {
+            gadget: gadget("Cans", Kind::Headphones, Some(100)),
+            since: Some(NOW - 12 * 60_000),
+        };
+        let en = card(Language::English, &remembered, 20, NOW);
+        assert!(en.stale);
+        assert_eq!(en.note, "Reported 12 minutes ago");
+        assert_eq!(
+            en.readings[0].percent, 100,
+            "the charge itself is still shown"
+        );
+        let vi = card(Language::Vietnamese, &remembered, 20, NOW);
+        assert!(vi.note.starts_with("Báo lần cuối "), "{}", vi.note);
+        let low = Seen {
+            gadget: gadget("Cans", Kind::Headphones, Some(9)),
+            since: Some(NOW - 60_000),
+        };
+        let low = card(Language::English, &low, 20, NOW);
+        assert!(
+            low.low && low.stale && low.warning == "Low",
+            "an old charge that was low still warns"
+        );
+    }
+
+    #[test]
     fn what_is_known_decides_what_the_tab_says_in_both_languages() {
-        let now = 1_000_000 + 5_000;
+        let now = NOW + 5_000;
         for language in LANGUAGES {
             let config = Config::default();
             let looking = display(language, &config, &Known::Nothing, now);
@@ -469,19 +537,14 @@ mod tests {
         let many: Vec<Gadget> = (0..8)
             .map(|i| gadget(&format!("Mouse {i}"), Kind::Mouse, Some(50)))
             .collect();
-        let shown = display(
-            Language::English,
-            &Config::default(),
-            &read(many),
-            1_000_000,
-        );
+        let shown = display(Language::English, &Config::default(), &read(many), NOW);
         assert_eq!(shown.cards.len(), MAX_CARDS);
         assert_eq!(shown.footer, "Updated just now. 2 more not shown.");
         let vi = display(
             Language::Vietnamese,
             &Config::default(),
             &read(vec![gadget("A", Kind::Mouse, None); 7]),
-            1_000_000,
+            NOW,
         );
         assert!(
             vi.footer.ends_with("1 thiết bị nữa không hiện."),
@@ -539,6 +602,7 @@ mod tests {
             ] {
                 assert!(!text.is_empty());
             }
+            assert!(language.devices_remembered("5 min").contains("5 min"));
         }
         for kind in [
             Kind::Headphones,

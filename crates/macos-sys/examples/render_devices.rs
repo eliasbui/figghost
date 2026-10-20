@@ -18,13 +18,22 @@ fn reading(label: &str, percent: u8, low: bool) -> Reading {
     }
 }
 
-fn card(symbol: &'static str, name: &str, readings: Vec<Reading>, note: &str) -> Card {
+fn card(
+    symbol: &'static str,
+    name: &str,
+    readings: Vec<Reading>,
+    warning: &str,
+    note: &str,
+    stale: bool,
+) -> Card {
     Card {
         symbol,
         name: name.to_owned(),
         low: readings.iter().any(|r| r.low),
         readings,
+        warning: warning.to_owned(),
         note: note.to_owned(),
+        stale,
     }
 }
 
@@ -36,18 +45,24 @@ fn scene(vi: bool, count: usize) -> DevicesDisplay {
             t("Sample Headphones", "Tai nghe mẫu"),
             vec![reading("", 100, false)],
             "",
+            "",
+            false,
         ),
         card(
             "computermouse.fill",
             t("Sample Mouse", "Chuột mẫu"),
             vec![reading("", 18, true)],
             t("Low", "Pin yếu"),
+            "",
+            false,
         ),
         card(
             "keyboard",
             t("Sample Keyboard", "Bàn phím mẫu"),
             vec![reading("", 64, false)],
             "",
+            "",
+            false,
         ),
         card(
             "headphones",
@@ -58,18 +73,24 @@ fn scene(vi: bool, count: usize) -> DevicesDisplay {
                 reading(t("Case", "Hộp"), 54, false),
             ],
             "",
+            "",
+            false,
         ),
         card(
             "hifispeaker.fill",
             t("Sample Speaker", "Loa mẫu"),
             vec![],
+            "",
             t("Does not report a charge", "Không báo mức pin"),
+            false,
         ),
         card(
-            "gamecontroller.fill",
-            t("Sample Controller", "Tay cầm mẫu"),
-            vec![reading("", 9, true)],
-            t("Low", "Pin yếu"),
+            "headphones",
+            t("Sample Headset", "Tai nghe chụp mẫu"),
+            vec![reading("", 100, false)],
+            "",
+            t("Reported 12 minutes ago", "Báo lần cuối 12 phút trước"),
+            true,
         ),
     ];
     DevicesDisplay {
