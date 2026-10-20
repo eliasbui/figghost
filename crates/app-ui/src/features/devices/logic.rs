@@ -159,7 +159,13 @@ fn percent(value: &Value) -> Option<u8> {
 fn clean_name(name: &str) -> String {
     let single: String = name
         .chars()
-        .map(|c| if c.is_control() { ' ' } else { c })
+        .map(|c| {
+            if crate::features::is_hidden_char(c) {
+                ' '
+            } else {
+                c
+            }
+        })
         .collect::<String>()
         .split_whitespace()
         .collect::<Vec<_>>()
@@ -340,6 +346,11 @@ mod tests {
         assert_eq!(clean_name("  Sam's \t\n Mouse  "), "Sam's Mouse");
         assert_eq!(clean_name("a\u{7}b\u{1b}[31mc"), "a b [31mc");
         assert_eq!(clean_name("   "), "");
+        assert_eq!(
+            clean_name("Pay\u{202E}fdp.exe"),
+            "Pay fdp.exe",
+            "a character that changes the direction of text is not kept"
+        );
         let long = "ệ".repeat(100);
         assert_eq!(clean_name(&long).chars().count(), MAX_NAME_CHARS);
         let text = json!({ "SPBluetoothDataType": [{ "device_connected": [

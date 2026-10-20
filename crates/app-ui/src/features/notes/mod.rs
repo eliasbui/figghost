@@ -251,6 +251,11 @@ impl Feature {
 
     /// The person typed: remember it, show the new title, and write it a moment after the last key.
     fn edited(&self, text: &str) {
+        // A note holds no more than a note may. What was pasted past that is not kept, and is taken off the screen too,
+        // so that what is shown is what is saved.
+        if logic::count(text) > logic::MAX_CHARS {
+            self.view.set_text(&logic::clipped(text));
+        }
         self.notes.borrow_mut().edit(text, now_ms());
         self.render(false);
         let epoch = self.epoch.get() + 1;

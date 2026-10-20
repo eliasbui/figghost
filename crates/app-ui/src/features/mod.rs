@@ -12,10 +12,12 @@ use serde_json::{Map, Value};
 use std::{
     collections::HashMap,
     fs,
-    io::{self, Read},
-    path::Path,
+    io::{self, Read, Write},
+    os::unix::process::CommandExt,
+    path::{Path, PathBuf},
     process::{Command, Stdio},
     rc::{Rc, Weak},
+    sync::{Arc, Mutex, PoisonError, mpsc},
     time::{Duration, Instant},
 };
 
@@ -48,7 +50,7 @@ pub mod wheel;
 
 /// The tabs of the notch that have a place in the strip only while their feature is on, so that a tab which would only
 /// say "this is off" is not there to be opened. Each follows the `enabled` of its own feature.
-const OPT_IN_TABS: [&str; 9] = [
+pub(crate) const OPT_IN_TABS: [&str; 9] = [
     "notes",
     "launcher",
     "weather",
@@ -76,17 +78,66 @@ pub fn tab_waits(id: &str, config: &Config) -> bool {
     }
 }
 
-/// Writes `text` to `path` through a file of its own and then renames it over the target, so that a crash or a full
-/// disk never leaves half of what was there.
+/// Whether a character may not stand in a name that is shown or compared: a control character, and the characters that
+/// change the direction of text or take no room, with which a name such as `invoice` followed by U+202E and `gpj.exe`
+/// is made to read as another.
+pub(crate) fn is_hidden_char(c: char) -> bool {
+    c.is_control()
+        || matches!(
+            c,
+            '\u{200B}'
+                | '\u{200E}'
+                | '\u{200F}'
+                | '\u{2028}'
+                | '\u{2029}'
+                | '\u{202A}'..='\u{202E}'
+                | '\u{2060}'
+                | '\u{2066}'..='\u{2069}'
+                | '\u{FEFF}'
+                | '\u{061C}'
+        )
+}
+
+/// The most a file of ours holds that is read whole: what the tallies and the statistics keep is small, so a longer
+/// file was written by something else.
+pub(crate) const MAX_FILE: u64 = 1 << 20;
+
+/// The text of a file no longer than `max` bytes; `None` for one that is missing, too long or not text.
+pub(crate) fn read_small(path: &Path, max: u64) -> Option<String> {
+    let mut text = String::new();
+    fs::File::open(path)
+        .ok()?
+        .take(max + 1)
+        .read_to_string(&mut text)
+        .ok()?;
+    (text.len() as u64 <= max).then_some(text)
+}
+
+/// Writes `text` to `path` through a file of its own (`<name>.part`, made new so that a link left at that name is not
+/// followed, and flushed to the disk) and then renames it over the target, so that a crash or a full disk never leaves
+/// half of what was there, nor an empty file after a power cut.
 pub(crate) fn write_atomically(path: &Path, text: &str) -> io::Result<()> {
     if let Some(dir) = path.parent() {
         fs::create_dir_all(dir)?;
     }
-    let partial = path.with_extension("json.part");
-    fs::write(&partial, text)?;
-    fs::rename(&partial, path).inspect_err(|_| {
-        let _ = fs::remove_file(&partial);
-    })
+    let mut name = path.as_os_str().to_owned();
+    name.push(".part");
+    let partial = PathBuf::from(name);
+    // What stands at that name, a leftover of a crash or a link somebody put there, goes first.
+    let _ = fs::remove_file(&partial);
+    let written = fs::OpenOptions::new()
+        .write(true)
+        .create_new(true)
+        .open(&partial)
+        .and_then(|mut file| {
+            file.write_all(text.as_bytes())?;
+            file.sync_all()
+        });
+    written
+        .and_then(|()| fs::rename(&partial, path))
+        .inspect_err(|_| {
+            let _ = fs::remove_file(&partial);
+        })
 }
 
 /// Why a command gave no answer.
@@ -98,8 +149,15 @@ pub(crate) enum Ran {
     Failed,
 }
 
-/// Runs a command and gives back what it printed, if it finishes within `seconds`; otherwise stops it. What it
-/// prints is read as it comes, so that a command with much to say does not wait for a reader that is not there.
+/// The most a command may print before it is cut off.
+const MAX_OUTPUT: usize = 1 << 20;
+/// After a command has finished, how long what it printed is waited for: something it started may still hold the
+/// output open, and is stopped if it does not let go.
+const DRAIN: Duration = Duration::from_secs(2);
+
+/// Runs a command and gives back what it printed, if it finishes within `seconds`; otherwise stops it, and what it
+/// started with it. What it prints is read as it comes, so that a command with much to say does not wait for a reader
+/// that is not there.
 pub(crate) fn run_bounded(program: &str, args: &[&str], seconds: u64) -> Result<String, Ran> {
     run_bounded_with(program, args, &[], seconds)
 }
@@ -117,21 +175,51 @@ pub(crate) fn run_bounded_with(
         .stdin(Stdio::null())
         .stdout(Stdio::piped())
         .stderr(Stdio::null())
+        // A group of its own, so that what it starts can be stopped with it.
+        .process_group(0)
         .spawn()
         .map_err(|_| Ran::Failed)?;
+    let group = child.id();
+    let stop_group = move || macos_sys::process::kill_group(group);
     let mut stdout = child.stdout.take().ok_or(Ran::Failed)?;
-    let reader = std::thread::spawn(move || {
-        let mut text = Vec::new();
-        let _ = stdout.by_ref().take(1 << 20).read_to_end(&mut text);
-        text
+    let text = Arc::new(Mutex::new(Vec::<u8>::new()));
+    // Told, when the reading is over, whether it stopped because there was too much.
+    let (over, finished) = mpsc::channel::<bool>();
+    let reading = Arc::clone(&text);
+    std::thread::spawn(move || {
+        let mut chunk = [0u8; 8192];
+        let too_much = loop {
+            match stdout.read(&mut chunk) {
+                Ok(0) => break false,
+                Ok(n) => {
+                    let mut all = reading.lock().unwrap_or_else(PoisonError::into_inner);
+                    all.extend_from_slice(&chunk[..n]);
+                    if all.len() > MAX_OUTPUT {
+                        break true;
+                    }
+                }
+                Err(e) if e.kind() == io::ErrorKind::Interrupted => {}
+                Err(_) => break false,
+            }
+        };
+        // Letting go of the pipe here is what makes a command that is still printing fail instead of wait.
+        drop(stdout);
+        let _ = over.send(too_much);
     });
     let deadline = Instant::now() + Duration::from_secs(seconds);
     loop {
         match child.try_wait() {
             Ok(Some(status)) => {
-                let text = reader.join().unwrap_or_default();
-                return if status.success() {
-                    Ok(String::from_utf8_lossy(&text).into_owned())
+                let too_much = match finished.recv_timeout(DRAIN) {
+                    Ok(too_much) => too_much,
+                    Err(_) => {
+                        stop_group();
+                        false
+                    }
+                };
+                let printed = text.lock().unwrap_or_else(PoisonError::into_inner).clone();
+                return if status.success() && !too_much {
+                    Ok(String::from_utf8_lossy(&printed).into_owned())
                 } else {
                     Err(Ran::Failed)
                 };
@@ -140,6 +228,7 @@ pub(crate) fn run_bounded_with(
                 std::thread::sleep(Duration::from_millis(40));
             }
             Ok(None) => {
+                stop_group();
                 let _ = child.kill();
                 let _ = child.wait();
                 return Err(Ran::Slow);
@@ -973,6 +1062,100 @@ pub fn set_shortcut(
 mod tests {
     use super::*;
     use crate::config::parse_hotkey;
+
+    #[test]
+    fn what_a_command_leaves_running_does_not_hold_up_its_answer_and_is_stopped() {
+        let started = Instant::now();
+        // The shell prints and leaves, but the sleep it started still holds the output open.
+        let answer = run_bounded("/bin/sh", &["-c", "sleep 31 & echo hi"], 20);
+        assert_eq!(answer, Ok("hi\n".to_owned()));
+        assert!(
+            started.elapsed() < Duration::from_secs(8),
+            "its answer was not waited for until the sleep ended"
+        );
+        let running = || {
+            Command::new("/usr/bin/pgrep")
+                .args(["-f", "sleep 31"])
+                .output()
+                .is_ok_and(|out| out.status.success())
+        };
+        let gone = (0..20).any(|_| {
+            std::thread::sleep(Duration::from_millis(100));
+            !running()
+        });
+        assert!(gone, "what the command started was stopped with it");
+    }
+
+    #[test]
+    fn a_file_is_written_whole_over_the_old_one_and_a_link_at_the_working_name_is_not_followed() {
+        let dir = std::env::temp_dir().join(format!("figghost-atomic-{}", std::process::id()));
+        let _ = fs::remove_dir_all(&dir);
+        let file = dir.join("deeper/tally.json");
+        write_atomically(&file, "first").unwrap();
+        assert_eq!(
+            fs::read_to_string(&file).unwrap(),
+            "first",
+            "the folders are made"
+        );
+        write_atomically(&file, "second").unwrap();
+        assert_eq!(
+            fs::read_to_string(&file).unwrap(),
+            "second",
+            "it replaces what was there"
+        );
+        assert!(
+            !dir.join("deeper/tally.json.part").exists(),
+            "no half-written file is left"
+        );
+        // A link left where the working file goes would send the write somewhere else if it were followed.
+        let elsewhere = dir.join("elsewhere.txt");
+        fs::write(&elsewhere, "untouched").unwrap();
+        std::os::unix::fs::symlink(&elsewhere, dir.join("deeper/tally.json.part")).unwrap();
+        write_atomically(&file, "third").unwrap();
+        assert_eq!(fs::read_to_string(&file).unwrap(), "third");
+        assert_eq!(fs::read_to_string(&elsewhere).unwrap(), "untouched");
+        fs::remove_dir_all(&dir).unwrap();
+    }
+
+    #[test]
+    fn a_file_is_read_whole_only_when_it_is_small_text() {
+        let dir = std::env::temp_dir().join(format!("figghost-small-{}", std::process::id()));
+        let _ = fs::remove_dir_all(&dir);
+        fs::create_dir_all(&dir).unwrap();
+        fs::write(dir.join("small"), "hello").unwrap();
+        fs::write(dir.join("exact"), "x".repeat(100)).unwrap();
+        fs::write(dir.join("long"), "x".repeat(101)).unwrap();
+        fs::write(dir.join("binary"), [0xff, 0xfe, 0x00]).unwrap();
+        assert_eq!(
+            read_small(&dir.join("small"), 100).as_deref(),
+            Some("hello")
+        );
+        assert_eq!(
+            read_small(&dir.join("exact"), 100).map(|t| t.len()),
+            Some(100)
+        );
+        assert_eq!(
+            read_small(&dir.join("long"), 100),
+            None,
+            "one byte over is too long"
+        );
+        assert_eq!(read_small(&dir.join("binary"), 100), None, "not text");
+        assert_eq!(read_small(&dir.join("missing"), 100), None);
+        fs::remove_dir_all(&dir).unwrap();
+    }
+
+    #[test]
+    fn characters_that_make_a_name_read_as_another_are_hidden_and_ordinary_ones_are_not() {
+        for hidden in [
+            '\u{202E}', '\u{202A}', '\u{2066}', '\u{2069}', '\u{200B}', '\u{200E}', '\u{FEFF}',
+            '\u{2028}', '\u{7}', '\n',
+        ] {
+            assert!(is_hidden_char(hidden), "{hidden:?}");
+        }
+        for shown in ['a', ' ', 'ệ', '-', '日', '\u{200D}', '\u{200C}'] {
+            assert!(!is_hidden_char(shown), "{shown:?}");
+        }
+    }
 
     #[test]
     fn the_tab_of_a_feature_waits_for_it_to_be_switched_on() {

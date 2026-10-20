@@ -806,7 +806,7 @@ mod tests {
             ..Config::default()
         }
         .sanitized();
-        assert_eq!(config.awake_minutes, 0);
+        assert_eq!(config.awake_minutes, 60);
         assert_eq!(config.snooze_minutes, 30);
         assert!(config.snooze_shortcut.is_empty());
         assert_eq!(config.lock_seconds, logic::LOCK_SECONDS.0);

@@ -1,11 +1,17 @@
 //! Output volume and mute of the default output device, and the mute of the microphone, through CoreAudio.
 //! Every call is safe from any thread, so the event tap can use them directly.
 
+use block2::RcBlock;
+use objc2_app_kit::NSApplicationWillTerminateNotification;
+use objc2_foundation::{NSNotification, NSNotificationCenter};
 use std::{
     ffi::c_void,
     mem::size_of,
-    ptr,
-    sync::atomic::{AtomicU32, Ordering},
+    ptr::{self, NonNull},
+    sync::{
+        Once,
+        atomic::{AtomicBool, AtomicU32, Ordering},
+    },
 };
 
 type ObjectId = u32;
@@ -253,8 +259,47 @@ pub fn microphone_muted() -> Option<bool> {
     })
 }
 
-/// Mutes or unmutes the default input device. False when it cannot be done.
+/// Set while this app is the one that muted the microphone.
+static MUTED_BY_US: AtomicBool = AtomicBool::new(false);
+
+/// Gives the microphone back when the app quits. Nothing else on the Mac has a switch for it, so a microphone left muted
+/// by an app that is gone would stay silent with no way to find out why. A crash or a kill leaves it as it was.
+fn unmute_at_quit() {
+    static ONCE: Once = Once::new();
+    ONCE.call_once(|| {
+        let block = RcBlock::new(|_: NonNull<NSNotification>| {
+            if MUTED_BY_US.swap(false, Ordering::Relaxed) {
+                set_microphone_muted(false);
+            }
+        });
+        // SAFETY: the block is 'static and the notification is posted on the main thread; the observer lives as long as
+        // the process, so it is leaked on purpose.
+        let observer = unsafe {
+            NSNotificationCenter::defaultCenter().addObserverForName_object_queue_usingBlock(
+                Some(NSApplicationWillTerminateNotification),
+                None,
+                None,
+                &block,
+            )
+        };
+        std::mem::forget(observer);
+    });
+}
+
+/// Mutes or unmutes the default input device. False when it cannot be done. A microphone this app has muted is
+/// unmuted when the app quits.
 pub fn set_microphone_muted(muted: bool) -> bool {
+    let done = change_microphone(muted);
+    if done {
+        MUTED_BY_US.store(muted, Ordering::Relaxed);
+        if muted {
+            unmute_at_quit();
+        }
+    }
+    done
+}
+
+fn change_microphone(muted: bool) -> bool {
     let Some(device) = default_input() else {
         return false;
     };

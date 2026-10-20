@@ -40,7 +40,10 @@ pub struct Item {
 }
 
 fn tidy(text: &str, max: usize) -> String {
-    let clean: String = text.chars().filter(|c| !c.is_control()).collect();
+    let clean: String = text
+        .chars()
+        .filter(|c| !crate::features::is_hidden_char(*c))
+        .collect();
     clean.trim().chars().take(max).collect()
 }
 
@@ -60,8 +63,9 @@ impl Item {
         let target = match self.kind {
             Kind::App => self.target.trim().to_owned(),
             Kind::Folder => tidy(&self.target, MAX_TARGET),
-            // A name that begins with a hyphen would be read as an option of the command that runs it.
-            Kind::Shortcut => tidy(&self.target, MAX_NAME),
+            // A name that begins with a hyphen would be read as an option of the command that runs it. It is kept whole,
+            // since a Shortcut is run by its name and a name that was cut would run nothing, or another one.
+            Kind::Shortcut => tidy(&self.target, MAX_TARGET),
         };
         let valid = match self.kind {
             Kind::App => is_bundle_id(&target),
@@ -73,14 +77,16 @@ impl Item {
         }
         let mut name = tidy(&self.name, MAX_NAME);
         if name.is_empty() {
-            name = match self.kind {
-                Kind::Folder => target
-                    .rsplit('/')
-                    .find(|part| !part.is_empty())
-                    .unwrap_or(&target)
-                    .to_owned(),
-                _ => target.clone(),
-            };
+            name = tidy(
+                match self.kind {
+                    Kind::Folder => target
+                        .rsplit('/')
+                        .find(|part| !part.is_empty())
+                        .unwrap_or(&target),
+                    _ => &target,
+                },
+                MAX_NAME,
+            );
         }
         Some(Self {
             kind: self.kind,
@@ -170,7 +176,7 @@ pub fn shift(items: &mut [Item], index: usize, earlier: bool) -> bool {
 pub fn shortcut_names(output: &str) -> Vec<String> {
     let mut names: Vec<String> = Vec::new();
     for line in output.lines() {
-        let name = tidy(line, MAX_NAME);
+        let name = tidy(line, MAX_TARGET);
         if !name.is_empty() && !name.starts_with('-') && !names.contains(&name) {
             names.push(name);
         }
@@ -256,7 +262,27 @@ mod tests {
         };
         let kept = long.sanitized().unwrap();
         assert_eq!(kept.name.chars().count(), 60);
-        assert_eq!(kept.target.chars().count(), 60);
+        assert_eq!(
+            kept.target.chars().count(),
+            300,
+            "the target is what runs, so it is not cut to the tile's width"
+        );
+        let huge = Item {
+            kind: Kind::Shortcut,
+            target: "x".repeat(900),
+            name: String::new(),
+        };
+        let kept = huge.sanitized().unwrap();
+        assert_eq!(
+            kept.target.chars().count(),
+            MAX_TARGET,
+            "but it has a limit"
+        );
+        assert_eq!(
+            kept.name.chars().count(),
+            60,
+            "a name taken from the target is cut to the tile's width"
+        );
     }
 
     #[test]
@@ -329,6 +355,43 @@ mod tests {
         assert!(remove(&mut items, 0));
         assert_eq!(items.len(), 2);
         assert!(!remove(&mut items, 5));
+    }
+
+    #[test]
+    fn a_shortcut_with_a_long_name_is_kept_whole_so_that_it_can_still_run() {
+        let long = "A".repeat(80);
+        let item = Item {
+            kind: Kind::Shortcut,
+            target: long.clone(),
+            name: String::new(),
+        }
+        .sanitized()
+        .unwrap();
+        assert_eq!(
+            item.target, long,
+            "a name that was cut would run nothing, or another Shortcut"
+        );
+        assert_eq!(
+            item.name.chars().count(),
+            MAX_NAME,
+            "only what the tile says is cut"
+        );
+        assert_eq!(shortcut_names(&format!("{long}\n")), [long]);
+    }
+
+    #[test]
+    fn what_would_make_a_name_read_as_another_is_taken_out_of_it() {
+        let item = Item {
+            kind: Kind::Shortcut,
+            target: "Pay\u{202E}fdp.exe".into(),
+            name: "Pay\u{2066}ment".into(),
+        }
+        .sanitized()
+        .unwrap();
+        assert_eq!(
+            (item.target.as_str(), item.name.as_str()),
+            ("Payfdp.exe", "Payment")
+        );
     }
 
     #[test]

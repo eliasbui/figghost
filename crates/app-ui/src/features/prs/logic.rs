@@ -35,7 +35,13 @@ pub struct Request {
 fn tidy(text: &str, max: usize) -> String {
     let kept: String = text
         .chars()
-        .map(|c| if c.is_control() { ' ' } else { c })
+        .map(|c| {
+            if crate::features::is_hidden_char(c) {
+                ' '
+            } else {
+                c
+            }
+        })
         .collect();
     kept.split_whitespace()
         .collect::<Vec<_>>()

@@ -38,20 +38,35 @@ pub fn overall(loads: &[f64]) -> f64 {
     }
 }
 
+/// The fastest a Mac's network can plausibly move, in bytes a second (a ten gigabit line is 1.25 GB/s). A counter that
+/// jumped by more than that in the time between two readings was reset, as when an interface goes down and up, and is
+/// not traffic.
+// shortcut: a counter reset from near the top of its range looks like a wrap and is still counted; tell them apart with
+// the interface's own 64 bit counters if that is ever seen.
+const MOST_PLAUSIBLE: f64 = 2.0e9;
+
 /// Bytes received and sent per second, from two readings of the interfaces taken `seconds` apart. Only an interface
 /// that is in both counts, and each one's counter is differenced on its own, since each wraps on its own.
 pub fn rates(before: &[Interface], after: &[Interface], seconds: f64) -> (f64, f64) {
     if seconds <= 0.0 {
         return (0.0, 0.0);
     }
-    let (mut down, mut up) = (0u64, 0u64);
+    let step = |now: u32, then: u32| {
+        let bytes = f64::from(now.wrapping_sub(then));
+        if bytes / seconds > MOST_PLAUSIBLE {
+            0.0
+        } else {
+            bytes
+        }
+    };
+    let (mut down, mut up) = (0.0, 0.0);
     for now in after {
         if let Some(then) = before.iter().find(|i| i.name == now.name) {
-            down += u64::from(now.received.wrapping_sub(then.received));
-            up += u64::from(now.sent.wrapping_sub(then.sent));
+            down += step(now.received, then.received);
+            up += step(now.sent, then.sent);
         }
     }
-    (down as f64 / seconds, up as f64 / seconds)
+    (down / seconds, up / seconds)
 }
 
 /// The last readings of something, oldest first, up to a capacity.
@@ -193,6 +208,25 @@ mod tests {
         let before = [interface("en0", u32::MAX - 99, 0)];
         let after = [interface("en0", 100, 0)];
         assert_eq!(rates(&before, &after, 1.0).0, 200.0);
+    }
+
+    #[test]
+    fn a_counter_that_was_reset_is_not_taken_for_traffic() {
+        // The interface went down and up: the counter fell from 5,000 to 10, which as a wrap would be 4 GB.
+        let before = [interface("en0", 5_000, 5_000), interface("en1", 100, 100)];
+        let after = [interface("en0", 10, 10), interface("en1", 600, 700)];
+        assert_eq!(
+            rates(&before, &after, 1.0),
+            (500.0, 600.0),
+            "only the interface that kept counting counts"
+        );
+        // A real transfer, even a fast one, is traffic.
+        let fast = rates(
+            &[interface("en0", 0, 0)],
+            &[interface("en0", 1_500_000_000, 0)],
+            1.0,
+        );
+        assert_eq!(fast.0, 1.5e9);
     }
 
     #[test]

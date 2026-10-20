@@ -229,8 +229,11 @@ impl Feature {
             (false, true) => self.start(),
             (true, false) => self.stop(),
             (true, true) if was.sources() != config.sources() || was.drafts != config.drafts => {
-                // What is asked for changed, so what is known is no longer an answer.
+                // What is asked for changed, so what is known is no longer an answer, and neither is one that is still on
+                // its way: it was asked for the old sources.
                 self.found.borrow_mut().take();
+                self.generation.set(self.generation.get() + 1);
+                self.busy.set(false);
                 self.look();
             }
             _ => {}

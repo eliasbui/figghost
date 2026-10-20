@@ -513,6 +513,24 @@ impl SettingsFeature {
             "agents_usage_off" => self.agent_usage(false),
             "restart" => relaunch(mtm, "--show-settings"),
             "quit" => app::quit(mtm),
+            "launcher_add_app" | "launcher_add_folder" => {
+                // The system's panel runs a loop of its own while it is open, in which timers and shortcuts keep running
+                // and may read the config, so nothing is held while the person chooses.
+                let Some(launcher) = self.ctx.features.launcher.clone() else {
+                    return;
+                };
+                let Some(item) = launcher.choose(name) else {
+                    return;
+                };
+                let result = {
+                    let mut config = self.ctx.config.borrow_mut();
+                    launcher.pin(&mut config.launcher, item)
+                };
+                match result {
+                    Ok(()) => self.ctx.save_config(),
+                    Err(fault) => self.fault(&fault),
+                }
+            }
             other => {
                 let result = {
                     let mut config = self.ctx.config.borrow_mut();

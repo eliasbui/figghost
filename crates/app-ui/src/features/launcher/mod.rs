@@ -8,7 +8,7 @@
 
 use super::{AttachEnv, Ran, run_bounded};
 use crate::{
-    i18n::{self, Language},
+    i18n::{self},
     settings::model::Fault,
     trace,
 };
@@ -148,10 +148,7 @@ impl Feature {
     /// The buttons of the settings page. `None` when the name is not this feature's. A change to the pins is made on
     /// `config`, which the caller saves, and on this feature's own copy.
     pub fn action(&self, name: &str, config: &mut Config) -> Option<Result<(), Fault>> {
-        let language = i18n::current();
         let result = match name {
-            "launcher_add_app" => self.pin_app(config, language),
-            "launcher_add_folder" => self.pin_folder(config, language),
             "launcher_shortcuts" => {
                 self.list_shortcuts();
                 return Some(Ok(()));
@@ -175,28 +172,38 @@ impl Feature {
         Some(result)
     }
 
-    fn pin_app(&self, config: &mut Config, language: Language) -> Result<(), Fault> {
-        let Some(app) = workspace::pick_app(self.mtm, language.pick_app_prompt()) else {
-            return Ok(());
-        };
-        let item = Item {
-            kind: Kind::App,
-            target: app.bundle_id,
-            name: app.name,
-        };
-        logic::add(&mut config.items, item).map_err(settings::refusal)
+    /// Asks the person for an app or a folder (`launcher_add_app`, `launcher_add_folder`) with the system's panel. The
+    /// panel runs a loop of its own while it is open, in which timers and shortcuts keep running and may read the config,
+    /// so the caller must not hold the config while it is asked. `None` when the name is neither, or the person cancelled.
+    pub fn choose(&self, name: &str) -> Option<Item> {
+        let language = i18n::current();
+        match name {
+            "launcher_add_app" => {
+                let app = workspace::pick_app(self.mtm, language.pick_app_prompt())?;
+                Some(Item {
+                    kind: Kind::App,
+                    target: app.bundle_id,
+                    name: app.name,
+                })
+            }
+            "launcher_add_folder" => {
+                let path = workspace::pick_folder(self.mtm, language.launcher_pick_folder())?;
+                Some(Item {
+                    kind: Kind::Folder,
+                    target: path.to_string_lossy().into_owned(),
+                    name: String::new(),
+                })
+            }
+            _ => None,
+        }
     }
 
-    fn pin_folder(&self, config: &mut Config, language: Language) -> Result<(), Fault> {
-        let Some(path) = workspace::pick_folder(self.mtm, language.launcher_pick_folder()) else {
-            return Ok(());
-        };
-        let item = Item {
-            kind: Kind::Folder,
-            target: path.to_string_lossy().into_owned(),
-            name: String::new(),
-        };
-        logic::add(&mut config.items, item).map_err(settings::refusal)
+    /// Pins what `choose` gave, on `config`, which the caller saves, and on this feature's own copy.
+    pub fn pin(&self, config: &mut Config, item: Item) -> Result<(), Fault> {
+        logic::add(&mut config.items, item).map_err(settings::refusal)?;
+        *self.config.borrow_mut() = config.clone().sanitized();
+        self.render();
+        Ok(())
     }
 
     /// Pins the n-th Shortcut of the list the page was last shown.
@@ -359,6 +366,7 @@ fn launch(item: &Item) -> Result<(), String> {
 #[cfg(test)]
 mod tests {
     use super::*;
+    use crate::i18n::Language;
     use serde_json::json;
 
     #[test]

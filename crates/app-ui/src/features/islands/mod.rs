@@ -14,7 +14,9 @@ use crate::{
     settings::model::Fault,
     trace,
 };
-use logic::{CapsWatcher, DownloadWatcher, PowerEvent, PowerWatcher, PrivacyWatcher, Reading};
+use logic::{
+    CapsWatcher, DownloadWatcher, Drives, PowerEvent, PowerWatcher, PrivacyWatcher, Reading,
+};
 use macos_sys::{
     app, camera, modifiers,
     notch::{Activity, Detail, Ear, Notch},
@@ -188,6 +190,10 @@ pub struct Feature {
     power: RefCell<PowerWatcher>,
     downloads: RefCell<DownloadWatcher>,
     privacy: RefCell<PrivacyWatcher>,
+    /// The drives that are announced when they leave.
+    drives: RefCell<Drives>,
+    /// The drives the menu showed when it was last opened, so that a click ejects the one that was named.
+    menu: RefCell<Vec<volumes::Volume>>,
     timers: RefCell<Vec<app::Timer>>,
     observer: RefCell<Option<volumes::Observer>>,
     me: Weak<Feature>,
@@ -205,6 +211,8 @@ pub fn attach(env: &AttachEnv) -> Option<Rc<Feature>> {
         power: RefCell::default(),
         downloads: RefCell::default(),
         privacy: RefCell::default(),
+        drives: RefCell::default(),
+        menu: RefCell::default(),
         timers: RefCell::default(),
         observer: RefCell::default(),
         me: me.clone(),
@@ -275,10 +283,13 @@ impl Feature {
         }
         *self.timers.borrow_mut() = timers;
         if config.drives {
+            self.drives
+                .borrow_mut()
+                .reset(volumes::external().into_iter().map(|v| v.path));
             let me = self.me.clone();
             *self.observer.borrow_mut() = Some(volumes::observe(move |event| {
                 if let Some(feature) = me.upgrade() {
-                    feature.drive(&event, false);
+                    feature.drive_event(event);
                 }
             }));
         }
@@ -429,6 +440,22 @@ impl Feature {
 
     // -- drives -----------------------------------------------------------------------------------------------
 
+    /// A drive arrived or left, as the system says. Only a drive that is known to be one that can be ejected is told of
+    /// leaving: disk images, backup volumes and shares come and go, and what this app has just ejected was told already.
+    fn drive_event(&self, event: volumes::Event) {
+        match &event {
+            volumes::Event::Mounted(volume) => {
+                self.drives.borrow_mut().arrived(volume.path.clone())
+            }
+            volumes::Event::Unmounted(volume) => {
+                if !self.drives.borrow_mut().left(&volume.path) {
+                    return;
+                }
+            }
+        }
+        self.drive(&event, false);
+    }
+
     /// `ejected` is true when this app has just ejected the drive, which is when it is safe to unplug.
     fn drive(&self, event: &volumes::Event, ejected: bool) {
         let language = self.language();
@@ -440,8 +467,8 @@ impl Feature {
                 language.island_drive_connected(),
                 "checkmark.circle.fill",
             ),
-            volumes::Event::Unmounted(name) => (
-                name.clone(),
+            volumes::Event::Unmounted(volume) => (
+                volume.name.clone(),
                 "externaldrive",
                 Tone::Gray,
                 if ejected {
@@ -486,7 +513,11 @@ impl Feature {
 
     fn eject(&self, volume: &volumes::Volume) {
         match volumes::eject(&volume.path) {
-            Ok(()) => self.drive(&volumes::Event::Unmounted(volume.name.clone()), true),
+            Ok(()) => {
+                // Told here, so the system's notice of the same departure that follows is not told again.
+                self.drives.borrow_mut().left(&volume.path);
+                self.drive(&volumes::Event::Unmounted(volume.clone()), true);
+            }
             Err(error) => {
                 eprintln!("islands: cannot eject {}: {error}", volume.path);
                 self.show(
@@ -629,7 +660,21 @@ impl Feature {
                 false,
             ),
             "download" => self.download_island("Figghost-1.5.0.dmg", 48_300_000, 0),
-            "privacy" => self.privacy_island(true, true, true),
+            "privacy" => {
+                self.privacy_island(true, true, true);
+                // When the sample has gone by, what is really going on comes back: a camera that is in use must not
+                // lose its island to a button.
+                let me = self.me.clone();
+                app::after(self.seconds() + 0.3, move || {
+                    if let Some(feature) = me.upgrade() {
+                        let config = feature.config.borrow().clone();
+                        if config.enabled && config.privacy {
+                            let (camera, mic) = feature.privacy.borrow().current();
+                            feature.privacy_island(camera, mic, false);
+                        }
+                    }
+                });
+            }
             _ => return None,
         }
         Some(Ok(()))
@@ -638,32 +683,52 @@ impl Feature {
     /// "Eject" for each drive that is plugged in, in the menu bar panel. The titles and what is visible follow the
     /// drives each time the menu opens.
     pub fn menu_entries(this: &Rc<Self>) -> Vec<Entry> {
-        let nth = |slot: usize| volumes::external().into_iter().nth(slot);
         (0..EJECT_SLOTS)
             .map(|slot| {
                 let (act, shown, title) = (this.me.clone(), this.me.clone(), this.me.clone());
                 Entry::Item(
                     Item::new("", move || {
-                        if let (Some(feature), Some(volume)) = (act.upgrade(), nth(slot)) {
+                        let Some(feature) = act.upgrade() else {
+                            return;
+                        };
+                        // The drive the menu named, not whichever stands in that place now.
+                        let volume = feature.menu.borrow().get(slot).cloned();
+                        if let Some(volume) = volume {
                             feature.eject(&volume);
                         }
                     })
                     .symbol(symbols::EJECT)
                     .titled(move || {
-                        nth(slot)
-                            .zip(title.upgrade())
-                            .map(|(volume, feature)| feature.language().island_eject(&volume.name))
+                        title
+                            .upgrade()
+                            .and_then(|feature| {
+                                feature
+                                    .menu_volume(slot)
+                                    .map(|volume| feature.language().island_eject(&volume.name))
+                            })
                             .unwrap_or_default()
                     })
                     .visible_when(move || {
-                        shown
-                            .upgrade()
-                            .is_some_and(|f| f.config.borrow().enabled && f.config.borrow().drives)
-                            && nth(slot).is_some()
+                        shown.upgrade().is_some_and(|f| {
+                            let wanted = {
+                                let config = f.config.borrow();
+                                config.enabled && config.drives
+                            };
+                            wanted && f.menu_volume(slot).is_some()
+                        })
                     }),
                 )
             })
             .collect()
+    }
+
+    /// The drive in this place of the menu, as the menu named it when it opened. The first place is where the refreshing
+    /// of the menu begins: it looks at the drives, and the others read what it saw.
+    fn menu_volume(&self, slot: usize) -> Option<volumes::Volume> {
+        if slot == 0 {
+            *self.menu.borrow_mut() = volumes::external();
+        }
+        self.menu.borrow().get(slot).cloned()
     }
 }
 

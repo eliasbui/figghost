@@ -1312,8 +1312,9 @@ function tabRow(page) {
     const now = pages()[at()];
     const on = !!(now && now.on);
     toggle.setAttribute('aria-checked', String(on));
-    // The last tab that shows cannot go: a notch with no tab could not be used.
-    toggle.disabled = on && pages().filter((p) => p.on).length === 1;
+    // The last tab that shows cannot go: a notch with no tab could not be used. A tab that waits for its feature does not show.
+    const shows = (p) => p.on && !p.waiting;
+    toggle.disabled = !!(now && shows(now) && pages().filter(shows).length === 1);
     up.disabled = at() <= 0;
     down.disabled = at() >= pages().length - 1;
   });
@@ -2286,6 +2287,13 @@ window.__selftest = function () {
     runSyncs();
     const lone = [...document.querySelectorAll('.card .row')].find((r) => r.querySelector('.tab-order'));
     expect(lone.querySelector('.switch').disabled, 'the last tab that shows cannot be turned off');
+    // A tab that waits for its feature does not show, so it does not count as one that does.
+    S.notch.pages = [{ id: 'clipboard', title: 'Clipboard', on: true, waiting: false }, { id: 'weather', title: 'Weather', on: true, waiting: true }];
+    runSyncs();
+    const waits = [...document.querySelectorAll('.card .row')].filter((r) => r.querySelector('.tab-order'));
+    expect(waits.length === 2 && waits[0].querySelector('.switch').disabled, 'the only tab that shows cannot go, though another is on and waiting');
+    expect(!waits[1].querySelector('.switch').disabled, 'a tab that waits can be turned off');
+    expect(waits[1].textContent.includes(t('tab.waiting')), 'a tab that waits says so');
     go('agents');
     expect(document.body.textContent.includes(t('agents.spend.claude')), 'the spend of Claude Code is listed');
 

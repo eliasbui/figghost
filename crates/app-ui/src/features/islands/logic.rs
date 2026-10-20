@@ -209,9 +209,13 @@ pub fn human_size(bytes: u64) -> String {
 
 /// A name cut to `max` characters with the middle left out, so that the end, which holds the extension, stays.
 pub fn shorten(name: &str, max: usize) -> String {
-    let chars: Vec<char> = name.chars().collect();
+    // A name is shown as it is written, without what would make it read as another (a file may be called anything).
+    let chars: Vec<char> = name
+        .chars()
+        .filter(|c| !crate::features::is_hidden_char(*c))
+        .collect();
     if chars.len() <= max || max < 5 {
-        return name.to_owned();
+        return chars.into_iter().collect();
     }
     let tail = max / 3;
     let head = max - tail - 1;
@@ -219,6 +223,47 @@ pub fn shorten(name: &str, max: usize) -> String {
     out.push('\u{2026}');
     out.extend(&chars[chars.len() - tail..]);
     out
+}
+
+// -- drives ---------------------------------------------------------------------------------------------------
+
+/// The drives that were announced arriving, or were there when watching began: only these are announced leaving. A disk
+/// image, a backup volume or a network share that comes and goes is not news, and a drive this app has just ejected has
+/// already been announced.
+#[derive(Debug, Default)]
+pub struct Drives {
+    paths: Vec<String>,
+}
+
+impl Drives {
+    /// How many are kept: a Mac has few.
+    const MAX: usize = 64;
+
+    /// Starts again from the drives that are there now.
+    pub fn reset(&mut self, paths: impl IntoIterator<Item = String>) {
+        self.paths.clear();
+        for path in paths {
+            self.arrived(path);
+        }
+    }
+
+    pub fn arrived(&mut self, path: String) {
+        if self.paths.contains(&path) {
+            return;
+        }
+        if self.paths.len() >= Self::MAX {
+            self.paths.remove(0);
+        }
+        self.paths.push(path);
+    }
+
+    /// Whether a drive that has gone was one that is announced; it is forgotten either way, so that a departure is told
+    /// once, whether it came from the eject button or from the system's own notice that follows it.
+    pub fn left(&mut self, path: &str) -> bool {
+        let before = self.paths.len();
+        self.paths.retain(|known| known != path);
+        self.paths.len() != before
+    }
 }
 
 // -- camera and microphone ------------------------------------------------------------------------------------
@@ -232,6 +277,11 @@ pub struct PrivacyWatcher {
 impl PrivacyWatcher {
     pub fn reset(&mut self) {
         *self = Self::default();
+    }
+
+    /// What was last seen: whether the camera and the microphone are in use.
+    pub fn current(&self) -> (bool, bool) {
+        self.last.unwrap_or((false, false))
     }
 
     /// `Some((camera, mic))` when either changed, including to neither, which clears the island. The first look
@@ -257,6 +307,40 @@ mod tests {
             on_ac,
             charged,
         }
+    }
+
+    #[test]
+    fn only_a_drive_that_was_known_is_announced_leaving_and_only_once() {
+        let mut drives = Drives::default();
+        drives.reset(["/Volumes/Backup".to_owned()]);
+        assert!(drives.left("/Volumes/Backup"));
+        assert!(
+            !drives.left("/Volumes/Backup"),
+            "told once: an eject and the notice that follows it are one departure"
+        );
+        assert!(
+            !drives.left("/Volumes/Disk Image"),
+            "a volume that was never announced is not news"
+        );
+        drives.arrived("/Volumes/New".into());
+        drives.arrived("/Volumes/New".into());
+        assert!(drives.left("/Volumes/New"));
+        assert!(!drives.left("/Volumes/New"));
+        for i in 0..200 {
+            drives.arrived(format!("/Volumes/{i}"));
+        }
+        assert!(drives.paths.len() <= Drives::MAX);
+        assert!(drives.left("/Volumes/199"), "the newest are the ones kept");
+    }
+
+    #[test]
+    fn the_privacy_watcher_says_what_it_last_saw() {
+        let mut watcher = PrivacyWatcher::default();
+        assert_eq!(watcher.current(), (false, false));
+        watcher.update(true, false);
+        assert_eq!(watcher.current(), (true, false));
+        watcher.reset();
+        assert_eq!(watcher.current(), (false, false));
     }
 
     #[test]
@@ -446,6 +530,8 @@ mod tests {
         assert_eq!(cut.chars().count(), 20);
         assert!(cut.ends_with("ing.pdf") || cut.ends_with(".pdf"), "{cut}");
         assert!(cut.contains('\u{2026}'));
+        // What would make a file read as another is not shown.
+        assert_eq!(shorten("invoice\u{202E}gpj.exe", 40), "invoicegpj.exe");
     }
 
     #[test]

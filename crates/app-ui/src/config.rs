@@ -235,12 +235,34 @@ impl From<serde_json::Value> for NotchConfig {
             shortcut: v["shortcut"].as_str().unwrap_or("").trim().to_owned(),
             hud: word(
                 &v["hud"],
-                &["notch", "glass", "corner", "bar", "island", "side", "tile", "ring", "equalizer", "wide"],
+                &[
+                    "notch",
+                    "glass",
+                    "corner",
+                    "bar",
+                    "island",
+                    "side",
+                    "tile",
+                    "ring",
+                    "equalizer",
+                    "wide",
+                ],
                 &d.hud,
             ),
             hud_position: word(
                 &v["hud_position"],
-                &["auto", "top-left", "top", "top-right", "left", "center", "right", "bottom-left", "bottom", "bottom-right"],
+                &[
+                    "auto",
+                    "top-left",
+                    "top",
+                    "top-right",
+                    "left",
+                    "center",
+                    "right",
+                    "bottom-left",
+                    "bottom",
+                    "bottom-right",
+                ],
                 &d.hud_position,
             ),
         }
@@ -348,7 +370,33 @@ impl Default for AgentsConfig {
 }
 
 /// The version of the file's layout this build writes; older files are brought up to it once, when they load.
-pub const CONFIG_VERSION: u32 = 2;
+pub const CONFIG_VERSION: u32 = 3;
+
+/// A section of the file that never fails the file: a value of the wrong type is read as that key's default and the
+/// rest of the section is kept, instead of the whole file being moved aside and every setting reset. A number that is
+/// out of range is brought into range by the section's `sanitized` afterwards.
+fn lenient_section<'de, D, T>(deserializer: D) -> Result<T, D::Error>
+where
+    D: serde::Deserializer<'de>,
+    T: serde::de::DeserializeOwned + Serialize + Default,
+{
+    let value = serde_json::Value::deserialize(deserializer)?;
+    if let Ok(whole) = serde_json::from_value::<T>(value.clone()) {
+        return Ok(whole);
+    }
+    let mut section = serde_json::to_value(T::default()).unwrap_or_default();
+    if let (Some(base), Some(found)) = (section.as_object_mut(), value.as_object()) {
+        for (key, item) in found {
+            let Some(old) = base.insert(key.clone(), item.clone()) else {
+                continue;
+            };
+            if serde_json::from_value::<T>(serde_json::Value::Object(base.clone())).is_err() {
+                base.insert(key.clone(), old);
+            }
+        }
+    }
+    Ok(serde_json::from_value(section).unwrap_or_default())
+}
 
 #[derive(Debug, Clone, Serialize, Deserialize)]
 #[serde(default)]
@@ -395,16 +443,27 @@ pub struct Config {
     pub pin: crate::features::pin::Config,
     pub cursor: crate::features::cursor::Config,
     pub musicwidget: crate::features::musicwidget::Config,
+    #[serde(deserialize_with = "lenient_section")]
     pub islands: crate::features::islands::Config,
+    #[serde(deserialize_with = "lenient_section")]
     pub utilities: crate::features::utilities::Config,
+    #[serde(deserialize_with = "lenient_section")]
     pub notes: crate::features::notes::Config,
+    #[serde(deserialize_with = "lenient_section")]
     pub launcher: crate::features::launcher::Config,
+    #[serde(deserialize_with = "lenient_section")]
     pub weather: crate::features::weather::Config,
+    #[serde(deserialize_with = "lenient_section")]
     pub prs: crate::features::prs::Config,
+    #[serde(deserialize_with = "lenient_section")]
     pub pomodoro: crate::features::pomodoro::Config,
+    #[serde(deserialize_with = "lenient_section")]
     pub screentime: crate::features::screentime::Config,
+    #[serde(deserialize_with = "lenient_section")]
     pub dayprogress: crate::features::dayprogress::Config,
+    #[serde(deserialize_with = "lenient_section")]
     pub devices: crate::features::devices::Config,
+    #[serde(deserialize_with = "lenient_section")]
     pub system: crate::features::system::Config,
     /// Replace the system volume indicator with one in the notch. Needs Accessibility access.
     pub volume_hud: bool,
@@ -548,6 +607,16 @@ impl Config {
             // into every file, so a file cannot tell a choice from a default: it is turned on once, as it now is
             // for everyone.
             self.snap.enabled = true;
+        }
+        if self.version < 3 && !self.notch.pages.is_empty() {
+            // A list of tabs the person arranged before these tabs existed shows only the tabs it names, so the tab of
+            // a feature switched on later would never appear. They join its end; a feature that is off keeps its tab
+            // out of the strip anyway.
+            for id in crate::features::OPT_IN_TABS {
+                if !self.notch.pages.iter().any(|p| p == id) {
+                    self.notch.pages.push(id.to_owned());
+                }
+            }
         }
         self.version = CONFIG_VERSION;
     }
@@ -922,6 +991,80 @@ mod tests {
     }
 
     #[test]
+    fn one_bad_value_in_a_section_costs_that_value_and_not_the_file() {
+        let dir = temp_dir();
+        fs::write(
+            dir.join("config.json"),
+            r#"{
+                "hotkey": "cmd+shift+v",
+                "islands": { "enabled": true, "full_at": 300, "seconds": "3", "low_at": 12 },
+                "pomodoro": { "work": -1, "rounds": 3, "sound": "yes" },
+                "notes": null,
+                "weather": { "enabled": true, "units": 5 },
+                "devices": 7,
+                "system": { "enabled": true, "seconds": 5 }
+            }"#,
+        )
+        .unwrap();
+        let (cfg, note) = Config::load(&dir);
+        assert!(note.is_none(), "{note:?}");
+        assert!(!dir.join("config.json.bad").exists());
+        let d = Config::default();
+        assert_eq!(cfg.hotkey, "cmd+shift+v", "the rest of the file is kept");
+        assert!(
+            cfg.islands.enabled && cfg.islands.low_at == 12,
+            "what reads in a section is kept"
+        );
+        assert_eq!(
+            (cfg.islands.full_at, cfg.islands.seconds),
+            (d.islands.full_at, d.islands.seconds),
+            "what does not read is the default"
+        );
+        assert_eq!(
+            (cfg.pomodoro.rounds, cfg.pomodoro.work, cfg.pomodoro.sound),
+            (3, d.pomodoro.work, d.pomodoro.sound)
+        );
+        assert_eq!(cfg.notes, d.notes, "a section that is null is the default");
+        assert!(cfg.weather.enabled && cfg.weather.units == d.weather.units);
+        assert_eq!(
+            cfg.devices, d.devices,
+            "a section that is not an object is the default"
+        );
+        assert!(cfg.system.enabled && cfg.system.seconds == 5);
+        fs::remove_dir_all(dir).unwrap();
+    }
+
+    #[test]
+    fn a_list_of_tabs_arranged_before_the_new_tabs_existed_gains_them_once() {
+        let dir = temp_dir();
+        fs::write(
+            dir.join("config.json"),
+            r#"{"version": 2, "notch": {"pages": ["media", "clipboard"]}}"#,
+        )
+        .unwrap();
+        let (cfg, _) = Config::load(&dir);
+        assert_eq!(cfg.version, CONFIG_VERSION);
+        assert_eq!(&cfg.notch.pages[..2], ["media", "clipboard"]);
+        for id in crate::features::OPT_IN_TABS {
+            assert!(cfg.notch.pages.iter().any(|p| p == id), "{id}");
+        }
+        assert_eq!(
+            cfg.notch.pages.len(),
+            2 + crate::features::OPT_IN_TABS.len()
+        );
+        // Saved and read again, nothing is added twice and a tab the person takes out stays out.
+        let mut chosen = cfg;
+        chosen.notch.pages.retain(|p| p != "weather");
+        chosen.save(&dir).unwrap();
+        let (again, _) = Config::load(&dir);
+        assert!(!again.notch.pages.iter().any(|p| p == "weather"));
+        // With no list there is nothing to add to: every tab shows.
+        fs::write(dir.join("config.json"), r#"{"version": 1}"#).unwrap();
+        assert!(Config::load(&dir).0.notch.pages.is_empty());
+        fs::remove_dir_all(dir).unwrap();
+    }
+
+    #[test]
     fn the_notch_can_be_pinned_to_a_named_screen() {
         let json = serde_json::json!({ "notch": { "display": "screen:LG FHD" } });
         let notch: NotchConfig = serde_json::from_value(json["notch"].clone()).unwrap();
@@ -947,7 +1090,7 @@ mod tests {
         let dir = temp_dir();
         fs::write(
             dir.join("config.json"),
-            r#"{"hotkey": "cmd+shift+v", "notch": {"enabled": "yes", "material": 7, "motion": "bouncy",
+            r#"{"version": 3, "hotkey": "cmd+shift+v", "notch": {"enabled": "yes", "material": 7, "motion": "bouncy",
                 "hover_delay_ms": 99999, "pages": ["media", "nope", "media", 3, "clipboard"],
                 "open_page": "agents", "shortcut": "  ctrl+opt+n "}}"#,
         )
@@ -1010,7 +1153,10 @@ mod tests {
         assert_eq!(notch.style().material, Material::Glass);
         assert_eq!(notch.hud_style(), HudStyle::Notch);
         notch.hud_position = "bottom-left".into();
-        assert_eq!(notch.hud_position(), macos_sys::hud::HudPosition::BottomLeft);
+        assert_eq!(
+            notch.hud_position(),
+            macos_sys::hud::HudPosition::BottomLeft
+        );
         notch.hud_position = "somewhere".into();
         assert_eq!(notch.hud_position(), macos_sys::hud::HudPosition::Auto);
     }

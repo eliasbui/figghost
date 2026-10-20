@@ -2,6 +2,7 @@
 //! how a title is found in a text, and how the list of them is kept in order while one is being written. Nothing
 //! here draws and nothing here knows a language.
 
+use crate::features::write_atomically;
 use std::{
     cmp::Reverse,
     fs, io,
@@ -11,7 +12,8 @@ use std::{
 
 /// More notes than this are not read; the rest stay where they are as files.
 pub const MAX_NOTES: usize = 200;
-/// A note is cut to this many characters when it is read or written, so that a huge file cannot hang the editor.
+/// A note holds no more characters than this: a longer text is cut when it is written, and a file that is longer is
+/// not listed at all, so that a huge file cannot hang the editor and its end can never be lost by editing it.
 pub const MAX_CHARS: usize = 50_000;
 /// The longest title a row shows, in characters.
 const TITLE_CHARS: usize = 60;
@@ -100,13 +102,15 @@ impl Folder {
         self.dir.join(file_name(id))
     }
 
-    /// Every note in the folder, the one written last first. A file that cannot be read as text is skipped, not
-    /// deleted.
+    /// Every note in the folder, the one written last first, no more than `MAX_NOTES`. The files are put in order from
+    /// what the folder says of them and only the newest are read, so that a folder with thousands does not stall the page.
+    /// A file that cannot be read as text is skipped, not deleted, and so is one longer than a note may be: it would be
+    /// cut when it was shown and its end lost with the next change.
     pub fn load(&self) -> Vec<Note> {
         let Ok(entries) = fs::read_dir(&self.dir) else {
             return Vec::new();
         };
-        let mut notes: Vec<Note> = entries
+        let mut files: Vec<(i64, u64, PathBuf)> = entries
             .flatten()
             .filter_map(|entry| {
                 let id = id_of(entry.file_name().to_str()?)?;
@@ -115,22 +119,28 @@ impl Folder {
                 if meta.len() > (MAX_CHARS as u64) * 4 {
                     return None;
                 }
-                let text = fs::read_to_string(entry.path()).ok()?;
                 let updated = meta
                     .modified()
                     .ok()
                     .and_then(|t| t.duration_since(UNIX_EPOCH).ok())
                     .map_or(0, |d| d.as_millis() as i64);
-                Some(Note {
-                    id,
-                    text: clipped(&text),
-                    updated,
-                })
+                Some((updated, id, entry.path()))
             })
-            .filter(|note| !note.is_blank())
             .collect();
-        notes.sort_by_key(|n| Reverse((n.updated, n.id)));
-        notes.truncate(MAX_NOTES);
+        files.sort_by_key(|(updated, id, _)| Reverse((*updated, *id)));
+        let mut notes = Vec::new();
+        for (updated, id, path) in files {
+            if notes.len() == MAX_NOTES {
+                break;
+            }
+            let Ok(text) = fs::read_to_string(path) else {
+                continue;
+            };
+            if text.trim().is_empty() || text.chars().count() > MAX_CHARS {
+                continue;
+            }
+            notes.push(Note { id, text, updated });
+        }
         notes
     }
 
@@ -153,13 +163,7 @@ impl Folder {
         if note.is_blank() {
             return self.discard(note.id);
         }
-        fs::create_dir_all(&self.dir)?;
-        let target = self.path(note.id);
-        let partial = self.dir.join(format!("{}.part", file_name(note.id)));
-        fs::write(&partial, clipped(&note.text))?;
-        fs::rename(&partial, &target).inspect_err(|_| {
-            let _ = fs::remove_file(&partial);
-        })
+        write_atomically(&self.path(note.id), &clipped(&note.text))
     }
 
     /// Removes a file that holds nothing worth keeping; a file that is not there is not an error.
@@ -246,7 +250,9 @@ impl Notes {
     pub fn start_new(&mut self, now: i64) -> u64 {
         self.drop_blank();
         let newest = self.items.iter().map(|n| n.id).max().unwrap_or(0);
-        let id = u64::try_from(now).unwrap_or(0).max(newest + 1);
+        let id = u64::try_from(now)
+            .unwrap_or(0)
+            .max(newest.saturating_add(1));
         self.items.insert(
             0,
             Note {
@@ -436,16 +442,91 @@ mod tests {
     }
 
     #[test]
-    fn a_huge_file_is_not_read_and_a_long_one_is_cut() {
+    fn a_file_too_long_to_be_a_note_is_left_alone_and_never_cut() {
         let dir = scratch("huge");
         fs::create_dir_all(&dir).unwrap();
         fs::write(dir.join("note-1.md"), "x".repeat(MAX_CHARS * 5)).unwrap();
         fs::write(dir.join("note-2.md"), "y".repeat(MAX_CHARS + 500)).unwrap();
+        fs::write(dir.join("note-3.md"), "z".repeat(MAX_CHARS)).unwrap();
+        // Characters, not bytes: a text of 50,000 two-byte characters is a note.
+        fs::write(dir.join("note-4.md"), "\u{1EC7}".repeat(MAX_CHARS)).unwrap();
         let loaded = Folder::new(dir.clone()).load();
-        assert_eq!(loaded.len(), 1);
-        assert_eq!(loaded[0].id, 2);
-        assert_eq!(loaded[0].text.chars().count(), MAX_CHARS);
+        let mut ids: Vec<u64> = loaded.iter().map(|n| n.id).collect();
+        ids.sort_unstable();
+        assert_eq!(ids, [3, 4], "only what a note may hold is listed");
+        assert!(
+            loaded.iter().all(|n| n.text.chars().count() == MAX_CHARS),
+            "and it is whole"
+        );
+        assert_eq!(
+            fs::read_to_string(dir.join("note-2.md"))
+                .unwrap()
+                .chars()
+                .count(),
+            MAX_CHARS + 500,
+            "what is not listed is not touched"
+        );
+        // A text that is written longer than that is cut, never in the middle of a character.
+        let folder = Folder::new(dir.clone());
+        folder
+            .save(&note(9, &"w".repeat(MAX_CHARS + 10), 1))
+            .unwrap();
+        assert_eq!(
+            fs::read_to_string(dir.join("note-9.md"))
+                .unwrap()
+                .chars()
+                .count(),
+            MAX_CHARS
+        );
         fs::remove_dir_all(dir).unwrap();
+    }
+
+    #[test]
+    fn only_the_newest_files_are_read_and_blank_ones_do_not_take_a_place() {
+        let dir = scratch("newest");
+        fs::create_dir_all(&dir).unwrap();
+        let stamp = |id: u64, text: &str| {
+            fs::write(dir.join(file_name(id)), text).unwrap();
+            File::options()
+                .write(true)
+                .open(dir.join(file_name(id)))
+                .unwrap()
+                .set_modified(SystemTime::UNIX_EPOCH + Duration::from_secs(1_000 + id))
+                .unwrap();
+        };
+        let total = MAX_NOTES as u64 + 5;
+        for id in 0..total {
+            stamp(id, &format!("note {id}"));
+        }
+        // The newest ten files are blank, which is no note.
+        for id in total..total + 10 {
+            stamp(id, "   \n");
+        }
+        let loaded = Folder::new(dir.clone()).load();
+        assert_eq!(loaded.len(), MAX_NOTES);
+        assert_eq!(
+            loaded[0].id,
+            total - 1,
+            "the newest note that has something in it comes first"
+        );
+        assert_eq!(loaded[MAX_NOTES - 1].id, total - MAX_NOTES as u64);
+        assert!(loaded.iter().all(|n| !n.is_blank()));
+        fs::remove_dir_all(dir).unwrap();
+    }
+
+    #[test]
+    fn a_stray_file_named_with_the_largest_number_does_not_overflow_the_next_id() {
+        let mut notes = Notes::default();
+        notes.start_new(5);
+        let largest = u64::MAX;
+        notes.items[0].id = largest;
+        notes.items[0].text = "something".into();
+        let next = notes.start_new(5);
+        assert_eq!(
+            next,
+            u64::MAX,
+            "no overflow; it is as far as the numbers go"
+        );
     }
 
     #[test]

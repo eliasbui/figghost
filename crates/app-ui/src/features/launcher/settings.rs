@@ -1,6 +1,7 @@
 //! This feature's part of the settings model: the JSON the page renders and the changes it may make.
 //! Pure data with no AppKit, so every rule is covered by plain unit tests. What the page can do beyond switching the
-//! tab on is done by actions (`launcher_add_app`, `launcher_remove:<n>`, ...), which `Feature::action` takes.
+//! tab on is done by actions (`launcher_remove:<n>`, ...), which `Feature::action` takes, and by `launcher_add_app` and `launcher_add_folder`,
+//! which ask the person with the system's panel (`Feature::choose`) before the config is touched (`Feature::pin`).
 
 use super::{
     Config,

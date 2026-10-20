@@ -134,7 +134,9 @@ impl Feature {
     pub fn configure(&self, config: &Config) -> Result<(), Fault> {
         *self.config.borrow_mut() = config.clone().sanitized();
         if !config.enabled {
-            // Off keeps nothing: no connection to the calendar and no copy of its events.
+            // Off keeps nothing: no connection to the calendar and no copy of its events, and no answer that is still on
+            // its way.
+            self.generation.set(self.generation.get() + 1);
             self.store.borrow_mut().take();
             self.events.borrow_mut().clear();
             self.reminders.borrow_mut().clear();

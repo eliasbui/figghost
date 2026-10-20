@@ -7,7 +7,7 @@
 //! running, so an idle app does no work for it. What is kept is the number of sessions and minutes of each of the last
 //! thirty days, in the file `pomodoro.json` of the data directory; nothing leaves the Mac.
 
-use super::{AttachEnv, write_atomically};
+use super::{AttachEnv, MAX_FILE, read_small, write_atomically};
 use crate::{
     config::parse_hotkey,
     focus_timer::{Phase, Snapshot, clock_text},
@@ -392,10 +392,13 @@ impl Feature {
         if config.open_on_end
             && let Some(notch) = self.notch.upgrade()
         {
-            if !notch.is_expanded() {
+            let was_closed = !notch.is_expanded();
+            notch.open_page(self.page);
+            // Only a notch that this opened is closed again: a tab that is hidden is not opened at all, and a notch the
+            // person opens a moment later is theirs.
+            if was_closed && notch.is_expanded() {
                 self.opened_by_us.set(true);
             }
-            notch.open_page(self.page);
             let weak = self.me.clone();
             app::after(PEEK_SECONDS, move || {
                 if let Some(f) = weak.upgrade() {
@@ -426,7 +429,7 @@ impl Feature {
     // -- what shows --------------------------------------------------------------------------------------------
 
     fn load_stats(&self) {
-        let mut stats = fs::read_to_string(&self.file)
+        let mut stats = read_small(&self.file, MAX_FILE)
             .map(|text| Stats::from_json(&text))
             .unwrap_or_default();
         stats.prune(today());

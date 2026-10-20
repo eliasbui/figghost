@@ -2,7 +2,7 @@
 //! is written to and read from a file, and how a length of time is said. Nothing here reads the system or draws.
 
 use serde_json::{Value, json};
-use std::collections::BTreeMap;
+use std::collections::{BTreeMap, BTreeSet};
 
 /// How often the app in front is looked at, in seconds.
 pub const SAMPLE_SECONDS: u64 = 5;
@@ -16,6 +16,8 @@ pub const IDLE_MINUTES: [u32; 3] = [1, 2, 5];
 const MAX_APPS_PER_DAY: usize = 400;
 const MAX_DAY_SECONDS: u64 = 86_400;
 const MAX_NAME: usize = 80;
+/// How many app names a file may hold: more than a few days of apps are, and the rest are forgotten.
+const MAX_NAMES: usize = 4_000;
 
 /// Whether the time since the last input says someone is there.
 pub fn is_active(idle_seconds: f64, idle_minutes: u32) -> bool {
@@ -40,7 +42,10 @@ pub struct Tally {
 }
 
 fn clean(text: &str, max: usize) -> String {
-    let kept: String = text.chars().filter(|c| !c.is_control()).collect();
+    let kept: String = text
+        .chars()
+        .filter(|c| !crate::features::is_hidden_char(*c))
+        .collect();
     kept.trim().chars().take(max).collect()
 }
 
@@ -76,8 +81,8 @@ impl Tally {
     pub fn prune(&mut self, today: i64) {
         self.days
             .retain(|day, _| *day > today - KEEP_DAYS && *day <= today);
-        let used: Vec<&String> = self.days.values().flat_map(BTreeMap::keys).collect();
-        self.names.retain(|id, _| used.contains(&id));
+        let used: BTreeSet<&String> = self.days.values().flat_map(BTreeMap::keys).collect();
+        self.names.retain(|id, _| used.contains(id));
     }
 
     pub fn clear(&mut self) {
@@ -157,7 +162,7 @@ impl Tally {
             }
         }
         if let Some(names) = root["names"].as_object() {
-            for (id, name) in names {
+            for (id, name) in names.iter().take(MAX_NAMES) {
                 if let Some(name) = name.as_str() {
                     let name = clean(name, MAX_NAME);
                     if !name.is_empty() {
@@ -343,6 +348,27 @@ mod tests {
         let t = sample();
         assert_eq!(Tally::from_json(&t.to_json()), t);
         assert!(Tally::from_json(&Tally::default().to_json()).is_empty());
+    }
+
+    #[test]
+    fn a_file_with_a_great_many_names_keeps_a_bounded_number_and_is_pruned_quickly() {
+        let names: serde_json::Map<String, Value> = (0..(MAX_NAMES * 3))
+            .map(|i| (format!("com.example.app{i}"), json!(format!("App {i}"))))
+            .collect();
+        let text =
+            json!({ "days": { "20000": { "com.example.app1": 60 } }, "names": names }).to_string();
+        let started = std::time::Instant::now();
+        let mut tally = Tally::from_json(&text);
+        assert!(tally.names.len() <= MAX_NAMES);
+        tally.prune(20_000);
+        assert!(
+            tally.names.len() <= 1,
+            "only the names of apps that have time are kept"
+        );
+        assert!(
+            started.elapsed() < std::time::Duration::from_secs(2),
+            "it is not slow"
+        );
     }
 
     #[test]

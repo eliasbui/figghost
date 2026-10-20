@@ -29,7 +29,10 @@ pub struct Place {
 }
 
 fn tidy(text: &str) -> String {
-    let clean: String = text.chars().filter(|c| !c.is_control()).collect();
+    let clean: String = text
+        .chars()
+        .filter(|c| !crate::features::is_hidden_char(*c))
+        .collect();
     clean.trim().chars().take(80).collect()
 }
 
@@ -76,7 +79,13 @@ pub fn places_query(name: &str, language_code: &str) -> Vec<(&'static str, Strin
 pub fn query_of(text: &str) -> Option<String> {
     let clean: String = text
         .chars()
-        .map(|c| if c.is_control() { ' ' } else { c })
+        .map(|c| {
+            if crate::features::is_hidden_char(c) {
+                ' '
+            } else {
+                c
+            }
+        })
         .collect();
     let clean = clean.split_whitespace().collect::<Vec<_>>().join(" ");
     let length = clean.chars().count();
@@ -315,10 +324,13 @@ impl Forecast {
 /// "05:54" from "2026-10-20T05:54".
 pub fn clock_of(time: &str) -> Option<String> {
     let clock = time.split('T').nth(1)?;
-    let valid = clock.len() >= 5
-        && clock.as_bytes()[2] == b':'
-        && clock[..2].bytes().all(|b| b.is_ascii_digit())
-        && clock[3..5].bytes().all(|b| b.is_ascii_digit());
+    let bytes = clock.as_bytes();
+    // Checked a byte at a time: text from the network may have a multi-byte character where a digit should be, and
+    // cutting a string inside one panics.
+    let valid = bytes.len() >= 5
+        && bytes[2] == b':'
+        && [0, 1, 3, 4].iter().all(|&i| bytes[i].is_ascii_digit());
+    // All five are ASCII, so the cut is on a character boundary.
     valid.then(|| clock[..5].to_owned())
 }
 
@@ -586,6 +598,19 @@ mod tests {
         assert_eq!(clock_of("2026-10-20T05:54:12"), Some("05:54".into()));
         assert_eq!(clock_of("2026-10-20"), None);
         assert_eq!(clock_of("2026-10-20Tab:cd"), None);
+        // A character of more than one byte where a digit should be is not a time, and does not panic.
+        for odd in [
+            "2026-10-20T12:3é",
+            "2026-10-20Té2:30",
+            "2026-10-20T1é:30",
+            "2026-10-20T12é30",
+            "2026-10-20T12:é0",
+            "2026-10-20T１２:30",
+            "2026-10-20T",
+        ] {
+            assert_eq!(clock_of(odd), None, "{odd}");
+            assert_eq!(hour_of(odd), None, "{odd}");
+        }
         assert_eq!(hour_of("2026-10-20T14:00"), Some(14));
         assert_eq!(hour_of("2026-10-20T24:00"), None);
         // 2026-10-20 is a Tuesday, 1970-01-01 a Thursday, 2000-02-29 a Tuesday, 2024-03-10 a Sunday.

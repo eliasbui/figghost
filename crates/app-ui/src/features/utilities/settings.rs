@@ -141,7 +141,10 @@ mod tests {
         set(&mut config, "awake_minutes", &json!(37))
             .unwrap()
             .unwrap();
-        assert_eq!(config.awake_minutes, 0);
+        assert_eq!(
+            config.awake_minutes, 60,
+            "not offered: an hour, never for ever"
+        );
         assert!(
             set(&mut config, "awake_minutes", &json!(-1))
                 .unwrap()

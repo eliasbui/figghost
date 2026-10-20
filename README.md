@@ -95,7 +95,7 @@ The System tab shows the processor core by core (the frugal cores and the fast o
 
 ![The System tab of the notch](docs/images/notch-system.png)
 
-The Notes tab is a scratchpad: a list of notes at the left and an editor at the right. Every note is a plain text file in a folder of its own (`notes` in the data directory), so any other app can read it; what is typed is saved a moment after the last key, a deleted note goes to the Trash, and a note left empty leaves no file. It is off until it is turned on in Settings, under Notch tabs, Notes.
+The Notes tab is a scratchpad: a list of notes at the left and an editor at the right. Every note is a plain text file in a folder of its own (`notes` in the data directory), so any other app can read it (a file longer than fifty thousand characters is not listed, so that it can never be cut); what is typed is saved a moment after the last key, a deleted note goes to the Trash, and a note left empty leaves no file. It is off until it is turned on in Settings, under Notch tabs, Notes.
 
 ![The Notes tab of the notch](docs/images/notch-notes.png)
 
@@ -211,7 +211,7 @@ Small notices that come out of the closed notch for a moment: Caps Lock turning 
 
 ### Utilities
 
-Keep the Mac awake for 15 minutes to 4 hours or until you stop it, mute the microphone itself so every app hears nothing, lock the keyboard while you wipe it (Command and Escape unlock it at once, and it unlocks by itself after the time you set), and snooze the notch for 5 minutes to 2 hours or until you wake it, so that it does not open when the pointer reaches the top of the screen while you present or play (a click on it, and a coding agent that waits for an answer, still open it). Each has a place in the menu bar panel, a shortcut that works in any app and a notice on the notch (off by default).
+Keep the Mac awake for 15 minutes to 4 hours or until you stop it, mute the microphone itself so every app hears nothing (it is unmuted when Figghost quits, since nothing else on the Mac has a switch for it), lock the keyboard while you wipe it (Command and Escape unlock it at once, and it unlocks by itself after the time you set), and snooze the notch for 5 minutes to 2 hours or until you wake it, so that it does not open when the pointer reaches the top of the screen while you present or play (a click on it, and a coding agent that waits for an answer, still open it). Each has a place in the menu bar panel, a shortcut that works in any app and a notice on the notch (off by default).
 
 ![The Utilities page in Vietnamese](docs/images/settings-utilities-vi.png)
 

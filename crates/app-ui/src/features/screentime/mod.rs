@@ -7,7 +7,7 @@
 //! leaves the Mac. No permission is needed: the app in front is public, and how long since the last input is read from the
 //! clock of the input system, not from the events.
 
-use super::{AttachEnv, write_atomically};
+use super::{AttachEnv, MAX_FILE, read_small, write_atomically};
 use crate::{
     i18n::{self, Language},
     settings::model::Fault,
@@ -199,7 +199,7 @@ impl Feature {
 
     /// Reads what was kept and starts looking at the app in front.
     fn start(&self) {
-        let mut tally = fs::read_to_string(&self.file)
+        let mut tally = read_small(&self.file, MAX_FILE)
             .map(|text| Tally::from_json(&text))
             .unwrap_or_default();
         tally.prune(today());

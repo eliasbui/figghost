@@ -29,8 +29,8 @@ pub struct Volume {
 #[derive(Debug, Clone, PartialEq, Eq)]
 pub enum Event {
     Mounted(Volume),
-    /// By the name it had, since it is gone.
-    Unmounted(String),
+    /// By the name and the place it had, since it is gone.
+    Unmounted(Volume),
 }
 
 fn file_name(path: &str) -> String {
@@ -145,7 +145,7 @@ fn event_of(note: &NSNotification, mounted: bool) -> Option<Event> {
         let url = NSURL::fileURLWithPath(&NSString::from_str(&path));
         describe(&url).map(Event::Mounted)
     } else {
-        Some(Event::Unmounted(name))
+        Some(Event::Unmounted(Volume { name, path }))
     }
 }
 

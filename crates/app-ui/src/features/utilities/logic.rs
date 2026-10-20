@@ -7,12 +7,13 @@ pub const SNOOZE_MINUTES: [u32; 6] = [5, 15, 30, 60, 120, 0];
 /// The lengths of the keyboard lock the settings offer, in seconds.
 pub const LOCK_SECONDS: (u32, u32) = (15, 300);
 
-/// Held to the lengths that are offered; anything else is "until I stop".
+/// Held to the lengths that are offered; anything else is an hour. A mistake in a file or a message must not turn into
+/// "until I stop", which keeps the Mac awake for ever.
 pub fn awake_minutes(minutes: u32) -> u32 {
     if AWAKE_MINUTES.contains(&minutes) {
         minutes
     } else {
-        0
+        60
     }
 }
 
@@ -53,11 +54,16 @@ mod tests {
     use super::*;
 
     #[test]
-    fn a_length_that_is_not_offered_means_until_stopped() {
+    fn a_length_that_is_not_offered_is_an_hour_and_never_until_stopped() {
         assert_eq!(awake_minutes(60), 60);
-        assert_eq!(awake_minutes(0), 0);
-        assert_eq!(awake_minutes(37), 0);
-        assert_eq!(awake_minutes(100_000), 0);
+        assert_eq!(
+            awake_minutes(0),
+            0,
+            "until I stop is offered, and chosen on purpose"
+        );
+        assert_eq!(awake_minutes(37), 60);
+        assert_eq!(awake_minutes(100_000), 60);
+        assert_eq!(awake_minutes(u32::MAX), 60);
     }
 
     #[test]

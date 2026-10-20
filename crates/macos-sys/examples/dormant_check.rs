@@ -14,6 +14,20 @@ use std::{process, rc::Rc};
 
 const IDS: [&str; 4] = ["one", "two", "three", "four"];
 
+fn page(mtm: MainThreadMarker, notch: &Notch, id: &'static str, width: f64) -> Page {
+    Page {
+        id,
+        title: id.into(),
+        symbol: "circle.fill",
+        root: NSView::initWithFrame(mtm.alloc(), notch.page_area(width, 100.0)),
+        on_show: Box::new(|| {}),
+        on_hide: Box::new(|| {}),
+        on_key: Box::new(|_| false),
+        accepts_files: false,
+        size: None,
+    }
+}
+
 fn check(ok: bool, what: &str) {
     println!("{}  {what}", if ok { "ok    " } else { "FAILED" });
     if !ok {
@@ -37,17 +51,9 @@ fn main() {
         };
         let notch = Rc::new(Notch::new(mtm, geometry, noop, |_| {}));
         for id in IDS {
-            notch.add_page(Page {
-                id,
-                title: id.into(),
-                symbol: "circle.fill",
-                root: NSView::initWithFrame(mtm.alloc(), notch.page_area(500.0, 100.0)),
-                on_show: Box::new(|| {}),
-                on_hide: Box::new(|| {}),
-                on_key: Box::new(|_| false),
-                accepts_files: false,
-                size: None,
-            });
+            // "two" is the widest page.
+            let width = if id == "two" { 700.0 } else { 500.0 };
+            notch.add_page(page(mtm, &notch, id, width));
         }
         notch.configure(&Style::default());
         let steps = Rc::clone(&notch);
@@ -112,6 +118,21 @@ fn main() {
             );
             check(!steps.tab_ids().contains(&"three"), "and its tab is gone");
             steps.set_page_dormant("three", false);
+            steps.close();
+
+            // The open shape is as wide as the widest page that shows, so it narrows when that page goes dormant.
+            steps.open_page(2);
+            let wide = steps.open_size().width;
+            check(
+                wide >= 700.0,
+                "the open shape is as wide as the widest page",
+            );
+            steps.set_page_dormant("two", true);
+            check(
+                steps.open_size().width < wide,
+                "the open shape narrows when the widest page goes dormant",
+            );
+            steps.set_page_dormant("two", false);
             steps.close();
 
             // The strip is never left empty.
