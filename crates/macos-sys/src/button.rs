@@ -376,10 +376,7 @@ impl TouchButton {
             let tone = iv.tone.get().map_or_else(|| white(0.9), Tone::color);
             style::draw_symbol(
                 &iv.symbol.borrow(),
-                NSPoint::new(
-                    picture.origin.x + side / 2.0,
-                    picture.origin.y + side / 2.0,
-                ),
+                NSPoint::new(picture.origin.x + side / 2.0, picture.origin.y + side / 2.0),
                 28.0,
                 &tone,
             );

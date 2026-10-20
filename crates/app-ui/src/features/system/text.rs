@@ -156,8 +156,12 @@ impl Language {
 
     pub fn system_empty_hint(self) -> &'static str {
         match self {
-            Language::English => "Choose what this tab shows in Settings, under Notch tabs, System.",
-            Language::Vietnamese => "Chọn nội dung của tab trong Cài đặt, mục Tab của notch, Hệ thống.",
+            Language::English => {
+                "Choose what this tab shows in Settings, under Notch tabs, System."
+            }
+            Language::Vietnamese => {
+                "Chọn nội dung của tab trong Cài đặt, mục Tab của notch, Hệ thống."
+            }
         }
     }
 }

@@ -54,24 +54,168 @@ fn main() {
         let notch = Rc::new(Notch::new(mtm, geometry, noop(), |_| {}));
         notch.configure(&Style::default());
         let shots: Vec<(&str, Activity)> = vec![
-            ("caps-on", island(symbol("capslock.fill", Tone::Orange, false), Ear::Empty, "Caps Lock", "On")),
-            ("caps-off", island(symbol("capslock", Tone::Gray, false), Ear::Empty, "Caps Lock", "Off")),
-            ("plugged", island(symbol("powerplug.fill", Tone::Green, true), text("64%", Tone::Green), "Power adapter connected", "")),
-            ("unplugged", island(symbol("battery.75", Tone::Gray, false), text("64%", Tone::Gray), "Running on battery", "")),
-            ("full", island(symbol("battery.100", Tone::Green, false), text("100%", Tone::Green), "Battery full", "Charged to 100%")),
-            ("low", island(symbol("battery.25", Tone::Red, true), text("15%", Tone::Red), "Battery low", "15% left, plug in soon")),
-            ("drive", island(symbol("externaldrive.fill", Tone::Blue, true), symbol("checkmark.circle.fill", Tone::Green, false), "Backup", "Connected")),
-            ("ejected", island(symbol("externaldrive", Tone::Gray, false), symbol("checkmark.circle.fill", Tone::Green, false), "Backup", "Safe to unplug")),
-            ("eject-failed", island(symbol("exclamationmark.triangle.fill", Tone::Orange, false), Ear::Empty, "Backup", "The drive is in use and could not be ejected")),
-            ("download", island(symbol("arrow.down.circle.fill", Tone::Blue, false), symbol("checkmark.circle.fill", Tone::Green, false), "Figghost-1.5.0.dmg", "Download finished, 48.3 MB")),
-            ("camera", island(symbol("video.fill", Tone::Green, true), Ear::Empty, "Camera in use", "")),
-            ("both", island(symbol("video.fill", Tone::Green, true), symbol("mic.fill", Tone::Orange, true), "Camera and microphone in use", "")),
-            ("awake", island(symbol("cup.and.saucer.fill", Tone::Orange, false), text("1h", Tone::Orange), "Keeping this Mac awake", "For 1 hour")),
-            ("awake-off", island(symbol("cup.and.saucer", Tone::Gray, false), Ear::Empty, "This Mac may sleep again", "")),
-            ("mic-muted", island(symbol("mic.slash.fill", Tone::Red, false), Ear::Empty, "Microphone muted", "Every app hears nothing")),
-            ("mic-live", island(symbol("mic.fill", Tone::Green, false), Ear::Empty, "Microphone on", "")),
-            ("lock", island(symbol("lock.fill", Tone::Orange, true), text("0:42", Tone::Orange), "Keyboard locked", "Command and Escape unlock it")),
-            ("unlocked", island(symbol("lock.open.fill", Tone::Green, false), Ear::Empty, "Keyboard unlocked", "")),
+            (
+                "caps-on",
+                island(
+                    symbol("capslock.fill", Tone::Orange, false),
+                    Ear::Empty,
+                    "Caps Lock",
+                    "On",
+                ),
+            ),
+            (
+                "caps-off",
+                island(
+                    symbol("capslock", Tone::Gray, false),
+                    Ear::Empty,
+                    "Caps Lock",
+                    "Off",
+                ),
+            ),
+            (
+                "plugged",
+                island(
+                    symbol("powerplug.fill", Tone::Green, true),
+                    text("64%", Tone::Green),
+                    "Power adapter connected",
+                    "",
+                ),
+            ),
+            (
+                "unplugged",
+                island(
+                    symbol("battery.75", Tone::Gray, false),
+                    text("64%", Tone::Gray),
+                    "Running on battery",
+                    "",
+                ),
+            ),
+            (
+                "full",
+                island(
+                    symbol("battery.100", Tone::Green, false),
+                    text("100%", Tone::Green),
+                    "Battery full",
+                    "Charged to 100%",
+                ),
+            ),
+            (
+                "low",
+                island(
+                    symbol("battery.25", Tone::Red, true),
+                    text("15%", Tone::Red),
+                    "Battery low",
+                    "15% left, plug in soon",
+                ),
+            ),
+            (
+                "drive",
+                island(
+                    symbol("externaldrive.fill", Tone::Blue, true),
+                    symbol("checkmark.circle.fill", Tone::Green, false),
+                    "Backup",
+                    "Connected",
+                ),
+            ),
+            (
+                "ejected",
+                island(
+                    symbol("externaldrive", Tone::Gray, false),
+                    symbol("checkmark.circle.fill", Tone::Green, false),
+                    "Backup",
+                    "Safe to unplug",
+                ),
+            ),
+            (
+                "eject-failed",
+                island(
+                    symbol("exclamationmark.triangle.fill", Tone::Orange, false),
+                    Ear::Empty,
+                    "Backup",
+                    "The drive is in use and could not be ejected",
+                ),
+            ),
+            (
+                "download",
+                island(
+                    symbol("arrow.down.circle.fill", Tone::Blue, false),
+                    symbol("checkmark.circle.fill", Tone::Green, false),
+                    "Figghost-1.5.0.dmg",
+                    "Download finished, 48.3 MB",
+                ),
+            ),
+            (
+                "camera",
+                island(
+                    symbol("video.fill", Tone::Green, true),
+                    Ear::Empty,
+                    "Camera in use",
+                    "",
+                ),
+            ),
+            (
+                "both",
+                island(
+                    symbol("video.fill", Tone::Green, true),
+                    symbol("mic.fill", Tone::Orange, true),
+                    "Camera and microphone in use",
+                    "",
+                ),
+            ),
+            (
+                "awake",
+                island(
+                    symbol("cup.and.saucer.fill", Tone::Orange, false),
+                    text("1h", Tone::Orange),
+                    "Keeping this Mac awake",
+                    "For 1 hour",
+                ),
+            ),
+            (
+                "awake-off",
+                island(
+                    symbol("cup.and.saucer", Tone::Gray, false),
+                    Ear::Empty,
+                    "This Mac may sleep again",
+                    "",
+                ),
+            ),
+            (
+                "mic-muted",
+                island(
+                    symbol("mic.slash.fill", Tone::Red, false),
+                    Ear::Empty,
+                    "Microphone muted",
+                    "Every app hears nothing",
+                ),
+            ),
+            (
+                "mic-live",
+                island(
+                    symbol("mic.fill", Tone::Green, false),
+                    Ear::Empty,
+                    "Microphone on",
+                    "",
+                ),
+            ),
+            (
+                "lock",
+                island(
+                    symbol("lock.fill", Tone::Orange, true),
+                    text("0:42", Tone::Orange),
+                    "Keyboard locked",
+                    "Command and Escape unlock it",
+                ),
+            ),
+            (
+                "unlocked",
+                island(
+                    symbol("lock.open.fill", Tone::Green, false),
+                    Ear::Empty,
+                    "Keyboard unlocked",
+                    "",
+                ),
+            ),
         ];
         let dir = Rc::new(dir);
         let step = Rc::new(Cell::new(0_usize));
