@@ -36,6 +36,10 @@ impl Default for AppAudio {
 pub struct DeviceAudio {
     pub volume: f32,
     pub muted: bool,
+    /// Bass of this device alone, in dB within `MAX_BAND_DB` either way.
+    pub bass: f32,
+    /// Treble of this device alone, in dB within `MAX_BAND_DB` either way.
+    pub treble: f32,
 }
 
 impl Default for DeviceAudio {
@@ -43,9 +47,16 @@ impl Default for DeviceAudio {
         Self {
             volume: 1.0,
             muted: false,
+            bass: 0.0,
+            treble: 0.0,
         }
     }
 }
+
+/// How much of the bass and treble knobs each equalizer band takes: bass shelves the lowest bands,
+/// treble the highest, and the bands next to the middle take less.
+const BASS_WEIGHT: [f32; BANDS] = [1.0, 1.0, 0.8, 0.4, 0.0, 0.0, 0.0, 0.0, 0.0, 0.0];
+const TREBLE_WEIGHT: [f32; BANDS] = [0.0, 0.0, 0.0, 0.0, 0.0, 0.0, 0.4, 0.8, 1.0, 1.0];
 
 /// Effects on everything this app plays: the system output, and every app it routes.
 #[derive(Debug, Clone, PartialEq, Serialize, Deserialize)]
@@ -126,6 +137,8 @@ impl AudioConfig {
         self.apps.retain(|_, app| !app.is_neutral());
         for device in self.devices.values_mut() {
             device.volume = clamp(device.volume, 0.0, MAX_GAIN, 1.0);
+            device.bass = clamp(device.bass, -MAX_BAND_DB, MAX_BAND_DB, 0.0);
+            device.treble = clamp(device.treble, -MAX_BAND_DB, MAX_BAND_DB, 0.0);
         }
         self.devices.retain(|_, d| *d != DeviceAudio::default());
         let e = &mut self.effects;
@@ -184,6 +197,19 @@ pub fn eq_curve(key: &str, custom: &[f32; BANDS]) -> Option<[f32; BANDS]> {
         .map(Preset::gains)
 }
 
+/// The curve with a device's own bass and treble added on top.
+fn with_tone(curve: Option<[f32; BANDS]>, device: &DeviceAudio) -> Option<[f32; BANDS]> {
+    if device.bass == 0.0 && device.treble == 0.0 {
+        return curve;
+    }
+    let mut gains = curve.unwrap_or([0.0; BANDS]);
+    for (band, gain) in gains.iter_mut().enumerate() {
+        let tone = device.bass * BASS_WEIGHT[band] + device.treble * TREBLE_WEIGHT[band];
+        *gain = (*gain + tone).clamp(-MAX_BAND_DB, MAX_BAND_DB);
+    }
+    Some(gains)
+}
+
 fn set_eq(params: &Params, curve: Option<[f32; BANDS]>) {
     match curve {
         Some(gains) => {
@@ -214,7 +240,10 @@ pub fn apply_device(effects: &Effects, device: &DeviceAudio, params: &Params) {
     params.set_spatial(effects.spatial);
     params.set_angle(effects.angle);
     params.set_orbit(effects.orbit);
-    set_eq(params, eq_curve(&effects.eq, &effects.custom_eq));
+    set_eq(
+        params,
+        with_tone(eq_curve(&effects.eq, &effects.custom_eq), device),
+    );
     if params.boost() != effects.boost {
         params.set_boost(effects.boost);
     }
@@ -427,6 +456,7 @@ mod tests {
             &DeviceAudio {
                 volume: 0.3,
                 muted: false,
+                ..DeviceAudio::default()
             },
             &params,
         );
@@ -442,6 +472,33 @@ mod tests {
         };
         apply_device(&custom, &DeviceAudio::default(), &params);
         assert_eq!(params.eq_gains(), [2.0; BANDS]);
+    }
+
+    #[test]
+    fn a_devices_bass_and_treble_add_to_the_curve_and_stay_in_range() {
+        let params = Params::default();
+        let device = DeviceAudio {
+            bass: 6.0,
+            treble: -4.0,
+            ..DeviceAudio::default()
+        };
+        apply_device(&Effects::default(), &device, &params);
+        let gains = params.eq_gains();
+        assert!(params.eq_enabled());
+        assert_eq!(
+            (gains[0], gains[3], gains[5], gains[9]),
+            (6.0, 2.4, 0.0, -4.0)
+        );
+        let loud = Effects {
+            eq: "bass_boost".into(),
+            ..Effects::default()
+        };
+        let device = DeviceAudio {
+            bass: 12.0,
+            ..DeviceAudio::default()
+        };
+        apply_device(&loud, &device, &params);
+        assert!(params.eq_gains().iter().all(|g| g.abs() <= MAX_BAND_DB));
     }
 
     #[test]

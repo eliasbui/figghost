@@ -75,6 +75,8 @@ pub struct Snapshot {
     pub default_output: Option<OutputDevice>,
     /// Software volume of the default output, when it has no volume of its own.
     pub device: Option<DeviceAudio>,
+    /// Bass and treble in dB of the default output, whatever kind of volume it has.
+    pub tone: Option<(f32, f32)>,
     pub effects: Effects,
     pub problem: Option<String>,
 }
@@ -260,6 +262,12 @@ impl Engine {
             .as_ref()
             .filter(|d| !d.hardware_volume)
             .map(|d| settings.devices.get(&d.uid).cloned().unwrap_or_default());
+        let tone = st.default_output.as_ref().map(|d| {
+            settings
+                .devices
+                .get(&d.uid)
+                .map_or((0.0, 0.0), |d| (d.bass, d.treble))
+        });
         Snapshot {
             supported: audio_tap::taps_supported(),
             enabled: settings.enabled,
@@ -267,6 +275,7 @@ impl Engine {
             devices: st.devices.clone(),
             default_output: st.default_output.clone(),
             device,
+            tone,
             effects: settings.effects.clone(),
             problem: st.problem.clone(),
         }

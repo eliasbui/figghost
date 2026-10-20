@@ -11,7 +11,7 @@ use crate::{
     config::Config,
     i18n::{self, Language},
 };
-use core_audio_fx::{MAX_ORBIT, Preset};
+use core_audio_fx::{MAX_BAND_DB, MAX_ORBIT, Preset};
 use macos_sys::{
     MainThreadMarker, app,
     mixer_ui::{MixerCallbacks, MixerModel, MixerRow, MixerTexts, MixerView},
@@ -54,6 +54,20 @@ fn index_of(keys: &[&str], key: &str) -> usize {
 
 fn percent(gain: f32) -> String {
     format!("{:.0}%", gain * 100.0)
+}
+
+/// Slider position (0 to 1) for a bass or treble setting; the middle is unchanged.
+fn tone_position(db: f32) -> f64 {
+    f64::from(db) / f64::from(2.0 * MAX_BAND_DB) + 0.5
+}
+
+/// The setting at a slider position; positions close to the middle snap to unchanged.
+fn tone_from_position(position: f64) -> f32 {
+    if (position - 0.5).abs() < 0.02 {
+        0.0
+    } else {
+        ((position - 0.5) * f64::from(2.0 * MAX_BAND_DB)) as f32
+    }
 }
 
 fn eq_name(text: Language, key: &str) -> String {
@@ -109,6 +123,9 @@ pub fn mixer_model(s: &Snapshot, text: Language) -> MixerModel {
             .is_empty()
             .then(|| text.audio_nothing_playing().to_owned()),
         device_title,
+        device_tone: s
+            .tone
+            .map(|(bass, treble)| (tone_position(bass), tone_position(treble))),
         device_volume: s
             .device
             .as_ref()
@@ -159,6 +176,26 @@ fn callbacks(
                 let uid = last.borrow().default_output.as_ref().map(|d| d.uid.clone());
                 if let Some(uid) = uid {
                     engine.update_device(&uid, |d| d.volume = gain_from_slider(position));
+                    done();
+                }
+            })
+        },
+        on_bass: {
+            let (engine, last, done) = (e(), Rc::clone(last), after(refresh));
+            Box::new(move |position| {
+                let uid = last.borrow().default_output.as_ref().map(|d| d.uid.clone());
+                if let Some(uid) = uid {
+                    engine.update_device(&uid, |d| d.bass = tone_from_position(position));
+                    done();
+                }
+            })
+        },
+        on_treble: {
+            let (engine, last, done) = (e(), Rc::clone(last), after(refresh));
+            Box::new(move |position| {
+                let uid = last.borrow().default_output.as_ref().map(|d| d.uid.clone());
+                if let Some(uid) = uid {
+                    engine.update_device(&uid, |d| d.treble = tone_from_position(position));
                     done();
                 }
             })
@@ -306,6 +343,8 @@ impl AudioFeature {
             hint: text.audio_hint().into(),
             enabled: text.audio_enabled().into(),
             device_volume: text.audio_device_volume().into(),
+            bass: text.audio_bass().into(),
+            treble: text.audio_treble().into(),
             boost: text.audio_boost().into(),
             night: text.audio_night().into(),
             width: text.audio_width().into(),
@@ -408,7 +447,9 @@ mod tests {
             device: Some(model::DeviceAudio {
                 volume: 0.5,
                 muted: false,
+                ..model::DeviceAudio::default()
             }),
+            tone: Some((6.0, 0.0)),
             effects: Effects {
                 eq: "bass_boost".into(),
                 width: 1.5,

@@ -22,7 +22,7 @@ use std::{cell::RefCell, collections::HashMap, rc::Rc};
 
 const MARGIN: f64 = 16.0;
 const FOOTER_HEIGHT: f64 = 24.0;
-const TOP_ROWS: [f64; 7] = [22.0, 24.0, 26.0, 24.0, 24.0, 24.0, 24.0];
+const TOP_ROWS: [f64; 8] = [22.0, 24.0, 24.0, 26.0, 24.0, 24.0, 24.0, 24.0];
 const ROW_HEIGHT: f64 = 34.0;
 const ICON: f64 = 20.0;
 const SMALL_FONT: f64 = 11.0;
@@ -34,6 +34,8 @@ pub struct MixerTexts {
     pub hint: String,
     pub enabled: String,
     pub device_volume: String,
+    pub bass: String,
+    pub treble: String,
     pub boost: String,
     pub night: String,
     pub width: String,
@@ -70,6 +72,9 @@ pub struct MixerModel {
     pub device_title: String,
     /// Slider position and percent text of the software volume, when the device has no volume of its own.
     pub device_volume: Option<(f64, String)>,
+    /// Slider positions (0 to 1, 0.5 is unchanged) of the default output's own bass and treble; `None`
+    /// when there is no output.
+    pub device_tone: Option<(f64, f64)>,
     /// First item follows the system's default output; then one per device.
     pub outputs: Vec<String>,
     /// Equalizer choices for the effects: the first turns it off.
@@ -97,6 +102,8 @@ pub type RowChange<T> = Box<dyn Fn(&str, T)>;
 pub struct MixerCallbacks {
     pub on_enabled: Box<dyn Fn(bool)>,
     pub on_device_volume: Box<dyn Fn(f64)>,
+    pub on_bass: Box<dyn Fn(f64)>,
+    pub on_treble: Box<dyn Fn(f64)>,
     pub on_effects_eq: Box<dyn Fn(usize)>,
     pub on_boost: Box<dyn Fn(f64)>,
     pub on_night: Box<dyn Fn(bool)>,
@@ -280,6 +287,10 @@ struct Header {
     volume_label: Retained<NSTextField>,
     volume: Retained<NSSlider>,
     volume_percent: Retained<NSTextField>,
+    bass_label: Retained<NSTextField>,
+    bass: Retained<NSSlider>,
+    treble_label: Retained<NSTextField>,
+    treble: Retained<NSSlider>,
     eq: Retained<NSPopUpButton>,
     boost: Retained<NSSlider>,
     night: Retained<NSButton>,
@@ -422,7 +433,40 @@ impl MixerView {
             0.8,
         );
 
-        let row3 = row(TOP_ROWS[2]);
+        let tone_row = row(TOP_ROWS[2]);
+        let bass_label = label(
+            mtm,
+            &texts.bass,
+            NSRect::new(
+                NSPoint::new(MARGIN, tone_row + 4.0),
+                NSSize::new(150.0, 16.0),
+            ),
+            0.8,
+        );
+        let (bass, bass_target) = self.slider_with(
+            NSRect::new(
+                NSPoint::new(170.0, tone_row),
+                NSSize::new(110.0, TOP_ROWS[2]),
+            ),
+            |c, v| (c.on_bass)(v),
+        );
+        targets.push(bass_target);
+        let treble_label = label(
+            mtm,
+            &texts.treble,
+            NSRect::new(NSPoint::new(300.0, tone_row + 4.0), NSSize::new(50.0, 16.0)),
+            0.8,
+        );
+        let (treble, treble_target) = self.slider_with(
+            NSRect::new(
+                NSPoint::new(352.0, tone_row),
+                NSSize::new(110.0, TOP_ROWS[2]),
+            ),
+            |c, v| (c.on_treble)(v),
+        );
+        targets.push(treble_target);
+
+        let row3 = row(TOP_ROWS[3]);
         let eq_target = {
             let callbacks = Rc::clone(&self.callbacks);
             let slot: Rc<RefCell<Option<Retained<NSPopUpButton>>>> = Rc::default();
@@ -440,7 +484,7 @@ impl MixerView {
             mtm,
             NSRect::new(
                 NSPoint::new(MARGIN - 4.0, row3),
-                NSSize::new(158.0, TOP_ROWS[2]),
+                NSSize::new(158.0, TOP_ROWS[3]),
             ),
             &[],
             &eq_target.0,
@@ -456,7 +500,7 @@ impl MixerView {
         let (boost, boost_target) = self.slider_with(
             NSRect::new(
                 NSPoint::new(260.0, row3 + 1.0),
-                NSSize::new(110.0, TOP_ROWS[2]),
+                NSSize::new(110.0, TOP_ROWS[3]),
             ),
             |c, v| (c.on_boost)(v),
         );
@@ -483,7 +527,7 @@ impl MixerView {
         *night_target.1.borrow_mut() = Some(night.clone());
         targets.push(night_target.0);
 
-        let row4 = row(TOP_ROWS[3]);
+        let row4 = row(TOP_ROWS[4]);
         let width_label = label(
             mtm,
             &texts.width,
@@ -491,7 +535,7 @@ impl MixerView {
             0.8,
         );
         let (width_slider, width_target) = self.slider_with(
-            NSRect::new(NSPoint::new(170.0, row4), NSSize::new(200.0, TOP_ROWS[3])),
+            NSRect::new(NSPoint::new(170.0, row4), NSSize::new(200.0, TOP_ROWS[4])),
             |c, v| (c.on_width)(v),
         );
         targets.push(width_target);
@@ -516,15 +560,20 @@ impl MixerView {
             self.root.addSubview(&control);
             control
         };
-        let spatial = three_d(4, &texts.spatial, |c, v| (c.on_spatial)(v));
-        let angle = three_d(5, &texts.angle, |c, v| (c.on_angle)(v));
-        let orbit = three_d(6, &texts.orbit, |c, v| (c.on_orbit)(v));
+        let spatial = three_d(5, &texts.spatial, |c, v| (c.on_spatial)(v));
+        let angle = three_d(6, &texts.angle, |c, v| (c.on_angle)(v));
+        let orbit = three_d(7, &texts.orbit, |c, v| (c.on_orbit)(v));
 
         self.root.addSubview(&enabled);
         self.root.addSubview(&device);
         self.root.addSubview(&volume_label);
         self.root.addSubview(&volume);
         self.root.addSubview(&volume_percent);
+        for view in [&bass_label, &treble_label] {
+            self.root.addSubview(view);
+        }
+        self.root.addSubview(&bass);
+        self.root.addSubview(&treble);
         self.root.addSubview(&eq);
         self.root.addSubview(&boost_label);
         self.root.addSubview(&boost);
@@ -537,6 +586,10 @@ impl MixerView {
             volume_label,
             volume,
             volume_percent,
+            bass_label,
+            bass,
+            treble_label,
+            treble,
             eq,
             boost,
             night,
@@ -772,6 +825,16 @@ impl MixerView {
                 h.volume.setDoubleValue(*position);
                 h.volume_percent
                     .setStringValue(&NSString::from_str(percent));
+            }
+            let tone = model.device_tone;
+            for view in [&h.bass_label, &h.treble_label] {
+                view.setHidden(tone.is_none());
+            }
+            h.bass.setHidden(tone.is_none());
+            h.treble.setHidden(tone.is_none());
+            if let Some((bass, treble)) = tone {
+                h.bass.setDoubleValue(bass);
+                h.treble.setDoubleValue(treble);
             }
             set_items(&h.eq, &model.eq_options);
             h.eq.selectItemAtIndex(model.effects_eq as isize);

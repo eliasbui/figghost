@@ -50,6 +50,20 @@ impl Language {
         }
     }
 
+    pub fn audio_bass(self) -> &'static str {
+        match self {
+            Language::English => "Bass of this output",
+            Language::Vietnamese => "Bass của thiết bị này",
+        }
+    }
+
+    pub fn audio_treble(self) -> &'static str {
+        match self {
+            Language::English => "Treble",
+            Language::Vietnamese => "Treble",
+        }
+    }
+
     pub fn audio_width(self) -> &'static str {
         match self {
             Language::English => "Stereo width",
