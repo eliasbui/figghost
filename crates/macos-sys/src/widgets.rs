@@ -175,6 +175,43 @@ pub(crate) fn draw_text(
     unsafe { NSString::from_str(text).drawInRect_withAttributes(rect, Some(attrs)) };
 }
 
+/// A centred notice for a page that has nothing to show: a glyph, a title and a hint under it. For a view whose
+/// origin is at the bottom, as the pages' roots are; `size` is the view's.
+pub fn draw_page_note(symbol: &str, title: &str, hint: &str, size: NSSize) {
+    style::draw_symbol(
+        symbol,
+        NSPoint::new(size.width / 2.0, size.height - 78.0),
+        34.0,
+        &white(0.34),
+    );
+    draw_text(
+        title,
+        NSRect::new(
+            NSPoint::new(20.0, size.height - 130.0),
+            NSSize::new(size.width - 40.0, 20.0),
+        ),
+        &text_attributes(
+            &style::font(14.0, style::Weight::Semibold),
+            &white(0.8),
+            Fit::Clip,
+            true,
+        ),
+    );
+    draw_text(
+        hint,
+        NSRect::new(
+            NSPoint::new(40.0, size.height - 182.0),
+            NSSize::new(size.width - 80.0, 48.0),
+        ),
+        &text_attributes(
+            &style::font(12.0, style::Weight::Regular),
+            &white(style::TEXT_SECONDARY),
+            Fit::Words,
+            true,
+        ),
+    );
+}
+
 pub struct PageRootIvars {
     hint: String,
 }

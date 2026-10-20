@@ -1,7 +1,12 @@
-//! Output volume and mute of the default output device, through CoreAudio. Every call is safe from any
-//! thread, so the event tap can use them directly.
+//! Output volume and mute of the default output device, and the mute of the microphone, through CoreAudio.
+//! Every call is safe from any thread, so the event tap can use them directly.
 
-use std::{ffi::c_void, mem::size_of, ptr};
+use std::{
+    ffi::c_void,
+    mem::size_of,
+    ptr,
+    sync::atomic::{AtomicU32, Ordering},
+};
 
 type ObjectId = u32;
 
@@ -20,6 +25,12 @@ const ELEMENT_MAIN: u32 = 0;
 /// The device's overall volume, whether it has one control or one per channel.
 const VIRTUAL_MAIN_VOLUME: u32 = u32::from_be_bytes(*b"vmvc");
 const MUTE: u32 = u32::from_be_bytes(*b"mute");
+const DEFAULT_INPUT_DEVICE: u32 = u32::from_be_bytes(*b"dIn ");
+const SCOPE_INPUT: u32 = u32::from_be_bytes(*b"inpt");
+const VOLUME_SCALAR: u32 = u32::from_be_bytes(*b"volm");
+const DEVICES: u32 = u32::from_be_bytes(*b"dev#");
+const STREAMS: u32 = u32::from_be_bytes(*b"stm#");
+const RUNNING_SOMEWHERE: u32 = u32::from_be_bytes(*b"gone");
 
 #[link(name = "CoreAudio", kind = "framework")]
 unsafe extern "C" {
@@ -43,6 +54,13 @@ unsafe extern "C" {
         object: ObjectId,
         address: *const Address,
         settable: *mut u8,
+    ) -> i32;
+    fn AudioObjectGetPropertyDataSize(
+        object: ObjectId,
+        address: *const Address,
+        qualifier_size: u32,
+        qualifier: *const c_void,
+        size: *mut u32,
     ) -> i32;
 }
 
@@ -146,6 +164,121 @@ pub fn step_level(level: f32, up: bool, fine: bool) -> f32 {
         (at - EDGE).ceil() - 1.0
     };
     (target / marks).clamp(0.0, 1.0)
+}
+
+// -- the microphone -----------------------------------------------------------------------------------------
+
+const fn input(selector: u32, element: u32) -> Address {
+    Address {
+        selector,
+        scope: SCOPE_INPUT,
+        element,
+    }
+}
+
+const fn global(selector: u32) -> Address {
+    Address {
+        selector,
+        scope: SCOPE_GLOBAL,
+        element: ELEMENT_MAIN,
+    }
+}
+
+fn default_input() -> Option<ObjectId> {
+    get::<u32>(SYSTEM_OBJECT, &global(DEFAULT_INPUT_DEVICE)).filter(|&device| device != 0)
+}
+
+/// The values of a property that is a list.
+fn list<T: Copy + Default>(object: ObjectId, address: &Address) -> Vec<T> {
+    let mut size = 0u32;
+    // SAFETY: `size` is a valid out value.
+    let status =
+        unsafe { AudioObjectGetPropertyDataSize(object, address, 0, ptr::null(), &mut size) };
+    if status != 0 || size == 0 {
+        return Vec::new();
+    }
+    let count = size as usize / size_of::<T>();
+    let mut items = vec![T::default(); count];
+    let mut size = (count * size_of::<T>()) as u32;
+    // SAFETY: `items` has room for exactly `size` bytes, which is all the call may write.
+    let status = unsafe {
+        AudioObjectGetPropertyData(
+            object,
+            address,
+            0,
+            ptr::null(),
+            &mut size,
+            items.as_mut_ptr().cast(),
+        )
+    };
+    if status != 0 {
+        return Vec::new();
+    }
+    items.truncate(size as usize / size_of::<T>());
+    items
+}
+
+/// True while any app records from a microphone or another input device.
+pub fn microphone_in_use() -> bool {
+    list::<u32>(SYSTEM_OBJECT, &global(DEVICES))
+        .into_iter()
+        .any(|device| {
+            let records = !list::<u32>(device, &input(STREAMS, ELEMENT_MAIN)).is_empty();
+            records
+                && get::<u32>(device, &global(RUNNING_SOMEWHERE))
+                    .is_some_and(|running| running != 0)
+        })
+}
+
+/// The channels a volume control may be on: the main one, or one per channel of a stereo input.
+const CHANNELS: [u32; 3] = [0, 1, 2];
+/// The level to bring back when a microphone without a mute control is unmuted, as the bits of an `f32`.
+static LEVEL_BEFORE_MUTE: AtomicU32 = AtomicU32::new(0x3F40_0000);
+/// Under this a volume counts as muted.
+const SILENT: f32 = 0.001;
+
+/// Whether the default input device is muted; `None` when there is none or it has nothing to mute with. A
+/// device that has no mute control but a volume is muted by turning the volume to nothing.
+pub fn microphone_muted() -> Option<bool> {
+    let device = default_input()?;
+    let mute = input(MUTE, ELEMENT_MAIN);
+    if settable(device, &mute) {
+        return get::<u32>(device, &mute).map(|m| m != 0);
+    }
+    CHANNELS.into_iter().find_map(|channel| {
+        let volume = input(VOLUME_SCALAR, channel);
+        settable(device, &volume)
+            .then(|| get::<f32>(device, &volume).map(|v| v <= SILENT))
+            .flatten()
+    })
+}
+
+/// Mutes or unmutes the default input device. False when it cannot be done.
+pub fn set_microphone_muted(muted: bool) -> bool {
+    let Some(device) = default_input() else {
+        return false;
+    };
+    let mute = input(MUTE, ELEMENT_MAIN);
+    if settable(device, &mute) {
+        return set(device, &mute, u32::from(muted));
+    }
+    let mut done = false;
+    for channel in CHANNELS {
+        let volume = input(VOLUME_SCALAR, channel);
+        if !settable(device, &volume) {
+            continue;
+        }
+        if muted {
+            if let Some(level) = get::<f32>(device, &volume).filter(|l| *l > SILENT) {
+                LEVEL_BEFORE_MUTE.store(level.to_bits(), Ordering::Relaxed);
+            }
+            done |= set(device, &volume, 0.0f32);
+        } else {
+            let level = f32::from_bits(LEVEL_BEFORE_MUTE.load(Ordering::Relaxed)).clamp(0.05, 1.0);
+            done |= set(device, &volume, level);
+        }
+    }
+    done
 }
 
 #[cfg(test)]

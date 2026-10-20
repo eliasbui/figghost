@@ -1164,6 +1164,8 @@ struct Inner {
     enabled: Cell<bool>,
     /// While something else is using the top edge (window snapping), the pointer does not open the notch.
     suppressed: Cell<bool>,
+    /// The person asked the notch not to open when the pointer reaches it, for a while.
+    snoozed: Cell<bool>,
     activities: RefCell<Vec<(&'static str, Activity, u64)>>,
     serial: Cell<u64>,
     /// The ears' bars are redrawn by this while they are on screen; nothing runs otherwise.
@@ -2533,12 +2535,16 @@ fn pointer_moved(inner: &Rc<Inner>, p: NSPoint) {
     let style = inner.style.borrow().clone();
     let inner = Rc::clone(inner);
     if inside {
-        if !style.open_on_hover {
+        if !style.open_on_hover || inner.snoozed.get() {
             return;
         }
         app::after(style.hover_delay, move || {
-            // Window snapping may have taken the top edge since the pointer arrived.
-            if inner.inside.get() && !inner.is_open() && !inner.suppressed.get() {
+            // Window snapping may have taken the top edge since the pointer arrived, or the notch was snoozed.
+            if inner.inside.get()
+                && !inner.is_open()
+                && !inner.suppressed.get()
+                && !inner.snoozed.get()
+            {
                 if style.haptics {
                     tap();
                 }
@@ -2717,6 +2723,7 @@ impl Notch {
             inside: Cell::new(false),
             enabled: Cell::new(true),
             suppressed: Cell::new(false),
+            snoozed: Cell::new(false),
             activities: RefCell::new(Vec::new()),
             serial: Cell::new(0),
             bars: RefCell::new(None),
@@ -3125,6 +3132,22 @@ impl Notch {
         if suppressed {
             self.inner.collapse();
         }
+    }
+
+    /// Snoozes the notch: while it is on, the pointer reaching the top edge does not open it. A click on it, a
+    /// shortcut and anything that opens it by itself (a coding agent that asks, an alert) still do, so nothing that
+    /// waits for the person is lost. An open notch closes.
+    pub fn set_snoozed(&self, snoozed: bool) {
+        if self.inner.snoozed.replace(snoozed) == snoozed {
+            return;
+        }
+        if snoozed {
+            self.inner.collapse();
+        }
+    }
+
+    pub fn is_snoozed(&self) -> bool {
+        self.inner.snoozed.get()
     }
 
     /// Whether the pointer is over the notch right now; something that opened it by itself leaves it open while the

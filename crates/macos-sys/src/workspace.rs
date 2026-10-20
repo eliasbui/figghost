@@ -86,6 +86,14 @@ pub fn reveal(path: &Path) {
 }
 
 /// The system alert sound, for an action that did not work.
+/// Moves a file to the Trash, where the person can still get it back.
+pub fn trash(path: &Path) -> std::io::Result<()> {
+    let url = NSURL::fileURLWithPath(&NSString::from_str(&path.to_string_lossy()));
+    NSFileManager::defaultManager()
+        .trashItemAtURL_resultingItemURL_error(&url, None)
+        .map_err(|e| std::io::Error::other(e.localizedDescription().to_string()))
+}
+
 pub fn beep() {
     objc2_app_kit::NSBeep();
 }
@@ -177,6 +185,36 @@ pub fn pick_app(mtm: MainThreadMarker, prompt: &str) -> Option<App> {
         name,
         pid: 0,
     })
+}
+
+/// The bundle identifier of this app, when it runs from a bundle.
+pub fn own_bundle_id() -> Option<String> {
+    NSBundle::mainBundle()
+        .bundleIdentifier()
+        .map(|id| id.to_string())
+}
+
+/// Lets the user choose a folder. Blocks until the dialog closes; `None` if cancelled.
+pub fn pick_folder(mtm: MainThreadMarker, prompt: &str) -> Option<PathBuf> {
+    let panel = NSOpenPanel::openPanel(mtm);
+    panel.setCanChooseFiles(false);
+    panel.setCanChooseDirectories(true);
+    panel.setCanCreateDirectories(false);
+    panel.setAllowsMultipleSelection(false);
+    panel.setMessage(Some(&NSString::from_str(prompt)));
+    if panel.runModal() != NSModalResponseOK {
+        return None;
+    }
+    let url = panel.URLs().firstObject()?;
+    Some(PathBuf::from(url.path()?.to_string()))
+}
+
+/// The icon the Finder shows for a file or folder, `points` square.
+pub fn icon_of(path: &Path, points: f64) -> Retained<NSImage> {
+    let icon =
+        NSWorkspace::sharedWorkspace().iconForFile(&NSString::from_str(&path.to_string_lossy()));
+    icon.setSize(NSSize::new(points, points));
+    icon
 }
 
 /// The app's icon as PNG bytes, `size` pixels square.

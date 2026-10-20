@@ -9,8 +9,8 @@ use objc2::{
     AnyThread, DefinedClass, MainThreadMarker, MainThreadOnly, define_class, msg_send, rc::Retained,
 };
 use objc2_app_kit::{
-    NSAccessibilityButtonRole, NSEvent, NSStringDrawing, NSTrackingArea, NSTrackingAreaOptions,
-    NSView,
+    NSAccessibilityButtonRole, NSEvent, NSImage, NSStringDrawing, NSTrackingArea,
+    NSTrackingAreaOptions, NSView,
 };
 use objc2_foundation::{NSCopying, NSObjectProtocol, NSPoint, NSRect, NSSize, NSString};
 use std::{
@@ -26,6 +26,10 @@ pub enum Look {
     Rect,
     /// A capsule with a glyph, a label and a count; white while selected.
     Chip,
+    /// A row of a list: the title over a dimmer line, with no shape of its own until it is hovered or chosen.
+    Row,
+    /// A tile of a grid: a picture (an app's icon, or a glyph) with its name under it.
+    Tile,
 }
 
 const CHIP_PAD: f64 = 12.0;
@@ -42,6 +46,8 @@ pub struct ButtonIvars {
     hovered: Cell<bool>,
     pressed: Cell<bool>,
     tone: Cell<Option<Tone>>,
+    /// A picture for a tile, drawn instead of the glyph.
+    image: RefCell<Option<Retained<NSImage>>>,
     on_click: RefCell<Option<Rc<dyn Fn()>>>,
 }
 
@@ -138,6 +144,7 @@ impl TouchButton {
             hovered: Cell::new(false),
             pressed: Cell::new(false),
             tone: Cell::new(None),
+            image: RefCell::new(None),
             on_click: RefCell::new(None),
         };
         // SAFETY: designated initializer with valid arguments on the main thread.
@@ -225,6 +232,12 @@ impl TouchButton {
         self.setNeedsDisplay(true);
     }
 
+    /// The picture of a tile, such as an app's icon.
+    pub fn set_image(&self, image: Option<Retained<NSImage>>) {
+        *self.ivars().image.borrow_mut() = image;
+        self.setNeedsDisplay(true);
+    }
+
     pub fn set_look(&self, look: Look) {
         self.ivars().look.set(look);
         self.setNeedsDisplay(true);
@@ -242,6 +255,8 @@ impl TouchButton {
             }
             Look::Rect => 15.0,
             Look::Chip => 12.0,
+            Look::Row => 14.0,
+            Look::Tile => 28.0,
         }
     }
 
@@ -278,10 +293,124 @@ impl TouchButton {
         width + 2.0 * CHIP_PAD
     }
 
+    /// A list row: a faint panel while hovered, a brighter one while chosen, and the title over its detail.
+    fn paint_row(&self) {
+        let iv = self.ivars();
+        let bounds = self.bounds();
+        let shade = if !iv.enabled.get() {
+            0.0
+        } else if iv.pressed.get() {
+            0.16
+        } else if iv.selected.get() {
+            0.13
+        } else if iv.hovered.get() {
+            0.07
+        } else {
+            0.0
+        };
+        if shade > 0.0 {
+            style::fill_rounded(bounds, 9.0, &white(shade));
+        }
+        let (title, detail) = (iv.title.borrow(), iv.detail.borrow());
+        let pad = 10.0;
+        let width = (bounds.size.width - 2.0 * pad).max(0.0);
+        let mid = bounds.size.height / 2.0;
+        let title_attrs = text_attributes(
+            &style::font(12.0, Weight::Medium),
+            &white(TEXT),
+            Fit::Tail,
+            false,
+        );
+        if detail.is_empty() {
+            draw_text(
+                &title,
+                NSRect::new(NSPoint::new(pad, mid - 8.0), NSSize::new(width, 16.0)),
+                &title_attrs,
+            );
+            return;
+        }
+        draw_text(
+            &title,
+            NSRect::new(NSPoint::new(pad, mid + 0.5), NSSize::new(width, 16.0)),
+            &title_attrs,
+        );
+        draw_text(
+            &detail,
+            NSRect::new(NSPoint::new(pad, mid - 15.5), NSSize::new(width, 14.0)),
+            &text_attributes(
+                &style::font(10.5, Weight::Regular),
+                &white(style::TEXT_SECONDARY),
+                Fit::Tail,
+                false,
+            ),
+        );
+    }
+
+    /// A tile: a faint panel while hovered, the picture above and the name under it.
+    fn paint_tile(&self) {
+        let iv = self.ivars();
+        let bounds = self.bounds();
+        let shade = if !iv.enabled.get() {
+            0.0
+        } else if iv.pressed.get() {
+            0.16
+        } else if iv.hovered.get() {
+            0.09
+        } else {
+            0.0
+        };
+        if shade > 0.0 {
+            style::fill_rounded(bounds, 12.0, &white(shade));
+        }
+        let side = 40.0;
+        let picture = NSRect::new(
+            NSPoint::new(
+                (bounds.size.width - side) / 2.0,
+                bounds.size.height - 10.0 - side,
+            ),
+            NSSize::new(side, side),
+        );
+        if let Some(image) = iv.image.borrow().as_ref() {
+            image.drawInRect(picture);
+        } else if !iv.symbol.borrow().is_empty() {
+            let tone = iv.tone.get().map_or_else(|| white(0.9), Tone::color);
+            style::draw_symbol(
+                &iv.symbol.borrow(),
+                NSPoint::new(
+                    picture.origin.x + side / 2.0,
+                    picture.origin.y + side / 2.0,
+                ),
+                28.0,
+                &tone,
+            );
+        }
+        draw_text(
+            &iv.title.borrow(),
+            NSRect::new(
+                NSPoint::new(4.0, 6.0),
+                NSSize::new((bounds.size.width - 8.0).max(0.0), 28.0),
+            ),
+            &text_attributes(
+                &style::font(10.5, Weight::Medium),
+                &white(TEXT),
+                Fit::Words,
+                true,
+            ),
+        );
+    }
+
     fn paint(&self) {
         let iv = self.ivars();
         let bounds = self.bounds();
         let (look, enabled) = (iv.look.get(), iv.enabled.get());
+        if look == Look::Row {
+            self.paint_row();
+            return;
+        }
+        if look == Look::Tile {
+            self.paint_tile();
+            return;
+        }
         let solid = matches!(look, Look::Round { filled: true })
             || (matches!(look, Look::Chip | Look::Rect) && iv.selected.get());
         // What separates the looks of a control is only how it is being used.
@@ -326,6 +455,8 @@ impl TouchButton {
             }
             Look::Rect => shape(bounds, BUTTON_RADIUS),
             Look::Chip => shape(bounds, bounds.size.height / 2.0),
+            // Drawn by `paint_row` and `paint_tile` above, which returned already.
+            Look::Row | Look::Tile => {}
         }
 
         let glyph_color = match (iv.tone.get(), solid) {
