@@ -317,7 +317,7 @@ impl Feature {
     fn tick(&self) {
         let ticks = self.ticks.get() + 1;
         self.ticks.set(ticks % RESYNC_TICKS);
-        self.push(ticks.is_multiple_of(RESYNC_TICKS));
+        self.push(ticks % RESYNC_TICKS == 0);
     }
 
     /// Tells the page what plays. A message goes only when something but the position changed, or when

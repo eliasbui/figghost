@@ -18,10 +18,12 @@ use std::{cell::RefCell, collections::HashMap, ptr::NonNull, rc::Rc, time::Insta
 
 const APP_NAME: &str = "Figghost";
 
+type MenuHandler = Rc<dyn Fn()>;
+
 thread_local! {
     /// What the items of the application menu do, by name ("settings", "updates", "whats_new", "config"); set by
     /// the app once what they open exists.
-    static MENU_HANDLERS: RefCell<HashMap<&'static str, Rc<dyn Fn()>>> = RefCell::new(HashMap::new());
+    static MENU_HANDLERS: RefCell<HashMap<&'static str, MenuHandler>> = RefCell::new(HashMap::new());
     /// The targets of the menu items; AppKit holds targets weakly.
     static MENU_TARGETS: RefCell<Vec<Retained<ActionTarget>>> = const { RefCell::new(Vec::new()) };
 }
