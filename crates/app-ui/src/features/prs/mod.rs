@@ -1,4 +1,5 @@
-//! The Pull requests tab of the notch: the review requests that wait for the person on GitHub and GitLab, newest first,
+//! The Pull requests tab of the notch: the review requests that wait for the person on GitHub and GitLab and the person's
+//! own open ones, newest first,
 //! with a dot on the tab's icon while there are some. Pressing one opens it in the browser. It is off until the person turns
 //! it on.
 //!
@@ -465,30 +466,39 @@ fn fetch(host: Host) -> Result<Vec<Request>, Problem> {
     match host {
         Host::GitHub => {
             let tool = locate(&tool_dirs(), "gh").ok_or(Problem::Missing)?;
-            let text = run(
-                &tool,
-                &[
-                    "search",
-                    "prs",
-                    "--review-requested=@me",
-                    "--state=open",
-                    "--limit",
-                    "20",
-                    "--json",
-                    "number,title,url,repository,author,updatedAt,isDraft",
-                ],
-                COMMAND_SECONDS,
-            )?;
-            parse_github(&text).map_err(|_| Problem::Unreadable)
+            // The requests waiting for the person's review, then the person's own open ones; `merged` drops repeats.
+            let mut all = Vec::new();
+            for who in ["--review-requested=@me", "--author=@me"] {
+                let text = run(
+                    &tool,
+                    &[
+                        "search",
+                        "prs",
+                        who,
+                        "--state=open",
+                        "--limit",
+                        "20",
+                        "--json",
+                        "number,title,url,repository,author,updatedAt,isDraft",
+                    ],
+                    COMMAND_SECONDS,
+                )?;
+                all.extend(parse_github(&text).map_err(|_| Problem::Unreadable)?);
+            }
+            Ok(all)
         }
         Host::GitLab => {
             let tool = locate(&tool_dirs(), "glab").ok_or(Problem::Missing)?;
             let me = run(&tool, &["api", "user"], COMMAND_SECONDS)?;
             let id = gitlab_user_id(&me).ok_or(Problem::Unreadable)?;
-            let query =
-                format!("merge_requests?state=opened&scope=all&reviewer_id={id}&per_page=20");
-            let text = run(&tool, &["api", &query], COMMAND_SECONDS)?;
-            parse_gitlab(&text).map_err(|_| Problem::Unreadable)
+            let mut all = Vec::new();
+            for who in ["reviewer_id", "author_id"] {
+                let query =
+                    format!("merge_requests?state=opened&scope=all&{who}={id}&per_page=20");
+                let text = run(&tool, &["api", &query], COMMAND_SECONDS)?;
+                all.extend(parse_gitlab(&text).map_err(|_| Problem::Unreadable)?);
+            }
+            Ok(all)
         }
     }
 }
