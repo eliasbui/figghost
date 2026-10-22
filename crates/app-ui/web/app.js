@@ -1998,23 +1998,46 @@ function pageTexts() {
   return searchIndex;
 }
 
-/** Shows the pages that say every word of `query`, and says so when none does. */
+/** Lists under the search field the pages that say every word of `query`, and says so when none does. */
 function applySearch(query) {
   searchWords = folded(query).split(/\s+/).filter(Boolean);
-  const index = searchWords.length ? pageTexts() : null;
-  let shown = 0;
-  for (const item of document.querySelectorAll('.nav-item')) {
-    const cat = CATEGORIES.find((c) => c.id === item.dataset.page);
-    const match = !index || (cat && cat.pages.some((pid) => {
-      const text = index.get(pid) || '';
-      return searchWords.every((w) => text.includes(w));
-    }));
-    item.hidden = !match;
-    if (match) shown += 1;
+  const box = $('#search-results');
+  if (!box) return;
+  if (!searchWords.length) {
+    box.hidden = true;
+    box.replaceChildren();
+    return;
   }
-  for (const sep of document.querySelectorAll('.nav-sep')) sep.hidden = searchWords.length > 0;
-  const empty = $('.nav-empty');
-  if (empty) empty.hidden = shown > 0;
+  const index = pageTexts();
+  const hits = CATEGORIES.flatMap((cat) => cat.pages.map((pid) => ({ cat, pid })))
+    .filter(({ pid }) => searchWords.every((w) => (index.get(pid) || '').includes(w)));
+  box.replaceChildren(...(hits.length
+    ? hits.map(({ cat, pid }, i) => h('button', {
+      class: 'result',
+      role: 'option',
+      'data-page': pid,
+      'data-cat': cat.id,
+      'aria-selected': String(i === 0),
+      // The field keeps the focus, so the list stays open until the choice is made.
+      onmousedown: (e) => e.preventDefault(),
+      onclick: () => openResult(pid),
+    },
+    h('span', { class: 'nav-icon' }, icon(cat.icon)),
+    h('span', { class: 'result-name', text: t('nav.' + pid) }),
+    h('span', { class: 'result-cat', text: t('cat.' + cat.id) })))
+    : [h('div', { class: 'search-empty', text: t('side.none') })]));
+  box.hidden = false;
+}
+
+/** Opens a page the search found, brings its row into view, and puts the search away. */
+function openResult(pid) {
+  go.rise = true;
+  go(pid);
+  reveal(searchWords);
+  const field = $('#search');
+  field.value = '';
+  applySearch('');
+  field.blur();
 }
 
 /** On the page just opened from a search, brings the first row that says the words into view and marks it. */
@@ -2029,40 +2052,47 @@ function reveal(words) {
 }
 
 function navSearch() {
-  const input = h('input', { type: 'search', id: 'side-search', autocomplete: 'off', spellcheck: 'false', placeholder: t('side.search'), 'aria-label': t('side.search') });
+  const input = h('input', { type: 'search', id: 'search', autocomplete: 'off', spellcheck: 'false', placeholder: t('side.search'), 'aria-label': t('side.search'), 'aria-controls': 'search-results' });
+  const box = h('div', { id: 'search-results', role: 'listbox', hidden: true });
   input.addEventListener('input', () => applySearch(input.value));
+  input.addEventListener('focus', () => applySearch(input.value));
+  input.addEventListener('blur', () => { box.hidden = true; });
   input.addEventListener('keydown', (e) => {
-    if (e.key === 'Escape' && input.value) {
+    const results = [...box.querySelectorAll('.result')];
+    const at = results.findIndex((r) => r.getAttribute('aria-selected') === 'true');
+    if (e.key === 'Escape') {
       e.preventDefault();
-      input.value = '';
-      applySearch('');
-    } else if (e.key === 'Enter') {
-      const first = [...document.querySelectorAll('.nav-item')].find((item) => !item.hidden);
-      if (first) {
-        const cat = CATEGORIES.find((c) => c.id === first.dataset.page);
-        const index = pageTexts();
-        const hit = (cat ? cat.pages : []).find((pid) => {
-          const text = index.get(pid) || '';
-          return searchWords.every((w) => text.includes(w));
-        }) || (cat ? (cat.lastPage || cat.pages[0]) : first.dataset.page);
-        go(hit);
-        reveal(searchWords);
-      }
+      if (input.value) { input.value = ''; applySearch(''); } else input.blur();
+    } else if ((e.key === 'ArrowDown' || e.key === 'ArrowUp') && results.length) {
+      e.preventDefault();
+      const next = (at + (e.key === 'ArrowDown' ? 1 : results.length - 1)) % results.length;
+      results.forEach((r, i) => r.setAttribute('aria-selected', String(i === next)));
+      results[next].scrollIntoView({ block: 'nearest' });
+    } else if (e.key === 'Enter' && results.length) {
+      openResult(results[Math.max(at, 0)].dataset.page);
     }
   });
-  // Command-F finds, as in any Mac window, and Command-K does the same for those who reach for it first. Bound once: the
-  // shell is rebuilt when the language changes.
+  // Command-K finds, and Command-F does the same, as in any Mac window. Bound once: the shell is rebuilt when the
+  // language changes.
   if (!navSearch.bound) {
     navSearch.bound = true;
     document.addEventListener('keydown', (e) => {
       if (e.metaKey && !e.shiftKey && !e.altKey && !e.ctrlKey && (e.code === 'KeyF' || e.code === 'KeyK')) {
         e.preventDefault();
-        const field = $('#side-search');
+        const field = $('#search');
         if (field) { field.focus(); field.select(); }
       }
     });
   }
-  return h('label', { class: 'side-search' }, icon('magnifyingglass'), input);
+  return h('div', { class: 'search' },
+    h('label', { class: 'top-search' }, icon('magnifyingglass'), input, h('kbd', { 'aria-hidden': 'true', text: '⌘K' })),
+    box);
+}
+
+function openCategory(cat) {
+  if (categoryOf(current).id === cat.id) return placeLens();
+  go.rise = true;
+  go(cat.lastPage || cat.pages[0]);
 }
 
 function renderNavItems() {
@@ -2070,17 +2100,81 @@ function renderNavItems() {
     h('button', {
       class: 'nav-item',
       'data-page': cat.id,
-      'data-name': t('cat.' + cat.id),
-      onclick: () => {
-        const target = cat.lastPage || cat.pages[0];
-        go.rise = true;
-        go(target);
-        reveal(searchWords);
-      },
+      'data-cat': cat.id,
+      title: t('cat.' + cat.id),
+      'aria-label': t('cat.' + cat.id),
+      // A press of the pointer is handled by the dock's lens; this is the keyboard's Space and Return.
+      onclick: (e) => { if (e.detail === 0) openCategory(cat); },
     },
-    h('span', { class: 'nav-icon' }, icon(cat.icon)),
-    h('span', { class: 'nav-label', text: t('cat.' + cat.id) }))
+    h('span', { class: 'nav-icon' }, icon(cat.icon)))
   );
+}
+
+/** Puts the lens of the dock under the icon of the open group: gliding there when a person chose it, at once
+ *  otherwise, so a window that opens does not show it sliding in from the edge. */
+function placeLens(glide = true) {
+  const nav = $('#nav');
+  const item = nav && nav.querySelector('.nav-item[aria-current="page"]');
+  if (!item) return;
+  nav.classList.toggle('still', !glide);
+  nav.style.setProperty('--x', item.offsetLeft + item.offsetWidth / 2 + 'px');
+  nav.style.setProperty('--s', '1');
+  if (!glide) {
+    void nav.offsetWidth;
+    nav.classList.remove('still');
+  }
+}
+
+/** The dock's lens follows a press: it swells where the pointer goes down, slides with a drag (stretched by its
+ *  speed, like a drop of water), lights the icon under it, and on release opens that icon's group. */
+function dockLens(nav) {
+  const items = () => [...nav.querySelectorAll('.nav-item')];
+  const centre = (item) => item.offsetLeft + item.offsetWidth / 2;
+  const nearest = (x) => items().reduce((best, item) => (Math.abs(centre(item) - x) < Math.abs(centre(best) - x) ? item : best));
+  let press = null;
+  let settle = 0;
+  const follow = (e) => {
+    const all = items();
+    const x = Math.min(Math.max(e.clientX - nav.getBoundingClientRect().left, centre(all[0])), centre(all[all.length - 1]));
+    const now = e.timeStamp;
+    const speed = press.t ? Math.abs(x - press.x) / Math.max(now - press.t, 1) : 0;
+    press.x = x;
+    press.t = now;
+    nav.style.setProperty('--x', x + 'px');
+    nav.style.setProperty('--s', String(1 + Math.min(speed * 0.18, 0.4)));
+    clearTimeout(settle);
+    settle = setTimeout(() => nav.style.setProperty('--s', '1'), 90);
+    const lit = nearest(x);
+    for (const item of all) item.classList.toggle('lit', item === lit);
+  };
+  const end = (open) => {
+    if (!press) return;
+    const target = nearest(press.x);
+    press = null;
+    clearTimeout(settle);
+    nav.classList.remove('pressing', 'dragging');
+    for (const item of items()) item.classList.remove('lit');
+    if (open) openCategory(CATEGORIES.find((c) => c.id === target.dataset.page));
+    else placeLens();
+  };
+  nav.addEventListener('pointerdown', (e) => {
+    if (e.button !== 0) return;
+    e.preventDefault();
+    try { nav.setPointerCapture(e.pointerId); } catch (_) { /* a synthetic pointer has nothing to capture */ }
+    press = { x: 0, t: 0, x0: e.clientX };
+    nav.classList.add('pressing');
+    follow(e);
+  });
+  nav.addEventListener('pointermove', (e) => {
+    if (!press) return;
+    if (Math.abs(e.clientX - press.x0) > 3) nav.classList.add('dragging');
+    follow(e);
+  });
+  nav.addEventListener('pointerup', () => end(true));
+  nav.addEventListener('pointercancel', () => end(false));
+  nav.addEventListener('lostpointercapture', () => end(false));
+  nav.prepend(h('div', { class: 'lens', 'aria-hidden': 'true' }));
+  return nav;
 }
 
 function renderSubtabs(cat, activeId) {
@@ -2132,16 +2226,12 @@ function buildShell() {
   document.documentElement.lang = lang;
   $('#root').replaceChildren(
     h('div', { id: 'app' },
-      h('aside', { id: 'sidebar', class: 'glass' },
-        h('div', { class: 'dragzone', 'data-drag': '' }),
-        h('span', { class: 'wordmark', 'aria-hidden': 'true', text: 'figghost' }),
-        navSearch(),
-        h('nav', { id: 'nav', 'aria-label': 'Figghost' },
-          ...renderNavItems(),
-          h('div', { class: 'nav-empty', hidden: true, text: t('side.none') })),
-        accessPill()),
       h('main', { id: 'main' },
         h('div', { class: 'dragzone', 'data-drag': '' }),
+        h('div', { class: 'topbar' },
+          h('span', { class: 'wordmark', 'aria-hidden': 'true', text: 'figghost' }),
+          navSearch(),
+          accessPill()),
         h('header', { class: 'page-head' },
           h('h1', { class: 'page-title', id: 'title' }),
           h('div', { id: 'subtabs', class: 'page-subtabs' }),
@@ -2149,7 +2239,8 @@ function buildShell() {
           h('div', { class: 'guide' },
             h('p', { class: 'bubble' }, h('span', { class: 'bubble-text', id: 'guide-text' })),
             h('button', { class: 'guide-ghost', 'aria-label': t('guide.label'), onclick: poke }, ghost()))),
-        h('div', { id: 'scroller' }))),
+        h('div', { id: 'scroller' })),
+      dockLens(h('nav', { id: 'nav', 'aria-label': 'Figghost' }, ...renderNavItems()))),
     h('div', { id: 'toast', 'aria-live': 'polite' }),
     h('div', { id: 'modal' }),
     h('div', { class: 'defs', 'aria-hidden': 'true', html: WOBBLE_SVG }));
@@ -2181,6 +2272,7 @@ function go(id) {
   for (const item of document.querySelectorAll('.nav-item')) {
     if (item.dataset.page === cat.id) item.setAttribute('aria-current', 'page'); else item.removeAttribute('aria-current');
   }
+  placeLens(rise);
   send({ t: 'page', id: current });
 }
 
@@ -2270,18 +2362,40 @@ window.__selftest = function () {
     expect(en.filter((k) => !I18N.vi[k]).length === 0, 'missing in vi: ' + en.filter((k) => !I18N.vi[k]).join(', '));
     expect(vi.filter((k) => !I18N.en[k]).length === 0, 'missing in en: ' + vi.filter((k) => !I18N.en[k]).join(', '));
 
-    // The search over the sidebar finds pages by what their settings say, with or without Vietnamese marks.
+    // The search in the top bar finds pages by what their settings say, with or without Vietnamese marks.
     {
-      const field = $('#side-search');
+      const field = $('#search');
       const search = (text) => { field.value = text; field.dispatchEvent(new Event('input')); };
-      const shown = () => [...document.querySelectorAll('.nav-item')].filter((item) => !item.hidden).map((item) => item.dataset.page);
+      const shown = () => [...document.querySelectorAll('#search-results .result')].map((item) => item.dataset.page);
       search('hover');
       expect(shown().includes('notch') && !shown().includes('scroll'), 'search finds the notch by its hover delay: ' + shown());
       expect(folded('Cuộn chuột Đ') === 'cuon chuot d', 'search ignores marks: ' + folded('Cuộn chuột Đ'));
+      field.dispatchEvent(new KeyboardEvent('keydown', { key: 'Enter', bubbles: true }));
+      expect(current === 'notch' && field.value === '' && $('#search-results').hidden, 'Return opens the first page found and puts the search away: ' + current);
       search('zzqx');
-      expect(shown().length === 0 && !$('.nav-empty').hidden, 'a search that matches nothing says so');
+      expect(shown().length === 0 && $('.search-empty') && !$('#search-results').hidden, 'a search that matches nothing says so');
       search('');
-      expect(shown().length === CATEGORIES.length && $('.nav-empty').hidden, 'clearing the search shows every page');
+      expect($('#search-results').hidden, 'clearing the search closes the list');
+      document.dispatchEvent(new KeyboardEvent('keydown', { code: 'KeyK', metaKey: true, bubbles: true, cancelable: true }));
+      expect(document.activeElement === field, 'Command-K puts the cursor in the search');
+      field.blur();
+    }
+
+    // A press on the dock dragged from the first icon to the fifth opens the fifth group, and the lens settles under it.
+    {
+      go('general');
+      const nav = $('#nav');
+      const items = [...nav.querySelectorAll('.nav-item')];
+      const at = (item) => nav.getBoundingClientRect().left + item.offsetLeft + item.offsetWidth / 2;
+      const pointer = (type, item) => nav.dispatchEvent(new PointerEvent(type, { pointerId: 9, button: 0, clientX: at(item), bubbles: true, cancelable: true }));
+      pointer('pointerdown', items[0]);
+      expect(nav.classList.contains('pressing') && items[0].classList.contains('lit'), 'a press swells the lens and lights the icon under it');
+      pointer('pointermove', items[4]);
+      expect(nav.classList.contains('dragging') && items[4].classList.contains('lit') && !items[0].classList.contains('lit'), 'a drag moves the light along');
+      pointer('pointerup', items[4]);
+      expect(categoryOf(current).id === CATEGORIES[4].id && !nav.classList.contains('pressing'), 'letting go opens the group under the lens: ' + current);
+      expect(nav.style.getPropertyValue('--x') === items[4].offsetLeft + items[4].offsetWidth / 2 + 'px', 'the lens rests under the open group');
+      go('general');
     }
 
     // Shortcut helpers.
