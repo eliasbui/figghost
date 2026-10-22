@@ -370,7 +370,7 @@ dependencies = [
 
 [[package]]
 name = "core-notes"
-version = "2.0.3"
+version = "2.0.4"
 
 [[package]]
 name = "core-smart"
@@ -704,7 +704,7 @@ dependencies = [
 
 [[package]]
 name = "figghost-desktop"
-version = "2.0.3"
+version = "2.0.4"
 dependencies = [
  "arboard",
  "auto-launch",
