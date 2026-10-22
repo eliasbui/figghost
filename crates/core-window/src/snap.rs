@@ -86,6 +86,17 @@ fn inflate(r: Rect, by: f64) -> Rect {
 }
 
 impl Display {
+    /// The screen with a closed notch of `size` (width, height) at its top: wider and taller than the cutout or the
+    /// pill while it shows something, such as music in its ears. The row covers it and hangs below it, and the
+    /// pointer anywhere on it brings the row.
+    pub fn covering(self, size: (f64, f64)) -> Display {
+        Display {
+            cutout: self.cutout.max(size.0),
+            inset: self.inset.max(size.1 + CLEARANCE),
+            ..self
+        }
+    }
+
     /// The band along the top edge, centred on the notch, where the pointer makes the row appear.
     pub fn trigger(&self) -> Rect {
         let w = self.cutout + 2.0 * TRIGGER_SLACK;
@@ -621,6 +632,26 @@ mod tests {
         // The cutout is 32 points tall there (inset 38 less the 6 of clearance), as is the notch's own trigger.
         assert_eq!(laptop().trigger().h, 32.0);
         assert_eq!(plain().trigger().h, TRIGGER_HEIGHT);
+    }
+
+    #[test]
+    fn a_notch_that_shows_something_widens_the_band_and_the_row_to_cover_it() {
+        // Music in the ears of the closed notch on a notchless monitor: 280 points wide and as tall as the menu bar.
+        let (before, after) = (plain(), plain().covering((280.0, 24.0)));
+        let low_on_the_shape = (960.0 + 130.0, 22.0);
+        assert!(!contains(before.trigger(), low_on_the_shape));
+        assert!(contains(after.trigger(), low_on_the_shape));
+        assert!(
+            !contains(after.trigger(), (960.0, 25.0)),
+            "but not below it"
+        );
+        // The row and the chip hang below the shape and cover it.
+        assert!(after.cells(7).iter().all(|c| c.y >= 24.0));
+        assert!(after.panel(1).w >= 280.0 && after.chip().w >= 280.0);
+        assert!(after.chip().h > 24.0 + CHIP.1);
+        // A notch that shows nothing beyond its cutout changes nothing.
+        assert_eq!(plain().covering((200.0, 4.0)), plain());
+        assert_eq!(laptop().covering((185.0, 32.0)), laptop());
     }
 
     #[test]

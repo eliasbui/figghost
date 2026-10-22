@@ -4,7 +4,7 @@ use super::controller::{Held, Platform, Pressed};
 use crate::i18n;
 use core_window::{
     Rect,
-    snap::{Display, Point, View},
+    snap::{Display, Point, View, contains},
     templates::Template,
 };
 use macos_sys::{MainThreadMarker, app, notch::Notch, permissions, snap_ui, window::Frame};
@@ -127,18 +127,29 @@ impl Platform for AppKit {
     }
 
     fn displays(&self) -> Vec<(Display, String)> {
+        // While the closed notch shows something, such as music in its ears, it is wider and taller than the cutout
+        // or the pill: a window dragged onto any part of it brings the row.
+        let notch = self
+            .notch
+            .as_ref()
+            .and_then(|n| n.closed_frame())
+            .map(|r| rect(snap_ui::frame_of(self.mtm, r)));
         snap_ui::displays(self.mtm)
             .into_iter()
             .map(|d| {
-                (
-                    Display {
-                        frame: rect(d.frame),
-                        area: rect(d.area),
-                        cutout: d.cutout,
-                        inset: d.inset,
-                    },
-                    d.name,
-                )
+                let display = Display {
+                    frame: rect(d.frame),
+                    area: rect(d.area),
+                    cutout: d.cutout,
+                    inset: d.inset,
+                };
+                let display = match notch {
+                    Some(n) if contains(display.frame, (n.x + n.w / 2.0, n.y)) => {
+                        display.covering((n.w, n.h))
+                    }
+                    _ => display,
+                };
+                (display, d.name)
             })
             .collect()
     }

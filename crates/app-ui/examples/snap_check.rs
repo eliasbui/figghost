@@ -33,8 +33,9 @@ use core_window::{
 };
 use macos_sys::{
     MainThreadMarker,
-    notch::{Notch, NotchGeometry},
+    notch::{Activity, Ear, Notch, NotchGeometry},
     snap_ui::{self, Mouse},
+    style::Tone,
     ui::AppCallbacks,
 };
 use objc2_app_kit::{
@@ -764,6 +765,40 @@ fn main() {
             "and is off screen at the end",
         );
     }
+
+    // On a screen without a notch the band at the top edge is thin, but music in the ears makes the closed notch
+    // a shape as tall as the menu bar: a window dragged onto any part of it must bring the row.
+    println!("music in the ears of the closed notch");
+    notch.set_activity(
+        "media",
+        Some(Activity {
+            left: Ear::Symbol {
+                name: "music.note",
+                tone: Tone::Gray,
+                pulse: false,
+            },
+            right: Ear::Text {
+                text: "3:12".into(),
+                tone: Tone::Gray,
+            },
+            detail: None,
+            page: None,
+            priority: 20,
+        }),
+    );
+    settle(0.6);
+    script.frame.set(start);
+    let mut pointer = title(start);
+    c.handle(Mouse::Down(pointer));
+    drag_to(&mut pointer, (centre_x + 60.0, top + 18.0));
+    settle(0.6);
+    r.check(
+        visible_row(mtm),
+        "a window dragged onto the lower part of the notch brings the row",
+    );
+    c.handle(Mouse::Lost);
+    settle(0.6);
+    notch.set_activity("media", None);
 
     println!(
         "{}",

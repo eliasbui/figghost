@@ -3380,6 +3380,16 @@ impl Notch {
         self.inner.snoozed.get()
     }
 
+    /// Where the closed notch is on the screen, ears and the lines under them included, in screen coordinates;
+    /// `None` while it is turned off or hidden over a full-screen app.
+    pub fn closed_frame(&self) -> Option<NSRect> {
+        let inner = &self.inner;
+        inner.shows().then(|| {
+            let size = inner.size_of(inner.closed_shape());
+            inner.geometry.get().frame(size.width, size.height)
+        })
+    }
+
     /// Whether the pointer is over the notch right now; something that opened it by itself leaves it open while the
     /// user is there.
     pub fn pointer_inside(&self) -> bool {

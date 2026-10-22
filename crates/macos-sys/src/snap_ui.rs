@@ -81,6 +81,11 @@ fn primary_height(mtm: MainThreadMarker) -> f64 {
         .map_or(0.0, |s| s.frame().size.height)
 }
 
+/// A rect in screen coordinates, as a window frame: top-left origin, y down.
+pub fn frame_of(mtm: MainThreadMarker, r: NSRect) -> Frame {
+    top_left(primary_height(mtm), r)
+}
+
 fn top_left(primary_height: f64, r: NSRect) -> Frame {
     Frame {
         x: r.origin.x,
