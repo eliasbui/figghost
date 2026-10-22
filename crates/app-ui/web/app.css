@@ -1237,7 +1237,7 @@ html.reduce-motion *::after {
 }
 .top-search:focus-within {
   border-color: var(--tint);
-  box-shadow: 0 0 0 3px color-mix(in srgb, var(--tint) 25%, transparent), inset 0 1px 0 var(--card-hi);
+  box-shadow: 0 0 0 3px color-mix(in srgb, var(--tint) 18%, transparent), inset 0 1px 0 var(--card-hi);
 }
 .top-search .glyph { width: 13px; height: 13px; opacity: 0.7; }
 .top-search input {
@@ -1263,44 +1263,72 @@ html.reduce-motion *::after {
 }
 .top-search:focus-within kbd { display: none; }
 
-/* What the search found, under the field. */
+/* What the search found, under the field: a panel of glass, one two-line row for each page, the chosen row lifted
+   in the accent colour with the key that opens it. */
 #search-results {
   position: absolute;
-  top: calc(100% + 8px);
-  left: 0;
-  right: 0;
+  top: calc(100% + 10px);
+  left: -8px;
+  right: -8px;
   display: flex;
   flex-direction: column;
   gap: 2px;
-  max-height: 360px;
+  max-height: 380px;
   overflow-y: auto;
-  padding: 6px;
-  border-radius: 18px;
-  background: color-mix(in srgb, var(--solid) 96%, transparent);
+  padding: 8px;
+  border-radius: 22px;
+  background: color-mix(in srgb, var(--solid) 90%, transparent);
   border: 0.5px solid var(--bar-edge);
-  -webkit-backdrop-filter: blur(36px) saturate(200%);
-  backdrop-filter: blur(36px) saturate(200%);
-  box-shadow: var(--bar-shadow), inset 0 1px 0 var(--card-hi);
+  -webkit-backdrop-filter: blur(40px) saturate(210%);
+  backdrop-filter: blur(40px) saturate(210%);
+  box-shadow: 0 18px 44px -12px rgba(10, 20, 50, 0.38), 0 2px 8px rgba(10, 20, 50, 0.1), inset 0 1px 0 var(--card-hi);
   animation: rise var(--motion) var(--spring) backwards;
 }
 #search-results[hidden] { display: none; }
 .result {
   display: flex;
   align-items: center;
-  gap: 10px;
+  gap: 12px;
   flex: none;
-  height: 38px;
-  padding: 0 8px;
+  height: 48px;
+  padding: 0 10px;
   border: 0;
-  border-radius: 12px;
+  border-radius: 15px;
   background: transparent;
   text-align: left;
+  transition: background var(--motion-fast);
 }
 .result:hover { background: var(--fill); }
-.result[aria-selected="true"] { background: color-mix(in srgb, var(--tint) 18%, transparent); }
-.result-name { flex: 1; min-width: 0; overflow: hidden; font-weight: 500; text-overflow: ellipsis; white-space: nowrap; }
-.result-cat { flex: none; color: var(--text-3); font-size: 11.5px; }
-.search-empty { padding: 12px 10px; font-size: 12px; color: var(--text-2); text-align: center; }
+.result[aria-selected="true"] {
+  background: color-mix(in srgb, var(--tint) 17%, var(--solid));
+  box-shadow: inset 0 0 0 0.5px color-mix(in srgb, var(--tint) 40%, transparent);
+}
+.result .nav-icon {
+  display: grid;
+  place-items: center;
+  flex: none;
+  width: 32px;
+  height: 32px;
+  border-radius: 10px;
+  color: #fff;
+  box-shadow: inset 0 0.5px 0.5px rgba(255, 255, 255, 0.55), inset 0 -1px 2px rgba(0, 0, 0, 0.16), 0 1px 3px rgba(0, 0, 0, 0.2);
+}
+.result .nav-icon .glyph { width: 18px; height: 18px; filter: drop-shadow(0 0.5px 0.5px rgba(0, 0, 0, 0.25)); }
+.result-text { display: flex; flex: 1; flex-direction: column; gap: 1px; min-width: 0; }
+.result-name { overflow: hidden; font-size: 13.5px; font-weight: 600; letter-spacing: -0.01em; text-overflow: ellipsis; white-space: nowrap; color: var(--text); }
+.result-cat { overflow: hidden; color: var(--text-2); font-size: 11.5px; text-overflow: ellipsis; white-space: nowrap; }
+.result-key {
+  flex: none;
+  padding: 1px 7px;
+  border-radius: 999px;
+  background: color-mix(in srgb, var(--tint) 14%, transparent);
+  color: var(--tint);
+  font: 600 12px var(--font);
+  opacity: 0;
+  transition: opacity var(--motion-fast);
+}
+.result[aria-selected="true"] .result-key { opacity: 1; }
+.search-empty { padding: 14px 10px; font-size: 12.5px; color: var(--text-2); text-align: center; }
 
 /* The dock: a floating capsule of glass at the foot of the window, one icon a page group. A lens of clear glass sits
    under the chosen icon; pressed, it swells and can be dragged across the dock, stretching with its speed, and

@@ -2036,8 +2036,15 @@ function applySearch(query) {
     return;
   }
   const index = pageTexts();
+  // A page whose own name says the words comes before one that only mentions them in a row, and one whose name
+  // starts with them comes first of those. The sort is stable, so the order of the dock is kept among equals.
+  const rank = (pid) => {
+    const name = folded(t('nav.' + pid));
+    return searchWords.every((w) => name.includes(w)) ? (name.startsWith(searchWords[0]) ? 0 : 1) : 2;
+  };
   const hits = CATEGORIES.flatMap((cat) => cat.pages.map((pid) => ({ cat, pid })))
-    .filter(({ pid }) => searchWords.every((w) => (index.get(pid) || '').includes(w)));
+    .filter(({ pid }) => searchWords.every((w) => (index.get(pid) || '').includes(w)))
+    .sort((a, b) => rank(a.pid) - rank(b.pid));
   box.replaceChildren(...(hits.length
     ? hits.map(({ cat, pid }, i) => h('button', {
       class: 'result',
@@ -2050,8 +2057,10 @@ function applySearch(query) {
       onclick: () => openResult(pid),
     },
     h('span', { class: 'nav-icon' }, icon(cat.icon)),
-    h('span', { class: 'result-name', text: t('nav.' + pid) }),
-    h('span', { class: 'result-cat', text: t('cat.' + cat.id) })))
+    h('span', { class: 'result-text' },
+      h('span', { class: 'result-name', text: t('nav.' + pid) }),
+      h('span', { class: 'result-cat', text: t('cat.' + cat.id) })),
+    h('kbd', { class: 'result-key', 'aria-hidden': 'true', text: '↩' })))
     : [h('div', { class: 'search-empty', text: t('side.none') })]));
   box.hidden = false;
 }
