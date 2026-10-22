@@ -168,6 +168,12 @@ const FEATURE_FIXTURES: &[(&str, &str)] = &[
 /// for an icon whose name is missing here.
 const SYMBOLS: &[&str] = &[
     "gearshape.fill",
+    "switch.2",
+    "scroll.fill",
+    "laptopcomputer",
+    "square.stack.3d.up.fill",
+    "list.clipboard.fill",
+    "square.split.2x2.fill",
     "keyboard",
     "computermouse.fill",
     "doc.on.clipboard.fill",

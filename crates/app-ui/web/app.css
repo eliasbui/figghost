@@ -1346,9 +1346,9 @@ html.reduce-motion *::after {
   top: 6px;
   left: 0;
   z-index: 0;
-  width: 56px;
+  width: 48px;
   height: 44px;
-  margin-left: -28px;
+  margin-left: -24px;
   border-radius: 999px;
   pointer-events: none;
   background: var(--lens-fill);

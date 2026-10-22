@@ -1915,12 +1915,12 @@ function pageAbout() {
 }
 
 const CATEGORIES = [
-  { id: 'general', icon: 'gearshape.fill', pages: ['general', 'mole', 'about'] },
-  { id: 'scroll', icon: 'computermouse.fill', pages: ['scroll', 'cursor', 'wheel'] },
-  { id: 'notch', icon: 'rectangle.topthird.inset.filled', pages: ['notch', 'islands', 'musicwidget'] },
-  { id: 'tabs', icon: 'square.grid.2x2.fill', pages: ['calendar', 'dayprogress', 'agents', 'notes', 'launcher', 'weather', 'prs', 'pomodoro', 'screentime', 'system', 'devices', 'displays'] },
-  { id: 'clipboard', icon: 'doc.on.clipboard.fill', pages: ['clipboard', 'smart', 'translate', 'typing', 'capture', 'vision', 'utilities'] },
-  { id: 'tiling', icon: 'rectangle.split.2x1.fill', pages: ['tiling', 'pin', 'keys'] },
+  { id: 'general', icon: 'switch.2', pages: ['general', 'mole', 'about'] },
+  { id: 'scroll', icon: 'scroll.fill', pages: ['scroll', 'cursor', 'wheel'] },
+  { id: 'notch', icon: 'laptopcomputer', pages: ['notch', 'islands', 'musicwidget'] },
+  { id: 'tabs', icon: 'square.stack.3d.up.fill', pages: ['calendar', 'dayprogress', 'agents', 'notes', 'launcher', 'weather', 'prs', 'pomodoro', 'screentime', 'system', 'devices', 'displays'] },
+  { id: 'clipboard', icon: 'list.clipboard.fill', pages: ['clipboard', 'smart', 'translate', 'typing', 'capture', 'vision', 'utilities'] },
+  { id: 'tiling', icon: 'square.split.2x2.fill', pages: ['tiling', 'pin', 'keys'] },
 ];
 
 function categoryOf(pageId) {
