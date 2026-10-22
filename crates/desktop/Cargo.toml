@@ -1,0 +1,34 @@
+[package]
+name = "figghost-desktop"
+description = "Figghost for Windows and Linux (beta)"
+version.workspace = true
+edition.workspace = true
+# File::try_lock keeps a second copy of the app from starting.
+rust-version = "1.89"
+publish.workspace = true
+
+[[bin]]
+name = "figghost"
+path = "src/main.rs"
+
+[dependencies]
+core-clipboard.workspace = true
+core-agents.workspace = true
+core-notes.workspace = true
+serde.workspace = true
+serde_json.workspace = true
+tao = "0.37"
+wry = "0.57"
+tray-icon = "0.26"
+global-hotkey = "0.9"
+arboard = { version = "3.7", features = ["image-data", "wayland-data-control"] }
+auto-launch = "0.6"
+trash = "5"
+# Pictures of the clipboard and the icons; arboard already builds it.
+image = { version = "0.25", default-features = false, features = ["png"] }
+sys-locale = "0.3"
+
+[target.'cfg(windows)'.dependencies]
+# Windows has no SQLite of its own, so it is built in.
+rusqlite = { workspace = true, features = ["bundled"] }
+clipboard-win = "5"
