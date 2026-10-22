@@ -254,38 +254,54 @@ button { cursor: default; }
   margin-top: 2px;
 }
 .subtabs-bar {
-  display: inline-flex;
-  flex-wrap: wrap;
+  display: flex;
   align-items: center;
-  gap: 3px;
-  padding: 3px;
-  background: var(--well);
-  border-radius: 18px;
-  box-shadow: inset 0 0 0 0.5px var(--well-edge);
-  /* A bar with more pages than the window has room for wraps to a second line instead of running off its edge. */
+  gap: 4px;
+  width: max-content;
   max-width: 100%;
+  padding: 5px;
+  /* The same glass as the dock and the search. A bar with more pages than the window has room for scrolls sideways
+     instead of wrapping into a second line. */
+  background: var(--bar-glass);
+  border: 0.5px solid var(--bar-edge);
+  border-radius: 999px;
+  -webkit-backdrop-filter: blur(30px) saturate(200%);
+  backdrop-filter: blur(30px) saturate(200%);
+  box-shadow: 0 4px 14px -6px rgba(20, 30, 70, 0.18), inset 0 1px 0 var(--card-hi);
+  overflow-x: auto;
+  scrollbar-width: none;
 }
+.subtabs-bar::-webkit-scrollbar { display: none; }
 .subtab {
+  flex: none;
+  height: 30px;
   border: 0;
   background: transparent;
-  padding: 4px 12px;
+  padding: 0 15px;
   border-radius: 999px;
-  font-size: 12px;
+  font-size: 12.5px;
   font-weight: 500;
   color: var(--text-2);
   cursor: pointer;
   white-space: nowrap;
-  transition: all var(--motion-fast);
+  transition: color var(--motion-fast), background var(--motion-fast), box-shadow var(--motion-fast);
 }
 .subtab:hover:not(.active) {
   color: var(--text);
   background: var(--fill);
 }
+/* The chosen page is a lens of clear glass, as in the dock: translucent, with a bright edge and a glow of the accent. */
 .subtab.active {
-  background: var(--thumb-bg);
-  color: var(--thumb-text);
+  background: var(--lens-fill);
+  color: var(--text);
   font-weight: 600;
-  box-shadow: 0 1px 2px rgba(0, 0, 0, 0.12), 0 0 0.5px rgba(0, 0, 0, 0.08);
+  -webkit-backdrop-filter: blur(1px) saturate(180%) brightness(1.06);
+  backdrop-filter: blur(1px) saturate(180%) brightness(1.06);
+  box-shadow:
+    inset 0 0 0 0.5px var(--lens-edge),
+    inset 0 1.5px 1px var(--lens-edge),
+    inset 0 -6px 12px -6px color-mix(in srgb, var(--tint) 45%, transparent),
+    0 3px 10px -4px rgba(0, 0, 0, 0.2);
 }
 
 #scroller {
@@ -1424,17 +1440,19 @@ html.reduce-motion *::after {
 #nav.still .lens { transition: none; }
 #nav.dragging .lens { transition: transform 90ms ease-out, background var(--motion), box-shadow var(--motion); }
 
+html.reduce-transparency .subtabs-bar,
 html.reduce-transparency #nav,
 html.reduce-transparency .guide-ghost,
 html.reduce-transparency .top-search,
 html.reduce-transparency #search-results { background: var(--solid); -webkit-backdrop-filter: none; backdrop-filter: none; }
+html.reduce-transparency .subtab.active,
 html.reduce-transparency .lens { background: var(--fill); -webkit-backdrop-filter: none; backdrop-filter: none; }
 
 /* The row a search led to, marked for a moment. */
 .found { box-shadow: inset 0 0 0 2px var(--tint); border-radius: 12px; transition: box-shadow 0.4s var(--ease-out); }
 
 /* Pages and headers */
-.page-head { padding: calc(var(--titlebar) + 6px) var(--gutter) 10px; }
+.page-head { padding: calc(var(--titlebar) + 6px) var(--gutter) 18px; }
 .page-sub { display: none; }
 .section-title { margin: 22px 14px 7px; font-size: 12.5px; font-weight: 650; letter-spacing: -0.01em; color: var(--text-2); text-transform: none; }
 

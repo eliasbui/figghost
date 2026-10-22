@@ -2233,7 +2233,17 @@ function renderSubtabs(cat, activeId) {
       onclick: () => { go.rise = true; go(pid); },
     }, t('nav.' + pid));
   });
-  container.replaceChildren(h('div', { class: 'subtabs-bar' }, ...pills));
+  const bar = h('div', { class: 'subtabs-bar' }, ...pills);
+  // A mouse wheel turns sideways here when the bar is longer than the window.
+  bar.addEventListener('wheel', (e) => {
+    if (bar.scrollWidth <= bar.clientWidth || Math.abs(e.deltaY) <= Math.abs(e.deltaX)) return;
+    e.preventDefault();
+    bar.scrollLeft += e.deltaY;
+  }, { passive: false });
+  container.replaceChildren(bar);
+  // A bar that scrolls keeps the chosen page in view.
+  const chosen = bar.querySelector('.subtab.active');
+  if (chosen) bar.scrollLeft = Math.max(0, chosen.offsetLeft - (bar.clientWidth - chosen.offsetWidth) / 2);
 }
 
 /** What the ghost says about a page: its first sentence, which is what the page is for. */
