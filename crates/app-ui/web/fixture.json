@@ -30,7 +30,6 @@
       { "id": "clipboard", "title": "Clipboard", "on": true, "waiting": false },
       { "id": "shelf", "title": "Shelf", "on": true, "waiting": false },
       { "id": "media", "title": "Media", "on": true, "waiting": false },
-      { "id": "focus", "title": "Focus", "on": true, "waiting": false },
       { "id": "agents", "title": "Agents", "on": true, "waiting": false },
       { "id": "calendar", "title": "Calendar", "on": true, "waiting": false },
       { "id": "dayprogress", "title": "Day progress", "on": true, "waiting": false },

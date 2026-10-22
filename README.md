@@ -129,7 +129,7 @@ Opening the app opens its settings; closing the window sends the app back to the
 
 ### The notch, with a tab for each tool
 
-A black shape grows out of the top edge of the screen when the pointer reaches it: clipboard, shelf, media, focus, AI agents, calendar, notes, launcher, weather, pull requests, pomodoro, screen time, sound and system, each a tab. Closed, it shows what is playing and what your coding agents are doing.
+A black shape grows out of the top edge of the screen when the pointer reaches it: clipboard, shelf, media, AI agents, calendar, notes, launcher, weather, pull requests, pomodoro, screen time, sound and system, each a tab. Closed, it shows what is playing and what your coding agents are doing.
 
 ![The notch opening on each tab in turn: clipboard, shelf, media, focus, AI agents with usage limits, an approval request and the calendar](docs/images/notch-tabs.gif)
 

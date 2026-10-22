@@ -1198,7 +1198,6 @@ mod tests {
             "clipboard",
             "shelf",
             "media",
-            "focus",
             "agents",
             "calendar",
             "sound",

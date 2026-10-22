@@ -45,11 +45,10 @@ impl TilingConfig {
 }
 
 /// The tabs of the notch, in their default order.
-pub const NOTCH_PAGES: [&str; 17] = [
+pub const NOTCH_PAGES: [&str; 16] = [
     "clipboard",
     "shelf",
     "media",
-    "focus",
     "agents",
     "calendar",
     "dayprogress",
