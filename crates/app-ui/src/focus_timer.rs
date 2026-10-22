@@ -1,18 +1,9 @@
-//! The state machine behind the focus tab: a countdown that can be started, paused, resumed and reset.
+//! The countdown behind the Pomodoro tab: a countdown that can be started, paused, resumed and reset.
 //!
 //! Time comes in as a wall-clock timestamp in milliseconds, so the machine is plain data that tests can
 //! drive, and a countdown keeps running while the Mac sleeps.
 
-pub const PRESET_MINUTES: [u32; 4] = [15, 25, 45, 60];
 pub const DEFAULT_MINUTES: u32 = 25;
-pub const MIN_MINUTES: u32 = 5;
-pub const MAX_MINUTES: u32 = 180;
-
-/// The length after the minus or plus button, kept between five minutes and three hours.
-pub fn adjusted_minutes(current: u32, delta: i32) -> u32 {
-    (i64::from(current) + i64::from(delta)).clamp(i64::from(MIN_MINUTES), i64::from(MAX_MINUTES))
-        as u32
-}
 
 #[derive(Debug, Clone, Copy, PartialEq, Eq)]
 pub enum Phase {
@@ -59,15 +50,6 @@ impl FocusTimer {
         }
     }
 
-    /// Chooses a length. A countdown that is running or paused starts over at the new length, paused.
-    pub fn set_minutes(&mut self, minutes: u32) {
-        *self = Self::new(minutes);
-    }
-
-    pub fn minutes(&self) -> u32 {
-        (self.total_ms / 60_000) as u32
-    }
-
     /// Start, pause or resume; after the time ran out it starts again from the full length.
     pub fn toggle(&mut self, now: i64) {
         self.state = match self.state {
@@ -81,10 +63,6 @@ impl FocusTimer {
                 ends_at: now + remaining_ms,
             },
         };
-    }
-
-    pub fn reset(&mut self) {
-        self.state = State::Ready;
     }
 
     pub fn is_running(&self) -> bool {
@@ -142,7 +120,6 @@ mod tests {
             (s.phase, s.total_secs, s.remaining_secs),
             (Phase::Ready, 25 * 60, 25 * 60)
         );
-        assert_eq!(t.minutes(), 25);
         assert!(!t.is_running());
     }
 
@@ -189,22 +166,9 @@ mod tests {
     }
 
     #[test]
-    fn reset_and_a_new_length_return_to_ready() {
-        let mut t = FocusTimer::new(25);
-        t.toggle(0);
-        t.reset();
-        assert_eq!(t.snapshot(100).phase, Phase::Ready);
-        assert_eq!(t.snapshot(100).remaining_secs, 25 * 60);
-        t.toggle(0);
-        t.set_minutes(45);
-        let s = t.snapshot(1_000);
-        assert_eq!((s.phase, s.total_secs), (Phase::Ready, 45 * 60));
-    }
-
-    #[test]
     fn lengths_are_kept_within_sensible_bounds() {
-        assert_eq!(FocusTimer::new(0).minutes(), 1);
-        assert_eq!(FocusTimer::new(100_000).minutes(), 24 * 60);
+        assert_eq!(FocusTimer::new(0).snapshot(0).total_secs, 60);
+        assert_eq!(FocusTimer::new(100_000).snapshot(0).total_secs, 24 * 3600);
     }
 
     #[test]
@@ -222,15 +186,5 @@ mod tests {
         assert_eq!(clock_text(25 * 60), "25:00");
         assert_eq!(clock_text(3600), "1:00:00");
         assert_eq!(clock_text(3600 + 5 * 60 + 9), "1:05:09");
-    }
-
-    #[test]
-    fn minus_and_plus_stay_between_five_minutes_and_three_hours() {
-        assert_eq!(adjusted_minutes(25, 5), 30);
-        assert_eq!(adjusted_minutes(25, -5), 20);
-        assert_eq!(adjusted_minutes(5, -5), MIN_MINUTES);
-        assert_eq!(adjusted_minutes(1, -5), MIN_MINUTES);
-        assert_eq!(adjusted_minutes(178, 5), MAX_MINUTES);
-        assert_eq!(adjusted_minutes(180, 5), MAX_MINUTES);
     }
 }

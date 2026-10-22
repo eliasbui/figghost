@@ -9,7 +9,6 @@ mod clipboard;
 mod config;
 mod context;
 mod features;
-mod focus;
 mod focus_timer;
 mod history;
 mod i18n;
@@ -33,7 +32,6 @@ use clipboard::Clipboard;
 use config::{Config, home_dir};
 use context::AppContext;
 use features::{AttachEnv, Features};
-use focus::FocusFeature;
 use live_media::LiveMedia;
 use macos_sys::{MainThreadMarker, app, hello, status_item::StatusMenu, workspace};
 use media::MediaFeature;
@@ -91,7 +89,6 @@ struct Shell {
     media: Option<Rc<MediaFeature>>,
     live_media: Option<Rc<LiveMedia>>,
     bluetooth: Option<Rc<Bluetooth>>,
-    focus: Option<FocusFeature>,
     agents: Option<Rc<AgentsFeature>>,
     audio: AudioFeature,
     tiling: Rc<Tiling>,
@@ -187,7 +184,6 @@ impl Shell {
             .zip(media.as_ref())
             .map(|(notch, media)| LiveMedia::attach(notch, media, &config.notch));
         let bluetooth = notch.as_ref().map(Bluetooth::attach);
-        let focus = notch.as_ref().map(|notch| FocusFeature::attach(mtm, notch));
         let agents = notch
             .as_ref()
             .map(|notch| AgentsFeature::attach(mtm, notch, &home, &config.agents));
@@ -267,7 +263,10 @@ impl Shell {
         if show_settings {
             settings.show();
         }
-        if args.iter().any(|a| a == "--permissions" || a == "--check-permissions") {
+        if args
+            .iter()
+            .any(|a| a == "--permissions" || a == "--check-permissions")
+        {
             permissions_popup.show();
         }
         update.start();
@@ -279,7 +278,6 @@ impl Shell {
             media,
             live_media,
             bluetooth,
-            focus,
             agents,
             audio,
             tiling,
