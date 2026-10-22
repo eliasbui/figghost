@@ -6,3 +6,9 @@
 .weather-result { display: flex; justify-content: space-between; align-items: center; gap: 10px; padding: 4px 0; }
 .weather-label { color: var(--text); font-size: var(--fs-small); }
 .weather-status { min-height: 1.2em; }
+.weather-places { display: flex; flex-direction: column; width: 100%; }
+.weather-place { display: flex; align-items: center; gap: 10px; padding: 6px 0; }
+.weather-place + .weather-place { border-top: 1px solid var(--line, rgba(128, 128, 128, 0.18)); }
+.weather-number { min-width: 16px; color: var(--text-3); font-size: var(--fs-small); }
+.weather-place .weather-label { flex: 1 1 auto; min-width: 0; overflow: hidden; text-overflow: ellipsis; white-space: nowrap; }
+.weather-tools { display: flex; gap: 4px; }

@@ -15,6 +15,8 @@ pub const DAYS: usize = 5;
 pub const MAX_PLACES: usize = 5;
 /// The longest city name that is searched for, in characters.
 pub const MAX_QUERY: usize = 60;
+/// How many cities the tab flips through.
+pub const MAX_CITIES: usize = 8;
 
 /// A place on Earth, as the service names it.
 #[derive(Debug, Clone, PartialEq, Serialize, Deserialize)]
@@ -52,6 +54,12 @@ impl Place {
         (real && !place.name.is_empty()).then_some(place)
     }
 
+    /// Whether two places get the same forecast, which is asked for coordinates to four decimals.
+    pub fn same_spot(&self, other: &Place) -> bool {
+        let spot = |p: &Place| format!("{:.4},{:.4}", p.latitude, p.longitude);
+        spot(self) == spot(other)
+    }
+
     /// "Springfield, Illinois, United States"; the region is left out when it only repeats the name.
     pub fn label(&self) -> String {
         let mut parts = vec![self.name.as_str()];
@@ -65,12 +73,40 @@ impl Place {
     }
 }
 
-/// What a city name is searched with.
+/// The cities a file or the page gives: real places only, each once, no more than `MAX_CITIES`, in their order.
+pub fn tidy_places(places: impl IntoIterator<Item = Place>) -> Vec<Place> {
+    let mut out: Vec<Place> = Vec::new();
+    for place in places.into_iter().filter_map(Place::sanitized) {
+        if out.len() < MAX_CITIES && !out.iter().any(|p| p.same_spot(&place)) {
+            out.push(place);
+        }
+    }
+    out
+}
+
+/// A letter only Vietnamese writes: đ, ă, ơ, ư, a vowel with a tone mark and a hat or a hook (the block U+1EA0 to
+/// U+1EF9), or the hook and the dot below of a name typed in decomposed form.
+fn vietnamese_letter(c: char) -> bool {
+    matches!(
+        c,
+        'đ' | 'Đ' | 'ă' | 'Ă' | 'ơ' | 'Ơ' | 'ư' | 'Ư' | '\u{1EA0}'
+            ..='\u{1EF9}' | '\u{0309}' | '\u{0323}'
+    )
+}
+
+/// What a city name is searched with. The service matches a name only against the names it knows in the language asked
+/// for, so a Vietnamese name searched in English finds nothing ("Hải Phòng") or a village in place of the capital
+/// ("Hà Nội"); a name with Vietnamese letters is therefore always asked in Vietnamese.
 pub fn places_query(name: &str, language_code: &str) -> Vec<(&'static str, String)> {
+    let language = if name.chars().any(vietnamese_letter) {
+        "vi"
+    } else {
+        language_code
+    };
     vec![
         ("name", name.to_owned()),
         ("count", MAX_PLACES.to_string()),
-        ("language", language_code.to_owned()),
+        ("language", language.to_owned()),
         ("format", "json".to_owned()),
     ]
 }
@@ -490,6 +526,27 @@ mod tests {
             search.contains(&("name", "Hà Nội".into()))
                 && search.contains(&("language", "vi".into()))
         );
+        assert!(places_query("Hanoi", "en").contains(&("language", "en".into())));
+        // In English the service finds no "Hải Phòng" at all and takes "Hà Nội" for a village; asked in Vietnamese it
+        // finds both cities. A name of other languages keeps the app's language, so its labels stay in English.
+        let nfd = "Ha\u{300} No\u{302}\u{323}i";
+        for vietnamese in [
+            "Hà Nội",
+            "Hải Phòng",
+            "Đà Nẵng",
+            "Thành phố Hồ Chí Minh",
+            "Huế",
+            nfd,
+        ] {
+            let search = places_query(vietnamese, "en");
+            assert!(search.contains(&("language", "vi".into())), "{vietnamese}");
+        }
+        for other in ["Kraków", "São Paulo", "Zürich", "Rhône"] {
+            assert!(
+                places_query(other, "en").contains(&("language", "en".into())),
+                "{other}"
+            );
+        }
         let place = Place {
             name: "Hanoi".into(),
             region: String::new(),
@@ -684,5 +741,34 @@ mod tests {
         assert!(place(90.1, 0.0, "Ok").sanitized().is_none());
         assert!(place(0.0, 0.0, " \n ").sanitized().is_none());
         assert!(place(-90.0, 180.0, "Edge").sanitized().is_some());
+    }
+
+    #[test]
+    fn a_list_of_cities_keeps_real_places_once_each_and_no_more_than_the_cap() {
+        let at = |name: &str, lat: f64| Place {
+            name: name.into(),
+            region: String::new(),
+            country: String::new(),
+            latitude: lat,
+            longitude: 100.0,
+        };
+        let mut many: Vec<Place> = (0..12)
+            .map(|i| at(&format!("C{i}"), f64::from(i)))
+            .collect();
+        many.insert(1, at("C0 again", 0.000_01));
+        many.insert(2, at("Nowhere", 91.0));
+        let list = tidy_places(many);
+        assert_eq!(list.len(), MAX_CITIES);
+        assert_eq!(
+            list[0].name, "C0",
+            "the first of two at the same spot stays"
+        );
+        assert_eq!(
+            list[1].name, "C1",
+            "a duplicate and a place that is not real are dropped"
+        );
+        assert!(
+            at("a", 1.0).same_spot(&at("b", 1.000_04)) && !at("a", 1.0).same_spot(&at("b", 1.0002))
+        );
     }
 }

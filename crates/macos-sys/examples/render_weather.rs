@@ -6,7 +6,10 @@ use macos_sys::{
     MainThreadMarker, app,
     notch::{Notch, NotchGeometry},
     ui::AppCallbacks,
-    weather_ui::{Current, Day, Glyph, Hour, Hue, PAGE_SIZE, WeatherDisplay, WeatherView},
+    weather_ui::{
+        Current, Day, Glyph, Hour, Hue, PAGE_SIZE, Pager, WeatherCallbacks, WeatherDisplay,
+        WeatherView,
+    },
 };
 use std::{env, fs, path::PathBuf, process, rc::Rc};
 
@@ -138,7 +141,23 @@ fn scene(vi: bool, rainy: bool) -> WeatherDisplay {
             })
             .collect(),
         note: None,
+        action: None,
+        pager: None,
     }
+}
+
+fn pager(position: usize, count: usize, vi: bool) -> Option<Pager> {
+    let (previous, next) = if vi {
+        ("Thành phố trước", "Thành phố sau")
+    } else {
+        ("Previous city", "Next city")
+    };
+    Some(Pager {
+        position,
+        count,
+        previous: previous.into(),
+        next: next.into(),
+    })
 }
 
 fn main() {
@@ -156,7 +175,15 @@ fn main() {
         let notch = Rc::new(Notch::new(mtm, geometry, noop, |view| {
             view.set_rows(Vec::new(), "")
         }));
-        let view = WeatherView::new(mtm, notch.page_area(PAGE_SIZE.width, PAGE_SIZE.height));
+        let callbacks = WeatherCallbacks {
+            on_flip: Box::new(|_| {}),
+            on_action: Box::new(|| {}),
+        };
+        let view = WeatherView::new(
+            mtm,
+            notch.page_area(PAGE_SIZE.width, PAGE_SIZE.height),
+            callbacks,
+        );
         let index = notch.page_count();
         notch.add_page(view.page("Weather".into(), || {}, || {}));
         let (shot, shown) = (Rc::clone(&notch), Rc::clone(&view));
@@ -165,23 +192,62 @@ fn main() {
                 ("sunny_en", scene(false, false)),
                 ("rainy_en", scene(false, true)),
                 ("sunny_vi", scene(true, false)),
+                (
+                    "cities_en",
+                    WeatherDisplay {
+                        pager: pager(2, 3, false),
+                        ..scene(false, true)
+                    },
+                ),
+                (
+                    "cities_vi",
+                    WeatherDisplay {
+                        pager: pager(1, 8, true),
+                        ..scene(true, false)
+                    },
+                ),
             ];
-            for (name, title, hint) in [
+            for (name, title, hint, action, place, flip) in [
                 (
                     "city_en",
                     "Choose a city",
                     "Search for one in Settings, under Notch tabs, Weather.",
+                    Some("Open Settings"),
+                    "",
+                    None,
+                ),
+                (
+                    "city_vi",
+                    "Chọn một thành phố",
+                    "Tìm trong Cài đặt, mục Tab của notch, Thời tiết.",
+                    Some("Mở Cài đặt"),
+                    "",
+                    None,
                 ),
                 (
                     "offline_vi",
                     "Không có kết nối",
                     "Chưa lấy được thời tiết. Sẽ thử lại khi bạn mở lại tab.",
+                    None,
+                    "",
+                    None,
+                ),
+                (
+                    "loading_cities_en",
+                    "Getting the weather",
+                    "One moment.",
+                    None,
+                    "Hue, Vietnam",
+                    pager(3, 3, false),
                 ),
             ] {
                 scenes.push((
                     name,
                     WeatherDisplay {
+                        place: place.into(),
                         note: Some((title.into(), hint.into())),
+                        action: action.map(Into::into),
+                        pager: flip,
                         ..WeatherDisplay::default()
                     },
                 ));

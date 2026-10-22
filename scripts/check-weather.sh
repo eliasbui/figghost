@@ -1,7 +1,7 @@
 #!/bin/sh
 # Starts the real program on a private instance and checks, through its trace, what the Weather tab does: off, or on
-# with no city, it asks nothing of the internet; on with a city, it asks Open-Meteo once when the tab opens and
-# shows the answer. The notch is placed outside every screen and the settings window stays closed. Nothing of the
+# with no city, it asks nothing of the internet; on with a city (written the old way, as one `place`), it asks
+# Open-Meteo once when the tab opens and shows the answer; on with several cities, it asks only for the one it shows. The notch is placed outside every screen and the settings window stays closed. Nothing of the
 # real settings is touched. The last check needs a connection and is skipped, with a note, without one.
 #
 # Usage: scripts/check-weather.sh [program]    (default: target/debug/app-ui)
@@ -64,6 +64,11 @@ sleep 12
 if [ "$(count 'asking for the forecast' "$WORK/on.log")" -eq 1 ]; then pass "an open tab asks once"; else fail "the tab did not ask exactly once"; grep weather "$WORK/on.log" || true; fi
 if [ "$(count 'forecast arrived' "$WORK/on.log")" -eq 1 ]; then pass "the forecast arrived and was read"; else fail "no forecast arrived"; grep weather "$WORK/on.log" || true; fi
 if kill -0 "$PID" 2>/dev/null; then pass "the program is still running"; else fail "the program died"; fi
-if grep -q "panicked" "$WORK/on.log" "$WORK/off.log" "$WORK/nocity.log"; then fail "the program panicked"; fi
+stop
+
+run '{ "enabled": true, "places": [{ "name": "Hue", "country": "Vietnam", "latitude": 16.4619, "longitude": 107.5955 }, { "name": "Hanoi", "country": "Vietnam", "latitude": 21.0245, "longitude": 105.84117 }] }' several
+sleep 12
+if [ "$(count 'asking for the forecast' "$WORK/several.log")" -eq 1 ] && [ "$(count 'forecast arrived' "$WORK/several.log")" -eq 1 ]; then pass "with several cities only the one on screen is asked for"; else fail "several cities did not ask exactly once"; grep weather "$WORK/several.log" || true; fi
+if grep -q "panicked" "$WORK/on.log" "$WORK/off.log" "$WORK/nocity.log" "$WORK/several.log"; then fail "the program panicked"; fi
 stop
 exit "$FAILED"

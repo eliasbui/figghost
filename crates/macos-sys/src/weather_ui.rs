@@ -1,8 +1,11 @@
-//! The Weather tab of the notch: the weather now, the next hours and the next days of one place. Everything on it
-//! is plain data from the app, so nothing here reads the network or knows a language.
+//! The Weather tab of the notch: the weather now, the next hours and the next days of one place, with a control to
+//! flip to the next city when there are several. Everything on it is plain data from the app, so nothing here reads
+//! the network or knows a language.
 
 use crate::{
+    button::{Look, TouchButton},
     notch::Page,
+    panel::Key,
     style::{self, Weight, white},
     widgets::{Fit, draw_page_note, draw_text, text_attributes},
 };
@@ -19,6 +22,13 @@ const GAP: f64 = 10.0;
 const NOW_WIDTH: f64 = 196.0;
 const RADIUS: f64 = 14.0;
 const HOURS_HEIGHT: f64 = 84.0;
+/// The flip control at the left of the line over the cards: two round buttons around "2/3".
+const FLIP_BUTTON: f64 = 22.0;
+const FLIP_LABEL: f64 = 34.0;
+const FLIP_WIDTH: f64 = FLIP_BUTTON * 2.0 + FLIP_LABEL + 8.0;
+/// The middle of the line over the cards, from the top.
+const HEADER_MIDDLE: f64 = 18.0;
+const NOTE_BUTTON_HEIGHT: f64 = 32.0;
 
 /// The colour a weather glyph is drawn in: the sky says what it is, and white would say nothing.
 #[derive(Debug, Clone, Copy, PartialEq, Eq)]
@@ -83,6 +93,17 @@ pub struct Day {
     pub low: String,
 }
 
+/// Which of several cities shows, for the flip control.
+#[derive(Debug, Clone)]
+pub struct Pager {
+    /// From 1.
+    pub position: usize,
+    pub count: usize,
+    /// What the buttons are called for assistive tools: "Previous city", "Next city".
+    pub previous: String,
+    pub next: String,
+}
+
 #[derive(Debug, Clone, Default)]
 pub struct WeatherDisplay {
     pub place: String,
@@ -93,6 +114,10 @@ pub struct WeatherDisplay {
     pub days: Vec<Day>,
     /// Words that replace everything: the tab is off, there is no city, no connection.
     pub note: Option<(String, String)>,
+    /// A button under the note, such as "Open Settings".
+    pub action: Option<String>,
+    /// Shown when there is more than one city, over the note too, so that a city that cannot be shown can be flipped past.
+    pub pager: Option<Pager>,
     /// Where the data comes from.
     pub credit: String,
 }
@@ -269,17 +294,27 @@ fn draw_days(days: &[Day], card: NSRect, h: f64) {
 
 fn draw(bounds: NSRect, display: &WeatherDisplay) {
     let (w, h) = (bounds.size.width, bounds.size.height);
-    if let Some((title, hint)) = &display.note {
-        draw_page_note("cloud.sun.fill", title, hint, bounds.size);
-        return;
+    let mut place_x = MARGIN + 2.0;
+    if let Some(pager) = &display.pager {
+        put(
+            &format!("{}/{}", pager.position, pager.count),
+            (MARGIN + FLIP_BUTTON, HEADER_MIDDLE - 7.0, FLIP_LABEL, 14.0),
+            &digits(10.5, Weight::Medium, style::TEXT_SECONDARY, true),
+            h,
+        );
+        place_x = MARGIN + FLIP_WIDTH;
     }
     // The line over the cards: the place at the left, how fresh it is and where it comes from at the right.
     put(
         &display.place,
-        (MARGIN + 2.0, 8.0, w * 0.5, 20.0),
+        (place_x, 8.0, w * 0.5 - (place_x - MARGIN - 2.0), 20.0),
         &attrs(15.0, Weight::Semibold, style::TEXT, false),
         h,
     );
+    if let Some((title, hint)) = &display.note {
+        draw_page_note("cloud.sun.fill", title, hint, bounds.size);
+        return;
+    }
     let status = if display.credit.is_empty() {
         display.status.clone()
     } else if display.status.is_empty() {
@@ -345,21 +380,103 @@ impl WeatherCanvas {
     }
 }
 
+/// What the controls of the tab do.
+pub struct WeatherCallbacks {
+    /// -1 for the previous city, 1 for the next.
+    pub on_flip: Box<dyn Fn(isize)>,
+    /// The button under the note.
+    pub on_action: Box<dyn Fn()>,
+}
+
 pub struct WeatherView {
     canvas: Retained<WeatherCanvas>,
+    previous: Retained<TouchButton>,
+    next: Retained<TouchButton>,
+    action: Retained<TouchButton>,
+    callbacks: Rc<WeatherCallbacks>,
 }
 
 impl WeatherView {
     /// `frame` is `Notch::page_area(PAGE_SIZE.width, PAGE_SIZE.height)`.
-    pub fn new(mtm: MainThreadMarker, frame: NSRect) -> Rc<Self> {
+    pub fn new(mtm: MainThreadMarker, frame: NSRect, callbacks: WeatherCallbacks) -> Rc<Self> {
+        let canvas = WeatherCanvas::new(mtm, frame);
+        let callbacks = Rc::new(callbacks);
+        let h = frame.size.height;
+        let round = |x: f64, symbol: &str, step: isize| {
+            let button = TouchButton::new(
+                mtm,
+                NSRect::new(
+                    NSPoint::new(x, h - HEADER_MIDDLE - FLIP_BUTTON / 2.0),
+                    NSSize::new(FLIP_BUTTON, FLIP_BUTTON),
+                ),
+                Look::Round { filled: false },
+            );
+            button.set_symbol(symbol);
+            let shared = Rc::clone(&callbacks);
+            button.set_on_click(move || (shared.on_flip)(step));
+            button.setHidden(true);
+            canvas.addSubview(&button);
+            button
+        };
+        let previous = round(MARGIN, "chevron.left", -1);
+        let next = round(MARGIN + FLIP_BUTTON + FLIP_LABEL, "chevron.right", 1);
+        let action = TouchButton::new(
+            mtm,
+            NSRect::new(NSPoint::ZERO, NSSize::new(10.0, NOTE_BUTTON_HEIGHT)),
+            Look::Rect,
+        );
+        action.set_selected(true);
+        let shared = Rc::clone(&callbacks);
+        action.set_on_click(move || (shared.on_action)());
+        action.setHidden(true);
+        canvas.addSubview(&action);
         Rc::new(Self {
-            canvas: WeatherCanvas::new(mtm, frame),
+            canvas,
+            previous,
+            next,
+            action,
+            callbacks,
         })
     }
 
     pub fn show(&self, display: WeatherDisplay) {
+        let pager = display.pager.as_ref();
+        self.previous.setHidden(pager.is_none());
+        self.next.setHidden(pager.is_none());
+        if let Some(pager) = pager {
+            self.previous.set_title(&pager.previous);
+            self.next.set_title(&pager.next);
+        }
+        let label = display.action.as_ref().filter(|_| display.note.is_some());
+        self.action.setHidden(label.is_none());
+        if let Some(label) = label {
+            self.action.set_title(label);
+            let size = self.canvas.bounds().size;
+            let w = (self.action.fit_width() + 24.0).max(140.0);
+            // Under the hint of the note, which ends 182 points below the top.
+            self.action.setFrame(NSRect::new(
+                NSPoint::new(
+                    (size.width - w) / 2.0,
+                    size.height - 190.0 - NOTE_BUTTON_HEIGHT,
+                ),
+                NSSize::new(w, NOTE_BUTTON_HEIGHT),
+            ));
+        }
         *self.canvas.ivars().display.borrow_mut() = display;
         self.canvas.setNeedsDisplay(true);
+    }
+
+    /// Left and Right flip through the cities when there are several. Returns true when the key was consumed.
+    pub fn handle_key(&self, key: Key) -> bool {
+        if self.canvas.ivars().display.borrow().pager.is_none() {
+            return false;
+        }
+        match key {
+            Key::Left => (self.callbacks.on_flip)(-1),
+            Key::Right => (self.callbacks.on_flip)(1),
+            _ => return false,
+        }
+        true
     }
 
     /// The notch tab for this view.
@@ -369,6 +486,7 @@ impl WeatherView {
         on_show: impl Fn() + 'static,
         on_hide: impl Fn() + 'static,
     ) -> Page {
+        let keys = Rc::clone(self);
         Page {
             id: "weather",
             title,
@@ -376,7 +494,7 @@ impl WeatherView {
             root: Retained::into_super(Retained::clone(&self.canvas)),
             on_show: Box::new(on_show),
             on_hide: Box::new(on_hide),
-            on_key: Box::new(|_| false),
+            on_key: Box::new(move |key| keys.handle_key(key)),
             accepts_files: false,
             size: None,
         }

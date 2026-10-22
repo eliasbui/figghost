@@ -1,10 +1,11 @@
-//! The Weather tab of the notch: the weather now, the next hours and the next days of one city. It is off until the
-//! person turns it on and chooses a city, because it is the one tab that talks to the internet.
+//! The Weather tab of the notch: the weather now, the next hours and the next days of a city, one at a time when
+//! several are chosen. It is off until the person turns it on and chooses a city, because it is the one tab that
+//! talks to the internet.
 //!
 //! Forecasts come from Open-Meteo, which needs no account or key, through the system's `curl` as the other features
-//! that go online do (see `core_smart::net`). What leaves the Mac is the coordinates of the chosen city, or the
+//! that go online do (see `core_smart::net`). What leaves the Mac is the coordinates of the city on screen, or the
 //! name typed when searching for one; never the Mac's own location, which is not asked for. The tab asks only
-//! while it is showing, and not again until the last answer is ten minutes old.
+//! while it is showing, only for the city it shows, and not again until that city's last answer is ten minutes old.
 
 use super::AttachEnv;
 use crate::{
@@ -14,10 +15,12 @@ use crate::{
     trace,
 };
 use core_smart::net;
-use logic::{DAYS, FORECAST_URL, Forecast, GEOCODING_URL, HOURS, Place};
+use logic::{DAYS, FORECAST_URL, Forecast, GEOCODING_URL, HOURS, MAX_CITIES, Place};
 use macos_sys::{
     app,
-    weather_ui::{Current, Day, Hour, PAGE_SIZE, WeatherDisplay, WeatherView},
+    weather_ui::{
+        Current, Day, Hour, PAGE_SIZE, Pager, WeatherCallbacks, WeatherDisplay, WeatherView,
+    },
 };
 use serde::{Deserialize, Serialize};
 use serde_json::{Value, json};
@@ -46,8 +49,13 @@ pub struct Config {
     pub enabled: bool,
     /// "metric" (degrees Celsius, kilometres an hour) or "imperial" (degrees Fahrenheit, miles an hour).
     pub units: String,
-    /// The city chosen from a search. A place of the wrong shape is none, not an unreadable file.
-    #[serde(deserialize_with = "lenient_place")]
+    /// The cities chosen from searches, in the order the tab flips through them. A city of the wrong shape is dropped,
+    /// not an unreadable file.
+    #[serde(deserialize_with = "lenient_places")]
+    pub places: Vec<Place>,
+    /// The one city of a file written before there could be several. Read, never written: `sanitized` makes it the
+    /// first of `places`.
+    #[serde(deserialize_with = "lenient_place", skip_serializing)]
     pub place: Option<Place>,
 }
 
@@ -58,33 +66,69 @@ fn lenient_place<'de, D: serde::Deserializer<'de>>(
     Ok(serde_json::from_value(value).ok())
 }
 
+fn lenient_places<'de, D: serde::Deserializer<'de>>(
+    deserializer: D,
+) -> Result<Vec<Place>, D::Error> {
+    let value = Value::deserialize(deserializer)?;
+    Ok(value
+        .as_array()
+        .into_iter()
+        .flatten()
+        .filter_map(|item| serde_json::from_value(item.clone()).ok())
+        .collect())
+}
+
 impl Default for Config {
     fn default() -> Self {
         Self {
             enabled: false,
             units: UNITS[0].into(),
+            places: Vec::new(),
             place: None,
         }
     }
 }
 
 impl Config {
-    /// A config file can say anything: unknown units are metric, and a place that is not real is none.
+    /// A config file can say anything: unknown units are metric, and a city that is not real, comes twice or is one too
+    /// many is dropped. The city of an older file comes first.
     pub fn sanitized(mut self) -> Self {
         if !UNITS.contains(&self.units.as_str()) {
             self.units = UNITS[0].into();
         }
-        self.place = self.place.and_then(Place::sanitized);
+        self.places = logic::tidy_places(self.place.take().into_iter().chain(self.places));
         self
     }
 
     fn imperial(&self) -> bool {
         self.units == "imperial"
     }
+}
 
-    fn ready(&self) -> bool {
-        self.enabled && self.place.is_some()
+/// A button of the settings page on the city at `index`: `remove` takes it out, `up` moves it one place earlier.
+fn edit_places(places: &mut Vec<Place>, verb: &str, index: usize) -> Result<(), Fault> {
+    if index >= places.len() {
+        return Err(Fault::new("invalid_value", "a city of the list"));
     }
+    match verb {
+        "remove" => drop(places.remove(index)),
+        // The first city is the one the tab opens on.
+        "up" if index > 0 => places.swap(index, index - 1),
+        _ => return Err(Fault::new("invalid_value", "a city that can move up")),
+    }
+    Ok(())
+}
+
+/// Adds a city found by a search at the end of the list.
+fn add_place(places: &mut Vec<Place>, place: Place) -> Result<(), Fault> {
+    if places.iter().any(|p| p.same_spot(&place)) {
+        return Err(Fault::new("weather_twice", place.label()));
+    }
+    if places.len() >= MAX_CITIES {
+        return Err(Fault::new("weather_full", MAX_CITIES.to_string()));
+    }
+    places.push(place);
+    Ok(())
 }
 
 #[derive(Debug, Clone, Copy, PartialEq, Eq)]
@@ -102,12 +146,30 @@ impl Problem {
     }
 }
 
-/// A forecast and what it was asked for, so that one for another city or other units is never shown.
-struct Fetched {
-    forecast: Forecast,
-    at: i64,
+/// What is known of one city in one system of units: its last forecast and when it came, a request on its way, and
+/// why the last one failed. Kept per city and units, so that one for another city or other units is never shown.
+struct Slot {
     place: Place,
     imperial: bool,
+    fetched: Option<(Forecast, i64)>,
+    busy: bool,
+    problem: Option<Problem>,
+}
+
+impl Slot {
+    fn new(place: Place, imperial: bool) -> Self {
+        Self {
+            place,
+            imperial,
+            fetched: None,
+            busy: false,
+            problem: None,
+        }
+    }
+
+    fn is(&self, place: &Place, imperial: bool) -> bool {
+        self.imperial == imperial && self.place.same_spot(place)
+    }
 }
 
 #[derive(Default)]
@@ -133,11 +195,9 @@ fn with_feature(f: impl FnOnce(&Feature)) {
 pub struct Feature {
     view: Rc<WeatherView>,
     config: RefCell<Config>,
-    fetched: RefCell<Option<Fetched>>,
-    problem: Cell<Option<Problem>>,
-    busy: Cell<bool>,
-    /// Bumped by every request; an answer that finds another number is for a question that is no longer asked.
-    generation: Cell<u64>,
+    slots: RefCell<Vec<Slot>>,
+    /// The city on screen, kept while the app runs; the first one when it is gone from the list.
+    shown: RefCell<Option<Place>>,
     search: RefCell<Search>,
     search_generation: Cell<u64>,
     ticker: RefCell<Option<app::Timer>>,
@@ -148,14 +208,20 @@ pub struct Feature {
 /// Adds the tab. `None` without a notch, which is where the tab lives.
 pub fn attach(env: &AttachEnv) -> Option<Rc<Feature>> {
     let notch = env.notch?;
-    let view = WeatherView::new(env.mtm, notch.page_area(PAGE_SIZE.width, PAGE_SIZE.height));
+    let callbacks = WeatherCallbacks {
+        on_flip: Box::new(|step| with_feature(|f| f.flip(step))),
+        on_action: Box::new(|| crate::settings::show_page("weather")),
+    };
+    let view = WeatherView::new(
+        env.mtm,
+        notch.page_area(PAGE_SIZE.width, PAGE_SIZE.height),
+        callbacks,
+    );
     let feature = Rc::new_cyclic(|me| Feature {
         view: Rc::clone(&view),
         config: RefCell::new(env.config.weather.clone().sanitized()),
-        fetched: RefCell::default(),
-        problem: Cell::new(None),
-        busy: Cell::new(false),
-        generation: Cell::new(0),
+        slots: RefCell::default(),
+        shown: RefCell::default(),
         search: RefCell::default(),
         search_generation: Cell::new(0),
         ticker: RefCell::default(),
@@ -183,10 +249,14 @@ pub fn attach(env: &AttachEnv) -> Option<Rc<Feature>> {
 }
 
 impl Feature {
-    /// Applies the settings after a change. A forecast for another city or other units is dropped.
+    /// Applies the settings after a change. What is kept of a city that left the list is dropped.
     pub fn configure(&self, config: &Config) -> Result<(), Fault> {
         *self.config.borrow_mut() = config.clone().sanitized();
-        self.drop_stale();
+        let config = self.config.borrow();
+        self.slots
+            .borrow_mut()
+            .retain(|s| config.places.iter().any(|p| p.same_spot(&s.place)));
+        drop(config);
         if self.showing.get() {
             self.begin();
         }
@@ -203,8 +273,9 @@ impl Feature {
         })
     }
 
-    /// The buttons of the settings page: `weather_search:<city>` looks for places, `weather_pick:<n>` takes the
-    /// n-th of the last search. `None` when the name is not this feature's.
+    /// The buttons of the settings page: `weather_search:<city>` looks for places, `weather_add:<n>` adds the n-th of
+    /// the last search to the cities, `weather_up:<n>` moves the n-th city one place earlier and `weather_remove:<n>`
+    /// takes it out. `None` when the name is not this feature's.
     pub fn action(&self, name: &str, config: &mut Config) -> Option<Result<(), Fault>> {
         if let Some(query) = name.strip_prefix("weather_search:") {
             return Some(match logic::query_of(query) {
@@ -215,46 +286,63 @@ impl Feature {
                 None => Err(Fault::new("invalid_value", "the name of a city")),
             });
         }
-        let index = name.strip_prefix("weather_pick:")?;
-        let place = index
-            .parse::<usize>()
-            .ok()
-            .and_then(|i| self.search.borrow().found.get(i).cloned());
-        Some(match place {
-            Some(place) => {
-                config.place = Some(place);
-                *self.config.borrow_mut() = config.clone().sanitized();
-                self.drop_stale();
-                if self.showing.get() {
-                    self.begin();
+        let (verb, index) = name.strip_prefix("weather_")?.split_once(':')?;
+        let index = index.parse::<usize>().ok();
+        let result = match verb {
+            "add" => {
+                let place = index.and_then(|i| self.search.borrow().found.get(i).cloned());
+                match place {
+                    Some(place) => add_place(&mut config.places, place),
+                    None => Err(Fault::new("invalid_value", "a place from the last search")),
                 }
-                Ok(())
             }
-            None => Err(Fault::new("invalid_value", "a place from the last search")),
-        })
+            "up" | "remove" => match index {
+                Some(index) => edit_places(&mut config.places, verb, index),
+                None => Err(Fault::new("invalid_value", "a city of the list")),
+            },
+            _ => return None,
+        };
+        if result.is_ok() {
+            let _ = self.configure(config);
+        }
+        Some(result)
     }
 
-    /// Forgets a forecast that is not for the city and units now chosen.
-    fn drop_stale(&self) {
+    /// The number in the list of the city on screen.
+    fn index(&self) -> usize {
         let config = self.config.borrow();
-        let keep = self.fetched.borrow().as_ref().is_some_and(|f| {
-            Some(&f.place) == config.place.as_ref() && f.imperial == config.imperial()
-        });
-        if !keep {
-            self.fetched.borrow_mut().take();
-            self.problem.set(None);
-            // An answer still on its way is for the old question.
-            self.generation.set(self.generation.get() + 1);
-            self.busy.set(false);
+        self.shown
+            .borrow()
+            .as_ref()
+            .and_then(|shown| config.places.iter().position(|p| p.same_spot(shown)))
+            .unwrap_or(0)
+    }
+
+    fn current(&self) -> Option<Place> {
+        self.config.borrow().places.get(self.index()).cloned()
+    }
+
+    /// Shows the previous (-1) or the next (1) city, round the list.
+    fn flip(&self, step: isize) {
+        let count = self.config.borrow().places.len();
+        if count < 2 {
+            return;
+        }
+        let next = (self.index() as isize + step).rem_euclid(count as isize) as usize;
+        *self.shown.borrow_mut() = self.config.borrow().places.get(next).cloned();
+        if self.showing.get() {
+            self.begin();
+        } else {
+            self.render();
         }
     }
 
-    /// The tab opened: show what there is, ask for a fresh forecast if the one at hand is old, and keep it fresh
-    /// while the tab stays open.
+    /// The tab opened or another city shows: show what there is, ask for a fresh forecast if the one at hand is old,
+    /// and keep it fresh while the tab stays open.
     fn begin(&self) {
         self.ticker.borrow_mut().take();
         self.render();
-        if !self.config.borrow().ready() {
+        if !self.config.borrow().enabled || self.current().is_none() {
             trace::log("weather: nothing to fetch");
             return;
         }
@@ -268,28 +356,40 @@ impl Feature {
         }));
     }
 
+    /// Asks for the forecast of the city on screen when its last one is older than `limit` and none is on its way.
     fn refresh_if_old(&self, limit: i64) {
+        let Some(place) = self.current() else {
+            return;
+        };
+        let imperial = self.config.borrow().imperial();
         let old = self
-            .fetched
+            .slots
             .borrow()
-            .as_ref()
-            .is_none_or(|f| now_ms() - f.at >= limit);
-        if old && !self.busy.get() {
-            self.fetch();
+            .iter()
+            .find(|s| s.is(&place, imperial))
+            .is_none_or(|s| {
+                !s.busy
+                    && s.fetched
+                        .as_ref()
+                        .is_none_or(|(_, at)| now_ms() - at >= limit)
+            });
+        if old {
+            self.fetch(place, imperial);
         }
     }
 
-    fn fetch(&self) {
-        let (place, imperial) = {
-            let config = self.config.borrow();
-            let Some(place) = config.place.clone() else {
-                return;
+    fn fetch(&self, place: Place, imperial: bool) {
+        {
+            let mut slots = self.slots.borrow_mut();
+            let slot = match slots.iter().position(|s| s.is(&place, imperial)) {
+                Some(i) => &mut slots[i],
+                None => {
+                    slots.push(Slot::new(place.clone(), imperial));
+                    slots.last_mut().expect("just pushed")
+                }
             };
-            (place, config.imperial())
-        };
-        let generation = self.generation.get() + 1;
-        self.generation.set(generation);
-        self.busy.set(true);
+            slot.busy = true;
+        }
         trace::log("weather: asking for the forecast");
         self.render();
         std::thread::spawn(move || {
@@ -302,36 +402,29 @@ impl Feature {
                 Err(_) => Err(Problem::Offline),
             };
             app::on_main(move || {
-                with_feature(|f| f.arrived(generation, place, imperial, result));
+                with_feature(|f| f.arrived(&place, imperial, result));
             });
         });
     }
 
-    fn arrived(
-        &self,
-        generation: u64,
-        place: Place,
-        imperial: bool,
-        result: Result<Forecast, Problem>,
-    ) {
-        if generation != self.generation.get() {
-            return;
-        }
-        self.busy.set(false);
-        match result {
-            Ok(forecast) => {
-                trace::log("weather: forecast arrived");
-                *self.fetched.borrow_mut() = Some(Fetched {
-                    forecast,
-                    at: now_ms(),
-                    place,
-                    imperial,
-                });
-                self.problem.set(None);
-            }
-            Err(problem) => {
-                trace::log(&format!("weather: no forecast ({})", problem.code()));
-                self.problem.set(Some(problem));
+    fn arrived(&self, place: &Place, imperial: bool, result: Result<Forecast, Problem>) {
+        {
+            let mut slots = self.slots.borrow_mut();
+            // A city taken out of the list meanwhile has lost its slot, and the answer is dropped with it.
+            let Some(slot) = slots.iter_mut().find(|s| s.is(place, imperial)) else {
+                return;
+            };
+            slot.busy = false;
+            match result {
+                Ok(forecast) => {
+                    trace::log("weather: forecast arrived");
+                    slot.fetched = Some((forecast, now_ms()));
+                    slot.problem = None;
+                }
+                Err(problem) => {
+                    trace::log(&format!("weather: no forecast ({})", problem.code()));
+                    slot.problem = Some(problem);
+                }
             }
         }
         self.render();
@@ -383,15 +476,14 @@ impl Feature {
 
     fn render(&self) {
         let config = self.config.borrow().clone();
-        let language = i18n::current();
-        self.view.show(display(
-            language,
-            &config,
-            self.fetched.borrow().as_ref(),
-            self.problem.get(),
-            self.busy.get(),
-            now_ms(),
-        ));
+        let index = self.index();
+        let slots = self.slots.borrow();
+        let slot = config
+            .places
+            .get(index)
+            .and_then(|p| slots.iter().find(|s| s.is(p, config.imperial())));
+        self.view
+            .show(display(i18n::current(), &config, index, slot, now_ms()));
     }
 }
 
@@ -403,23 +495,35 @@ fn note(title: &str, hint: &str) -> WeatherDisplay {
 }
 
 /// What the tab shows for the state it is in. Pure, so the tests drive it without a screen or a network.
+/// `index` is the number of the city on screen and `slot` what is known of it in the units chosen.
 fn display(
     language: Language,
     config: &Config,
-    fetched: Option<&Fetched>,
-    problem: Option<Problem>,
-    busy: bool,
+    index: usize,
+    slot: Option<&Slot>,
     now: i64,
 ) -> WeatherDisplay {
-    if !config.enabled {
-        return note(language.weather_off_title(), language.weather_off_hint());
-    }
-    let Some(place) = &config.place else {
-        return note(language.weather_city_title(), language.weather_city_hint());
+    // The way to fix it is in the settings, so the note opens them.
+    let settings = |title: &str, hint: &str| WeatherDisplay {
+        action: Some(language.weather_open_settings().to_owned()),
+        ..note(title, hint)
     };
-    let Some(fetched) = fetched.filter(|f| &f.place == place && f.imperial == config.imperial())
-    else {
-        return match problem {
+    if !config.enabled {
+        return settings(language.weather_off_title(), language.weather_off_hint());
+    }
+    let Some(place) = config.places.get(index) else {
+        return settings(language.weather_city_title(), language.weather_city_hint());
+    };
+    let pager = (config.places.len() > 1).then(|| Pager {
+        position: index + 1,
+        count: config.places.len(),
+        previous: language.weather_previous().to_owned(),
+        next: language.weather_next().to_owned(),
+    });
+    let slot = slot.filter(|s| s.is(place, config.imperial()));
+    let (busy, problem) = slot.map_or((false, None), |s| (s.busy, s.problem));
+    let Some((forecast, at)) = slot.and_then(|s| s.fetched.as_ref()) else {
+        let shown = match problem {
             Some(Problem::Offline) => note(
                 language.weather_offline_title(),
                 language.weather_offline_hint(),
@@ -433,10 +537,14 @@ fn display(
                 language.weather_loading_hint(),
             ),
         };
+        return WeatherDisplay {
+            place: place.label(),
+            pager,
+            ..shown
+        };
     };
-    let forecast = &fetched.forecast;
     let imperial = config.imperial();
-    let age = ago(language, now, fetched.at);
+    let age = ago(language, now, *at);
     let status = if busy {
         language.weather_updating().to_owned()
     } else if problem.is_some() {
@@ -513,6 +621,8 @@ fn display(
         hours,
         days,
         note: None,
+        action: None,
+        pager,
     }
 }
 
@@ -536,16 +646,23 @@ mod tests {
         Config {
             enabled: true,
             units: if imperial { "imperial" } else { "metric" }.into(),
-            place: Some(hanoi()),
+            places: vec![hanoi()],
+            place: None,
         }
     }
 
-    fn fetched(at: i64, imperial: bool) -> Fetched {
-        Fetched {
-            forecast: logic::parse_forecast(FORECAST).unwrap(),
-            at,
-            place: hanoi(),
-            imperial,
+    fn fetched(at: i64, imperial: bool) -> Slot {
+        Slot {
+            fetched: Some((logic::parse_forecast(FORECAST).unwrap(), at)),
+            ..Slot::new(hanoi(), imperial)
+        }
+    }
+
+    fn failed(problem: Option<Problem>, busy: bool) -> Slot {
+        Slot {
+            problem,
+            busy,
+            ..Slot::new(hanoi(), false)
         }
     }
 
@@ -553,13 +670,30 @@ mod tests {
     fn the_feature_is_off_by_default_and_old_files_load() {
         let config: Config = serde_json::from_str("{}").unwrap();
         assert_eq!(config, Config::default());
-        assert!(!config.enabled && config.place.is_none() && config.units == "metric");
+        assert!(!config.enabled && config.places.is_empty() && config.units == "metric");
         let partial: Config = serde_json::from_str(
             r#"{ "enabled": true, "units": "imperial", "place": { "name": "Hue", "latitude": 16.46, "longitude": 107.59 }, "future_key": 1 }"#,
         )
         .unwrap();
         assert!(partial.enabled && partial.imperial());
-        assert_eq!(partial.place.unwrap().name, "Hue");
+        // A file of the one-city days: its city becomes the first of the list, and is written back only there.
+        let partial = partial.sanitized();
+        assert_eq!(partial.places.len(), 1);
+        assert_eq!(partial.places[0].name, "Hue");
+        let written = serde_json::to_value(&partial).unwrap();
+        assert!(written.get("place").is_none() && written["places"][0]["name"] == "Hue");
+        let both: Config = serde_json::from_str(
+            r#"{ "place": { "name": "Hue", "latitude": 16.46, "longitude": 107.59 },
+                 "places": [{ "name": "Hanoi", "latitude": 21.02, "longitude": 105.84 }, { "name": "Hue again", "latitude": 16.46, "longitude": 107.59 }] }"#,
+        )
+        .unwrap();
+        let names: Vec<String> = both
+            .sanitized()
+            .places
+            .into_iter()
+            .map(|p| p.name)
+            .collect();
+        assert_eq!(names, ["Hue", "Hanoi"], "the old city first, and once");
     }
 
     #[test]
@@ -570,47 +704,105 @@ mod tests {
         .unwrap();
         let config = config.sanitized();
         assert_eq!(config.units, "metric");
-        assert!(config.place.is_none());
-        // A place of the wrong shape must not make the whole file unreadable, which would reset every setting.
+        assert!(config.place.is_none() && config.places.is_empty());
+        // A city of the wrong shape must not make the whole file unreadable, which would reset every setting.
         for wrong in [
             r#"{ "place": "Hanoi" }"#,
             r#"{ "place": 5 }"#,
             r#"{ "place": { "name": 3 } }"#,
             r#"{ "place": [] }"#,
             r#"{ "place": null }"#,
+            r#"{ "places": "Hanoi" }"#,
+            r#"{ "places": { "name": "Hue" } }"#,
+            r#"{ "places": null }"#,
+            r#"{ "places": [5, "x", { "name": 3 }, { "name": "Far", "latitude": 0, "longitude": 999 }] }"#,
         ] {
             let config: Config = serde_json::from_str(wrong).expect(wrong);
-            assert!(config.place.is_none(), "{wrong}");
+            assert!(config.sanitized().places.is_empty(), "{wrong}");
         }
+        let mixed: Config = serde_json::from_str(
+            r#"{ "places": [7, { "name": "Hue", "latitude": 16.46, "longitude": 107.59 }] }"#,
+        )
+        .unwrap();
+        assert_eq!(mixed.places.len(), 1, "a bad city leaves the good ones");
+    }
+
+    #[test]
+    fn cities_are_added_once_up_to_the_cap_moved_up_and_removed() {
+        let at = |name: &str, latitude: f64| Place {
+            name: name.into(),
+            latitude,
+            ..hanoi()
+        };
+        let mut places = Vec::new();
+        for i in 0..MAX_CITIES {
+            assert!(add_place(&mut places, at("C", i as f64)).is_ok());
+        }
+        assert_eq!(
+            add_place(&mut places, at("More", 50.0)).unwrap_err().code,
+            "weather_full"
+        );
+        assert_eq!(
+            add_place(&mut places, at("Again", 3.0)).unwrap_err().code,
+            "weather_twice",
+            "a city already there is refused before the cap is"
+        );
+        assert!(
+            edit_places(&mut places, "up", 0).is_err(),
+            "the first cannot move up"
+        );
+        assert!(edit_places(&mut places, "up", 2).is_ok());
+        assert_eq!((places[1].latitude, places[2].latitude), (2.0, 1.0));
+        assert!(edit_places(&mut places, "remove", 0).is_ok());
+        assert_eq!(places.len(), MAX_CITIES - 1);
+        assert!(edit_places(&mut places, "remove", 99).is_err());
+        assert!(edit_places(&mut places, "sideways", 1).is_err());
     }
 
     #[test]
     fn the_tab_says_why_it_has_nothing_to_show() {
-        let off = display(Language::English, &Config::default(), None, None, false, 0);
+        let off = display(Language::English, &Config::default(), 0, None, 0);
         assert_eq!(off.note.as_ref().unwrap().0, "The Weather tab is off");
         let no_city = Config {
             enabled: true,
             ..Config::default()
         };
-        let city = display(Language::English, &no_city, None, None, false, 0);
+        // With no city the tab has nothing to fetch, and its button opens the page where a city is added.
+        for (language, button) in [
+            (Language::English, "Open Settings"),
+            (Language::Vietnamese, "Mở Cài đặt"),
+        ] {
+            let city = display(language, &no_city, 0, None, 0);
+            assert!(city.note.is_some() && city.pager.is_none());
+            assert_eq!(city.action.as_deref(), Some(button));
+        }
+        let city = display(Language::English, &no_city, 0, None, 0);
         assert_eq!(city.note.as_ref().unwrap().0, "Choose a city");
-        let loading = display(Language::English, &ready(false), None, None, true, 0);
+        let loading = display(
+            Language::English,
+            &ready(false),
+            0,
+            Some(&failed(None, true)),
+            0,
+        );
         assert_eq!(loading.note.as_ref().unwrap().0, "Getting the weather");
+        assert!(
+            loading.action.is_none(),
+            "nothing to change in the settings while it loads"
+        );
         let offline = display(
             Language::Vietnamese,
             &ready(false),
-            None,
-            Some(Problem::Offline),
-            false,
+            0,
+            Some(&failed(Some(Problem::Offline), false)),
             0,
         );
         assert_eq!(offline.note.as_ref().unwrap().0, "Không có kết nối");
         let service = display(
             Language::English,
             &ready(false),
-            None,
-            Some(Problem::Service),
-            false,
+            0,
+            Some(&failed(Some(Problem::Service), false)),
             0,
         );
         assert_eq!(
@@ -626,9 +818,8 @@ mod tests {
             let shown = display(
                 language,
                 &ready(false),
+                0,
                 Some(&fetched(at, false)),
-                None,
-                false,
                 at + 3 * 60_000,
             );
             assert!(shown.note.is_none());
@@ -656,9 +847,8 @@ mod tests {
         let english = display(
             Language::English,
             &ready(false),
+            0,
             Some(&fetched(at, false)),
-            None,
-            false,
             at,
         );
         assert_eq!(english.hours[0].label, "11 AM");
@@ -668,9 +858,8 @@ mod tests {
         let vietnamese = display(
             Language::Vietnamese,
             &ready(false),
+            0,
             Some(&fetched(at, false)),
-            None,
-            false,
             at,
         );
         assert_eq!(vietnamese.hours[0].label, "11h");
@@ -684,9 +873,8 @@ mod tests {
         let imperial = display(
             Language::English,
             &ready(true),
+            0,
             Some(&fetched(at, true)),
-            None,
-            false,
             at,
         );
         assert_eq!(imperial.current.as_ref().unwrap().facts[2].1, "4 mph");
@@ -694,23 +882,18 @@ mod tests {
         let mismatch = display(
             Language::English,
             &ready(true),
-            Some(&fetched(at, false)),
-            None,
-            true,
+            0,
+            Some(&Slot {
+                busy: true,
+                ..fetched(at, false)
+            }),
             at,
         );
         assert_eq!(mismatch.note.as_ref().unwrap().0, "Getting the weather");
         // Another city: the same.
         let mut other = fetched(at, false);
-        other.place.name = "Hue".into();
-        let elsewhere = display(
-            Language::English,
-            &ready(false),
-            Some(&other),
-            None,
-            true,
-            at,
-        );
+        other.place.latitude = 16.46;
+        let elsewhere = display(Language::English, &ready(false), 0, Some(&other), at);
         assert!(elsewhere.note.is_some());
     }
 
@@ -721,9 +904,11 @@ mod tests {
         let stale = display(
             Language::English,
             &ready(false),
-            Some(&fetched(at, false)),
-            Some(Problem::Offline),
-            false,
+            0,
+            Some(&Slot {
+                problem: Some(Problem::Offline),
+                ..fetched(at, false)
+            }),
             now,
         );
         assert!(stale.note.is_none());
@@ -735,11 +920,54 @@ mod tests {
         let updating = display(
             Language::English,
             &ready(false),
-            Some(&fetched(at, false)),
-            None,
-            true,
+            0,
+            Some(&Slot {
+                busy: true,
+                ..fetched(at, false)
+            }),
             now,
         );
         assert_eq!(updating.status, "Updating...");
+    }
+
+    #[test]
+    fn several_cities_show_one_at_a_time_with_where_it_is_in_the_list() {
+        let at = 7;
+        let hue = Place {
+            name: "Hue".into(),
+            region: String::new(),
+            latitude: 16.46,
+            longitude: 107.59,
+            ..hanoi()
+        };
+        let config = Config {
+            places: vec![hanoi(), hue.clone()],
+            ..ready(false)
+        };
+        let first = display(Language::English, &config, 0, Some(&fetched(at, false)), at);
+        let pager = first.pager.as_ref().unwrap();
+        assert_eq!((pager.position, pager.count), (1, 2));
+        assert_eq!(
+            (pager.previous.as_str(), pager.next.as_str()),
+            ("Previous city", "Next city")
+        );
+        assert!(first.note.is_none());
+        // The second city has no forecast yet: it says so under its own name, and can still be flipped past.
+        let second = display(Language::Vietnamese, &config, 1, None, at);
+        assert_eq!(second.place, "Hue, Vietnam");
+        assert_eq!(second.note.as_ref().unwrap().0, "Đang lấy thời tiết");
+        assert_eq!(second.pager.as_ref().unwrap().position, 2);
+        assert_eq!(second.pager.as_ref().unwrap().previous, "Thành phố trước");
+        // The forecast of the first city is never shown for the second.
+        let wrong = display(Language::English, &config, 1, Some(&fetched(at, false)), at);
+        assert!(wrong.note.is_some() && wrong.current.is_none());
+        let one = display(
+            Language::English,
+            &ready(false),
+            0,
+            Some(&fetched(at, false)),
+            at,
+        );
+        assert!(one.pager.is_none(), "one city needs no flipping");
     }
 }
