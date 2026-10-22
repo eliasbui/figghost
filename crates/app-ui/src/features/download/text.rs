@@ -10,6 +10,14 @@ impl Language {
         }
     }
 
+    /// On the closed notch, in the place of the percentage, while the picture and the sound are made into one file.
+    pub fn download_joining(self) -> &'static str {
+        match self {
+            Language::English => "Joining",
+            Language::Vietnamese => "Đang ghép",
+        }
+    }
+
     pub fn download_pick_folder(self) -> &'static str {
         match self {
             Language::English => "Choose the folder for downloaded videos",
@@ -26,6 +34,8 @@ mod tests {
     fn every_word_is_there_in_both_languages() {
         for language in Language::ALL {
             assert!(!language.download_menu().is_empty());
+            assert!(!language.download_joining().is_empty());
+            assert!(language.download_joining().chars().count() <= 14);
             assert!(!language.download_pick_folder().is_empty());
         }
     }

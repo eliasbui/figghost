@@ -11,8 +11,8 @@
     'sec.download.tools': 'Tools',
     'download.ytdlp.title': 'yt-dlp', 'download.ytdlp.found': 'Found, version {version}', 'download.ytdlp.found.plain': 'Found',
     'download.ytdlp.missing': 'Not installed. In Terminal, run: brew install yt-dlp',
-    'download.ffmpeg.title': 'ffmpeg', 'download.ffmpeg.found': 'Found. Video and sound are joined, so 1080p and above, and music only, work.',
-    'download.ffmpeg.missing': 'Not installed. Without it only a video that comes as one file can be saved (YouTube usually offers 720p at most). For 1080p and above and for music only, run: brew install ffmpeg',
+    'download.ffmpeg.title': 'ffmpeg', 'download.ffmpeg.found': 'Found. It joins video and sound, so above 1080p (VP9, AV1) and other formats work, and music only is saved as m4a.',
+    'download.ffmpeg.missing': 'Not installed. Figghost joins H.264 video and AAC sound itself, so YouTube works up to 1080p. ffmpeg is needed only above 1080p (VP9, AV1), for sites with formats Figghost cannot join, and to turn music into m4a. To get it, run: brew install ffmpeg',
     'sec.download.get': 'Download',
     'download.link.label': 'Link to the video', 'download.link.ph': 'https://...', 'download.go': 'Download',
     'download.quality.title': 'Quality', 'download.quality.desc': 'The best the site has, or no taller than the height you choose. Music only saves the sound.',
@@ -23,9 +23,9 @@
     'download.list.empty': 'Nothing downloaded yet. Paste a link above.',
     'download.clear': 'Clear finished',
     'download.cancel': 'Cancel', 'download.reveal': 'Show in Finder',
-    'download.st.queued': 'Waiting for a free place', 'download.st.running': 'Starting...', 'download.st.done': 'Saved', 'download.st.cancelled': 'Cancelled',
+    'download.st.queued': 'Waiting for a free place', 'download.st.running': 'Starting...', 'download.st.joining': 'Joining', 'download.st.done': 'Saved', 'download.st.cancelled': 'Cancelled',
     'download.st.failed': 'Failed',
-    'download.err.ffmpeg': 'This video comes as separate picture and sound, which needs ffmpeg to join. In Terminal, run: brew install ffmpeg',
+    'download.err.ffmpeg': 'This video needs ffmpeg: Figghost cannot join its formats itself. In Terminal, run: brew install ffmpeg',
     'download.speed': '{speed}/s', 'download.eta': '{time} left',
     'fault.download_off': 'Turn on Download videos first.',
     'fault.download_missing': 'yt-dlp is not installed. In Terminal, run: brew install yt-dlp',
@@ -38,8 +38,8 @@
     'sec.download.tools': 'Công cụ',
     'download.ytdlp.title': 'yt-dlp', 'download.ytdlp.found': 'Đã có, phiên bản {version}', 'download.ytdlp.found.plain': 'Đã có',
     'download.ytdlp.missing': 'Chưa cài. Trong Terminal, chạy: brew install yt-dlp',
-    'download.ffmpeg.title': 'ffmpeg', 'download.ffmpeg.found': 'Đã có. Hình và tiếng được ghép lại nên tải được từ 1080p trở lên và chỉ lấy nhạc.',
-    'download.ffmpeg.missing': 'Chưa cài. Khi thiếu, chỉ lưu được video có sẵn thành một tệp (YouTube thường chỉ có tối đa 720p). Muốn 1080p trở lên và chỉ lấy nhạc, hãy chạy: brew install ffmpeg',
+    'download.ffmpeg.title': 'ffmpeg', 'download.ffmpeg.found': 'Đã có. ffmpeg ghép hình và tiếng nên tải được trên 1080p (VP9, AV1) và các định dạng khác, và chỉ lấy nhạc thì lưu thành m4a.',
+    'download.ffmpeg.missing': 'Chưa cài. Figghost tự ghép hình H.264 và tiếng AAC nên YouTube tải được tối đa 1080p. Chỉ cần ffmpeg khi muốn trên 1080p (VP9, AV1), với trang có định dạng Figghost không tự ghép được, và để chuyển nhạc sang m4a. Muốn cài, hãy chạy: brew install ffmpeg',
     'sec.download.get': 'Tải về',
     'download.link.label': 'Link video', 'download.link.ph': 'https://...', 'download.go': 'Tải',
     'download.quality.title': 'Chất lượng', 'download.quality.desc': 'Tốt nhất mà trang có, hoặc không cao hơn chiều cao bạn chọn. Chỉ lấy nhạc thì chỉ lưu phần tiếng.',
@@ -50,9 +50,9 @@
     'download.list.empty': 'Chưa tải gì. Hãy dán link ở trên.',
     'download.clear': 'Xóa các lượt đã xong',
     'download.cancel': 'Hủy', 'download.reveal': 'Mở trong Finder',
-    'download.st.queued': 'Đang chờ đến lượt', 'download.st.running': 'Đang bắt đầu...', 'download.st.done': 'Đã lưu', 'download.st.cancelled': 'Đã hủy',
+    'download.st.queued': 'Đang chờ đến lượt', 'download.st.running': 'Đang bắt đầu...', 'download.st.joining': 'Đang ghép', 'download.st.done': 'Đã lưu', 'download.st.cancelled': 'Đã hủy',
     'download.st.failed': 'Thất bại',
-    'download.err.ffmpeg': 'Video này có hình và tiếng riêng, cần ffmpeg để ghép. Trong Terminal, chạy: brew install ffmpeg',
+    'download.err.ffmpeg': 'Video này cần ffmpeg: Figghost không tự ghép được định dạng của nó. Trong Terminal, chạy: brew install ffmpeg',
     'download.speed': '{speed}/giây', 'download.eta': 'còn {time}',
     'fault.download_off': 'Hãy bật Tải video trước.',
     'fault.download_missing': 'Chưa cài yt-dlp. Trong Terminal, chạy: brew install yt-dlp',
@@ -70,7 +70,6 @@
     };
     const clock = (s) => Math.floor(s / 60) + ':' + String(s % 60).padStart(2, '0');
     const hostOf = (url) => url.replace(/^[a-z]+:\/\//i, '').split(/[/?#]/)[0];
-    const tilde = (p) => p;
 
     // Tools ---------------------------------------------------------
     const ytdlp = h('span', { class: 'download-state' });
@@ -80,10 +79,10 @@
     reg(() => {
       const d = dl();
       ytdlpRow.querySelector('.row-desc').textContent = d.ytdlp ? (d.ytdlp_version ? t('download.ytdlp.found', { version: d.ytdlp_version }) : t('download.ytdlp.found.plain')) : t('download.ytdlp.missing');
-      ytdlp.textContent = d.ytdlp ? tilde(d.ytdlp) : '';
+      ytdlp.textContent = d.ytdlp ? d.ytdlp : '';
       ytdlpRow.dataset.state = d.ytdlp ? 'ready' : 'missing';
       ffmpegRow.querySelector('.row-desc').textContent = d.ffmpeg ? t('download.ffmpeg.found') : t('download.ffmpeg.missing');
-      ffmpeg.textContent = d.ffmpeg ? tilde(d.ffmpeg) : '';
+      ffmpeg.textContent = d.ffmpeg ? d.ffmpeg : '';
       ffmpegRow.dataset.state = d.ffmpeg ? 'ready' : 'missing';
     });
 
@@ -106,7 +105,7 @@
     const where = h('span', { class: 'download-path' });
     const reset = button(t('download.folder.reset'), () => change('download.folder', ''), { small: true });
     const choose = button(t('download.folder.choose'), () => act('download_pick'), { small: true });
-    reg(() => { where.textContent = tilde(dl().folder_path); reset.hidden = !dl().folder; });
+    reg(() => { where.textContent = dl().folder_path; reset.hidden = !dl().folder; });
     // The panel that chooses a folder is the app's, so the choice comes back through the state and is stored from here.
     let seenPick = dl().picked.seq;
     reg(() => {
@@ -218,7 +217,7 @@
     pick.value = 'best';
     pick.dispatchEvent(new Event('change'));
 
-    // The list: progress, a finished file, a failure and one that needs ffmpeg.
+    // The list: progress, joining, a finished file, a failure and one that needs ffmpeg.
     const items = [...page.querySelectorAll('.download-item')];
     expect(items.length === S.download.jobs.length, 'download: a row for each download: ' + items.length);
     const running = items.find((i) => i.dataset.status === 'running');
@@ -227,6 +226,9 @@
     sent.length = 0;
     [...running.querySelectorAll('.btn')].find((b) => !b.hidden).click();
     expect(sent.some((m) => m.name === 'download_cancel:' + S.download.jobs.find((j) => j.status === 'running').id), 'download: a running download can be cancelled: ' + JSON.stringify(sent));
+    const joining = items.find((i) => i.dataset.status === 'joining');
+    expect(joining && joining.textContent.includes(t('download.st.joining')), 'download: a download that joins its parts says so');
+    expect(joining && [...joining.querySelectorAll('.btn')].every((b) => b.hidden), 'download: a download that joins its parts offers no button');
     const done = items.find((i) => i.dataset.status === 'done');
     sent.length = 0;
     [...done.querySelectorAll('.btn')].find((b) => !b.hidden).click();

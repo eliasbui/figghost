@@ -11,8 +11,9 @@
     { "id": 1, "url": "https://www.youtube.com/watch?v=jNQXAC9IVRw", "title": "Me at the zoo", "status": "done", "percent": 100, "speed": null, "eta": null, "error": "", "needs_ffmpeg": false },
     { "id": 2, "url": "https://vimeo.com/76979871", "title": "The New Vimeo Player", "status": "running", "percent": 42, "speed": 3250000, "eta": 18, "error": "", "needs_ffmpeg": false },
     { "id": 3, "url": "https://example.com/gone", "title": "", "status": "failed", "percent": 12.5, "speed": null, "eta": null, "error": "[generic] gone: Unable to download webpage: HTTP Error 404", "needs_ffmpeg": false },
-    { "id": 4, "url": "https://www.youtube.com/watch?v=BaW_jenozKc", "title": "youtube-dl test video", "status": "failed", "percent": null, "speed": null, "eta": null, "error": "Requested format is not available", "needs_ffmpeg": true },
-    { "id": 5, "url": "https://www.facebook.com/watch/?v=1", "title": "", "status": "queued", "percent": null, "speed": null, "eta": null, "error": "", "needs_ffmpeg": false }
+    { "id": 4, "url": "https://video.example.org/watch/4", "title": "A video that needs ffmpeg", "status": "failed", "percent": null, "speed": null, "eta": null, "error": "Requested format is not available", "needs_ffmpeg": true },
+    { "id": 5, "url": "https://www.facebook.com/watch/?v=1", "title": "", "status": "queued", "percent": null, "speed": null, "eta": null, "error": "", "needs_ffmpeg": false },
+    { "id": 6, "url": "https://www.youtube.com/watch?v=jNQXAC9IVRw", "title": "Me at the zoo", "status": "joining", "percent": 100, "speed": null, "eta": null, "error": "", "needs_ffmpeg": false }
   ],
   "picked": { "seq": 0, "path": "" }
 }

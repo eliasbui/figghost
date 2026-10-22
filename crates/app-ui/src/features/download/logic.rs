@@ -176,8 +176,9 @@ pub fn build_args(plan: &Plan) -> Vec<String> {
     args
 }
 
-/// The `-f` of yt-dlp. With ffmpeg the best video and the best audio are fetched apart and joined; without it only a
-/// file that already has both can be used, so the choice is the best of those, an mp4 if there is one.
+/// The `-f` of yt-dlp. With ffmpeg the best video and the best audio are fetched apart and joined by it. Without it the
+/// choice is a picture that AVFoundation can join to a sound without encoding (H.264 in mp4 and AAC in m4a, the two apart,
+/// which is all that YouTube now offers), then a file that already has both, an mp4 if there is one.
 fn format_selector(quality: Quality, ffmpeg: bool) -> String {
     let cap = quality
         .height()
@@ -187,8 +188,81 @@ fn format_selector(quality: Quality, ffmpeg: bool) -> String {
         (Quality::Audio, true) => "ba/b".into(),
         (Quality::Audio, false) => "ba[ext=m4a]/ba/b".into(),
         (_, true) => format!("bv*{cap}+ba/b{cap}"),
-        (_, false) => format!("b{cap}[ext=mp4]/b{cap}"),
+        (_, false) => {
+            format!("bv*[vcodec^=avc1][ext=mp4]{cap}+ba[ext=m4a]/b{cap}[ext=mp4]/b{cap}")
+        }
     }
+}
+
+/// The two files yt-dlp leaves when it was told to join a picture and a sound and could not.
+#[derive(Debug, Clone, PartialEq, Eq)]
+pub struct Parts {
+    pub video: PathBuf,
+    pub audio: PathBuf,
+}
+
+/// Whether `name` is `stem`, `.f` and a format id, then an extension: the way yt-dlp names a stream it kept apart.
+/// The extension tells a picture (`true`) from a sound (`false`); any other is not a part.
+fn part_kind(stem: &str, name: &str) -> Option<bool> {
+    let rest = name.strip_prefix(stem)?.strip_prefix(".f")?;
+    let (id, ext) = rest.rsplit_once('.')?;
+    if id.is_empty()
+        || !id
+            .chars()
+            .all(|c| c.is_ascii_alphanumeric() || "-_=".contains(c))
+    {
+        return None;
+    }
+    match ext {
+        "mp4" | "m4v" => Some(true),
+        "m4a" => Some(false),
+        _ => None,
+    }
+}
+
+/// The parts of `reported`, the path yt-dlp said it wrote when that file is not there: yt-dlp prints the name of the
+/// joined file even when it could not join, and leaves `<name>.f<format>.<ext>` for each stream. `None` unless there is
+/// exactly one picture and one sound.
+pub fn find_parts(reported: &Path) -> Option<Parts> {
+    let stem = reported.file_stem()?.to_str()?;
+    let (mut video, mut audio) = (Vec::new(), Vec::new());
+    for entry in std::fs::read_dir(reported.parent()?).ok()?.flatten() {
+        let name = entry.file_name();
+        match part_kind(stem, name.to_str()?) {
+            Some(true) => video.push(entry.path()),
+            Some(false) => audio.push(entry.path()),
+            None => {}
+        }
+    }
+    match (&mut video[..], &mut audio[..]) {
+        ([video], [audio]) => Some(Parts {
+            video: std::mem::take(video),
+            audio: std::mem::take(audio),
+        }),
+        _ => None,
+    }
+}
+
+/// `wanted`, or the first of `name (2).ext`, `name (3).ext` and so on that `taken` does not say is there, so that a joined
+/// file never replaces one that was already in the folder.
+pub fn free_name(wanted: &Path, taken: impl Fn(&Path) -> bool) -> PathBuf {
+    let (Some(stem), ext) = (wanted.file_stem(), wanted.extension()) else {
+        return wanted.to_path_buf();
+    };
+    let mut path = wanted.to_path_buf();
+    for n in 2.. {
+        if !taken(&path) {
+            break;
+        }
+        let mut name = stem.to_os_string();
+        name.push(format!(" ({n})"));
+        if let Some(ext) = ext {
+            name.push(".");
+            name.push(ext);
+        }
+        path = wanted.with_file_name(name);
+    }
+    path
 }
 
 /// What one progress line says. A number the line does not have is `None`.
@@ -303,7 +377,7 @@ mod tests {
     #[test]
     fn a_link_is_http_or_https_with_a_host_and_nothing_else_in_it() {
         for good in [
-            "https://www.youtube.com/watch?v=BaW_jenozKc",
+            "https://www.youtube.com/watch?v=jNQXAC9IVRw",
             "http://example.com/a.mp4",
             "HTTPS://Vimeo.com/123",
             "  https://example.com/x  \n",
@@ -438,10 +512,17 @@ mod tests {
             "bv*[height<=?720]+ba/b[height<=?720]"
         );
         assert_eq!(format(Quality::Audio, Some(ffmpeg)), "ba/b");
-        assert_eq!(format(Quality::Best, None), "b[ext=mp4]/b");
+        assert_eq!(
+            format(Quality::Best, None),
+            "bv*[vcodec^=avc1][ext=mp4]+ba[ext=m4a]/b[ext=mp4]/b"
+        );
+        assert_eq!(
+            format(Quality::P1080, None),
+            "bv*[vcodec^=avc1][ext=mp4][height<=?1080]+ba[ext=m4a]/b[height<=?1080][ext=mp4]/b[height<=?1080]"
+        );
         assert_eq!(
             format(Quality::P720, None),
-            "b[height<=?720][ext=mp4]/b[height<=?720]"
+            "bv*[vcodec^=avc1][ext=mp4][height<=?720]+ba[ext=m4a]/b[height<=?720][ext=mp4]/b[height<=?720]"
         );
         assert_eq!(format(Quality::Audio, None), "ba[ext=m4a]/ba/b");
 
@@ -468,6 +549,78 @@ mod tests {
                 );
             }
         }
+    }
+
+    #[test]
+    fn a_stream_kept_apart_is_a_part_only_by_its_name_and_extension() {
+        let stem = "Me at the zoo [jNQXAC9IVRw]";
+        let kind = |name: &str| part_kind(stem, name);
+        assert_eq!(kind("Me at the zoo [jNQXAC9IVRw].f133.mp4"), Some(true));
+        assert_eq!(kind("Me at the zoo [jNQXAC9IVRw].f140.m4a"), Some(false));
+        assert_eq!(kind("Me at the zoo [jNQXAC9IVRw].fhls-720.mp4"), Some(true));
+        for not in [
+            "Me at the zoo [jNQXAC9IVRw].mp4",
+            "Me at the zoo [jNQXAC9IVRw].f.mp4",
+            "Me at the zoo [jNQXAC9IVRw].f251.webm",
+            "Me at the zoo [jNQXAC9IVRw].f133.mp4.part",
+            "Me at the zoo [jNQXAC9IVRw].f133.mp4.ytdl",
+            "Me at the zoo [jNQXAC9IVRw].en.vtt",
+            "Another [x].f133.mp4",
+        ] {
+            assert_eq!(kind(not), None, "{not}");
+        }
+    }
+
+    #[test]
+    fn two_parts_are_found_beside_the_file_yt_dlp_named_and_nothing_else_is() {
+        let root = std::env::temp_dir().join(format!("figghost-dl-parts-{}", std::process::id()));
+        let _ = std::fs::remove_dir_all(&root);
+        std::fs::create_dir_all(&root).unwrap();
+        let touch = |name: &str| std::fs::write(root.join(name), "x").unwrap();
+        let reported = root.join("Me at the zoo [jNQXAC9IVRw].mp4");
+        assert_eq!(find_parts(&reported), None, "nothing is there");
+        touch("Me at the zoo [jNQXAC9IVRw].f133.mp4");
+        touch("Other [abc].f140.m4a");
+        assert_eq!(
+            find_parts(&reported),
+            None,
+            "a sound of another video is not its sound"
+        );
+        touch("Me at the zoo [jNQXAC9IVRw].f140.m4a");
+        assert_eq!(
+            find_parts(&reported),
+            Some(Parts {
+                video: root.join("Me at the zoo [jNQXAC9IVRw].f133.mp4"),
+                audio: root.join("Me at the zoo [jNQXAC9IVRw].f140.m4a"),
+            })
+        );
+        touch("Me at the zoo [jNQXAC9IVRw].f134.mp4");
+        assert_eq!(
+            find_parts(&reported),
+            None,
+            "two pictures leave no way to choose"
+        );
+        assert_eq!(find_parts(Path::new("/does/not/exist/a.mp4")), None);
+        std::fs::remove_dir_all(&root).unwrap();
+    }
+
+    #[test]
+    fn a_joined_file_takes_the_next_free_name_and_never_a_taken_one() {
+        let wanted = Path::new("/d/Me at the zoo [x].mp4");
+        assert_eq!(free_name(wanted, |_| false), wanted);
+        let taken = |p: &Path| {
+            ["Me at the zoo [x].mp4", "Me at the zoo [x] (2).mp4"]
+                .iter()
+                .any(|n| p.file_name().is_some_and(|f| f == *n))
+        };
+        assert_eq!(
+            free_name(wanted, taken),
+            Path::new("/d/Me at the zoo [x] (3).mp4")
+        );
+        assert_eq!(
+            free_name(Path::new("/d/a"), |p| p == Path::new("/d/a")),
+            Path::new("/d/a (2)")
+        );
     }
 
     #[test]

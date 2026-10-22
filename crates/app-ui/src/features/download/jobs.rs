@@ -1,5 +1,5 @@
-//! The downloads in progress: a queue that lets two run at a time, a thread for each that reads what yt-dlp prints, and the
-//! ways to stop one. There is no AppKit here, so the tests run it against a stand-in for yt-dlp.
+//! The downloads in progress: a queue that lets two run at a time, a thread for each that reads what yt-dlp prints and, when
+//! it left a picture and a sound apart, joins them, and the ways to stop one. There is no AppKit here, so the tests run it against a stand-in for yt-dlp.
 
 use super::logic::{self, Line, Plan, Quality};
 use macos_sys::process::kill_group;
@@ -25,6 +25,8 @@ pub const SEARCH_PATH: &str = "/opt/homebrew/bin:/usr/local/bin:/usr/bin:/bin";
 pub enum Status {
     Queued,
     Running,
+    /// The picture and the sound yt-dlp left apart are being made into one file.
+    Joining,
     Done,
     Failed,
     Cancelled,
@@ -35,14 +37,15 @@ impl Status {
         match self {
             Status::Queued => "queued",
             Status::Running => "running",
+            Status::Joining => "joining",
             Status::Done => "done",
             Status::Failed => "failed",
             Status::Cancelled => "cancelled",
         }
     }
 
-    fn over(self) -> bool {
-        !matches!(self, Status::Queued | Status::Running)
+    pub fn over(self) -> bool {
+        !matches!(self, Status::Queued | Status::Running | Status::Joining)
     }
 }
 
@@ -85,6 +88,8 @@ struct Entry {
     /// The process group of yt-dlp while it runs.
     group: Option<u32>,
     cancelled: bool,
+    /// The files yt-dlp said it wrote, in order.
+    reported: Vec<PathBuf>,
 }
 
 #[derive(Default)]
@@ -130,6 +135,7 @@ impl Engine {
                 request: Some(request),
                 group: None,
                 cancelled: false,
+                reported: Vec::new(),
             });
             forget_old(&mut inner);
             id
@@ -138,7 +144,8 @@ impl Engine {
         id
     }
 
-    /// Stops a download that waits or runs, and what it started with it. One that is over is left as it is.
+    /// Stops a download that waits or runs, and what it started with it. One that is over is left as it is, and so is one
+    /// that joins its parts, which is a matter of a moment and ends with the file whole or the parts kept.
     pub fn cancel(&self, id: u64) {
         let mut inner = lock(&self.inner);
         let ended = inner.ended + 1;
@@ -191,7 +198,7 @@ impl Engine {
         let temps: Vec<PathBuf> = lock(&self.inner)
             .entries
             .iter()
-            .filter(|e| e.job.status == Status::Running)
+            .filter(|e| matches!(e.job.status, Status::Running | Status::Joining))
             .map(|e| temp_dir(&e.job.folder, e.job.id))
             .collect();
         for temp in temps {
@@ -249,7 +256,7 @@ fn start_waiting(shared: &Arc<Mutex<Inner>>) {
         let mut running = inner
             .entries
             .iter()
-            .filter(|e| e.job.status == Status::Running)
+            .filter(|e| matches!(e.job.status, Status::Running | Status::Joining))
             .count();
         for entry in &mut inner.entries {
             if running >= MAX_RUNNING {
@@ -285,7 +292,15 @@ struct Outcome {
 
 fn run(shared: &Arc<Mutex<Inner>>, id: u64, request: Request) {
     let temp = temp_dir(&request.folder, id);
-    let outcome = fetch(shared, id, &request, &temp);
+    let mut outcome = fetch(shared, id, &request, &temp);
+    if outcome.success
+        && let Err(why) = join_parts(shared, id, &temp)
+    {
+        outcome = Outcome {
+            success: false,
+            error: Some(why),
+        };
+    }
     let _ = fs::remove_dir_all(&temp);
     {
         let mut inner = lock(shared);
@@ -391,6 +406,43 @@ fn fetch(shared: &Arc<Mutex<Inner>>, id: u64, request: &Request, temp: &Path) ->
     }
 }
 
+/// yt-dlp without ffmpeg leaves a picture and a sound apart and still names the joined file, which is not there: this
+/// makes the one file of them with AVFoundation, without encoding, and removes the two. Failing keeps both, since they are
+/// what was downloaded. The words of the error are the person's to read.
+fn join_parts(shared: &Mutex<Inner>, id: u64, temp: &Path) -> Result<(), String> {
+    let (reported, cancelled) = {
+        let mut inner = lock(shared);
+        inner
+            .entries
+            .iter_mut()
+            .find(|e| e.job.id == id)
+            .map_or((Vec::new(), true), |e| {
+                (std::mem::take(&mut e.reported), e.cancelled)
+            })
+    };
+    if cancelled {
+        return Ok(());
+    }
+    for reported in reported.into_iter().filter(|p| !p.exists()) {
+        let Some(parts) = logic::find_parts(&reported) else {
+            continue;
+        };
+        update(shared, id, |e| e.job.status = Status::Joining);
+        let joined = temp.join("joined.mp4");
+        let target = logic::free_name(&reported, |p| p.exists());
+        // A link and not a rename, so that a file that appeared meanwhile under the name is never replaced.
+        macos_sys::mux::join(&parts.video, &parts.audio, &joined)
+            .and_then(|()| fs::hard_link(&joined, &target).map_err(|e| e.to_string()))
+            .map_err(|why| {
+                format!("The picture and the sound could not be joined ({why}). Both parts are kept in the folder.")
+            })?;
+        let _ = fs::remove_file(&parts.video);
+        let _ = fs::remove_file(&parts.audio);
+        update(shared, id, |e| e.job.file = Some(target));
+    }
+    Ok(())
+}
+
 /// Applies one line of what yt-dlp printed.
 fn read(shared: &Mutex<Inner>, id: u64, line: &str) {
     match logic::parse_line(line) {
@@ -404,7 +456,10 @@ fn read(shared: &Mutex<Inner>, id: u64, line: &str) {
             e.job.speed = p.speed;
             e.job.eta_seconds = p.eta_seconds;
         }),
-        Line::File(path) => update(shared, id, |e| e.job.file = Some(path)),
+        Line::File(path) => update(shared, id, |e| {
+            e.reported.push(path.clone());
+            e.job.file = Some(path);
+        }),
         Line::Error(_) | Line::Other => {}
     }
 }
@@ -438,8 +493,10 @@ mod tests {
     }
 
     /// A stand-in for yt-dlp that does what the last part of the link says: `ok` prints progress and writes a file,
-    /// `fail` says an error and fails, `slow` starts a sleep of the number of seconds in `$SLEEP` and waits for it.
-    /// It keeps what it was given in `args.log` next to itself.
+    /// `fail` says an error and fails, `slow` starts a sleep of the number of seconds given to `fake` and waits for it,
+    /// `parts` and `joinable` leave a picture and a sound apart as yt-dlp does without ffmpeg while naming the joined file,
+    /// with parts that cannot be joined or ones that can (the picture is the sample of the tests of `macos-sys`, which has
+    /// a sound of its own, so that nothing but the picture is needed). It keeps what it was given in `<itself>.args`.
     fn fake(dir: &Dir, sleep: u32) -> PathBuf {
         let script = dir.0.join("yt-dlp");
         let body = format!(
@@ -473,15 +530,35 @@ case "$url" in
     exit 3
     ;;
   *slow)
+    # The sleep exists before the progress is printed, so that whoever sees the progress finds it running.
+    sleep {sleep} &
     echo "FGINFO|A slow video"
     echo "FGDL|downloading|1000|4000|NA|1000|3"
-    sleep {sleep} &
     wait
+    ;;
+  *parts)
+    echo "FGINFO|A fake video"
+    echo "FGDL|finished|10|10|NA|1|NA"
+    echo video > "$home/A fake video [parts].f133.mp4"
+    echo audio > "$home/A fake video [parts].f140.m4a"
+    echo "FGFILE|$home/A fake video [parts].mp4"
+    ;;
+  *joinable)
+    echo "FGINFO|A fake video"
+    echo "FGDL|finished|10|10|NA|1|NA"
+    cp "$0.sample" "$home/A fake video [joinable].f133.mp4"
+    echo audio > "$home/A fake video [joinable].f140.m4a"
+    echo "FGFILE|$home/A fake video [joinable].mp4"
     ;;
 esac
 "#
         );
         fs::write(&script, body).unwrap();
+        fs::write(
+            dir.0.join("yt-dlp.sample"),
+            include_bytes!("../../../../macos-sys/testdata/sound.mov"),
+        )
+        .unwrap();
         fs::set_permissions(&script, fs::Permissions::from_mode(0o755)).unwrap();
         script
     }
@@ -509,11 +586,30 @@ esac
         }
     }
 
-    fn running(sleep: u32) -> bool {
+    fn running_now(sleep: u32) -> bool {
         Command::new("/usr/bin/pgrep")
             .args(["-f", &format!("sleep {sleep}")])
             .output()
             .is_ok_and(|out| out.status.success())
+    }
+
+    /// Whether the sleep is there within a few seconds: the process of a stand-in that has printed is not always listed
+    /// the moment it is asked for.
+    fn running(sleep: u32) -> bool {
+        (0..100).any(|_| {
+            let found = running_now(sleep);
+            if !found {
+                thread::sleep(Duration::from_millis(50));
+            }
+            found
+        })
+    }
+
+    fn gone(sleep: u32) -> bool {
+        (0..50).any(|_| {
+            thread::sleep(Duration::from_millis(100));
+            !running_now(sleep)
+        })
     }
 
     #[test]
@@ -664,11 +760,7 @@ esac
                 .iter()
                 .all(|j| j.status == Status::Cancelled)
         );
-        let gone = (0..50).any(|_| {
-            thread::sleep(Duration::from_millis(100));
-            !running(71)
-        });
-        assert!(gone, "what the stand-in started was stopped with it");
+        assert!(gone(71), "what the stand-in started was stopped with it");
     }
 
     #[test]
@@ -683,11 +775,7 @@ esac
         let job = wait_for(&engine, id, |j| j.status.over());
         assert_eq!(job.status, Status::Cancelled);
         assert!(job.error.is_none(), "a cancel is not an error");
-        let gone = (0..50).any(|_| {
-            thread::sleep(Duration::from_millis(100));
-            !running(72)
-        });
-        assert!(gone, "the process under it was stopped as well");
+        assert!(gone(72), "the process under it was stopped as well");
         let hidden = fs::read_dir(&dir.0).unwrap().any(|e| {
             e.unwrap()
                 .file_name()
@@ -701,13 +789,75 @@ esac
         assert_eq!(engine.job(id).unwrap().status, Status::Cancelled);
     }
 
+    #[test]
+    fn a_picture_and_a_sound_left_apart_are_joined_into_the_file_yt_dlp_named() {
+        let dir = Dir::new("join");
+        let folder = dir.0.join("out");
+        fs::create_dir(&folder).unwrap();
+        let program = fake(&dir, 1);
+        let engine = Engine::default();
+        let id = engine.submit(request(&program, &folder, "https://fake.test/joinable"));
+        let job = wait_for(&engine, id, |j| j.status.over());
+        assert_eq!(job.status, Status::Done, "{job:?}");
+        let file = folder.join("A fake video [joinable].mp4");
+        assert_eq!(job.file.as_ref(), Some(&file));
+        let tracks = macos_sys::mux::tracks(&file).expect("the joined file opens");
+        assert_eq!((tracks.video, tracks.audio), (1, 1));
+        let left: Vec<String> = fs::read_dir(&folder)
+            .unwrap()
+            .map(|e| e.unwrap().file_name().to_string_lossy().into_owned())
+            .collect();
+        assert_eq!(
+            left,
+            ["A fake video [joinable].mp4"],
+            "the parts and the work folder are gone"
+        );
+    }
+
+    #[test]
+    fn parts_that_cannot_be_joined_fail_the_download_and_stay_in_the_folder() {
+        let dir = Dir::new("nojoin");
+        let program = fake(&dir, 1);
+        let engine = Engine::default();
+        let id = engine.submit(request(&program, &dir.0, "https://fake.test/parts"));
+        let job = wait_for(&engine, id, |j| j.status.over());
+        assert_eq!(job.status, Status::Failed, "{job:?}");
+        let error = job.error.unwrap();
+        assert!(error.contains("could not be joined"), "{error}");
+        assert!(error.contains("Both parts are kept"), "{error}");
+        assert!(!job.needs_ffmpeg);
+        assert!(dir.0.join("A fake video [parts].f133.mp4").exists());
+        assert!(dir.0.join("A fake video [parts].f140.m4a").exists());
+        assert!(!dir.0.join("A fake video [parts].mp4").exists());
+        let hidden = fs::read_dir(&dir.0).unwrap().any(|e| {
+            e.unwrap()
+                .file_name()
+                .to_string_lossy()
+                .starts_with(".figghost")
+        });
+        assert!(!hidden, "the folder for the work is removed");
+    }
+
+    #[test]
+    fn joining_is_a_status_of_its_own_that_has_not_ended() {
+        assert_eq!(Status::Joining.key(), "joining");
+        assert!(!Status::Joining.over());
+        assert!(Status::Done.over() && Status::Failed.over() && Status::Cancelled.over());
+        assert!(!Status::Queued.over() && !Status::Running.over());
+    }
+
     /// The one real download: `cargo test -p app-ui real_download -- --ignored --nocapture`, with `FIGGHOST_TEST_URL` to try
-    /// another link than the test video of youtube-dl. It uses the yt-dlp that is installed and a folder of its own.
+    /// another link than the first video of YouTube and `FIGGHOST_TEST_QUALITY` (`best`, `1080`, `720`, `audio`) for
+    /// another quality than the best. It uses the yt-dlp that is installed and a folder of its own.
     #[test]
     #[ignore = "needs the network and an installed yt-dlp"]
     fn real_download_saves_a_video_with_the_installed_yt_dlp() {
         let url = std::env::var("FIGGHOST_TEST_URL")
-            .unwrap_or_else(|_| "https://www.youtube.com/watch?v=BaW_jenozKc".into());
+            .unwrap_or_else(|_| "https://www.youtube.com/watch?v=jNQXAC9IVRw".into());
+        let quality = std::env::var("FIGGHOST_TEST_QUALITY")
+            .ok()
+            .and_then(|q| Quality::parse(&q))
+            .unwrap_or(Quality::Best);
         let dirs = logic::tool_dirs(Path::new("/nonexistent"), &std::env::var("PATH").unwrap());
         let program = logic::find_tool("yt-dlp", &dirs).expect("yt-dlp is installed");
         let ffmpeg = logic::find_tool("ffmpeg", &dirs);
@@ -715,6 +865,7 @@ esac
         let engine = Engine::default();
         let mut asked = request(&program, &dir.0, &url);
         asked.ffmpeg = ffmpeg.clone();
+        asked.quality = quality;
         let id = engine.submit(asked);
         let mut best = 0.0_f64;
         let job = loop {
@@ -741,6 +892,15 @@ esac
             .collect();
         println!("left in the folder: {left:?}");
         assert_eq!(left.len(), 1, "only the video is left: {left:?}");
+        let tracks = macos_sys::mux::tracks(&file).expect("the file opens");
+        println!("tracks: {tracks:?}");
+        let (extension, video, audio) = if quality == Quality::Audio {
+            ("m4a", 0, 1)
+        } else {
+            ("mp4", 1, 1)
+        };
+        assert_eq!(file.extension().and_then(|e| e.to_str()), Some(extension));
+        assert_eq!((tracks.video, tracks.audio), (video, audio));
     }
 
     #[test]
@@ -761,7 +921,8 @@ esac
             "the oldest are forgotten"
         );
         assert!(engine.job(last).is_some());
-        let slow = fake(&Dir::new("clear-slow"), 73);
+        let slow_dir = Dir::new("clear-slow");
+        let slow = fake(&slow_dir, 73);
         let waiting = engine.submit(request(&slow, &dir.0, "https://fake.test/slow"));
         wait_for(&engine, waiting, |j| j.status == Status::Running);
         engine.clear_finished();

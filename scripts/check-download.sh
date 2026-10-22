@@ -4,8 +4,8 @@
 # the live islands say nothing of the folder yt-dlp keeps what it has not finished in. Nothing of the real settings or the
 # real Downloads folder is touched, and no key or mouse input is sent.
 #
-# With a link as the second argument it also downloads that link with the installed yt-dlp into a folder of its own and
-# removes the file afterwards.
+# With a link as the second argument it also downloads that link with the installed yt-dlp into a folder of its own, checks
+# that the file opens with a picture and a sound (a music only link, with one sound), and removes the file afterwards.
 #
 # Usage: scripts/check-download.sh [program] [link]    (program default: target/debug/app-ui)
 set -eu
@@ -56,6 +56,9 @@ FIGGHOST_HOME="$WORK/home" FIGGHOST_DOWNLOADS="$WORK/downloads" FIGGHOST_NOTCH_O
 PID=$!
 sleep 4
 if kill -0 "$PID" 2>/dev/null; then pass "the program runs with the feature on"; else fail "the program exited"; cat "$WORK/err.log"; exit 1; fi
+
+# With the feature on and nothing downloaded, nothing wakes: the timer of the feature comes with the first download.
+if grep -q 'download: timer' "$WORK/err.log"; then fail "the feature started its timer with nothing to download"; else pass "nothing is woken while the feature is on and idle"; fi
 
 # What yt-dlp has not finished lives in a hidden folder of the folder downloads go to, which the islands never list. A
 # finished file of the folder is announced, and that is the control: where it is not (a session with no screen to place

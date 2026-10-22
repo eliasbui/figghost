@@ -42,7 +42,7 @@ const RUNNING_PRIORITY: u8 = 20;
 /// The end of a download is news for a few seconds, and so takes the place of the progress while it lasts.
 const NOTICE_PRIORITY: u8 = 22;
 const NOTICE_SECONDS: f64 = 5.0;
-/// How often the notch is brought up to date while the feature is on.
+/// How often the notch is brought up to date while a download is waiting or going on.
 const SYNC_SECONDS: f64 = 0.5;
 /// A command is stopped if it has not answered after this many seconds.
 const VERSION_SECONDS: u64 = 10;
@@ -155,13 +155,28 @@ impl Feature {
         Ok(())
     }
 
+    /// Nothing runs while the feature is on and nothing is downloaded: the timer comes with the first download and goes
+    /// with the last, once `sync` has put its end on the notch.
     fn start(&self) {
-        let weak = self.me.clone();
-        *self.timer.borrow_mut() = Some(app::every(SYNC_SECONDS, move || {
-            if let Some(f) = weak.upgrade() {
-                f.sync();
-            }
-        }));
+        self.sync();
+    }
+
+    /// Starts or stops the timer to match whether a download waits or goes on.
+    fn keep_timer(&self, jobs: &[Job]) {
+        let wanted = needs_timer(jobs);
+        let mut timer = self.timer.borrow_mut();
+        if wanted && timer.is_none() {
+            trace::log("download: timer on");
+            let weak = self.me.clone();
+            *timer = Some(app::every(SYNC_SECONDS, move || {
+                if let Some(f) = weak.upgrade() {
+                    f.sync();
+                }
+            }));
+        } else if !wanted && timer.is_some() {
+            trace::log("download: timer off");
+            timer.take();
+        }
     }
 
     /// Stops what runs and takes everything off the notch.
@@ -312,11 +327,27 @@ impl Feature {
     /// of one that ended.
     fn sync(&self) {
         let jobs = self.engine.snapshot();
+        self.show_on_notch(&jobs);
+        self.keep_timer(&jobs);
+    }
+
+    fn show_on_notch(&self, jobs: &[Job]) {
+        let seen = self.seen.get();
+        self.seen
+            .set(jobs.iter().map(|j| j.ended).max().unwrap_or(0).max(seen));
         let Some(notch) = self.notch.as_ref().and_then(Weak::upgrade) else {
             return;
         };
-        let running = jobs.iter().find(|j| j.status == Status::Running);
-        let key = running.map_or_else(String::new, |j| percent_text(j.percent));
+        let running = jobs
+            .iter()
+            .find(|j| matches!(j.status, Status::Running | Status::Joining));
+        let key = running.map_or_else(String::new, |j| {
+            if j.status == Status::Joining {
+                i18n::current().download_joining().to_owned()
+            } else {
+                percent_text(j.percent)
+            }
+        });
         if *self.shown.borrow() != key {
             let activity = running.map(|_| Activity {
                 left: Ear::Symbol {
@@ -335,13 +366,10 @@ impl Feature {
             notch.set_activity(RUNNING_SLOT, activity);
             *self.shown.borrow_mut() = key;
         }
-        let seen = self.seen.get();
         let latest = jobs
             .iter()
             .filter(|j| j.ended > seen && matches!(j.status, Status::Done | Status::Failed))
             .max_by_key(|j| j.ended);
-        self.seen
-            .set(jobs.iter().map(|j| j.ended).max().unwrap_or(0).max(seen));
         if let Some(job) = latest {
             let (symbol, tone) = if job.status == Status::Done {
                 ("checkmark.circle.fill", Tone::Green)
@@ -384,6 +412,12 @@ impl Feature {
             .visible_when(move || shown.upgrade().is_some_and(|f| f.config.borrow().enabled)),
         )]
     }
+}
+
+/// Whether the notch needs looking after on a timer: only while a download waits, goes on or joins its parts. An end is
+/// put on the notch by the look that finds it, after which nothing is left to wake for.
+fn needs_timer(jobs: &[Job]) -> bool {
+    jobs.iter().any(|j| !j.status.over())
 }
 
 fn percent_text(percent: Option<f64>) -> String {
@@ -461,6 +495,41 @@ mod tests {
         assert_eq!(percent_text(Some(41.6)), "42%");
         assert_eq!(percent_text(Some(0.0)), "0%");
         assert_eq!(percent_text(None), "...");
+    }
+
+    fn job_with(status: Status) -> Job {
+        Job {
+            id: 1,
+            url: "https://example.com/v".into(),
+            title: None,
+            status,
+            percent: None,
+            speed: None,
+            eta_seconds: None,
+            file: None,
+            folder: PathBuf::from("/Users/x/Downloads"),
+            error: None,
+            needs_ffmpeg: false,
+            ended: u64::from(status.over()),
+        }
+    }
+
+    #[test]
+    fn the_timer_runs_only_while_a_download_waits_goes_on_or_joins() {
+        assert!(
+            !needs_timer(&[]),
+            "the feature on with nothing to do wakes nothing"
+        );
+        for over in [Status::Done, Status::Failed, Status::Cancelled] {
+            assert!(
+                !needs_timer(&[job_with(over), job_with(over)]),
+                "{over:?} needs no look once the look that saw it has run"
+            );
+        }
+        for active in [Status::Queued, Status::Running, Status::Joining] {
+            assert!(needs_timer(&[job_with(active)]), "{active:?}");
+            assert!(needs_timer(&[job_with(Status::Done), job_with(active)]));
+        }
     }
 
     #[test]
