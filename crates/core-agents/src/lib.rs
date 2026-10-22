@@ -2,6 +2,7 @@
 //! Coding agents (Claude Code, Codex) as the notch sees them: what their hooks report, which sessions exist,
 //! which commands wait for an answer, how much of the usage limits is left, and how the hooks get installed.
 
+pub mod accounts;
 pub mod cli;
 pub mod event;
 pub mod install;

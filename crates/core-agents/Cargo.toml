@@ -6,6 +6,8 @@ rust-version.workspace = true
 publish.workspace = true
 
 [dependencies]
+# Reads Orca's settings, read-only, for the accounts it keeps.
+rusqlite.workspace = true
 serde.workspace = true
 # Keeps the order of the keys in the files of the agents, which belong to the user and are edited in place.
 serde_json = { workspace = true, features = ["preserve_order"] }

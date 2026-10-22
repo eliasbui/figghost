@@ -1988,3 +1988,12 @@ html[data-sky="night"] { --aurora-1: rgba(112, 124, 238, 0.30); --aurora-2: rgba
    at once, the canvas turns solid). Increase Contrast draws the outline of the bubble in the text colour. */
 html.increase-contrast { --bubble-line: var(--text); }
 html.increase-contrast .page-title::after { opacity: 1; }
+
+/* The limits of one Orca account on the AI agents page: the window, a bar, the share used and when it starts over. */
+.acct-limit { display: grid; grid-template-columns: 56px minmax(60px, 1fr) 40px minmax(0, 150px); align-items: center; gap: 8px; margin-top: 6px; color: var(--text-2); font-size: var(--fs-small); }
+.acct-bar { height: 6px; border-radius: 3px; background: var(--track); overflow: hidden; }
+.acct-bar i { display: block; height: 100%; border-radius: 3px; background: var(--accent); }
+.acct-bar.warn i { background: var(--warn); }
+.acct-bar.bad i { background: var(--bad); }
+.acct-value { color: var(--text); font-weight: 600; text-align: right; font-variant-numeric: tabular-nums; }
+.acct-reset { overflow: hidden; white-space: nowrap; text-overflow: ellipsis; }

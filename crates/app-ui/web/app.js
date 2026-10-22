@@ -1571,6 +1571,136 @@ function spendRow(spend) {
     h('span', { class: 'row-title', text: line('agents.spend.week', spend.week, spend.week_cost) }));
 }
 
+// The Accounts section: the Claude Code and Codex accounts Orca keeps, their limits, and switching the account of
+// the plain claude and codex commands (see crates/app-ui/src/accounts.rs). Its words are kept with it.
+Object.assign(I18N.en, {
+  'sec.agents.accounts': 'Accounts',
+  'accounts.intro.title': 'Accounts in Orca',
+  'accounts.intro.body': 'The Claude Code and Codex accounts you keep in Orca. Switching to one copies its sign-in to the plain claude (or codex) command, after keeping a private copy of the account the command used, which Restore puts back.',
+  'accounts.cli': 'The claude command uses {email}.',
+  'accounts.cli.outside': 'The claude command uses {email}, an account Orca does not keep. A switch keeps a copy of it, so Restore brings it back.',
+  'accounts.badge.cli.claude': 'Used by claude', 'accounts.badge.cli.codex': 'Used by codex', 'accounts.badge.orca': 'Used by Orca',
+  'accounts.switch': 'Switch',
+  'accounts.switch.title': 'Use {email} for the {cmd} command?',
+  'accounts.switch.body.claude': 'Figghost keeps a private copy of the account the command uses now, so Restore can bring it back. New Claude Code sessions use the new account; running ones may need a restart. The account then shares one sign-in with Orca: when one of them renews it, the other may have to sign in again.',
+  'accounts.switch.body.codex': 'Figghost keeps a private copy of ~/.codex/auth.json, so Restore can bring it back. New Codex sessions use the new account; running ones may need a restart.',
+  'accounts.refresh.title': 'Limits of each account',
+  'accounts.limits.desc': 'Refresh asks Anthropic for the limits of each Claude account with its own sign-in, read from the Keychain; macOS asks you first whether Figghost may read it. After that they are asked again every five minutes while this page is open. A sign-in that has run out is never renewed here, because that would sign Orca out; its numbers come back once Orca or Claude Code has renewed it.',
+  'accounts.refresh': 'Refresh', 'accounts.asking': 'Asking...', 'accounts.updated': 'Updated {when}',
+  'accounts.nokeychain': 'A private instance does not use the Keychain.',
+  'accounts.note.none': 'Press Refresh to see the limits.',
+  'accounts.note.expired': 'The sign-in has run out. The numbers come back once Orca or Claude Code renews it.',
+  'accounts.note.no_sign_in': 'No sign-in was found for this account. Sign in to it again in Orca.',
+  'accounts.note.refused': 'The Keychain did not let Figghost read the sign-in. Press Refresh to be asked again.',
+  'accounts.note.failed': 'Anthropic did not give the limits. Try again later.',
+  'accounts.note.codex': 'The limits of Codex accounts are not shown here.',
+  'accounts.empty': 'Orca keeps no Claude Code or Codex accounts on this Mac.',
+  'accounts.restore.claude': 'Restore the previous Claude Code account', 'accounts.restore.codex': 'Restore the previous Codex account',
+  'accounts.restore.desc': 'Puts back the sign-in the command had before the last switch.',
+  'accounts.restore': 'Restore', 'accounts.restore.confirm': 'Restore the previous account?',
+  'accounts.done.switched': 'Switched. New sessions use the new account.',
+  'accounts.done.restored': 'The previous account is back.',
+  'accounts.done.failed': 'That did not work: {detail}',
+  'fault.accounts_failed': 'Could not change the account.',
+});
+Object.assign(I18N.vi, {
+  'sec.agents.accounts': 'Tài khoản',
+  'accounts.intro.title': 'Tài khoản trong Orca',
+  'accounts.intro.body': 'Các tài khoản Claude Code và Codex bạn lưu trong Orca. Chuyển sang một tài khoản sẽ chép thông tin đăng nhập của nó cho lệnh claude (hoặc codex), sau khi giữ riêng một bản của tài khoản lệnh đang dùng để nút Khôi phục đặt lại.',
+  'accounts.cli': 'Lệnh claude đang dùng {email}.',
+  'accounts.cli.outside': 'Lệnh claude đang dùng {email}, một tài khoản Orca không lưu. Khi chuyển, Figghost giữ một bản của nó để nút Khôi phục đặt lại.',
+  'accounts.badge.cli.claude': 'claude đang dùng', 'accounts.badge.cli.codex': 'codex đang dùng', 'accounts.badge.orca': 'Orca đang dùng',
+  'accounts.switch': 'Chuyển',
+  'accounts.switch.title': 'Dùng {email} cho lệnh {cmd}?',
+  'accounts.switch.body.claude': 'Figghost giữ riêng một bản của tài khoản lệnh đang dùng để nút Khôi phục đặt lại. Phiên Claude Code mới dùng tài khoản mới; phiên đang chạy có thể cần khởi động lại. Sau đó tài khoản này dùng chung một lần đăng nhập với Orca: khi một bên gia hạn, bên kia có thể phải đăng nhập lại.',
+  'accounts.switch.body.codex': 'Figghost giữ riêng một bản của ~/.codex/auth.json để nút Khôi phục đặt lại. Phiên Codex mới dùng tài khoản mới; phiên đang chạy có thể cần khởi động lại.',
+  'accounts.refresh.title': 'Hạn mức của từng tài khoản',
+  'accounts.limits.desc': 'Nút Làm mới hỏi Anthropic hạn mức của từng tài khoản Claude bằng chính thông tin đăng nhập của nó, đọc từ Keychain; macOS hỏi bạn trước khi cho Figghost đọc. Sau đó hạn mức được hỏi lại mỗi năm phút khi trang này đang mở. Figghost không bao giờ tự gia hạn thông tin đăng nhập đã hết hạn, vì làm vậy sẽ đăng xuất Orca; con số hiện lại khi Orca hoặc Claude Code đã gia hạn.',
+  'accounts.refresh': 'Làm mới', 'accounts.asking': 'Đang hỏi...', 'accounts.updated': 'Cập nhật {when}',
+  'accounts.nokeychain': 'Bản chạy riêng không dùng Keychain.',
+  'accounts.note.none': 'Bấm Làm mới để xem hạn mức.',
+  'accounts.note.expired': 'Thông tin đăng nhập đã hết hạn. Con số hiện lại khi Orca hoặc Claude Code gia hạn.',
+  'accounts.note.no_sign_in': 'Không tìm thấy thông tin đăng nhập của tài khoản này. Hãy đăng nhập lại trong Orca.',
+  'accounts.note.refused': 'Keychain không cho Figghost đọc thông tin đăng nhập. Bấm Làm mới để được hỏi lại.',
+  'accounts.note.failed': 'Anthropic không trả về hạn mức. Hãy thử lại sau.',
+  'accounts.note.codex': 'Hạn mức của tài khoản Codex không hiện ở đây.',
+  'accounts.empty': 'Orca không lưu tài khoản Claude Code hay Codex nào trên máy này.',
+  'accounts.restore.claude': 'Khôi phục tài khoản Claude Code trước đó', 'accounts.restore.codex': 'Khôi phục tài khoản Codex trước đó',
+  'accounts.restore.desc': 'Đặt lại thông tin đăng nhập mà lệnh dùng trước lần chuyển gần nhất.',
+  'accounts.restore': 'Khôi phục', 'accounts.restore.confirm': 'Khôi phục tài khoản trước đó?',
+  'accounts.done.switched': 'Đã chuyển. Phiên mới dùng tài khoản mới.',
+  'accounts.done.restored': 'Đã đặt lại tài khoản trước đó.',
+  'accounts.done.failed': 'Không làm được: {detail}',
+  'fault.accounts_failed': 'Không đổi được tài khoản.',
+});
+
+function accountsState() { return S.agents.accounts || { list: [], restore: {}, keychain: false }; }
+
+/** One window of an account's limits, drawn like the bars of the notch. */
+function accountLimit(limit) {
+  const used = limit.fraction == null ? 0 : Math.min(1, Math.max(0, limit.fraction));
+  const tone = used >= 0.9 ? ' bad' : used >= 0.7 ? ' warn' : '';
+  return h('div', { class: 'acct-limit' },
+    h('span', { text: limit.label }),
+    h('span', { class: 'acct-bar' + tone, role: 'img', 'aria-label': limit.label + ' ' + limit.value }, h('i', { style: `width:${used * 100}%` })),
+    h('span', { class: 'acct-value', text: limit.value }),
+    h('span', { class: 'acct-reset', text: limit.reset }));
+}
+
+function accountRow(account) {
+  const details = [account.name !== account.email && account.name, account.plan, account.agent === 'claude' ? 'Claude Code' : 'Codex'];
+  const switchBtn = !account.cli && button(t('accounts.switch'), () => confirmDialog({
+    title: t('accounts.switch.title', { email: account.email, cmd: account.agent }),
+    body: t('accounts.switch.body.' + account.agent),
+    confirm: t('accounts.switch'),
+  }, () => send({ t: 'action', name: 'accounts_switch:' + account.id })), { small: true, aria: t('accounts.switch') + ': ' + account.email });
+  if (switchBtn) reg(() => { switchBtn.disabled = accountsState().busy || (account.agent === 'claude' && !accountsState().keychain); });
+  const line = row(account.email, details.filter(Boolean).join(' · '), [
+    account.cli && pill(() => t('accounts.badge.cli.' + account.agent), () => true),
+    account.orca && pill(() => t('accounts.badge.orca'), () => true),
+    switchBtn,
+  ]);
+  const note = account.agent === 'codex' ? 'codex' : account.note || (account.limits.length ? '' : 'none');
+  line.querySelector('.row-text').append(...account.limits.map(accountLimit), note && h('div', { class: 'row-desc', text: t('accounts.note.' + note) }));
+  return line;
+}
+
+function accountsRows() {
+  const intro = infoRow(t('accounts.intro.title'), t('accounts.intro.body'));
+  const said = h('div', { class: 'row-desc', role: 'status' });
+  intro.querySelector('.row-text').append(said);
+  reg(() => {
+    const A = accountsState();
+    const inOrca = A.list.some((a) => a.agent === 'claude' && a.cli);
+    const lines = [A.cli && t(inOrca ? 'accounts.cli' : 'accounts.cli.outside', { email: A.cli }),
+      A.outcome && t('accounts.done.' + A.outcome.what, { detail: A.outcome.detail })];
+    said.textContent = lines.filter(Boolean).join(' ');
+    said.style.display = said.textContent ? '' : 'none';
+  });
+  const refresh = button(t('accounts.refresh'), () => send({ t: 'action', name: 'accounts_refresh' }), { small: true });
+  const status = h('div', { class: 'row-desc', role: 'status' });
+  reg(() => {
+    const A = accountsState();
+    refresh.disabled = A.busy || !A.keychain;
+    status.textContent = A.busy ? t('accounts.asking') : !A.keychain ? t('accounts.nokeychain') : A.updated ? t('accounts.updated', { when: A.updated }) : '';
+    status.style.display = status.textContent ? '' : 'none';
+  });
+  const refreshRow = row(t('accounts.refresh.title'), t('accounts.limits.desc'), refresh);
+  refreshRow.querySelector('.row-text').append(status);
+  const restoreRow = (agent) => {
+    const btn = button(t('accounts.restore'), () => confirmDialog({
+      title: t('accounts.restore.confirm'), body: t('accounts.restore.desc'), confirm: t('accounts.restore'),
+    }, () => send({ t: 'action', name: 'accounts_restore:' + agent })), { small: true, aria: t('accounts.restore.' + agent) });
+    const line = row(t('accounts.restore.' + agent), t('accounts.restore.desc'), btn);
+    reg(() => {
+      line.style.display = accountsState().restore[agent] ? '' : 'none';
+      btn.disabled = accountsState().busy;
+    });
+    return line;
+  };
+  return [intro, dynamicList(() => accountsState().list, accountRow, t('accounts.empty')), refreshRow, restoreRow('claude'), restoreRow('codex')];
+}
+
 function pageAgents() {
   const body = [
     card(toggleRow('agents.enabled', t('agents.enable.title'), t('agents.enable.desc'))),
@@ -1584,6 +1714,8 @@ function pageAgents() {
       toggleRow('agents.peek', t('agents.peek.title'), t('agents.peek.desc'))),
     sectionTitle(t('sec.agents.limits')),
     card(usageRow()),
+    sectionTitle(t('sec.agents.accounts')),
+    card(...accountsRows()),
     sectionTitle(t('sec.agents.tokens')),
     card(
       toggleRow('agents.tokens', t('agents.tokens.title'), t('agents.tokens.desc')),
@@ -2257,6 +2389,24 @@ window.__selftest = function () {
     wait.value = '60';
     wait.dispatchEvent(new Event('change'));
     expect(S.agents.wait === 60, 'the wait is a number of seconds');
+    // The accounts: a switch asks first, then names the account; the one in use offers none; restore and refresh send theirs.
+    const accountLine = (email) => [...document.querySelectorAll('.card .row')].find((r) => r.querySelector('.row-title').textContent === email);
+    expect(!accountLine('work@example.com').querySelector('button'), 'the account in use offers no switch');
+    expect(accountLine('work@example.com').querySelectorAll('.acct-limit').length === 2, 'an account shows both windows');
+    sent.length = 0;
+    accountLine('home@example.com').querySelector('button').click();
+    expect(!sent.length && $('#modal').classList.contains('show'), 'a switch asks first');
+    $('#modal .btn.primary').click();
+    expect(sent.some((m) => m.t === 'action' && m.name === 'accounts_switch:a2'), 'a confirmed switch names the account: ' + JSON.stringify(sent));
+    const restoreLine = accountLine(t('accounts.restore.claude'));
+    expect(restoreLine && restoreLine.style.display !== 'none', 'restore shows when there is a backup');
+    expect(accountLine(t('accounts.restore.codex')).style.display === 'none', 'and not without one');
+    sent.length = 0;
+    accountLine(t('accounts.refresh.title')).querySelector('button').click();
+    expect(sent.some((m) => m.t === 'action' && m.name === 'accounts_refresh'), 'refresh asks for the limits');
+    S.agents.accounts.busy = true; runSyncs();
+    expect(accountLine(t('accounts.refresh.title')).querySelector('button').disabled, 'nothing is asked twice at once');
+    S.agents.accounts.busy = false; runSyncs();
 
     // The notch page: choices send their words, the tab list sends the ids that show, in order, and never none.
     go('notch');

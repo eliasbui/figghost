@@ -75,10 +75,12 @@ pub struct SettingsFeature {
     menu_icon: RefCell<Option<ShowIcon>>,
     /// A page asked for before the window's script was ready to take it.
     pending_page: RefCell<Option<String>>,
+    accounts: crate::accounts::Accounts,
 }
 
 impl SettingsFeature {
     pub fn new(ctx: Rc<AppContext>) -> Rc<Self> {
+        let accounts = crate::accounts::Accounts::new(&ctx.home);
         let feature = Rc::new_cyclic(|me| Self {
             ctx,
             me: me.clone(),
@@ -89,6 +91,7 @@ impl SettingsFeature {
             last_state: RefCell::default(),
             menu_icon: RefCell::default(),
             pending_page: RefCell::default(),
+            accounts,
         });
         FEATURE.with(|slot| *slot.borrow_mut() = Rc::downgrade(&feature));
         // The About page follows the update, which goes on whether or not this window is open.
@@ -252,6 +255,9 @@ impl SettingsFeature {
             notch_hardware: notch.as_ref().is_some_and(|n| n.on_hardware_notch()),
             screens: workspace::screen_names(self.ctx.mtm),
             runtime: self.ctx.features.runtime(),
+            accounts: self
+                .accounts
+                .snapshot(i18n::current(), crate::history::now_ms()),
         }
     }
 
@@ -293,7 +299,7 @@ impl SettingsFeature {
             Message::JsError { message, line } => {
                 eprintln!("settings page: {message} (line {line})");
             }
-            Message::Page { .. } => {}
+            Message::Page { id } => self.accounts.set_page(id),
             Message::Recording { on } => self.recording(*on),
             Message::Action { name } if name != "reset_tiling" => self.action(name),
             Message::PickApp { purpose } => self.pick_app(*purpose),
@@ -511,6 +517,11 @@ impl SettingsFeature {
             "agents_remove_codex" => self.agent_hooks(Agent::Codex, false),
             "agents_usage_on" => self.agent_usage(true),
             "agents_usage_off" => self.agent_usage(false),
+            name if name.starts_with("accounts_") => {
+                if let Err(e) = self.accounts.action(name, crate::history::now_ms()) {
+                    self.fault(&Fault::new("accounts_failed", e));
+                }
+            }
             "restart" => relaunch(mtm, "--show-settings"),
             "quit" => app::quit(mtm),
             "launcher_add_app" | "launcher_add_folder" => {
