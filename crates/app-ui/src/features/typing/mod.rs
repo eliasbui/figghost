@@ -10,11 +10,11 @@ use super::{AttachEnv, islands};
 use crate::{config::parse_hotkey, i18n, menu::symbols, settings::model::Fault};
 use core_typing::{Chord, Options};
 use macos_sys::{
-    app,
+    MainThreadMarker, app,
     hotkey::modifier,
     notch::{Activity, Detail, Ear, Notch},
     permissions,
-    status_item::{Entry, Item},
+    status_item::{Entry, Item, TextItem},
     style::Tone,
     typing::{self, Keyboard},
     workspace,
@@ -38,6 +38,9 @@ const MAX_ID_LEN: usize = 200;
 /// How often the keyboard is tried again while Accessibility is missing.
 const RETRY_SECONDS: f64 = 3.0;
 const SLOT: &str = "typing";
+/// The language shown all the time, under everything else that is live.
+const BADGE_SLOT: &str = "typing_language";
+const BADGE_PRIORITY: u8 = 1;
 const PRIORITY: u8 = 21;
 const SHOW_SECONDS: f64 = 1.5;
 
@@ -86,6 +89,10 @@ pub struct Config {
     pub shortcut: String,
     /// Bundle identifiers of the apps where every key is left alone.
     pub apps: Vec<String>,
+    /// The language on the closed notch all the time, not only for a moment when it changes.
+    pub notch_badge: bool,
+    /// An item of its own in the menu bar with the language, that switches it when clicked.
+    pub tray_badge: bool,
 }
 
 impl Default for Config {
@@ -97,6 +104,8 @@ impl Default for Config {
             english_restore: true,
             shortcut: DEFAULT_SHORTCUT.into(),
             apps: Vec::new(),
+            notch_badge: true,
+            tray_badge: true,
         }
     }
 }
@@ -155,9 +164,51 @@ impl Config {
     }
 }
 
+type ChordSink = Box<dyn Fn(Option<String>)>;
+
 thread_local! {
     /// The running feature, for the shortcut: it is seen on the keyboard's thread and handled on this one.
     static LIVE: RefCell<Weak<Feature>> = const { RefCell::new(Weak::new()) };
+    /// Where a shortcut taken while the settings page records one goes: to the page.
+    static CHORD_SINK: RefCell<Option<ChordSink>> = const { RefCell::new(None) };
+}
+
+/// Tells `sink` the shortcut ("ctrl+space"; `None` for a key shortcuts have no name for) the keyboard took while
+/// the settings page was recording one. The system gives some shortcuts to itself before any window sees them, so
+/// the page would never hear of them.
+pub fn on_chord(sink: impl Fn(Option<String>) + 'static) {
+    CHORD_SINK.with(|slot| *slot.borrow_mut() = Some(Box::new(sink)));
+}
+
+/// A key pressed with modifiers as a shortcut is written: "ctrl+opt+shift+cmd+space".
+fn chord_text(code: u16, flags: u64) -> Option<String> {
+    let key = typing::key_of(code, flags);
+    let name = crate::config::key_name(u32::from(code))?;
+    let mut parts: Vec<&str> = Vec::new();
+    for (held, word) in [
+        (key.control, "ctrl"),
+        (key.option, "opt"),
+        (key.shift, "shift"),
+        (key.command, "cmd"),
+    ] {
+        if held {
+            parts.push(word);
+        }
+    }
+    parts.push(name);
+    Some(parts.join("+"))
+}
+
+/// Runs on the keyboard's thread, inside the input path.
+fn on_chord_taken(code: u16, flags: u64) {
+    app::on_main(move || {
+        let text = chord_text(code, flags);
+        CHORD_SINK.with(|slot| {
+            if let Some(sink) = &*slot.borrow() {
+                sink(text);
+            }
+        });
+    });
 }
 
 /// Runs on the keyboard's thread, inside the input path: everything else happens on the main thread.
@@ -173,6 +224,7 @@ fn on_toggle(vietnamese: bool) {
 
 /// The running feature. Created by `attach`, kept alive by the app context.
 pub struct Feature {
+    mtm: MainThreadMarker,
     notch: Option<Weak<Notch>>,
     config: RefCell<Config>,
     keyboard: RefCell<Option<Keyboard>>,
@@ -183,12 +235,15 @@ pub struct Feature {
     /// The name of another Vietnamese input method that is running.
     other: RefCell<Option<String>>,
     names: RefCell<HashMap<String, String>>,
+    /// The item of the menu bar that shows the language.
+    tray: RefCell<Option<TextItem>>,
     me: Weak<Feature>,
 }
 
 /// Starts the feature; it runs only while switched on.
 pub fn attach(env: &AttachEnv) -> Option<Rc<Feature>> {
     let feature = Rc::new_cyclic(|me| Feature {
+        mtm: env.mtm,
         notch: env.notch.map(Rc::downgrade),
         config: RefCell::new(Config::default()),
         keyboard: RefCell::default(),
@@ -197,6 +252,7 @@ pub fn attach(env: &AttachEnv) -> Option<Rc<Feature>> {
         recording: Cell::new(false),
         other: RefCell::default(),
         names: RefCell::default(),
+        tray: RefCell::default(),
         me: me.clone(),
     });
     LIVE.with(|live| *live.borrow_mut() = Rc::downgrade(&feature));
@@ -215,9 +271,10 @@ impl Feature {
         if let Some(keyboard) = &*self.keyboard.borrow() {
             keyboard.configure(config.keyboard());
             keyboard.set_paused(self.paused());
-            return;
+        } else {
+            self.start();
         }
-        self.start();
+        self.refresh_badges();
     }
 
     fn paused(&self) -> bool {
@@ -230,12 +287,14 @@ impl Feature {
         }
         let settings = self.config.borrow().keyboard();
         let frontmost = workspace::frontmost_app().map(|a| a.bundle_id);
-        match Keyboard::start(settings, true, frontmost, on_toggle) {
+        match Keyboard::start(settings, true, frontmost, on_toggle, on_chord_taken) {
             Ok(keyboard) => {
                 keyboard.set_paused(self.paused());
+                keyboard.set_capture(self.recording.get());
                 *self.keyboard.borrow_mut() = Some(keyboard);
                 self.retry.borrow_mut().take();
                 self.watch_front();
+                self.refresh_badges();
             }
             Err(e) => {
                 if self.retry.borrow().is_some() {
@@ -258,6 +317,53 @@ impl Feature {
         self.retry.borrow_mut().take();
         self.front.borrow_mut().take();
         self.keyboard.borrow_mut().take();
+        self.refresh_badges();
+    }
+
+    /// Puts the language on the notch and in the menu bar, or takes it off, as the settings and the keyboard say.
+    fn refresh_badges(&self) {
+        let (notch_badge, tray_badge) = {
+            let config = self.config.borrow();
+            (config.notch_badge, config.tray_badge)
+        };
+        let running = self.is_running();
+        let vietnamese = self.is_vietnamese();
+        let word = if vietnamese { "VI" } else { "EN" };
+        if let Some(notch) = self.notch.as_ref().and_then(Weak::upgrade) {
+            let activity = (running && notch_badge).then(|| {
+                let tone = if vietnamese { Tone::Green } else { Tone::Gray };
+                Activity {
+                    left: Ear::Symbol {
+                        name: "keyboard",
+                        tone,
+                        pulse: false,
+                    },
+                    right: Ear::Text {
+                        text: word.into(),
+                        tone,
+                    },
+                    detail: None,
+                    page: None,
+                    priority: BADGE_PRIORITY,
+                }
+            });
+            notch.set_activity(BADGE_SLOT, activity);
+        }
+        if !(running && tray_badge) {
+            self.tray.borrow_mut().take();
+            return;
+        }
+        if let Some(item) = &*self.tray.borrow() {
+            item.set_text(word);
+            return;
+        }
+        let me = self.me.clone();
+        let item = TextItem::new(self.mtm, i18n::current().typing_menu(), word, move || {
+            if let Some(feature) = me.upgrade() {
+                feature.toggle();
+            }
+        });
+        *self.tray.borrow_mut() = Some(item);
     }
 
     fn watch_front(&self) {
@@ -285,12 +391,14 @@ impl Feature {
         self.recording.set(true);
         if let Some(keyboard) = &*self.keyboard.borrow() {
             keyboard.set_paused(true);
+            keyboard.set_capture(true);
         }
     }
 
     pub fn resume_hotkeys(&self, _config: &Config) {
         self.recording.set(false);
         if let Some(keyboard) = &*self.keyboard.borrow() {
+            keyboard.set_capture(false);
             keyboard.set_paused(self.paused());
         }
     }
@@ -322,6 +430,7 @@ impl Feature {
 
     /// Says on the notch which language typing is in now.
     fn announce(&self, vietnamese: bool) {
+        self.refresh_badges();
         let Some(notch) = self.notch.as_ref().and_then(Weak::upgrade) else {
             return;
         };
@@ -422,6 +531,7 @@ mod tests {
         assert!(config.modern_tone && config.english_restore);
         assert_eq!(config.shortcut, DEFAULT_SHORTCUT);
         assert!(config.apps.is_empty());
+        assert!(config.notch_badge && config.tray_badge);
         let loaded: Config = serde_json::from_str("{}").unwrap();
         assert_eq!(loaded, config, "a file from before this feature");
     }
@@ -452,6 +562,25 @@ mod tests {
         let settings = Config::default().keyboard();
         assert_eq!(settings.toggle, chord_of(DEFAULT_SHORTCUT));
         assert_eq!(settings.options, Options::default());
+    }
+
+    #[test]
+    fn a_taken_key_is_written_as_a_shortcut() {
+        assert_eq!(chord_text(49, 0x0004_0000).as_deref(), Some("ctrl+space"));
+        assert_eq!(
+            chord_text(9, 0x0002_0000 | 0x0008_0000 | 0x0010_0000).as_deref(),
+            Some("opt+shift+cmd+v")
+        );
+        assert_eq!(
+            chord_text(10, 0x0004_0000),
+            None,
+            "a key shortcuts cannot name"
+        );
+        // The recorder of the page writes the same, and the parser reads it back as the same chord.
+        assert_eq!(
+            chord_of(&chord_text(49, 0x0004_0000).unwrap()),
+            chord_of("ctrl+space")
+        );
     }
 
     #[test]

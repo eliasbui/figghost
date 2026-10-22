@@ -21,6 +21,8 @@ pub fn state(config: &Config, runtime: &Value) -> Value {
         "method": config.method.as_str(),
         "modern_tone": config.modern_tone,
         "english_restore": config.english_restore,
+        "notch_badge": config.notch_badge,
+        "tray_badge": config.tray_badge,
         "shortcut": config.shortcut,
         "apps": apps,
         "max_apps": MAX_APPS,
@@ -48,6 +50,8 @@ pub fn set(config: &mut Config, path: &str, value: &Value) -> Option<Result<(), 
         "enabled" => flag(&mut config.enabled),
         "modern_tone" => flag(&mut config.modern_tone),
         "english_restore" => flag(&mut config.english_restore),
+        "notch_badge" => flag(&mut config.notch_badge),
+        "tray_badge" => flag(&mut config.tray_badge),
         "method" => value
             .as_str()
             .and_then(Method::parse)
@@ -151,7 +155,13 @@ mod tests {
     #[test]
     fn every_change_is_validated() {
         let mut config = Config::default();
-        for path in ["enabled", "modern_tone", "english_restore"] {
+        for path in [
+            "enabled",
+            "modern_tone",
+            "english_restore",
+            "notch_badge",
+            "tray_badge",
+        ] {
             assert!(
                 set(&mut config, path, &json!(false)).unwrap().is_ok(),
                 "{path}"
@@ -166,6 +176,7 @@ mod tests {
             );
         }
         assert!(!config.enabled && !config.modern_tone && !config.english_restore);
+        assert!(!config.notch_badge && !config.tray_badge);
         assert!(set(&mut config, "method", &json!("vni")).unwrap().is_ok());
         assert_eq!(config.method, Method::Vni);
         for bad in [json!("VNI"), json!("qwerty"), json!(1), json!(null)] {

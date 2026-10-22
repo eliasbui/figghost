@@ -99,6 +99,10 @@ impl SettingsFeature {
             .ctx
             .update
             .on_status(|status| with_feature(|this| this.post(status)));
+        // A shortcut taken by Vietnamese typing while the page records one is the page's to set.
+        crate::features::typing::on_chord(|value| {
+            with_feature(|this| this.post(&json!({ "t": "chord", "value": value })));
+        });
         feature
     }
 

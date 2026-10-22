@@ -8,6 +8,8 @@
     'typing.enable.title': 'Type Vietnamese', 'typing.enable.desc': 'The marks go where they belong as you type. Needs Accessibility, like scrolling and window snapping.',
     'typing.now.title': 'Typing in', 'typing.now.desc': 'The shortcut, the menu bar panel and this button switch between Vietnamese and English.',
     'typing.now.vi': 'Vietnamese', 'typing.now.en': 'English', 'typing.now.switch': 'Switch',
+    'typing.notch.title': 'Language on the notch', 'typing.notch.desc': 'VI or EN stays on the closed notch while typing runs, under anything else that is live.',
+    'typing.tray.title': 'Language in the menu bar', 'typing.tray.desc': 'A small VI or EN beside the ghost. Click it to switch.',
     'typing.other.title': '{name} is running',
     'typing.other.desc': 'Two input methods would put every mark twice, so Figghost leaves the keys alone while {name} runs. Quit one of the two.',
     'sec.typing.how': 'How you type',
@@ -29,6 +31,8 @@
     'typing.enable.title': 'Gõ tiếng Việt', 'typing.enable.desc': 'Dấu được đặt đúng chỗ ngay khi bạn gõ. Cần quyền Trợ năng, như cuộn chuột và xếp cửa sổ.',
     'typing.now.title': 'Đang gõ', 'typing.now.desc': 'Phím tắt, bảng ở thanh menu và nút này chuyển qua lại giữa tiếng Việt và tiếng Anh.',
     'typing.now.vi': 'Tiếng Việt', 'typing.now.en': 'Tiếng Anh', 'typing.now.switch': 'Chuyển',
+    'typing.notch.title': 'Hiện ngôn ngữ trên notch', 'typing.notch.desc': 'VI hoặc EN nằm sẵn trên notch khi đóng, miễn là đang gõ và chưa có việc nào khác đang diễn ra.',
+    'typing.tray.title': 'Hiện ngôn ngữ ở thanh menu', 'typing.tray.desc': 'Chữ VI hoặc EN nhỏ cạnh con ma. Bấm vào để chuyển.',
     'typing.other.title': '{name} đang chạy',
     'typing.other.desc': 'Hai bộ gõ cùng chạy sẽ bỏ dấu hai lần, nên Figghost để nguyên các phím khi {name} đang chạy. Hãy thoát một trong hai.',
     'sec.typing.how': 'Cách gõ',
@@ -75,6 +79,8 @@
       card(
         row(t('typing.now.title'), t('typing.now.desc'), [now, switchBtn], running),
         row(t('typing.shortcut'), t('typing.shortcut.desc'), hotkeyButton('typing', { allowClear: true, label: t('typing.shortcut') }), when),
+        toggleRow('typing.notch_badge', t('typing.notch.title'), t('typing.notch.desc'), when),
+        toggleRow('typing.tray_badge', t('typing.tray.title'), t('typing.tray.desc'), when),
         row(t('typing.access.title'), t('typing.access.desc'), [
           pill(() => (S.typing.accessibility ? t('access.granted') : t('access.missing')), () => S.typing.accessibility),
           button(t('typing.access.open'), () => send({ t: 'action', name: 'open_accessibility' }), { small: true }),
@@ -102,6 +108,19 @@
     master.click();
 
     expect(page.querySelectorAll('.hotkey').length === 1, 'typing: one shortcut recorder, for the switch');
+    // A shortcut the app took for the page (the system keeps Control+Space from it) is set like a typed one.
+    page.querySelector('.hotkey').click();
+    sent.length = 0;
+    window.__fig.recv({ t: 'chord', value: 'ctrl+opt+space' });
+    expect(sent.some((m) => m.t === 'hotkey' && m.target === 'typing' && m.value === 'ctrl+opt+space'), 'typing: a shortcut the app took is set: ' + JSON.stringify(sent));
+    expect(!page.querySelector('.hotkey.recording'), 'typing: the recorder is done after it');
+    sent.length = 0;
+    const badge = (title) => [...page.querySelectorAll('.switch')].find((b) => b.getAttribute('aria-label') === title);
+    badge(t('typing.notch.title')).click();
+    badge(t('typing.tray.title')).click();
+    expect(sent.some((m) => m.path === 'typing.notch_badge') && sent.some((m) => m.path === 'typing.tray_badge'), 'typing: the notch and menu bar switches send their settings: ' + JSON.stringify(sent));
+    badge(t('typing.notch.title')).click();
+    badge(t('typing.tray.title')).click();
     sent.length = 0;
     const vni = [...page.querySelectorAll('.seg button')].find((b) => b.textContent === 'VNI');
     vni.click();

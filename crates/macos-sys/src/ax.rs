@@ -13,12 +13,21 @@ type AXValueRef = *const c_void;
 const AX_VALUE_POINT: i32 = 1;
 const AX_VALUE_SIZE: i32 = 2;
 const AX_VALUE_RECT: i32 = 3;
+const AX_VALUE_RANGE: i32 = 4;
 
 #[repr(C)]
 #[derive(Clone, Copy, Default)]
 struct Pair {
     first: f64,
     second: f64,
+}
+
+/// The layout of CFRange: where the range starts and how long it is, in UTF-16 units.
+#[repr(C)]
+#[derive(Clone, Copy, Default)]
+struct Span {
+    location: isize,
+    length: isize,
 }
 
 /// The layout of CGRect.
@@ -233,6 +242,53 @@ impl Element {
         unsafe {
             AXUIElementSetAttributeValue(self.0, name(attribute).as_concrete_TypeRef(), value.0)
                 == 0
+        }
+    }
+
+    /// A range attribute such as `AXSelectedTextRange`, as (start, length) in UTF-16 units.
+    pub fn range(&self, attribute: &str) -> Option<(usize, usize)> {
+        let value = Element::own(self.copy(attribute)?)?;
+        let mut out = Span::default();
+        // SAFETY: `out` matches the layout of CFRange.
+        let ok =
+            unsafe { AXValueGetValue(value.0, AX_VALUE_RANGE, ptr::from_mut(&mut out).cast()) };
+        if !ok {
+            return None;
+        }
+        Some((
+            usize::try_from(out.location).ok()?,
+            usize::try_from(out.length).ok()?,
+        ))
+    }
+
+    pub fn set_range(&self, attribute: &str, (start, length): (usize, usize)) -> bool {
+        let span = Span {
+            location: start as isize,
+            length: length as isize,
+        };
+        // SAFETY: `span` matches the layout of CFRange and outlives the call.
+        let Some(value) =
+            Element::own(unsafe { AXValueCreate(AX_VALUE_RANGE, ptr::from_ref(&span).cast()) })
+        else {
+            return false;
+        };
+        // SAFETY: element and value are live; the attribute name is a valid CFString.
+        unsafe {
+            AXUIElementSetAttributeValue(self.0, name(attribute).as_concrete_TypeRef(), value.0)
+                == 0
+        }
+    }
+
+    /// Sets a string attribute such as `AXValue`. Whether the app then shows it is up to the app.
+    pub fn set_string(&self, attribute: &str, text: &str) -> bool {
+        let value = CFString::new(text);
+        // SAFETY: element and value are live; the attribute name is a valid CFString.
+        unsafe {
+            AXUIElementSetAttributeValue(
+                self.0,
+                name(attribute).as_concrete_TypeRef(),
+                value.as_concrete_TypeRef().cast(),
+            ) == 0
         }
     }
 

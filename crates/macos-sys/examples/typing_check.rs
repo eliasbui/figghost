@@ -353,7 +353,7 @@ fn main() {
         }),
         ..Settings::default()
     };
-    let keyboard = match typing::Keyboard::start(settings, true, None, |_| {}) {
+    let keyboard = match typing::Keyboard::start(settings, true, None, |_| {}, |_, _| {}) {
         Ok(keyboard) => keyboard,
         Err(e) => {
             eprintln!("typing_check: no keyboard tap ({e:?})");

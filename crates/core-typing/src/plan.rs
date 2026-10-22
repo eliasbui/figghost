@@ -19,6 +19,9 @@ pub enum Delivery {
     EmptyCharPrefix,
     /// Forward Delete first, which clears the suggestion Spotlight selects after the cursor.
     ClearSuggestion,
+    /// The field's own value is rewritten through Accessibility, so no key can overtake another or meet the
+    /// suggestion. When the field does not take it, the same as `ClearSuggestion`.
+    AxDirect,
     /// Nothing is replaced: the keys go to another device (iPhone Mirroring, a remote desktop), which types for
     /// itself and never sees posted events.
     Passthrough,
@@ -148,13 +151,15 @@ pub fn plan_for(app: Option<&str>, role: Option<&str>) -> Plan {
     if app == "com.apple.ScreenContinuity" || REMOTE_DESKTOPS.contains(&app) {
         return PASSTHROUGH;
     }
+    // Spotlight's box is a search field too, but it selects its suggestion after the cursor, which a selection
+    // typed over would meet; so it comes before the rule of the role.
+    if app.starts_with("com.apple.Spotlight") {
+        return plan(Delivery::AxDirect, 1_000, 5_000, 0, SETTLE);
+    }
     if matches!(role, Some("AXComboBox" | "AXSearchField")) {
         return SELECTION;
     }
-    if app.starts_with("com.apple.Spotlight")
-        || app.starts_with("com.apple.campo")
-        || app == "com.apple.systemuiserver"
-    {
+    if app.starts_with("com.apple.campo") || app == "com.apple.systemuiserver" {
         return plan(Delivery::ClearSuggestion, 1_000, 5_000, 0, SETTLE);
     }
     if app == "com.apple.Safari" || app == "com.apple.SafariTechnologyPreview" {
@@ -262,12 +267,24 @@ mod tests {
     }
 
     #[test]
-    fn spotlight_clears_its_suggestion_first() {
-        for app in [
-            "com.apple.Spotlight",
-            "com.apple.campo",
-            "com.apple.systemuiserver",
+    fn spotlight_is_written_through_accessibility_whatever_its_role() {
+        for role in [
+            Some("AXTextField"),
+            Some("AXSearchField"),
+            Some("AXComboBox"),
+            None,
         ] {
+            assert_eq!(
+                delivery("com.apple.Spotlight", role),
+                Delivery::AxDirect,
+                "{role:?}"
+            );
+        }
+    }
+
+    #[test]
+    fn the_other_system_searches_clear_their_suggestion_first() {
+        for app in ["com.apple.campo", "com.apple.systemuiserver"] {
             assert_eq!(
                 delivery(app, Some("AXTextField")),
                 Delivery::ClearSuggestion,

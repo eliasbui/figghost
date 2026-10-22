@@ -515,6 +515,56 @@ impl StatusMenu {
     }
 }
 
+/// A second item in the menu bar that shows a few letters, such as the language Vietnamese typing is in, and runs
+/// one action when it is clicked. Leaves the menu bar when dropped.
+pub struct TextItem {
+    mtm: MainThreadMarker,
+    item: Retained<NSStatusItem>,
+    _click: Retained<ClickTarget>,
+}
+
+impl TextItem {
+    /// `label` is what the item is called for assistive technology and in its tooltip.
+    pub fn new(
+        mtm: MainThreadMarker,
+        label: &str,
+        text: &str,
+        on_click: impl Fn() + 'static,
+    ) -> Self {
+        let item = NSStatusBar::systemStatusBar().statusItemWithLength(NSVariableStatusItemLength);
+        let click = ClickTarget::new(mtm, on_click);
+        if let Some(button) = item.button(mtm) {
+            button.setTitle(&NSString::from_str(text));
+            button.setToolTip(Some(&NSString::from_str(label)));
+            button.setAccessibilityLabel(Some(&NSString::from_str(label)));
+            // SAFETY: `clicked:` is implemented by ClickTarget with the (id) signature AppKit expects, and the
+            // target is kept alive in the returned value.
+            unsafe {
+                button.setTarget(Some(&click));
+                button.setAction(Some(sel!(clicked:)));
+            }
+            button.sendActionOn(NSEventMask::LeftMouseUp);
+        }
+        Self {
+            mtm,
+            item,
+            _click: click,
+        }
+    }
+
+    pub fn set_text(&self, text: &str) {
+        if let Some(button) = self.item.button(self.mtm) {
+            button.setTitle(&NSString::from_str(text));
+        }
+    }
+}
+
+impl Drop for TextItem {
+    fn drop(&mut self) {
+        NSStatusBar::systemStatusBar().removeStatusItem(&self.item);
+    }
+}
+
 #[cfg(test)]
 mod tests {
     use super::*;

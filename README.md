@@ -195,7 +195,7 @@ Units, money, times and translation for the selected text (off by default). Rate
 
 ### Vietnamese typing (like Gõ Nhanh)
 
-Telex or VNI in every app with no other input method, through the engine of [Gõ Nhanh](https://github.com/khaphanspace/gonhanh.org) (off by default). The marks go where the new rules put them (`hoà`, `khoẻ`) or the older way, English words come back when the word ends (`text`, `with`), a shortcut (Control+Space by default) or the menu bar panel switches to English and back with a word on the notch, and the apps you list are left alone. Address bars, search fields, Spotlight, editors built on web views, terminals and Adobe apps each get the way of typing that Gõ Nhanh settled on for them. While another Vietnamese input method runs, Figghost leaves every key alone.
+Telex or VNI in every app with no other input method, through the engine of [Gõ Nhanh](https://github.com/khaphanspace/gonhanh.org) (off by default). The marks go where the new rules put them (`hoà`, `khoẻ`) or the older way, English words come back when the word ends (`text`, `with`), a shortcut (Control+Space by default, recorded by the app itself so that the system's own use of the same keys cannot take it) or the menu bar panel switches to English and back with a word on the notch, VI or EN stays on the closed notch and in a small menu bar item of its own (click it to switch; each can be turned off), and the apps you list are left alone. Address bars, search fields, Spotlight (written through Accessibility, with the keys as the fallback), editors built on web views, terminals and Adobe apps each get the way of typing that Gõ Nhanh settled on for them. While another Vietnamese input method runs, Figghost leaves every key alone.
 
 ### Capture (like CleanShot X)
 

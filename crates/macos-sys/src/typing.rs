@@ -122,6 +122,61 @@ fn pause(micros: u32) {
     }
 }
 
+/// The value of a field after the `delete` characters before the caret and the selection after it are replaced by
+/// `text`, and where the caret then stands. Positions are UTF-16 units, as Accessibility counts them. `None` when
+/// fewer than `delete` characters stand before the caret or the range lies outside the value.
+fn splice(
+    value: &str,
+    at: usize,
+    selected: usize,
+    delete: usize,
+    text: &str,
+) -> Option<(String, usize)> {
+    let units: Vec<u16> = value.encode_utf16().collect();
+    let end = at.checked_add(selected).filter(|end| *end <= units.len())?;
+    let mut start = at;
+    for _ in 0..delete {
+        start = start.checked_sub(1)?;
+        let low = (0xDC00..0xE000).contains(&units[start]);
+        if low && start > 0 && (0xD800..0xDC00).contains(&units[start - 1]) {
+            start -= 1;
+        }
+    }
+    let inserted: Vec<u16> = text.encode_utf16().collect();
+    let caret = start + inserted.len();
+    let mut out = units[..start].to_vec();
+    out.extend_from_slice(&inserted);
+    out.extend_from_slice(&units[end..]);
+    Some((String::from_utf16(&out).ok()?, caret))
+}
+
+/// Rewrites the focused field itself instead of typing into it: no key can overtake another, and the suggestion a
+/// search box selects after the caret goes with the selection. `false` when the field does not take it, with
+/// nothing changed, so that the keys can do it.
+fn replace_in_field(delete: usize, text: &str) -> bool {
+    let Some(field) = Element::system_wide().and_then(|s| s.attribute("AXFocusedUIElement")) else {
+        return false;
+    };
+    field.set_timeout(FOCUS_TIMEOUT_SECONDS);
+    let (Some(value), Some((at, selected))) =
+        (field.string("AXValue"), field.range("AXSelectedTextRange"))
+    else {
+        return false;
+    };
+    let Some((changed, caret)) = splice(&value, at, selected, delete, text) else {
+        return false;
+    };
+    if !field.set_string("AXValue", &changed) {
+        return false;
+    }
+    // Some fields answer that they took the value and show the old one.
+    if changed != value && field.string("AXValue").as_deref() == Some(value.as_str()) {
+        return false;
+    }
+    field.set_range("AXSelectedTextRange", (caret, 0));
+    true
+}
+
 /// Posts key events that carry only what is set on them, each stamped as this app's own.
 struct Poster(*mut c_void);
 
@@ -203,7 +258,11 @@ impl Poster {
                 pause(d.delete.max(1_000));
                 delete += 1;
             }
-            Delivery::ClearSuggestion => {
+            Delivery::AxDirect if replace_in_field(delete, text) => {
+                pause(d.settle);
+                return;
+            }
+            Delivery::ClearSuggestion | Delivery::AxDirect => {
                 self.key(key::FORWARD_DELETE, 0);
                 pause(3_000);
             }
@@ -311,6 +370,9 @@ pub fn other_input_method() -> Option<String> {
 struct Shared {
     vietnamese: AtomicBool,
     paused: AtomicBool,
+    /// A shortcut is being recorded: a key pressed with a modifier is taken, so that the system's own shortcuts
+    /// (Control+Space switches the input source) cannot take it first, and handed to `on_chord`.
+    capture: AtomicBool,
     /// The focus went to another app: the word being typed is over.
     forget: AtomicBool,
     /// The settings and how many times they changed, so the tap notices a change at its next key.
@@ -329,16 +391,19 @@ pub struct Keyboard {
 
 impl Keyboard {
     /// Starts the tap. `on_toggle` is told the new language each time the shortcut switches it; it runs inside the
-    /// input path, on the tap's thread, so it must hand anything slow to another thread.
+    /// input path, on the tap's thread, so it must hand anything slow to another thread. `on_chord` is told the key
+    /// code and the flags of each key pressed with a modifier while `set_capture` is on, with the same care.
     pub fn start(
         settings: Settings,
         vietnamese: bool,
         frontmost: Option<String>,
         on_toggle: impl Fn(bool) + Send + 'static,
+        on_chord: impl Fn(u16, u64) + Send + 'static,
     ) -> Result<Self, TapError> {
         let shared = Arc::new(Shared {
             vietnamese: AtomicBool::new(vietnamese),
             paused: AtomicBool::new(false),
+            capture: AtomicBool::new(false),
             forget: AtomicBool::new(false),
             settings: Mutex::new((0, settings.clone())),
             frontmost: Mutex::new(frontmost),
@@ -361,6 +426,7 @@ impl Keyboard {
             control: false,
             asked: None,
             on_toggle: Box::new(on_toggle),
+            on_chord: Box::new(on_chord),
         };
         let tap = EventTap::spawn_hid(mask, move |kind, event| tap.handle(kind, event))?;
         Ok(Self {
@@ -396,6 +462,11 @@ impl Keyboard {
         self.shared.forget.store(true, Ordering::Release);
     }
 
+    /// While on, a key pressed with a modifier is taken and handed to `on_chord` instead of reaching anything.
+    pub fn set_capture(&self, on: bool) {
+        self.shared.capture.store(on, Ordering::Release);
+    }
+
     /// Another app came to the front.
     pub fn app_changed(&self, frontmost: Option<String>) {
         *self
@@ -423,6 +494,7 @@ struct Tap {
     /// When the focus was last asked about from here.
     asked: Option<Instant>,
     on_toggle: Box<dyn Fn(bool) + Send>,
+    on_chord: Box<dyn Fn(u16, u64) + Send>,
 }
 
 impl Tap {
@@ -444,6 +516,14 @@ impl Tap {
             LEFT_MOUSE_DOWN | RIGHT_MOUSE_DOWN | OTHER_MOUSE_DOWN => Event::Click,
             _ => return Verdict::Pass,
         };
+        if kind == KEY_DOWN
+            && view.int(AUTOREPEAT_FIELD) == 0
+            && view.flags() & (FLAG_SHIFT | FLAG_CONTROL | FLAG_OPTION | FLAG_COMMAND) != 0
+            && self.shared.capture.load(Ordering::Acquire)
+        {
+            (self.on_chord)(view.int(KEYCODE_FIELD) as u16, view.flags());
+            return Verdict::Drop;
+        }
         self.catch_up();
         if self.shared.paused.load(Ordering::Acquire) {
             self.session.forget();
@@ -584,11 +664,31 @@ mod tests {
     }
 
     #[test]
+    fn a_replacement_is_spliced_into_the_value_at_the_caret() {
+        // "vie" typed, "e" again: the engine deletes one character and types "ê".
+        assert_eq!(splice("vie", 3, 0, 1, "ê"), Some(("viê".into(), 3)));
+        // The suggestion a search box selects after the caret goes with it.
+        assert_eq!(splice("vi", 2, 0, 0, "ệ"), Some(("việ".into(), 3)));
+        assert_eq!(splice("vis Code", 2, 6, 0, "ệ"), Some(("việ".into(), 3)));
+        // Text after the caret stays, and the caret stands after the new text.
+        assert_eq!(splice("a-b", 1, 0, 1, "xy"), Some(("xy-b".into(), 2)));
+        // Positions count UTF-16 units: a character outside the first plane is two, and goes whole.
+        assert_eq!(splice("a😀", 3, 0, 1, "b"), Some(("ab".into(), 2)));
+        assert_eq!(splice("😀b", 3, 0, 1, "c"), Some(("😀c".into(), 3)));
+        // More to delete than there is, or a range outside the value: nothing is done.
+        assert_eq!(splice("a", 1, 0, 2, "x"), None);
+        assert_eq!(splice("a", 5, 0, 0, "x"), None);
+        assert_eq!(splice("a", 1, 3, 0, "x"), None);
+        assert_eq!(splice("", 0, 0, 0, ""), Some((String::new(), 0)));
+    }
+
+    #[test]
     fn the_keyboard_can_be_started_and_dropped() {
         // Without Accessibility access macOS refuses the tap and there is nothing to drop. English, so that a
         // person typing meanwhile is not changed.
-        if let Ok(keyboard) = Keyboard::start(Settings::default(), false, None, |_| {}) {
+        if let Ok(keyboard) = Keyboard::start(Settings::default(), false, None, |_| {}, |_, _| {}) {
             keyboard.configure(Settings::default());
+            keyboard.set_capture(false);
             keyboard.app_changed(Some("com.apple.TextEdit".into()));
             drop(keyboard);
         }

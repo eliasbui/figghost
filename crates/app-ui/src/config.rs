@@ -758,6 +758,21 @@ pub fn parse_hotkey(text: &str) -> Result<HotkeySpec, String> {
     })
 }
 
+/// The name shortcuts are written with for a virtual key code, or `None` for a key they cannot name.
+pub(crate) fn key_name(code: u32) -> Option<&'static str> {
+    const NAMES: [&str; 62] = [
+        "a", "b", "c", "d", "e", "f", "g", "h", "i", "j", "k", "l", "m", "n", "o", "p", "q", "r",
+        "s", "t", "u", "v", "w", "x", "y", "z", "0", "1", "2", "3", "4", "5", "6", "7", "8", "9",
+        "space", "return", "tab", "esc", "delete", "left", "right", "down", "up", "f1", "f2", "f3",
+        "f4", "f5", "f6", "f7", "f8", "f9", "f10", "f11", "f12", "f13", "f14", "f15", "f16", "f17",
+    ];
+    const MORE: [&str; 3] = ["f18", "f19", "f20"];
+    NAMES
+        .into_iter()
+        .chain(MORE)
+        .find(|name| key_code(name) == Some(code))
+}
+
 /// The virtual key code of a key by the name shortcuts and the drag wheel write ("a", "f19", "space").
 pub(crate) fn key_code(name: &str) -> Option<u32> {
     Some(match name {
@@ -863,6 +878,30 @@ mod tests {
         assert!(parse_hotkey("cmd+").is_err());
         assert!(parse_hotkey("cmd+a+b").is_err());
         assert!(parse_hotkey("cmd+nonsense").is_err());
+    }
+
+    #[test]
+    fn a_key_code_has_the_name_a_shortcut_is_written_with() {
+        assert_eq!(key_name(49), Some("space"));
+        assert_eq!(key_name(8), Some("c"));
+        assert_eq!(key_name(36), Some("return"));
+        assert_eq!(key_name(53), Some("esc"));
+        assert_eq!(key_name(51), Some("delete"));
+        assert_eq!(key_name(90), Some("f20"));
+        assert_eq!(
+            key_name(10),
+            None,
+            "the key beside left shift on a non-US keyboard"
+        );
+        for code in 0..128 {
+            if let Some(name) = key_name(code) {
+                assert_eq!(key_code(name), Some(code), "{name}");
+            }
+        }
+        // Every name the parser knows is found again, so none is missing from the list.
+        for name in ["a", "z", "0", "9", "tab", "up", "f1", "f13", "f19"] {
+            assert_eq!(key_code(name).and_then(key_name), Some(name));
+        }
     }
 
     #[test]

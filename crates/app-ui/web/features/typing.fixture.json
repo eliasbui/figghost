@@ -3,6 +3,8 @@
   "method": "telex",
   "modern_tone": true,
   "english_restore": true,
+  "notch_badge": true,
+  "tray_badge": true,
   "shortcut": "ctrl+space",
   "apps": [{ "id": "com.apple.Terminal", "name": "Terminal" }],
   "max_apps": 100,

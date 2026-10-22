@@ -578,6 +578,13 @@ function startRecording(el, target, allowClear, render) {
   window.addEventListener('mousedown', onRecordAway, true);
 }
 function onRecordAway(e) { if (rec && !rec.el.contains(e.target)) stopRecording(); }
+/** The app took a shortcut the system would have kept from the page (Control+Space), and tells it here. */
+function onChord(m) {
+  if (!rec) return;
+  if (!m.value) return toast(t('fault.unsupported_key'));
+  send({ t: 'hotkey', target: rec.target, value: m.value });
+  stopRecording();
+}
 function onRecordKey(e) {
   e.preventDefault();
   e.stopPropagation();
@@ -2331,6 +2338,7 @@ window.__fig = {
       case 'state': onState(message.state); break;
       case 'fault': onFault(message); break;
       case 'running': onRunning(message); break;
+      case 'chord': onChord(message); break;
       case 'icons': onIcons(message.icons); break;
       case 'curve': onCurve(message); break;
       case 'update': onUpdate(message); break;
