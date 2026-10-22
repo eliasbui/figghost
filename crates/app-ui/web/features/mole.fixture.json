@@ -1,9 +1,11 @@
 {
-  "installed": true,
-  "busy": null,
+  "home": "/Users/me",
+  "busy": [],
   "status": null,
-  "report": null,
+  "clean": null,
+  "purge": null,
+  "installers": null,
   "apps": null,
   "analyze": null,
-  "history": null
+  "result": null
 }

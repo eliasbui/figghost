@@ -1,311 +1,230 @@
-//! Mole (github.com/tw93/Mole, GPL-3.0) in the settings window: the app runs the user's own `mo` program
-//! for a health reading, a preview or a run of `mo clean` and `mo optimize`, and shows what it printed as
-//! cards. Nothing of Mole is bundled or linked; without `mo` the page says how to install it.
+//! A cleaner for the Mac in the settings window, after the features of Mole (github.com/tw93/Mole) but written
+//! here, with nothing of Mole run or bundled: the health of the Mac, caches and logs, old build folders of
+//! projects, installer files, apps with their leftovers and what takes the disk. The page scans as it opens, and
+//! what is chosen in a list is removed together.
+
+mod scan;
+mod strings;
 
 use super::AttachEnv;
-mod strings;
 use crate::settings::model::Fault;
 use macos_sys::{
     status_item::{Entry, Item},
-    workspace,
+    sysinfo, workspace,
 };
+use scan::{Found, Kind};
 use serde_json::{Value, json};
 use std::{
-    path::PathBuf,
-    process::{Command, Stdio},
-    sync::{Arc, Mutex},
+    collections::{BTreeMap, BTreeSet},
+    path::{Path, PathBuf},
+    rc::Rc,
+    sync::{Arc, Mutex, MutexGuard},
+    time::Duration,
 };
 
-const SITE: &str = "https://github.com/tw93/Mole";
-/// A GUI app does not inherit the shell's PATH, so the usual install places are tried in turn.
-const PLACES: [&str; 3] = ["/opt/homebrew/bin/mo", "/usr/local/bin/mo", ".local/bin/mo"];
-/// Lines of one report kept for the page; a long list is cut, not paged.
-const MAX_LINES: usize = 300;
-
-const SECTION: char = '\u{27A4}';
-const ITEM: char = '\u{2192}';
-const NOTE: [char; 3] = ['\u{25CE}', '\u{2299}', '\u{2713}'];
+/// The time between the two readings of the processor that its use is worked out from.
+const CPU_SAMPLE: Duration = Duration::from_millis(400);
 
 #[derive(Default)]
 struct Inner {
-    busy: Option<&'static str>,
+    busy: BTreeSet<&'static str>,
     status: Value,
-    report: Value,
-    apps: Value,
-    analyze: Value,
-    history: Value,
+    lists: BTreeMap<Kind, Vec<Found>>,
+    /// The folder the disk view shows.
+    folder: Option<PathBuf>,
+    /// What the last removal did; `seq` tells the page it is new.
+    result: Value,
+    seq: u64,
 }
 
 pub struct Feature {
-    bin: Option<PathBuf>,
+    home: PathBuf,
+    own_id: Option<String>,
     inner: Arc<Mutex<Inner>>,
 }
 
-pub fn attach(env: &AttachEnv) -> Option<Rc<Feature>> {
-    let bin = PLACES
-        .iter()
-        .map(|p| {
-            let path = PathBuf::from(p);
-            if path.is_absolute() {
-                path
-            } else {
-                env.home.join(p)
-            }
-        })
-        .find(|p| p.is_file());
+fn lock(inner: &Mutex<Inner>) -> MutexGuard<'_, Inner> {
+    inner.lock().unwrap_or_else(|e| e.into_inner())
+}
+
+pub fn attach(_env: &AttachEnv) -> Option<Rc<Feature>> {
     Some(Rc::new(Feature {
-        bin,
+        home: PathBuf::from(std::env::var_os("HOME")?),
+        own_id: workspace::own_bundle_id(),
         inner: Arc::default(),
     }))
 }
 
-use std::rc::Rc;
-
 impl Feature {
     pub fn runtime(&self) -> Value {
-        let inner = self.inner.lock().unwrap_or_else(|e| e.into_inner());
+        let inner = lock(&self.inner);
+        let list = |kind: Kind| {
+            inner
+                .lists
+                .get(&kind)
+                .map_or(Value::Null, |l| l.iter().map(Found::json).collect())
+        };
+        let analyze = inner.lists.get(&Kind::Analyze).map_or(Value::Null, |l| {
+            json!({
+                "path": inner.folder,
+                "total": l.iter().map(|f| f.size).sum::<u64>(),
+                "entries": list(Kind::Analyze),
+            })
+        });
         json!({
-            "installed": self.bin.is_some(),
+            "home": self.home,
             "busy": inner.busy,
             "status": inner.status,
-            "report": inner.report,
-            "apps": inner.apps,
-            "analyze": inner.analyze,
-            "history": inner.history,
+            "clean": list(Kind::Clean),
+            "purge": list(Kind::Purge),
+            "installers": list(Kind::Installers),
+            "apps": list(Kind::Apps),
+            "analyze": analyze,
+            "result": inner.result,
         })
     }
 
-    /// A submenu of quick actions for the menu bar item. Each one starts the task and shows its page, where
-    /// the result appears; only previews and the health reading are here, since a real run asks first.
-    pub fn menu_entries(this: &Rc<Self>) -> Vec<Entry> {
-        let text = crate::i18n::current().mole_menu();
-        let quick = |title: &'static str, symbol: &'static str, action: &'static str| {
-            let this = Rc::clone(this);
-            let item = Item::new(title, move || {
-                if !action.is_empty() {
-                    let _ = this.action(action);
-                }
-                crate::settings::show_page("mole");
-            })
-            .symbol(symbol);
-            // The panel under the icon has the one that only opens the page, not four more to choose between.
-            Entry::Item(if action.is_empty() {
-                item
-            } else {
-                item.menu_only()
-            })
-        };
-        vec![Entry::Submenu {
-            title: text[0].to_owned(),
-            symbol: Some("sparkles"),
-            entries: vec![
-                quick(text[1], "trash", "mole_clean_preview"),
-                quick(text[2], "arrow.clockwise", "mole_optimize_preview"),
-                quick(text[3], "folder", "mole_purge_preview"),
-                quick(text[4], "waveform.path.ecg", "mole_status"),
-                Entry::Separator,
-                quick(text[5], "sparkles", ""),
-            ],
-        }]
+    /// The menu bar item opens the page, which scans by itself.
+    pub fn menu_entries(_this: &Rc<Self>) -> Vec<Entry> {
+        let title = crate::i18n::current().mole_menu();
+        vec![Entry::Item(
+            Item::new(title, || crate::settings::show_page("mole")).symbol("sparkles"),
+        )]
     }
 
-    /// A button of the page; `None` when the name is not this feature's. A name may carry one argument after
-    /// a colon: the app to uninstall or the folder to analyze, checked here because the page is not trusted.
+    /// A button of the page; `None` when the name is not this feature's. What comes after the colon is checked
+    /// here, since the page is not trusted: a folder must be one, and only rows the app listed can be removed.
     pub fn action(&self, name: &str) -> Option<Result<(), Fault>> {
         let (verb, arg) = name.split_once(':').unwrap_or((name, ""));
-        let plan = match verb {
-            "mole_open_site" => {
-                workspace::open_url(SITE);
-                return Some(Ok(()));
-            }
-            "mole_terminal_installer" => {
-                return Some(self.in_terminal("installer"));
-            }
-            "mole_status" => Plan::new(Kind::Status, &["status", "--json"]),
-            "mole_apps" => Plan::new(Kind::Apps, &["uninstall", "--list"]),
-            "mole_history" => Plan::new(Kind::History, &["history", "--json"]),
-            "mole_analyze" => match self.folder(arg) {
-                Ok(dir) => Plan::new(Kind::Analyze, &["analyze", "--json"]).arg(dir),
-                Err(f) => return Some(Err(f)),
-            },
-            "mole_clean_preview" => Plan::new(Kind::Report("clean", true), &["clean", "--dry-run"]),
-            "mole_clean_run" => Plan::new(Kind::Report("clean", false), &["clean"]),
-            "mole_optimize_preview" => {
-                Plan::new(Kind::Report("optimize", true), &["optimize", "--dry-run"])
-            }
-            "mole_optimize_run" => Plan::new(Kind::Report("optimize", false), &["optimize"]),
-            "mole_purge_preview" => Plan::new(Kind::Report("purge", true), &["purge", "--dry-run"]),
-            "mole_purge_run" => Plan::new(Kind::Report("purge", false), &["purge", "--yes"]),
-            "mole_uninstall_preview" | "mole_uninstall_run" => {
-                let dry = verb.ends_with("preview");
-                match self.app(arg) {
-                    Ok(app) => {
-                        let mut plan = Plan::new(Kind::Report("uninstall", dry), &["uninstall"]);
-                        if dry {
-                            plan = plan.arg("--dry-run".into());
-                        }
-                        // `mo uninstall` asks once before it removes anything; the page already asked.
-                        plan.arg(app).stdin("y\n")
-                    }
-                    Err(f) => return Some(Err(f)),
+        match verb {
+            // Opening the page reads the health again and scans only what was never scanned.
+            "mole_open" | "mole_refresh" => {
+                let all = verb == "mole_refresh";
+                self.status();
+                let missing: Vec<Kind> = {
+                    let inner = lock(&self.inner);
+                    Kind::ALL
+                        .into_iter()
+                        .filter(|k| all || !inner.lists.contains_key(k))
+                        .collect()
+                };
+                for kind in missing {
+                    self.scan(kind, None);
                 }
             }
+            "mole_status" => self.status(),
+            "mole_scan" => match Kind::parse(arg) {
+                Some(kind) => self.scan(kind, None),
+                None => return Some(Err(Fault::new("invalid_value", "unknown list"))),
+            },
+            "mole_analyze" => {
+                let path = Path::new(arg);
+                if !path.is_absolute() || !path.is_dir() {
+                    return Some(Err(Fault::new("invalid_value", "not a folder")));
+                }
+                self.scan(Kind::Analyze, Some(path.to_path_buf()));
+            }
+            "mole_remove" => return Some(self.remove(arg)),
             _ => return None,
-        };
-        let Some(bin) = self.bin.clone() else {
-            return Some(Err(Fault::new("mole_missing", "mo is not installed")));
-        };
-        let mut inner = self.inner.lock().unwrap_or_else(|e| e.into_inner());
-        if inner.busy.is_some() {
-            return Some(Ok(()));
         }
-        inner.busy = Some(plan.kind.label());
-        drop(inner);
-        let shared = Arc::clone(&self.inner);
-        // ponytail: no timeout; a hung `mo` keeps the page busy until the app restarts.
-        std::thread::spawn(move || {
-            let out = plan.run(&bin);
-            let mut inner = shared.lock().unwrap_or_else(|e| e.into_inner());
-            inner.busy = None;
-            plan.kind.store(&mut inner, out);
-        });
         Some(Ok(()))
     }
 
-    /// An absolute folder, as the analyzer takes it; empty means the whole Mac.
-    fn folder(&self, arg: &str) -> Result<String, Fault> {
-        if arg.is_empty() {
-            return Ok(String::new());
+    /// Runs `work` on its own thread and `store`s what it gives back; a job already running is not started twice.
+    fn spawn<R: Send + 'static>(
+        &self,
+        key: &'static str,
+        work: impl FnOnce() -> R + Send + 'static,
+        store: impl FnOnce(&mut Inner, R) + Send + 'static,
+    ) {
+        if !lock(&self.inner).busy.insert(key) {
+            return;
         }
-        let path = std::path::Path::new(arg);
-        if !path.is_absolute() || !path.is_dir() {
-            return Err(Fault::new("invalid_value", "not a folder"));
-        }
-        Ok(arg.to_owned())
+        let shared = Arc::clone(&self.inner);
+        std::thread::spawn(move || {
+            let out = work();
+            let mut inner = lock(&shared);
+            inner.busy.remove(key);
+            store(&mut inner, out);
+        });
     }
 
-    /// The name `mo uninstall` accepts, only if it is one of the apps it listed.
-    fn app(&self, arg: &str) -> Result<String, Fault> {
-        let inner = self.inner.lock().unwrap_or_else(|e| e.into_inner());
-        inner
-            .apps
-            .as_array()
-            .into_iter()
-            .flatten()
-            .filter_map(|a| a["uninstall_name"].as_str())
-            .find(|n| *n == arg && !n.starts_with('-'))
-            .map(str::to_owned)
-            .ok_or_else(|| Fault::new("invalid_value", "unknown app"))
+    fn status(&self) {
+        self.spawn("status", health, |inner, v| inner.status = v);
     }
 
-    /// `mo installer` and similar choose from a list in the terminal and have no plain mode.
-    fn in_terminal(&self, command: &str) -> Result<(), Fault> {
-        let Some(bin) = &self.bin else {
-            return Err(Fault::new("mole_missing", "mo is not installed"));
-        };
-        let line = format!("'{}' {command}", bin.to_string_lossy().replace('\'', ""));
-        let script = format!(
-            "tell application \"Terminal\"\nactivate\ndo script \"{}\"\nend tell",
-            line.replace('\\', "\\\\").replace('"', "\\\"")
-        );
-        Command::new("osascript")
-            .args(["-e", &script])
-            .spawn()
-            .map(|_| ())
-            .map_err(|e| Fault::new("mole_terminal", e.to_string()))
-    }
-}
-
-#[derive(Clone, Copy)]
-enum Kind {
-    Status,
-    Apps,
-    History,
-    Analyze,
-    /// A task name and whether it is a preview.
-    Report(&'static str, bool),
-}
-
-impl Kind {
-    fn label(self) -> &'static str {
-        match self {
-            Kind::Status => "status",
-            Kind::Apps => "apps",
-            Kind::History => "history",
-            Kind::Analyze => "analyze",
-            Kind::Report(task, _) => task,
-        }
-    }
-
-    fn store(self, inner: &mut Inner, out: std::io::Result<std::process::Output>) {
-        let out = match out {
-            Ok(out) => out,
-            Err(e) => {
-                if let Kind::Report(task, dry) = self {
-                    inner.report =
-                        json!({ "task": task, "dry": dry, "ok": false, "error": e.to_string() });
+    /// Lists one kind again; the disk view keeps its folder unless given another.
+    fn scan(&self, kind: Kind, folder: Option<PathBuf>) {
+        let home = self.home.clone();
+        let own_id = self.own_id.clone();
+        let folder = folder
+            .or_else(|| lock(&self.inner).folder.clone())
+            .unwrap_or_else(|| home.clone());
+        self.spawn(
+            kind.label(),
+            move || {
+                let list = if kind == Kind::Analyze {
+                    scan::analyze(&folder)
+                } else {
+                    scan::list(kind, &home, own_id.as_deref())
+                };
+                (list, folder)
+            },
+            move |inner, (list, folder)| {
+                if kind == Kind::Analyze {
+                    inner.folder = Some(folder);
                 }
-                return;
-            }
+                inner.lists.insert(kind, list);
+            },
+        );
+    }
+
+    /// `arg` is the kind of list and then the paths of its rows, one per line.
+    fn remove(&self, arg: &str) -> Result<(), Fault> {
+        let mut lines = arg.lines();
+        let kind = lines
+            .next()
+            .and_then(Kind::parse)
+            .ok_or_else(|| Fault::new("invalid_value", "unknown list"))?;
+        let wanted: BTreeSet<&Path> = lines.map(Path::new).collect();
+        let chosen: Vec<Found> = {
+            let inner = lock(&self.inner);
+            inner
+                .lists
+                .get(&kind)
+                .into_iter()
+                .flatten()
+                .filter(|f| wanted.contains(f.path.as_path()))
+                // The disk view can show any folder of the Mac; what it sends to the Trash is the user's own.
+                .filter(|f| kind != Kind::Analyze || f.path.starts_with(&self.home))
+                .cloned()
+                .collect()
         };
-        let json = || serde_json::from_slice::<Value>(&out.stdout).ok();
-        match self {
-            Kind::Status => inner.status = json().map(|v| health(&v)).unwrap_or(Value::Null),
-            Kind::Apps => inner.apps = json().filter(Value::is_array).unwrap_or(Value::Null),
-            Kind::History => inner.history = json().map(|v| sessions(&v)).unwrap_or(Value::Null),
-            Kind::Analyze => inner.analyze = json().map(|v| entries(&v)).unwrap_or(Value::Null),
-            Kind::Report(task, dry) => {
-                let text = String::from_utf8_lossy(&out.stdout);
-                inner.report = parse(task, dry, out.status.success(), &text);
-            }
+        if chosen.is_empty() {
+            return Err(Fault::new("invalid_value", "nothing to remove"));
         }
-    }
-}
-
-struct Plan {
-    kind: Kind,
-    args: Vec<String>,
-    stdin: Option<&'static str>,
-}
-
-impl Plan {
-    fn new(kind: Kind, args: &[&str]) -> Self {
-        Self {
-            kind,
-            args: args.iter().map(|a| (*a).to_owned()).collect(),
-            stdin: None,
-        }
-    }
-
-    /// Appended after the fixed arguments; an empty one is left out.
-    fn arg(mut self, arg: String) -> Self {
-        if !arg.is_empty() {
-            self.args.push(arg);
-        }
-        self
-    }
-
-    fn stdin(mut self, text: &'static str) -> Self {
-        self.stdin = Some(text);
-        self
-    }
-
-    fn run(&self, bin: &std::path::Path) -> std::io::Result<std::process::Output> {
-        use std::io::Write;
-        let mut child = Command::new(bin)
-            .args(&self.args)
-            .stdin(if self.stdin.is_some() {
-                Stdio::piped()
-            } else {
-                Stdio::null()
-            })
-            .stdout(Stdio::piped())
-            .stderr(Stdio::null())
-            .spawn()?;
-        if let (Some(text), Some(mut pipe)) = (self.stdin, child.stdin.take()) {
-            let _ = pipe.write_all(text.as_bytes());
-        }
-        child.wait_with_output()
+        self.spawn(
+            "remove",
+            move || {
+                let (gone, failed): (Vec<Found>, Vec<Found>) = chosen
+                    .into_iter()
+                    .partition(|f| scan::remove(kind, f).is_ok());
+                (gone, failed.len(), health())
+            },
+            move |inner, (gone, failed, status)| {
+                let paths: BTreeSet<&PathBuf> = gone.iter().map(|f| &f.path).collect();
+                if let Some(list) = inner.lists.get_mut(&kind) {
+                    list.retain(|f| !paths.contains(&f.path));
+                }
+                inner.seq += 1;
+                inner.result = json!({
+                    "seq": inner.seq, "kind": kind.label(), "removed": gone.len(), "failed": failed,
+                    "freed": gone.iter().map(|f| f.size).sum::<u64>(),
+                });
+                inner.status = status;
+            },
+        );
+        Ok(())
     }
 }
 
@@ -314,144 +233,144 @@ pub mod settings {
     use serde_json::{Value, json};
 
     pub fn state(runtime: &Value) -> Value {
+        let object = |key: &str| {
+            if runtime[key].is_object() {
+                runtime[key].clone()
+            } else {
+                Value::Null
+            }
+        };
+        let array = |key: &str| {
+            if runtime[key].is_array() {
+                runtime[key].clone()
+            } else {
+                Value::Null
+            }
+        };
         json!({
-            "installed": runtime["installed"].as_bool().unwrap_or(false),
-            "busy": runtime["busy"].as_str(),
-            "status": if runtime["status"].is_object() { runtime["status"].clone() } else { Value::Null },
-            "report": if runtime["report"].is_object() { runtime["report"].clone() } else { Value::Null },
-            "apps": runtime["apps"].clone(),
-            "analyze": runtime["analyze"].clone(),
-            "history": runtime["history"].clone(),
+            "home": runtime["home"].as_str().unwrap_or(""),
+            "busy": runtime["busy"].as_array().cloned().unwrap_or_default(),
+            "status": object("status"),
+            "clean": array("clean"),
+            "purge": array("purge"),
+            "installers": array("installers"),
+            "apps": array("apps"),
+            "analyze": object("analyze"),
+            "result": object("result"),
         })
     }
 }
 
-/// The few numbers of `mo status --json` the page shows.
-fn health(v: &Value) -> Value {
-    let disk = &v["disks"][0];
+/// The share of the processors in use between two readings of their ticks: user, system, idle, nice.
+fn cpu_percent(a: &[[u32; 4]], b: &[[u32; 4]]) -> f64 {
+    let (mut busy, mut all) = (0u64, 0u64);
+    for (x, y) in a.iter().zip(b) {
+        let d: Vec<u64> = (0..4).map(|i| u64::from(y[i].wrapping_sub(x[i]))).collect();
+        busy += d[0] + d[1] + d[3];
+        all += d.iter().sum::<u64>();
+    }
+    if all == 0 {
+        0.0
+    } else {
+        busy as f64 * 100.0 / all as f64
+    }
+}
+
+/// Out of 100: what is taken off for a busy processor, full memory, a full disk and heavy swapping.
+fn score(cpu: f64, memory: f64, disk: f64, swap: f64) -> u32 {
+    let mut score = 100.0;
+    for (value, warn, bad, weight) in [
+        (cpu, 70.0, 90.0, 15.0),
+        (memory, 80.0, 92.0, 20.0),
+        (disk, 80.0, 92.0, 30.0),
+        (swap, 50.0, 80.0, 10.0),
+    ] {
+        if value >= bad {
+            score -= weight;
+        } else if value >= warn {
+            score -= weight / 2.0;
+        }
+    }
+    score as u32
+}
+
+/// The numbers the page shows; it takes a moment to read the processor twice.
+fn health() -> Value {
+    let first = sysinfo::cpu_ticks();
+    std::thread::sleep(CPU_SAMPLE);
+    let cpu = match (first, sysinfo::cpu_ticks()) {
+        (Some(a), Some(b)) => cpu_percent(&a, &b),
+        _ => 0.0,
+    };
+    let percent = |used: u64, total: u64| {
+        if total == 0 {
+            0.0
+        } else {
+            used as f64 * 100.0 / total as f64
+        }
+    };
+    let (mem_used, mem_total) = sysinfo::memory().map_or((0, 0), |m| (m.used(), m.total));
+    let (swap_total, swap_used) = sysinfo::swap().unwrap_or((0, 0));
+    let (free, disk_total) = sysinfo::disk().unwrap_or((0, 0));
+    let disk_used = disk_total.saturating_sub(free);
+    let (memory, disk) = (percent(mem_used, mem_total), percent(disk_used, disk_total));
     json!({
-        "score": v["health_score"],
-        "message": v["health_score_msg"],
-        "uptime": v["uptime"],
-        "model": v["hardware"]["model"],
-        "chip": v["hardware"]["cpu_model"],
-        "os": v["hardware"]["os_version"],
-        "cpu": v["cpu"]["usage"],
-        "memory": v["memory"]["used_percent"],
-        "swap_used": v["memory"]["swap_used"],
-        "swap_total": v["memory"]["swap_total"],
-        "disk": disk["used_percent"],
-        "disk_used": disk["used"],
-        "disk_total": disk["total"],
+        "score": score(cpu, memory, disk, percent(swap_used, swap_total)),
+        "cpu": cpu,
+        "memory": memory, "memory_used": mem_used, "memory_total": mem_total,
+        "swap_used": swap_used, "swap_total": swap_total,
+        "disk": disk, "disk_used": disk_used, "disk_total": disk_total,
     })
-}
-
-/// The folder or the Mac as `mo analyze --json` sizes it: the biggest entries first.
-fn entries(v: &Value) -> Value {
-    let mut list: Vec<Value> = v["entries"].as_array().cloned().unwrap_or_default();
-    list.sort_by_key(|e| std::cmp::Reverse(e["size"].as_u64().unwrap_or(0)));
-    list.truncate(40);
-    let list: Vec<Value> = list
-        .iter()
-        .map(|e| json!({ "name": e["name"], "path": e["path"], "size": e["size"], "dir": e["is_dir"] }))
-        .collect();
-    json!({ "path": v["path"], "overview": v["overview"], "total": v["total_size"], "entries": list })
-}
-
-/// What `mo history --json` kept of each session.
-fn sessions(v: &Value) -> Value {
-    let list: Vec<Value> = v["sessions"]
-        .as_array()
-        .into_iter()
-        .flatten()
-        .map(|s| json!({
-            "command": s["command"], "at": s["started_at"], "items": s["items"], "size": s["size"],
-            "failed": s["failed_tasks"],
-        }))
-        .collect();
-    Value::Array(list)
-}
-
-/// Removes the colour and cursor codes `mo` prints even when its output is not a terminal.
-fn strip_ansi(text: &str) -> String {
-    let mut out = String::with_capacity(text.len());
-    let mut chars = text.chars().peekable();
-    while let Some(c) = chars.next() {
-        if c != '\u{1b}' {
-            out.push(c);
-        } else if chars.next_if_eq(&'[').is_some() {
-            for n in chars.by_ref() {
-                if n.is_ascii_alphabetic() {
-                    break;
-                }
-            }
-        }
-    }
-    out
-}
-
-/// Sections (`SECTION name`) with their lines, and the closing summary between the rules of `=`.
-fn parse(task: &str, dry: bool, ok: bool, raw: &str) -> Value {
-    let text = strip_ansi(raw);
-    let mut sections: Vec<Value> = Vec::new();
-    let mut summary: Vec<String> = Vec::new();
-    let mut rules = 0;
-    let mut lines = 0;
-    for line in text.lines().map(str::trim).filter(|l| !l.is_empty()) {
-        if line.starts_with("====") {
-            rules += 1;
-        } else if rules == 1 {
-            summary.push(line.to_owned());
-        } else if let Some(name) = line.strip_prefix(SECTION) {
-            sections.push(json!({ "name": name.trim(), "lines": [] }));
-        } else if lines < MAX_LINES && !line.contains("DRY RUN MODE") {
-            let first = line.chars().next().unwrap_or(' ');
-            let kind = if first == ITEM || first.is_ascii_digit() || line.contains("[DRY RUN]") {
-                "item"
-            } else if NOTE.contains(&first) {
-                "note"
-            } else {
-                continue;
-            };
-            if sections.is_empty() {
-                sections.push(json!({ "name": "", "lines": [] }));
-            }
-            let section = sections.last_mut().expect("a section was just made");
-            let body = if first.is_ascii_digit() {
-                line
-            } else {
-                line[first.len_utf8()..].trim()
-            };
-            section["lines"]
-                .as_array_mut()
-                .expect("lines is an array")
-                .push(json!({ "kind": kind, "text": body }));
-            lines += 1;
-        }
-    }
-    json!({ "task": task, "dry": dry, "ok": ok, "sections": sections, "summary": summary })
 }
 
 #[cfg(test)]
 mod tests {
     use super::*;
 
-    const SAMPLE: &str = "\u{1b}[1;36mClean Your Mac\u{1b}[0m\n\n\u{27A4} User essentials\n  \u{2192} User app cache \u{b7} 6 items, 340.8MB dry\n\u{27A4} Browsers\n  \u{2713} Nothing to clean\n\n======\nDry run complete - no changes made\nPotential space: 1.48GB | Items: 29\n======\n";
+    #[test]
+    fn the_processor_share_counts_every_state_but_idle() {
+        let a = [[100, 50, 800, 50]];
+        let b = [[200, 100, 1000, 100]];
+        assert!((cpu_percent(&a, &b) - 50.0).abs() < 1e-9);
+        assert_eq!(cpu_percent(&a, &a), 0.0);
+        let wrapped = [[u32::MAX, 0, 0, 0]];
+        let after = [[9, 0, 10, 0]];
+        assert!((cpu_percent(&wrapped, &after) - 50.0).abs() < 1e-9);
+    }
 
     #[test]
-    fn a_report_keeps_sections_lines_and_summary() {
-        let r = parse("clean", true, true, SAMPLE);
-        let sections = r["sections"].as_array().unwrap();
-        assert_eq!(sections.len(), 2);
-        assert_eq!(sections[0]["name"], "User essentials");
-        assert_eq!(sections[0]["lines"][0]["kind"], "item");
-        assert_eq!(
-            sections[0]["lines"][0]["text"],
-            "User app cache \u{b7} 6 items, 340.8MB dry"
+    fn a_full_disk_costs_more_than_a_busy_processor() {
+        assert_eq!(score(10.0, 50.0, 50.0, 0.0), 100);
+        assert_eq!(score(95.0, 50.0, 50.0, 0.0), 85);
+        assert_eq!(score(10.0, 50.0, 95.0, 0.0), 70);
+    }
+
+    #[test]
+    fn only_listed_rows_can_be_removed() {
+        let feature = Feature {
+            home: PathBuf::from("/nonexistent-home"),
+            own_id: None,
+            inner: Arc::default(),
+        };
+        assert!(
+            feature
+                .action("mole_remove:clean\n/etc/hosts")
+                .unwrap()
+                .is_err()
         );
-        assert_eq!(sections[1]["lines"][0]["kind"], "note");
-        assert_eq!(r["summary"][1], "Potential space: 1.48GB | Items: 29");
-        assert!(!r.to_string().contains('\u{1b}'));
+        assert!(
+            feature
+                .action("mole_remove:nope\n/etc/hosts")
+                .unwrap()
+                .is_err()
+        );
+        assert!(
+            feature
+                .action("mole_analyze:relative/path")
+                .unwrap()
+                .is_err()
+        );
+        assert!(feature.action("mole_other").is_none());
     }
 
     #[test]

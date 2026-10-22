@@ -54,7 +54,7 @@ Cửa sổ cài đặt gom mọi tính năng dưới sáu biểu tượng trên 
 | Trang | Tiếng Anh | Chức năng |
 | --- | --- | --- |
 | Chung | General | Mở khi đăng nhập, lời chào của chú ma, giao diện sáng tối và ngôn ngữ, kiểm tra mọi quyền bằng một lần bấm, và ô bật tắt cho từng tính năng chính |
-| Mole | Mole | Điểm sức khỏe máy Mac và dọn bộ nhớ đệm, thư mục build cũ, ứng dụng đã xóa bằng công cụ dòng lệnh Mole, luôn xem trước rồi mới làm (tắt mặc định) |
+| Mole | Mole | Điểm sức khỏe máy Mac và dọn bộ nhớ đệm, thư mục build cũ, tệp cài đặt, ứng dụng cùng phần còn sót, trong các danh sách tự hiện ra và xóa nhiều mục cùng lúc (tắt mặc định) |
 | Giới thiệu | About | Phiên bản, mỗi ngày tìm bản mới và cài ngay trong ứng dụng, có gì mới, riêng tư, thư mục dữ liệu và giấy phép |
 
 ### Chuột & Thao tác (Mouse & Cursor)
@@ -307,9 +307,9 @@ Kính lúp trên màn hình đóng băng; màu được chép dạng HEX, RGB, H
 
 ### Mole
 
-Kiểm tra sức khỏe máy Mac và giải phóng dung lượng bằng công cụ dòng lệnh Mole (`brew install mole`): bộ nhớ đệm và tệp thừa, thư mục build cũ, và ứng dụng đã gỡ cùng những gì chúng để lại. Mọi thứ được xem trước và không có gì đi kèm sẵn (tắt mặc định).
+Kiểm tra sức khỏe máy Mac và giải phóng dung lượng, theo các tính năng của [Mole](https://github.com/tw93/Mole) nhưng do chính Figghost làm nên không cần cài gì thêm: bộ nhớ đệm và nhật ký, thư mục build cũ của dự án, tệp cài đặt, ứng dụng cùng những gì nó để lại, và cái gì chiếm chỗ trên ổ đĩa. Danh sách tự hiện ra khi mở trang; chọn từng dòng hoặc chọn tất cả rồi xóa cùng lúc. Bộ nhớ đệm và thư mục build bị xóa hẳn, còn lại được chuyển vào Thùng rác (tắt mặc định).
 
-![Trang Mole với điểm sức khỏe và các thao tác bảo trì](docs/images/settings-mole.png)
+![Trang Mole với điểm sức khỏe và các danh sách để dọn](docs/images/settings-mole.png)
 
 ### Đảo trạng thái
 

@@ -54,7 +54,7 @@ The settings window keeps every feature under six icons in a dock at its foot, a
 | Page | Vietnamese | What it does |
 | --- | --- | --- |
 | General | Chung | Launch at login, the hello from the ghost, theme and language, a one-press check of every permission, and a tile to switch each main feature |
-| Mole | Mole | Health score of the Mac and clean-up of caches, old build folders and removed apps with the Mole command line tool, always previewed first (off by default) |
+| Mole | Mole | Health score of the Mac and clean-up of caches, old build folders, installers and apps with their leftovers, in lists that fill in by themselves and are removed from together (off by default) |
 | About | Giới thiệu | Version, a daily look for a new version with install in the app, what is new, privacy, the data folder and the licences |
 
 ### Chuột & Thao tác (Mouse & Cursor)
@@ -307,9 +307,9 @@ A loupe on a frozen screen; the colour is copied as HEX, RGB, HSL or HSB (off by
 
 ### Mole
 
-Checks the health of the Mac and frees disk space with the Mole command line tool (`brew install mole`): caches and leftovers, old build folders, and apps removed with what they left behind. Everything is previewed first and nothing is bundled (off by default).
+Checks the health of the Mac and frees disk space, after the features of [Mole](https://github.com/tw93/Mole) but done by Figghost itself, so nothing needs installing: caches and logs, old build folders of projects, installer files, apps with what they left behind, and what takes the disk. The lists fill in as the page opens; choose rows, or all of them, and remove them together. Caches and build folders are deleted, everything else goes to the Trash (off by default).
 
-![The Mole page with the health score and the maintenance actions](docs/images/settings-mole.png)
+![The Mole page with the health score and the lists to clean](docs/images/settings-mole.png)
 
 ### Live islands
 

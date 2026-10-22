@@ -148,6 +148,21 @@ pub fn app_name(bundle_id: &str) -> Option<String> {
     )
 }
 
+/// The bundle identifier and the name Finder shows of the app bundle at this path.
+pub fn bundle_info(path: &Path) -> Option<(String, String)> {
+    let text = NSString::from_str(&path.to_string_lossy());
+    let id = NSBundle::bundleWithPath(&text)?
+        .bundleIdentifier()?
+        .to_string();
+    let name = NSFileManager::defaultManager()
+        .displayNameAtPath(&text)
+        .to_string();
+    let name = name
+        .strip_suffix(".app")
+        .map_or(name.clone(), str::to_owned);
+    Some((id, name))
+}
+
 /// Apps with a Dock icon that are running now, without this one.
 pub fn running_apps() -> Vec<App> {
     let ours = std::process::id() as i32;

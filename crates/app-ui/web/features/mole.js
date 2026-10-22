@@ -1,135 +1,116 @@
-// Mole (github.com/tw93/Mole): system health, cleaning and optimizing through the user's own `mo` program.
-// The state is under S.mole; every action is checked again by the app.
+// Mole: the health of this Mac and what can be cleaned from it, after the features of Mole (github.com/tw93/Mole)
+// but done by the app itself. The state is under S.mole; the page scans as it opens and every list can be chosen
+// from and removed together. Every removal is checked again by the app.
 (function () {
   const en = {
     'nav.mole': 'Mole',
     'page.mole': 'Mole',
-    'page.mole.sub': 'Check the health of this Mac and free disk space, with the Mole command line tool.',
-    'mole.missing.title': 'Mole is not installed',
-    'mole.missing.desc': 'Install it with Homebrew: brew install mole. Figghost only runs the mo program; nothing is bundled.',
-    'mole.site': 'Open Mole',
+    'page.mole.sub': 'The health of this Mac and what can be cleaned from it. Lists fill in by themselves; choose rows and remove them together.',
+    'mole.refresh': 'Refresh', 'mole.refresh.all': 'Refresh all',
     'mole.sec.health': 'Health',
     'mole.health.title': 'Health score',
-    'mole.health.none': 'Not read yet',
-    'mole.health.refresh': 'Refresh',
+    'mole.health.reading': 'Reading',
+    'mole.health.good': 'Running well', 'mole.health.fair': 'Could use some room', 'mole.health.poor': 'Under strain',
+    'mole.health.can_free': '{size} can be cleaned',
     'mole.cpu': 'CPU', 'mole.memory': 'Memory', 'mole.disk': 'Disk',
     'mole.swap': 'Swap {used} of {total}',
-    'mole.sec.tasks': 'Maintenance',
+    'mole.sec.clean': 'Caches and logs',
     'mole.clean.title': 'Free up disk space',
-    'mole.clean.desc': 'Caches, logs, temporary files and leftovers of apps that are gone. Preview first: nothing is deleted until you choose Clean now. Items that need an administrator password are skipped.',
-    'mole.clean.confirm.title': 'Clean now?',
-    'mole.clean.confirm.body': 'Mole deletes the items it found. Run a preview first if you have not seen the list.',
-    'mole.clean.run': 'Clean now',
-    'mole.optimize.title': 'Refresh caches and services',
-    'mole.optimize.desc': 'Rebuilds Finder and system caches, refreshes the network stack and repairs broken settings.',
-    'mole.optimize.confirm.title': 'Optimize now?',
-    'mole.optimize.confirm.body': 'Mole refreshes caches and services. Run a preview first if you want to see what changes.',
-    'mole.optimize.run': 'Optimize now',
-    'mole.preview': 'Preview',
-    'mole.working': 'Working, this can take a minute',
-    'mole.sec.report': 'Result',
-    'mole.report.preview': 'Preview of {task}',
-    'mole.report.done': 'Result of {task}',
-    'mole.report.failed': 'Did not finish',
-    'mole.task.clean': 'clean', 'mole.task.optimize': 'optimize',
-    'mole.report.empty': 'Run a preview to see what Mole would do.',
-    'mole.purge.title': 'Remove old build folders',
-    'mole.purge.desc': 'node_modules, build and virtual environment folders of projects you have not touched for a while, found in the usual project folders.',
-    'mole.purge.confirm.title': 'Remove these folders?',
-    'mole.purge.confirm.body': 'Mole deletes the build folders it found. They can be rebuilt, but they are not sent to the Trash.',
-    'mole.purge.run': 'Remove now',
-    'mole.sec.installer': 'Installers',
-    'mole.installer.title': 'Old installer files',
-    'mole.installer.desc': 'Finds .dmg, .pkg, .iso, .xip and .zip files. Mole asks you to pick them in a list, so this opens it in Terminal.',
-    'mole.installer.open': 'Open in Terminal',
-    'mole.sec.uninstall': 'Uninstall apps',
-    'mole.uninstall.title': 'Remove an app with its leftovers',
-    'mole.uninstall.desc': 'Apps and what they left in Library go to the Trash, so they can be put back.',
-    'mole.uninstall.scan': 'List apps',
-    'mole.uninstall.empty': 'List the apps to choose one.',
-    'mole.uninstall.run': 'Uninstall',
-    'mole.uninstall.confirm.title': 'Uninstall {name}?',
-    'mole.uninstall.confirm.body': 'The app and its leftover files go to the Trash.',
+    'mole.clean.desc': 'App and browser caches, logs, developer caches and the Trash. They are emptied, not moved to the Trash; apps make them again when needed.',
+    'mole.clean.empty': 'Nothing to clean.',
+    'mole.clean.remove': 'Clean selected',
+    'mole.clean.body': 'The contents of the chosen folders are deleted for good. Apps make their caches again when needed.',
+    'mole.group.cache': 'Cache', 'mole.group.log': 'Logs', 'mole.group.dev': 'Developer', 'mole.group.trash': 'Trash',
+    'mole.sec.purge': 'Old build folders',
+    'mole.purge.title': 'Build folders of projects',
+    'mole.purge.desc': 'node_modules, target, build, .venv, bin and obj and similar folders that their tools make again, found in the usual project folders.',
+    'mole.purge.empty': 'No build folders found.',
+    'mole.purge.remove': 'Delete selected',
+    'mole.purge.body': 'The chosen build folders are deleted for good. Building the project makes them again.',
+    'mole.age': 'touched {n} days ago', 'mole.age.today': 'touched today',
+    'mole.sec.installers': 'Installers',
+    'mole.installers.title': 'Old installer files',
+    'mole.installers.desc': '.dmg, .pkg, .iso and .xip files in Downloads, Desktop and Documents.',
+    'mole.installers.empty': 'No installer files found.',
+    'mole.installers.remove': 'Move to Trash',
+    'mole.installers.body': 'The chosen files go to the Trash, where they can be put back.',
+    'mole.sec.apps': 'Uninstall apps',
+    'mole.apps.title': 'Apps with their leftovers',
+    'mole.apps.desc': 'Each app and what it left in Library go to the Trash together, so they can be put back. Quit an app before removing it.',
+    'mole.apps.empty': 'No apps found.',
+    'mole.apps.remove': 'Uninstall selected',
+    'mole.apps.body': 'The chosen apps and their leftover files go to the Trash.',
+    'mole.apps.extra': '{n} leftovers',
     'mole.sec.analyze': 'Disk usage',
     'mole.analyze.title': 'What takes the space',
-    'mole.analyze.desc': 'The biggest folders first. Choose a folder to look inside it.',
-    'mole.analyze.scan': 'Scan this Mac',
-    'mole.analyze.up': 'Up',
-    'mole.analyze.empty': 'Scan to see where the space went.',
-    'mole.sec.history': 'History',
-    'mole.history.title': 'Recent runs',
-    'mole.history.desc': 'What Mole did lately, from its own log.',
-    'mole.history.scan': 'Show history',
-    'mole.history.empty': 'Nothing to show yet.',
-    'mole.history.items': '{n} items',
-    'mole.task.purge': 'purge', 'mole.task.uninstall': 'uninstall',
-    'fault.mole_missing': 'Mole is not installed.',
-    'fault.mole_terminal': 'Could not open Terminal.',
+    'mole.analyze.desc': 'The biggest entries first. Open a folder to look inside it; what is chosen goes to the Trash.',
+    'mole.analyze.empty': 'This folder is empty.',
+    'mole.analyze.remove': 'Move to Trash',
+    'mole.analyze.body': 'The chosen files and folders go to the Trash, where they can be put back.',
+    'mole.analyze.up': 'Up', 'mole.analyze.open': 'Open {name}', 'mole.analyze.home': 'Home',
+    'mole.scanning': 'Scanning...',
+    'mole.search': 'Filter',
+    'mole.pick.all': 'Choose all',
+    'mole.total': '{n} items, {size}',
+    'mole.picked': '{n} chosen, {size}',
+    'mole.confirm': 'Remove {n} items ({size})?',
+    'mole.result': 'Removed {n} items, {size} freed.',
+    'mole.result.partial': 'Removed {n} items, {size} freed. {failed} could not be removed.',
   };
   const vi = {
     'nav.mole': 'Mole',
     'page.mole': 'Mole',
-    'page.mole.sub': 'Kiểm tra sức khỏe máy Mac và giải phóng dung lượng bằng công cụ dòng lệnh Mole.',
-    'mole.missing.title': 'Chưa cài Mole',
-    'mole.missing.desc': 'Cài bằng Homebrew: brew install mole. Figghost chỉ chạy chương trình mo, không đóng gói kèm.',
-    'mole.site': 'Mở Mole',
+    'page.mole.sub': 'Sức khỏe của máy Mac và những gì có thể dọn. Danh sách tự hiện ra; chọn nhiều dòng rồi xóa cùng lúc.',
+    'mole.refresh': 'Làm mới', 'mole.refresh.all': 'Làm mới tất cả',
     'mole.sec.health': 'Sức khỏe',
     'mole.health.title': 'Điểm sức khỏe',
-    'mole.health.none': 'Chưa đọc',
-    'mole.health.refresh': 'Đọc lại',
+    'mole.health.reading': 'Đang đọc',
+    'mole.health.good': 'Máy chạy tốt', 'mole.health.fair': 'Nên dọn bớt', 'mole.health.poor': 'Máy đang quá tải',
+    'mole.health.can_free': 'Có thể dọn {size}',
     'mole.cpu': 'CPU', 'mole.memory': 'Bộ nhớ', 'mole.disk': 'Ổ đĩa',
     'mole.swap': 'Swap {used} trên {total}',
-    'mole.sec.tasks': 'Bảo trì',
+    'mole.sec.clean': 'Bộ nhớ đệm và nhật ký',
     'mole.clean.title': 'Giải phóng dung lượng',
-    'mole.clean.desc': 'Bộ nhớ đệm, nhật ký, tệp tạm và phần còn sót của ứng dụng đã xóa. Hãy xem trước: không có gì bị xóa cho đến khi bạn chọn Dọn ngay. Mục cần mật khẩu quản trị sẽ bị bỏ qua.',
-    'mole.clean.confirm.title': 'Dọn ngay?',
-    'mole.clean.confirm.body': 'Mole sẽ xóa các mục đã tìm thấy. Hãy chạy xem trước nếu bạn chưa xem danh sách.',
-    'mole.clean.run': 'Dọn ngay',
-    'mole.optimize.title': 'Làm mới bộ nhớ đệm và dịch vụ',
-    'mole.optimize.desc': 'Dựng lại bộ nhớ đệm của Finder và hệ thống, làm mới mạng và sửa các thiết lập hỏng.',
-    'mole.optimize.confirm.title': 'Tối ưu ngay?',
-    'mole.optimize.confirm.body': 'Mole sẽ làm mới bộ nhớ đệm và dịch vụ. Hãy chạy xem trước nếu muốn biết điều gì thay đổi.',
-    'mole.optimize.run': 'Tối ưu ngay',
-    'mole.preview': 'Xem trước',
-    'mole.working': 'Đang chạy, có thể mất khoảng một phút',
-    'mole.sec.report': 'Kết quả',
-    'mole.report.preview': 'Xem trước {task}',
-    'mole.report.done': 'Kết quả {task}',
-    'mole.report.failed': 'Chưa hoàn tất',
-    'mole.task.clean': 'dọn dẹp', 'mole.task.optimize': 'tối ưu',
-    'mole.report.empty': 'Hãy chạy xem trước để biết Mole sẽ làm gì.',
-    'mole.purge.title': 'Xóa thư mục build cũ',
-    'mole.purge.desc': 'node_modules, thư mục build và môi trường ảo của các dự án lâu chưa đụng tới, tìm trong các thư mục dự án thông dụng.',
-    'mole.purge.confirm.title': 'Xóa các thư mục này?',
-    'mole.purge.confirm.body': 'Mole xóa các thư mục build đã tìm thấy. Chúng dựng lại được nhưng không được chuyển vào Thùng rác.',
-    'mole.purge.run': 'Xóa ngay',
-    'mole.sec.installer': 'Bộ cài',
-    'mole.installer.title': 'Tệp cài đặt cũ',
-    'mole.installer.desc': 'Tìm các tệp .dmg, .pkg, .iso, .xip và .zip. Mole để bạn chọn trong một danh sách nên mục này mở nó trong Terminal.',
-    'mole.installer.open': 'Mở trong Terminal',
-    'mole.sec.uninstall': 'Gỡ ứng dụng',
-    'mole.uninstall.title': 'Gỡ ứng dụng cùng phần còn sót',
-    'mole.uninstall.desc': 'Ứng dụng và những gì nó để lại trong Library được chuyển vào Thùng rác nên có thể khôi phục.',
-    'mole.uninstall.scan': 'Liệt kê ứng dụng',
-    'mole.uninstall.empty': 'Hãy liệt kê ứng dụng để chọn.',
-    'mole.uninstall.run': 'Gỡ',
-    'mole.uninstall.confirm.title': 'Gỡ {name}?',
-    'mole.uninstall.confirm.body': 'Ứng dụng và các tệp còn sót được chuyển vào Thùng rác.',
+    'mole.clean.desc': 'Bộ nhớ đệm của ứng dụng và trình duyệt, nhật ký, bộ nhớ đệm cho lập trình và Thùng rác. Chúng bị xóa hẳn, không vào Thùng rác; ứng dụng sẽ tự tạo lại khi cần.',
+    'mole.clean.empty': 'Không có gì để dọn.',
+    'mole.clean.remove': 'Dọn mục đã chọn',
+    'mole.clean.body': 'Nội dung của các thư mục đã chọn bị xóa hẳn. Ứng dụng sẽ tự tạo lại bộ nhớ đệm khi cần.',
+    'mole.group.cache': 'Bộ nhớ đệm', 'mole.group.log': 'Nhật ký', 'mole.group.dev': 'Lập trình', 'mole.group.trash': 'Thùng rác',
+    'mole.sec.purge': 'Thư mục build cũ',
+    'mole.purge.title': 'Thư mục build của dự án',
+    'mole.purge.desc': 'node_modules, target, build, .venv, bin, obj và các thư mục tương tự mà công cụ dựng lại được, tìm trong các thư mục dự án thông dụng.',
+    'mole.purge.empty': 'Không thấy thư mục build nào.',
+    'mole.purge.remove': 'Xóa mục đã chọn',
+    'mole.purge.body': 'Các thư mục build đã chọn bị xóa hẳn. Build lại dự án sẽ tạo lại chúng.',
+    'mole.age': 'sửa {n} ngày trước', 'mole.age.today': 'sửa hôm nay',
+    'mole.sec.installers': 'Bộ cài',
+    'mole.installers.title': 'Tệp cài đặt cũ',
+    'mole.installers.desc': 'Các tệp .dmg, .pkg, .iso và .xip trong Downloads, Desktop và Documents.',
+    'mole.installers.empty': 'Không thấy tệp cài đặt nào.',
+    'mole.installers.remove': 'Chuyển vào Thùng rác',
+    'mole.installers.body': 'Các tệp đã chọn được chuyển vào Thùng rác nên có thể khôi phục.',
+    'mole.sec.apps': 'Gỡ ứng dụng',
+    'mole.apps.title': 'Ứng dụng cùng phần còn sót',
+    'mole.apps.desc': 'Mỗi ứng dụng và những gì nó để lại trong Library được chuyển vào Thùng rác cùng lúc nên có thể khôi phục. Hãy thoát ứng dụng trước khi gỡ.',
+    'mole.apps.empty': 'Không thấy ứng dụng nào.',
+    'mole.apps.remove': 'Gỡ mục đã chọn',
+    'mole.apps.body': 'Các ứng dụng đã chọn và tệp còn sót được chuyển vào Thùng rác.',
+    'mole.apps.extra': '{n} tệp còn sót',
     'mole.sec.analyze': 'Dung lượng ổ đĩa',
     'mole.analyze.title': 'Cái gì chiếm chỗ',
-    'mole.analyze.desc': 'Thư mục lớn nhất xếp trước. Chọn một thư mục để xem bên trong.',
-    'mole.analyze.scan': 'Quét máy này',
-    'mole.analyze.up': 'Lên trên',
-    'mole.analyze.empty': 'Hãy quét để biết dung lượng đã đi đâu.',
-    'mole.sec.history': 'Lịch sử',
-    'mole.history.title': 'Các lần chạy gần đây',
-    'mole.history.desc': 'Những gì Mole đã làm gần đây, theo nhật ký của chính nó.',
-    'mole.history.scan': 'Xem lịch sử',
-    'mole.history.empty': 'Chưa có gì để hiện.',
-    'mole.history.items': '{n} mục',
-    'mole.task.purge': 'xóa thư mục build', 'mole.task.uninstall': 'gỡ ứng dụng',
-    'fault.mole_missing': 'Chưa cài Mole.',
-    'fault.mole_terminal': 'Không mở được Terminal.',
+    'mole.analyze.desc': 'Mục lớn nhất xếp trước. Mở một thư mục để xem bên trong; mục đã chọn được chuyển vào Thùng rác.',
+    'mole.analyze.empty': 'Thư mục này trống.',
+    'mole.analyze.remove': 'Chuyển vào Thùng rác',
+    'mole.analyze.body': 'Các tệp và thư mục đã chọn được chuyển vào Thùng rác nên có thể khôi phục.',
+    'mole.analyze.up': 'Lên trên', 'mole.analyze.open': 'Mở {name}', 'mole.analyze.home': 'Thư mục nhà',
+    'mole.scanning': 'Đang quét...',
+    'mole.search': 'Lọc',
+    'mole.pick.all': 'Chọn tất cả',
+    'mole.total': '{n} mục, {size}',
+    'mole.picked': 'Đã chọn {n} mục, {size}',
+    'mole.confirm': 'Xóa {n} mục ({size})?',
+    'mole.result': 'Đã xóa {n} mục, giải phóng {size}.',
+    'mole.result.partial': 'Đã xóa {n} mục, giải phóng {size}. Còn {failed} mục không xóa được.',
   };
 
   const size = (n) => {
@@ -138,9 +119,12 @@
     const i = Math.min(units.length - 1, Math.floor(Math.log(n) / Math.log(1024)));
     return (n / 1024 ** i).toFixed(i > 1 ? 1 : 0) + ' ' + units[i];
   };
+  const sum = (list) => list.reduce((n, i) => n + i.size, 0);
   const mole = () => S.mole;
-  const busy = () => !!mole().busy;
+  const busy = (key) => (mole().busy || []).includes(key);
   const act = (name) => send({ t: 'action', name });
+  const tilde = (p) => (mole().home && p.startsWith(mole().home) ? '~' + p.slice(mole().home.length) : p);
+  const scanning = () => h('div', { class: 'empty', role: 'status', text: t('mole.scanning') });
 
   function meter(key, value, detail) {
     const fill = h('span');
@@ -148,145 +132,122 @@
     const num = h('b');
     const extra = h('span');
     reg(() => {
-      const v = Math.max(0, Math.min(100, +value() || 0));
+      const v = clamp(+value() || 0, 0, 100);
       fill.style.width = v + '%';
       bar.classList.toggle('hot', v >= 90);
       bar.setAttribute('aria-valuenow', String(Math.round(v)));
       num.textContent = Math.round(v) + '%';
-      extra.textContent = detail ? detail() : '';
+      extra.textContent = detail() || '';
     });
     return h('div', {}, h('div', { class: 'mole-meter-label' }, h('span', { text: t('mole.' + key) }), num), bar, h('div', { class: 'mole-meter-label' }, extra));
   }
 
-  function healthCards() {
+  function healthCard() {
     const st = () => mole().status || {};
     const score = h('span', { class: 'mole-score' });
-    const refresh = button(t('mole.health.refresh'), () => act('mole_status'), { icon: 'refresh', small: true });
+    const refresh = button(t('mole.refresh.all'), () => act('mole_refresh'), { icon: 'refresh', small: true });
+    const head = row(t('mole.health.title'), ' ', h('div', { class: 'mole-actions' }, score, refresh));
+    const desc = head.querySelector('.row-desc');
     reg(() => {
-      score.textContent = st().score != null ? String(st().score) : '';
-      refresh.disabled = busy();
+      const s = st().score;
+      score.textContent = s != null ? String(s) : '';
+      score.className = 'mole-score ' + (s >= 85 ? 'good' : s >= 60 ? 'fair' : 'poor');
+      refresh.disabled = busy('status');
+      const lists = ['clean', 'purge', 'installers'].map((k) => mole()[k] || []);
+      const free = lists.reduce((n, l) => n + sum(l), 0);
+      const word = s == null ? t('mole.health.reading') : t('mole.health.' + (s >= 85 ? 'good' : s >= 60 ? 'fair' : 'poor'));
+      desc.textContent = free ? word + ' / ' + t('mole.health.can_free', { size: size(free) }) : word;
     });
-    const head = row(t('mole.health.title'), null, [score, refresh]);
-    const text = head.querySelector('.row-desc') || head.querySelector('.row-text').appendChild(h('div', { class: 'row-desc' }));
-    reg(() => { text.textContent = st().score != null ? [st().message, st().chip, st().os].filter(Boolean).join(' / ') : t('mole.health.none'); });
     const meters = h('div', { class: 'mole-meters' },
-      meter('cpu', () => st().cpu),
+      meter('cpu', () => st().cpu, () => ''),
       meter('memory', () => st().memory, () => (st().swap_total ? t('mole.swap', { used: size(st().swap_used), total: size(st().swap_total) }) : '')),
       meter('disk', () => st().disk, () => (st().disk_total ? size(st().disk_used) + ' / ' + size(st().disk_total) : '')));
-    reg(() => { meters.style.display = st().score != null ? '' : 'none'; });
     return [sectionTitle(t('mole.sec.health')), card(head, meters)];
   }
 
-  /** One task as a row: what it does, a preview and the run, which asks first. */
-  function taskRow(task) {
-    const preview = button(t('mole.preview'), () => act('mole_' + task + '_preview'), { icon: 'magnifyingglass', small: true });
-    const run = button(t('mole.' + task + '.run'), () => confirmDialog(
-      { title: t('mole.' + task + '.confirm.title'), body: t('mole.' + task + '.confirm.body'), confirm: t('mole.' + task + '.run') },
-      () => act('mole_' + task + '_run')), { small: true, danger: task === 'clean' });
-    reg(() => { preview.disabled = run.disabled = busy(); });
-    return row(t('mole.' + task + '.title'), t('mole.' + task + '.desc'), h('div', { class: 'mole-actions' }, preview, run));
-  }
-
-  function reportCard() {
-    const box = h('div');
-    let last = null;
-    reg(() => {
-      const r = mole().report;
-      const stamp = JSON.stringify([r, mole().busy, lang]);
-      if (stamp === last) return;
-      last = stamp;
-      if (mole().busy) { box.replaceChildren(h('div', { class: 'empty', role: 'status', text: t('mole.working') })); return; }
-      if (!r) { box.replaceChildren(h('div', { class: 'empty', text: t('mole.report.empty') })); return; }
-      const task = t('mole.task.' + r.task);
-      const kids = [h('div', { class: 'mole-summary' },
-        h('div', { text: r.ok ? t(r.dry ? 'mole.report.preview' : 'mole.report.done', { task }) : t('mole.report.failed') + (r.error ? ': ' + r.error : '') }),
-        (r.summary || []).map((s) => h('div', { text: s })))];
-      for (const s of r.sections || []) {
-        kids.push(h('div', { class: 'mole-section' }, h('div', { class: 'mole-section-name', text: s.name }),
-          s.lines.map((l) => h('div', { class: 'mole-line ' + l.kind, text: l.text }))));
-      }
-      box.replaceChildren(...kids);
-    });
-    return [sectionTitle(t('mole.sec.report')), card(box)];
-  }
-
-
-  function uninstallCard() {
-    const scan = button(t('mole.uninstall.scan'), () => act('mole_apps'), { icon: 'refresh', small: true });
-    const list = h('div', { class: 'mole-list' });
-    let last = null;
-    reg(() => {
-      scan.disabled = busy();
-      const apps = mole().apps;
-      const stamp = JSON.stringify([apps, mole().busy, lang]);
-      if (stamp === last) return;
-      last = stamp;
-      if (!apps || !apps.length) { list.replaceChildren(h('div', { class: 'empty', text: t('mole.uninstall.empty') })); return; }
-      list.replaceChildren(...apps.map((a) => {
-        const preview = button(t('mole.preview'), () => act('mole_uninstall_preview:' + a.uninstall_name), { small: true });
-        const run = button(t('mole.uninstall.run'), () => confirmDialog(
-          { title: t('mole.uninstall.confirm.title', { name: a.name }), body: t('mole.uninstall.confirm.body'), confirm: t('mole.uninstall.run') },
-          () => act('mole_uninstall_run:' + a.uninstall_name)), { small: true, danger: true });
-        preview.disabled = run.disabled = !!mole().busy;
-        return h('div', { class: 'mole-app' }, h('span', { class: 'mole-app-name', text: a.name }), h('span', { class: 'mole-app-size', text: a.size }), preview, run);
-      }));
-    });
-    return [sectionTitle(t('mole.sec.uninstall')), card(row(t('mole.uninstall.title'), t('mole.uninstall.desc'), scan), list)];
-  }
-
-  function analyzeCard() {
-    const scan = button(t('mole.analyze.scan'), () => act('mole_analyze'), { icon: 'magnifyingglass', small: true });
-    const box = h('div');
-    let last = null;
-    const parent = (path) => path.replace(/\/[^/]+\/?$/, '') || '/';
-    reg(() => {
-      scan.disabled = busy();
-      const a = mole().analyze;
-      const stamp = JSON.stringify([a, mole().busy, lang]);
-      if (stamp === last) return;
-      last = stamp;
-      if (!a || !a.entries) { box.replaceChildren(h('div', { class: 'empty', text: t('mole.analyze.empty') })); return; }
-      const top = Math.max(1, ...a.entries.map((e) => e.size));
-      const head = h('div', { class: 'mole-summary' }, h('div', { text: a.path + ' (' + size(a.total || a.entries.reduce((n, e) => n + e.size, 0)) + ')' }));
-      if (!a.overview && a.path !== '/') head.append(button(t('mole.analyze.up'), () => act('mole_analyze:' + parent(a.path)), { small: true }));
-      box.replaceChildren(head, ...a.entries.map((e) => {
+  /**
+   * A list whose rows are chosen with a checkbox and removed together. `detail` is the second line of a row,
+   * `lead` an element before its name, `open` makes a folder row open; `head` goes above the toolbar.
+   */
+  function pickList({ kind, read, detail, lead, open, head, filter }) {
+    const chosen = new Set();
+    const items = () => read() || [];
+    const all = h('input', { type: 'checkbox', 'aria-label': t('mole.pick.all') });
+    const count = h('span', { class: 'mole-count' });
+    const search = filter ? h('input', { type: 'search', class: 'text-field mole-search', placeholder: t('mole.search'), 'aria-label': t('mole.search'), spellcheck: 'false', autocomplete: 'off' }) : null;
+    const remove = button(t('mole.' + kind + '.remove'), () => {
+      const picked = items().filter((i) => chosen.has(i.path));
+      confirmDialog({ title: t('mole.confirm', { n: picked.length, size: size(sum(picked)) }), body: t('mole.' + kind + '.body'), confirm: t('mole.' + kind + '.remove') },
+        () => act('mole_remove:' + kind + '\n' + picked.map((i) => i.path).join('\n')));
+    }, { icon: 'trash', small: true, danger: true });
+    const refresh = button('', () => act('mole_scan:' + kind), { icon: 'refresh', small: true, aria: t('mole.refresh') });
+    refresh.title = t('mole.refresh');
+    const box = h('div', { class: 'mole-list' });
+    const visible = () => {
+      const q = search ? search.value.trim().toLowerCase() : '';
+      return items().filter((i) => !q || (i.name + ' ' + i.note).toLowerCase().includes(q));
+    };
+    const paint = () => {
+      const list = items();
+      for (const p of [...chosen]) if (!list.some((i) => i.path === p)) chosen.delete(p);
+      const picked = list.filter((i) => chosen.has(i.path));
+      const shown = visible();
+      const n = shown.filter((i) => chosen.has(i.path)).length;
+      all.checked = shown.length > 0 && n === shown.length;
+      all.indeterminate = n > 0 && n < shown.length;
+      all.disabled = !shown.length;
+      count.textContent = busy(kind) || !read() ? t('mole.scanning')
+        : picked.length ? t('mole.picked', { n: picked.length, size: size(sum(picked)) })
+        : t('mole.total', { n: list.length, size: size(sum(list)) });
+      remove.disabled = !picked.length || busy('remove');
+      refresh.disabled = busy(kind);
+    };
+    const draw = () => {
+      if (!read()) { box.replaceChildren(scanning()); return; }
+      const shown = visible();
+      if (!shown.length) { box.replaceChildren(busy(kind) ? scanning() : h('div', { class: 'empty', text: t('mole.' + kind + '.empty') })); return; }
+      const top = Math.max(1, ...shown.map((i) => i.size));
+      box.replaceChildren(...shown.map((i) => {
+        const pick = h('input', { type: 'checkbox', 'aria-label': i.name });
+        pick.checked = chosen.has(i.path);
+        pick.addEventListener('change', () => { if (pick.checked) chosen.add(i.path); else chosen.delete(i.path); paint(); });
         const fill = h('span');
-        fill.style.width = Math.max(1, (e.size / top) * 100) + '%';
-        const label = h('span', { class: 'mole-entry-name', text: e.name }, );
-        const el = h(e.dir ? 'button' : 'div', { class: 'mole-entry' + (e.dir ? ' dir' : ''), 'aria-label': e.name + ', ' + size(e.size) },
-          label, h('span', { class: 'mole-entry-size', text: size(e.size) }), h('div', { class: 'mole-bar' }, fill));
-        if (e.dir) el.addEventListener('click', () => act('mole_analyze:' + e.path));
-        return el;
+        fill.style.width = Math.max(1, (i.size / top) * 100) + '%';
+        const go = open && i.dir ? button('', (e) => { e.preventDefault(); open(i); }, { icon: 'folder', small: true, aria: t('mole.analyze.open', { name: i.name }) }) : null;
+        return h('label', { class: 'mole-item', title: tilde(i.path) }, pick, lead ? lead(i) : null,
+          h('span', { class: 'mole-item-text' }, h('span', { class: 'mole-item-name', text: i.name }), h('span', { class: 'mole-item-note', text: detail(i) }),
+            h('span', { class: 'mole-bar' }, fill)),
+          h('span', { class: 'mole-item-size', text: size(i.size) }), go);
       }));
+    };
+    all.addEventListener('change', () => {
+      for (const i of visible()) { if (all.checked) chosen.add(i.path); else chosen.delete(i.path); }
+      draw(); paint();
     });
-    return [sectionTitle(t('mole.sec.analyze')), card(row(t('mole.analyze.title'), t('mole.analyze.desc'), scan), box)];
-  }
-
-  function historyCard() {
-    const scan = button(t('mole.history.scan'), () => act('mole_history'), { icon: 'refresh', small: true });
-    const box = h('div');
+    if (search) search.addEventListener('input', () => { draw(); paint(); });
     let last = null;
     reg(() => {
-      scan.disabled = busy();
-      const rows = mole().history;
-      const stamp = JSON.stringify([rows, lang]);
-      if (stamp === last) return;
-      last = stamp;
-      if (!rows || !rows.length) { box.replaceChildren(h('div', { class: 'empty', text: t('mole.history.empty') })); return; }
-      box.replaceChildren(...rows.map((r) => h('div', { class: 'mole-app' },
-        h('span', { class: 'mole-app-name', text: r.command }), h('span', { class: 'mole-app-size', text: t('mole.history.items', { n: r.items }) + ' / ' + r.size }),
-        h('span', { class: 'mole-line', text: r.at }))));
+      const stamp = JSON.stringify([read(), busy(kind), lang]);
+      if (stamp !== last) { last = stamp; draw(); }
+      paint();
     });
-    return [sectionTitle(t('mole.sec.history')), card(row(t('mole.history.title'), t('mole.history.desc'), scan), box)];
+    return [sectionTitle(t('mole.sec.' + kind)), card(row(t('mole.' + kind + '.title'), t('mole.' + kind + '.desc'), null), head,
+      h('div', { class: 'mole-toolbar' }, h('label', { class: 'mole-all' }, all, count), search, remove, refresh), box)];
   }
 
-  function installerCard() {
-    return [sectionTitle(t('mole.sec.installer')), card(row(t('mole.installer.title'), t('mole.installer.desc'),
-      button(t('mole.installer.open'), () => act('mole_terminal_installer'), { icon: 'terminal.fill', small: true })))];
-  }
+  const age = (i) => (i.age == null ? '' : i.age ? t('mole.age', { n: i.age }) : t('mole.age.today'));
 
-  function missingCard() {
-    return card(row(t('mole.missing.title'), t('mole.missing.desc'), button(t('mole.site'), () => act('mole_open_site'), { small: true })));
+  function analyzeHead() {
+    const where = h('span', { class: 'mole-path' });
+    const up = button(t('mole.analyze.up'), () => act('mole_analyze:' + (mole().analyze.path.replace(/\/[^/]+\/?$/, '') || '/')), { icon: 'chevron.up', small: true });
+    const home = button(t('mole.analyze.home'), () => act('mole_analyze:' + mole().home), { small: true });
+    reg(() => {
+      const a = mole().analyze;
+      where.textContent = a ? tilde(a.path) + ' (' + size(a.total) + ')' : '';
+      up.disabled = !a || a.path === '/' || busy('analyze');
+      home.disabled = !a || a.path === mole().home || busy('analyze');
+    });
+    return h('div', { class: 'mole-toolbar' }, where, up, home);
   }
 
   (window.__plugins = window.__plugins || []).push({
@@ -295,54 +256,82 @@
     en,
     vi,
     build() {
-      const ready = [...healthCards(), ...reportCard(), sectionTitle(t('mole.sec.tasks')), card(taskRow('clean'), taskRow('optimize'), taskRow('purge')), ...uninstallCard(), ...analyzeCard(), ...installerCard(), ...historyCard()];
-      const missing = missingCard();
-      const wrap = h('div', {}, ...ready);
+      let seen = mole().result ? mole().result.seq : null;
       reg(() => {
-        wrap.style.display = mole().installed ? '' : 'none';
-        missing.style.display = mole().installed ? 'none' : '';
+        const r = mole().result;
+        if (!r || r.seq === seen) return;
+        seen = r.seq;
+        toast(t(r.failed ? 'mole.result.partial' : 'mole.result', { n: r.removed, size: size(r.freed), failed: r.failed }));
       });
-      if (mole().installed) act('mole_status');
-      return [missing, wrap];
+      act('mole_open');
+      return [
+        ...healthCard(),
+        ...pickList({ kind: 'clean', read: () => mole().clean, detail: (i) => t('mole.group.' + i.note) + ' / ' + tilde(i.path) }),
+        ...pickList({ kind: 'purge', read: () => mole().purge, detail: (i) => [i.note, age(i)].filter(Boolean).join(' / ') }),
+        ...pickList({ kind: 'installers', read: () => mole().installers, detail: (i) => tilde(i.path) }),
+        ...pickList({ kind: 'apps', read: () => mole().apps, filter: true, lead: (i) => iconImg(i.note),
+          detail: (i) => (i.extra ? i.note + ' / ' + t('mole.apps.extra', { n: i.extra }) : i.note) }),
+        ...pickList({ kind: 'analyze', read: () => mole().analyze && mole().analyze.entries, head: analyzeHead(), detail: () => '',
+          open: (i) => act('mole_analyze:' + i.path) }),
+      ];
     },
     selftest({ expect, go, sent, S }) {
-      S.mole.status = { score: 91, message: 'Excellent', uptime: '12d 0h', model: 'Mac mini', chip: 'Apple M4', os: 'macOS 27', cpu: 13.6, memory: 81.2, swap_used: 3858169856, swap_total: 5368709120, disk: 48.2, disk_used: 238313164359, disk_total: 494384795648 };
-      S.mole.report = { task: 'clean', dry: true, ok: true, sections: [{ name: 'User essentials', lines: [{ kind: 'item', text: 'User app cache' }] }], summary: ['Dry run complete'] };
+      const home = S.mole.home;
+      S.mole.status = { score: 91, cpu: 13.6, memory: 81.2, memory_used: 1, memory_total: 2, swap_used: 3858169856, swap_total: 5368709120, disk: 48.2, disk_used: 238313164359, disk_total: 494384795648 };
+      S.mole.clean = [
+        { path: home + '/Library/Caches/org.a', name: 'org.a', note: 'cache', size: 3000000, dir: true, age: 1, extra: 0 },
+        { path: home + '/Library/Logs/b', name: 'b', note: 'log', size: 2000000, dir: true, age: 1, extra: 0 },
+      ];
+      S.mole.purge = [];
+      S.mole.installers = null;
+      S.mole.apps = [{ path: '/Applications/Figma.app', name: 'Figma', note: 'com.figma.Desktop', size: 400, dir: true, age: 3, extra: 2 },
+        { path: '/Applications/Zed.app', name: 'Zed', note: 'dev.zed.Zed', size: 300, dir: true, age: 3, extra: 0 }];
+      S.mole.analyze = { path: home, total: 300, entries: [{ path: home + '/Library', name: 'Library', note: '', size: 200, dir: true, age: 0, extra: 0 }] };
       sent.length = 0;
       go('mole');
-      expect(sent.some((m) => m.t === 'action' && m.name === 'mole_status'), 'mole: opening the page reads the health: ' + JSON.stringify(sent));
-      const btn = (label) => [...document.querySelectorAll('.btn')].find((b) => b.textContent === label);
+      expect(sent.some((m) => m.t === 'action' && m.name === 'mole_open'), 'mole: opening the page scans by itself: ' + JSON.stringify(sent));
+      expect(document.body.textContent.includes('org.a'), 'mole: the cleanable rows are shown without a click');
+      expect(document.body.textContent.includes(t('mole.scanning')), 'mole: a list not read yet says it is scanning');
+      const section = (kind) => [...document.querySelectorAll('.card')].find((c) => c.textContent.includes(t('mole.' + kind + '.title')));
+      const btn = (root, label) => [...root.querySelectorAll('.btn')].find((b) => b.textContent === label);
+      const clean = section('clean');
+      const remove = btn(clean, t('mole.clean.remove'));
+      expect(remove.disabled, 'mole: nothing chosen, nothing to remove');
+      const all = clean.querySelector('.mole-all input');
+      all.click();
+      expect(!remove.disabled && clean.querySelectorAll('.mole-item input:checked').length === 2, 'mole: choose all picks every row');
       sent.length = 0;
-      btn(t('mole.preview')).click();
-      expect(sent.some((m) => m.name === 'mole_clean_preview'), 'mole: the first preview is the clean one: ' + JSON.stringify(sent));
-      sent.length = 0;
-      btn(t('mole.clean.run')).click();
-      expect(!sent.length, 'mole: cleaning for real asks first');
-      const yes = document.querySelector('#modal .btn.primary, #modal .btn.danger');
-      expect(!!yes, 'mole: the confirmation has a button');
+      remove.click();
+      expect(!sent.length, 'mole: removing asks first');
+      const yes = document.querySelector('#modal .btn.primary');
       if (yes) yes.click();
-      expect(sent.some((m) => m.name === 'mole_clean_run'), 'mole: confirming sends the run: ' + JSON.stringify(sent));
-      expect(document.body.textContent.includes('User essentials'), 'mole: the report lists its sections');
-      S.mole.apps = [{ name: 'Figma', uninstall_name: 'Figma', size: '325.7MB' }];
-      S.mole.analyze = { path: '/Users/me', overview: false, total: 300, entries: [{ name: 'Library', path: '/Users/me/Library', size: 200, dir: true }, { name: 'a.txt', path: '/Users/me/a.txt', size: 100, dir: false }] };
-      S.mole.history = [{ command: 'clean', at: '2026-10-19 10:00:00', items: 3, size: '1MB', failed: 0 }];
-      runSyncs();
+      const msg = sent.find((m) => m.name && m.name.startsWith('mole_remove:'));
+      expect(msg && msg.name === 'mole_remove:clean\n' + home + '/Library/Caches/org.a\n' + home + '/Library/Logs/b', 'mole: the chosen rows go together: ' + JSON.stringify(sent));
+      const apps = section('apps');
+      const search = apps.querySelector('.mole-search');
+      search.value = 'zed';
+      search.dispatchEvent(new Event('input'));
+      expect(apps.querySelectorAll('.mole-item').length === 1, 'mole: the filter narrows the apps');
+      apps.querySelector('.mole-all input').click();
       sent.length = 0;
-      btn(t('mole.uninstall.run')).click();
-      const ok = document.querySelector('#modal .btn.primary, #modal .btn.danger');
+      btn(apps, t('mole.apps.remove')).click();
+      const ok = document.querySelector('#modal .btn.primary');
       if (ok) ok.click();
-      expect(sent.some((m) => m.name === 'mole_uninstall_run:Figma'), 'mole: uninstalling names the app after the confirmation: ' + JSON.stringify(sent));
+      expect(sent.some((m) => m.name === 'mole_remove:apps\n/Applications/Zed.app'), 'mole: only the filtered app is uninstalled: ' + JSON.stringify(sent));
       sent.length = 0;
-      document.querySelector('.mole-entry.dir').click();
-      expect(sent.some((m) => m.name === 'mole_analyze:/Users/me/Library'), 'mole: a folder opens when chosen: ' + JSON.stringify(sent));
-      expect(document.body.textContent.includes('2026-10-19'), 'mole: the history is listed');
-      S.mole.apps = null; S.mole.analyze = null; S.mole.history = null; runSyncs();
-      S.mole.busy = 'clean'; runSyncs();
-      expect(btn(t('mole.preview')).disabled, 'mole: buttons are off while it works');
-      S.mole.busy = null; runSyncs();
-      S.mole.installed = false; runSyncs();
-      expect(!!btn(t('mole.site')), 'mole: the missing card offers the site');
-      S.mole.installed = true; S.mole.status = null; S.mole.report = null; runSyncs();
+      section('analyze').querySelector('.mole-item .btn').click();
+      expect(sent.some((m) => m.name === 'mole_analyze:' + home + '/Library'), 'mole: a folder opens: ' + JSON.stringify(sent));
+      sent.length = 0;
+      btn(section('installers'), '').click();
+      expect(sent.some((m) => m.name === 'mole_scan:installers'), 'mole: each list has its own refresh: ' + JSON.stringify(sent));
+      sent.length = 0;
+      btn(document, t('mole.refresh.all')).click();
+      expect(sent.some((m) => m.name === 'mole_refresh'), 'mole: refresh all scans everything again');
+      S.mole.busy = ['remove']; runSyncs();
+      expect(btn(clean, t('mole.clean.remove')).disabled, 'mole: no second removal while one runs');
+      S.mole.clean = []; S.mole.busy = []; runSyncs();
+      expect(clean.textContent.includes(t('mole.clean.empty')), 'mole: an empty list says so');
+      S.mole.status = null; S.mole.clean = null; S.mole.purge = null; S.mole.apps = null; S.mole.analyze = null; runSyncs();
     },
   });
 })();
