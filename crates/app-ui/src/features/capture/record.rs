@@ -23,8 +23,8 @@ use std::{
 
 const FPS: u32 = 30;
 /// GIF frame delays are in hundredths of a second; 8 of them make exactly 12.5 frames per second.
-const GIF_FPS: f64 = 12.5;
-const GIF_MAX_WIDTH: f64 = 960.0;
+pub(crate) const GIF_FPS: f64 = 12.5;
+pub(crate) const GIF_MAX_WIDTH: f64 = 960.0;
 const STATUS_SECONDS: f64 = 0.5;
 /// A stopped recording that has not finished its file by then is given up on, so a new one can start.
 const STOP_TIMEOUT_SECONDS: f64 = 15.0;

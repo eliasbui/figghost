@@ -63,7 +63,7 @@ Cửa sổ cài đặt gom mọi tính năng dưới sáu biểu tượng trên 
 | --- | --- | --- |
 | Cuộn chuột | Scrolling | Cuộn bánh xe mượt với đường cong nhìn thấy được, đảo chiều chỉ cho chuột ngoài, phím bổ trợ để cuộn ngang, nhanh hơn và phóng to, cùng quy tắc riêng cho từng ứng dụng |
 | Con trỏ | Cursor | Mũi tên cầu vồng, nhân vật pixel hoặc ảnh, GIF bất kỳ làm con trỏ (tắt mặc định) |
-| Vòng kéo thả | Drag wheel | Một vòng quanh con trỏ khi bạn kéo tệp: đổi cỡ, nén, tách hoặc gộp PDF, chú thích, chép chữ trong ảnh, cắt chủ thể, xóa siêu dữ liệu |
+| Vòng kéo thả | Drag wheel | Một vòng quanh con trỏ khi bạn kéo tệp: đổi cỡ, nén, tách hoặc gộp PDF, chú thích, chép chữ trong ảnh, cắt chủ thể, xóa siêu dữ liệu, đổi video thành GIF |
 
 ### Notch & Tiện ích (Notch & Island)
 

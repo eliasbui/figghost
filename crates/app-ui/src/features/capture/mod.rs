@@ -6,7 +6,7 @@
 //! This folder belongs to one task. Shared code reaches it only through `features/mod.rs`, so everything the
 //! feature needs lives here, in `web/features/capture.*` and in its own files of `macos-sys`.
 
-mod record;
+pub(crate) mod record;
 mod scroll;
 pub mod settings;
 mod text;

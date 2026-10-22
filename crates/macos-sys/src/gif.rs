@@ -30,9 +30,13 @@ pub fn video_to_gif(
     let ticket = reply::expect(done);
     let (video, gif) = (video.to_owned(), gif.to_owned());
     std::thread::spawn(move || {
-        let result = autoreleasepool(|_| convert(&video, &gif, max_width, fps)).map(|()| gif);
-        ticket.send(result);
+        ticket.send(write_gif(&video, &gif, max_width, fps).map(|()| gif));
     });
+}
+
+/// Like `video_to_gif`, for a caller that is already on a worker thread and waits for the file.
+pub fn write_gif(video: &Path, gif: &Path, max_width: f64, fps: f64) -> Result<(), String> {
+    autoreleasepool(|_| convert(video, gif, max_width, fps))
 }
 
 fn file_url(path: &Path) -> Retained<NSURL> {

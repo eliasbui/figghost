@@ -9,7 +9,7 @@
   const SLOTS = {
     formats: [
       'image:to_png', 'image:to_jpeg', 'image:to_heic', 'image:to_tiff', 'image:to_avif', 'image:to_gif', 'image:to_bmp', 'image:to_pdf',
-      'video:to_mp4', 'video:to_mov', 'video:to_m4a',
+      'video:to_mp4', 'video:to_mov', 'video:to_gif', 'video:to_m4a',
       'audio:to_m4a', 'audio:to_wav', 'audio:to_aiff', 'audio:to_flac', 'audio:to_caf', 'audio:to_aac',
       'pdf:to_png', 'pdf:to_jpeg',
       'document:to_docx', 'document:to_doc', 'document:to_rtf', 'document:to_odt', 'document:to_html', 'document:to_txt', 'document:to_pdf',

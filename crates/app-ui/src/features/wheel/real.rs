@@ -494,6 +494,37 @@ fn the_video_slots_work_on_a_real_movie() {
 }
 
 #[test]
+fn a_video_becomes_a_gif_next_to_it_and_never_replaces_one() {
+    let dir = temp_dir();
+    let video = dir.join("silent.mov");
+    fs::write(
+        &video,
+        include_bytes!("../../../../macos-sys/testdata/silent.mov"),
+    )
+    .unwrap();
+    let paths = vec![video.clone()];
+    let Some(Plan::Jobs(jobs)) = plan("to_gif", &paths) else {
+        panic!("a video is offered a GIF");
+    };
+    assert_eq!(jobs[0].output, dir.join("silent.gif"));
+    shelf_actions::run(&jobs[0]).unwrap();
+    let gif = fs::read(&jobs[0].output).unwrap();
+    assert_eq!(&gif[..6], b"GIF89a");
+    assert!(gif.len() > 1000, "{} bytes", gif.len());
+    // Each frame starts with a graphic control extension.
+    let frames = gif.windows(2).filter(|w| w == &[0x21, 0xf9]).count();
+    assert!(frames > 1, "{frames} frames");
+    // A second run finds the name taken and picks the next one.
+    let Some(Plan::Jobs(again)) = plan("to_gif", &paths) else {
+        panic!();
+    };
+    assert_eq!(again[0].output, dir.join("silent 2.gif"));
+    shelf_actions::run(&again[0]).unwrap();
+    assert_eq!(fs::read(dir.join("silent.gif")).unwrap(), gif);
+    assert!(dir.join("silent 2.gif").exists());
+}
+
+#[test]
 fn the_main_thread_slots_are_planned_for_a_picture_and_not_run() {
     let image = vec![PathBuf::from("/x/a.png")];
     let Some(Plan::Main(MainAction::Annotate(path))) = plan("annotate", &image) else {
