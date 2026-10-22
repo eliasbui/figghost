@@ -1997,6 +1997,8 @@ function accessPill() {
   reg(() => {
     label.textContent = S.env.accessibility ? t('chip.access.ok') : t('chip.access.no');
     mark.classList.toggle('asleep', !S.env.accessibility);
+    // Granted is the normal state and says nothing; only the missing access is worth the room in the bar.
+    el.style.display = S.env.accessibility ? 'none' : '';
   });
   return el;
 }
@@ -2269,7 +2271,6 @@ function buildShell() {
           h('div', { id: 'subtabs', class: 'page-subtabs' }),
           h('p', { class: 'page-sub', id: 'subtitle' })),
         h('div', { id: 'scroller' }),
-        h('span', { class: 'wordmark', 'aria-hidden': 'true', text: 'figghost' }),
         h('div', { class: 'guide' },
           h('p', { class: 'bubble' }, h('span', { class: 'bubble-text', id: 'guide-text' })),
           h('button', { class: 'guide-ghost', 'aria-label': t('guide.label'), onclick: poke }, ghost()))),

@@ -1425,6 +1425,7 @@ html.reduce-motion *::after {
 #nav.dragging .lens { transition: transform 90ms ease-out, background var(--motion), box-shadow var(--motion); }
 
 html.reduce-transparency #nav,
+html.reduce-transparency .guide-ghost,
 html.reduce-transparency .top-search,
 html.reduce-transparency #search-results { background: var(--solid); -webkit-backdrop-filter: none; backdrop-filter: none; }
 html.reduce-transparency .lens { background: var(--fill); -webkit-backdrop-filter: none; backdrop-filter: none; }
@@ -1772,7 +1773,6 @@ html[data-sky="night"] { --aurora-1: rgba(112, 124, 238, 0.30); --aurora-2: rgba
 .feat-name,
 .hero-ghost h2,
 .empty,
-.wordmark,
 .bubble,
 .status-pill {
   font-family: var(--hand);
@@ -1786,18 +1786,15 @@ html[data-sky="night"] { --aurora-1: rgba(112, 124, 238, 0.30); --aurora-2: rgba
 /* Holds the SVG filter of the ghost; it draws nothing itself. */
 .defs { position: absolute; width: 0; height: 0; overflow: hidden; }
 
-/* The wordmark in the bottom left corner, quiet, opposite the ghost. */
-.wordmark {
-  position: absolute;
-  left: 18px;
-  bottom: 14px;
-  z-index: 4;
-  font-size: 17px;
-  line-height: 1;
-  color: var(--text-3);
-  pointer-events: none;
+/* The bottom row: the dock and the ghost are pieces of the same glass, level with each other, so nothing that
+   scrolls underneath shows through them. */
+.guide-ghost {
+  background: var(--bar-glass);
+  border: 0.5px solid var(--bar-edge);
+  -webkit-backdrop-filter: blur(30px) saturate(200%);
+  backdrop-filter: blur(30px) saturate(200%);
+  box-shadow: var(--bar-shadow), inset 0 1px 0 var(--card-hi);
 }
-.wordmark::after { content: "."; color: var(--tint); }
 
 /* The ghost, drawn once (app.js GHOST_SVG) and used at every size. The filter wobbles the outline a little, as a
    pen would. */
@@ -1830,19 +1827,19 @@ html[data-sky="night"] { --aurora-1: rgba(112, 124, 238, 0.30); --aurora-2: rgba
 .guide {
   position: absolute;
   right: 18px;
-  bottom: 14px;
+  bottom: 24px;
   z-index: 4;
 }
 .guide-ghost {
-  display: block;
-  width: 30px;
-  height: 34px;
+  display: grid;
+  place-items: center;
+  width: 40px;
+  height: 40px;
   padding: 0;
-  border: 0;
-  background: none;
+  border-radius: 50%;
   cursor: pointer;
 }
-.guide-ghost .ghost-wrap { width: 100%; height: 100%; }
+.guide-ghost .ghost-wrap { width: 22px; height: 25px; }
 .bubble {
   position: absolute;
   right: 0;
