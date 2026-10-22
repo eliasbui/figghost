@@ -560,6 +560,13 @@ impl Language {
         }
     }
 
+    pub fn menu_check_updates(self) -> &'static str {
+        match self {
+            Language::English => "Check for updates...",
+            Language::Vietnamese => "Kiểm tra cập nhật...",
+        }
+    }
+
     pub fn menu_quit(self) -> &'static str {
         match self {
             Language::English => "Quit",

@@ -63,6 +63,7 @@ pub mod symbols {
         CLEAR_HISTORY = "trash",
         LOGIN = "power",
         OPEN_CONFIG = "folder",
+        CHECK_UPDATES = "arrow.down.circle",
         QUIT = "xmark.rectangle",
         CAPTURE = "camera.viewfinder",
         CAPTURE_AREA = "rectangle.dashed",
@@ -288,6 +289,11 @@ pub fn build(ctx: &AppContext, settings: &Rc<SettingsFeature>) -> StatusMenu {
         entries.extend(extra);
     }
     entries.push(Entry::Separator);
+    let update = Rc::clone(&ctx.update);
+    entries.push(Entry::Item(
+        Item::new(text.menu_check_updates(), move || update.check_from_menu())
+            .symbol(symbols::CHECK_UPDATES),
+    ));
     entries.push(Entry::Item(
         Item::new(text.menu_quit(), move || app::quit(mtm)).symbol(symbols::QUIT),
     ));
