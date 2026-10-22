@@ -81,6 +81,13 @@ pub struct Request {
     pub ffmpeg: Option<PathBuf>,
 }
 
+impl Request {
+    /// A sound asked for without ffmpeg: yt-dlp keeps the m4a as the site served it, in fragments.
+    fn is_bare_sound(&self) -> bool {
+        self.quality == Quality::Audio && self.ffmpeg.is_none()
+    }
+}
+
 struct Entry {
     job: Job,
     /// Taken when the download starts.
@@ -294,7 +301,7 @@ fn run(shared: &Arc<Mutex<Inner>>, id: u64, request: Request) {
     let temp = temp_dir(&request.folder, id);
     let mut outcome = fetch(shared, id, &request, &temp);
     if outcome.success
-        && let Err(why) = join_parts(shared, id, &temp)
+        && let Err(why) = join_parts(shared, id, &temp, request.is_bare_sound())
     {
         outcome = Outcome {
             success: false,
@@ -408,8 +415,10 @@ fn fetch(shared: &Arc<Mutex<Inner>>, id: u64, request: &Request, temp: &Path) ->
 
 /// yt-dlp without ffmpeg leaves a picture and a sound apart and still names the joined file, which is not there: this
 /// makes the one file of them with AVFoundation, without encoding, and removes the two. Failing keeps both, since they are
-/// what was downloaded. The words of the error are the person's to read.
-fn join_parts(shared: &Mutex<Inner>, id: u64, temp: &Path) -> Result<(), String> {
+/// what was downloaded. The words of the error are the person's to read. A sound asked for (`bare_sound`) is a single m4a
+/// that is written again the same way, since the fragmented one of a site is not counted right by every player; the file
+/// as downloaded stays when that fails.
+fn join_parts(shared: &Mutex<Inner>, id: u64, temp: &Path, bare_sound: bool) -> Result<(), String> {
     let (reported, cancelled) = {
         let mut inner = lock(shared);
         inner
@@ -422,6 +431,20 @@ fn join_parts(shared: &Mutex<Inner>, id: u64, temp: &Path) -> Result<(), String>
     };
     if cancelled {
         return Ok(());
+    }
+    if bare_sound {
+        for sound in reported
+            .iter()
+            .filter(|p| p.extension().is_some_and(|e| e == "m4a") && p.is_file())
+        {
+            update(shared, id, |e| e.job.status = Status::Joining);
+            let tidy = temp.join("tidy.m4a");
+            macos_sys::mux::rewrite_sound(sound, &tidy)
+                .and_then(|()| fs::rename(&tidy, sound).map_err(|e| e.to_string()))
+                .map_err(|why| {
+                    format!("The sound could not be written again as a plain m4a ({why}). The file is kept as it was downloaded and may show the wrong length in some players.")
+                })?;
+        }
     }
     for reported in reported.into_iter().filter(|p| !p.exists()) {
         let Some(parts) = logic::find_parts(&reported) else {
@@ -549,6 +572,18 @@ case "$url" in
     cp "$0.sample" "$home/A fake video [joinable].f133.mp4"
     echo audio > "$home/A fake video [joinable].f140.m4a"
     echo "FGFILE|$home/A fake video [joinable].mp4"
+    ;;
+  *badtune)
+    echo "FGINFO|A tune"
+    echo "FGDL|finished|10|10|NA|1|NA"
+    echo notasound > "$home/A tune [badtune].m4a"
+    echo "FGFILE|$home/A tune [badtune].m4a"
+    ;;
+  *tune)
+    echo "FGINFO|A tune"
+    echo "FGDL|finished|10|10|NA|1|NA"
+    cp "$0.tune" "$home/A tune [tune].m4a"
+    echo "FGFILE|$home/A tune [tune].m4a"
     ;;
 esac
 "#
@@ -815,6 +850,39 @@ esac
     }
 
     #[test]
+    fn a_sound_without_ffmpeg_is_written_again_and_one_that_cannot_be_stays_as_downloaded() {
+        let dir = Dir::new("tune");
+        let folder = dir.0.join("out");
+        fs::create_dir(&folder).unwrap();
+        let program = fake(&dir, 1);
+        let sample = dir.0.join("sample.mov");
+        fs::copy(dir.0.join("yt-dlp.sample"), &sample).unwrap();
+        // AVFoundation tells the kind of a file by its extension, so the tune is written under the one it will have.
+        macos_sys::mux::rewrite_sound(&sample, &dir.0.join("tune.m4a")).unwrap();
+        fs::rename(dir.0.join("tune.m4a"), dir.0.join("yt-dlp.tune")).unwrap();
+        let engine = Engine::default();
+        let mut asked = request(&program, &folder, "https://fake.test/tune");
+        asked.quality = Quality::Audio;
+        let job = wait_for(&engine, engine.submit(asked), |j| j.status.over());
+        assert_eq!(job.status, Status::Done, "{job:?}");
+        let file = folder.join("A tune [tune].m4a");
+        assert_eq!(job.file.as_ref(), Some(&file));
+        let tracks = macos_sys::mux::tracks(&file).expect("the sound opens");
+        assert_eq!((tracks.video, tracks.audio), (0, 1));
+
+        let mut asked = request(&program, &folder, "https://fake.test/badtune");
+        asked.quality = Quality::Audio;
+        let job = wait_for(&engine, engine.submit(asked), |j| j.status.over());
+        assert_eq!(job.status, Status::Failed, "{job:?}");
+        let error = job.error.unwrap();
+        assert!(error.contains("kept as it was downloaded"), "{error}");
+        let bad = folder.join("A tune [badtune].m4a");
+        assert_eq!(fs::read_to_string(bad).unwrap(), "notasound\n");
+        let left = fs::read_dir(&folder).unwrap().count();
+        assert_eq!(left, 2, "no work folder is left");
+    }
+
+    #[test]
     fn parts_that_cannot_be_joined_fail_the_download_and_stay_in_the_folder() {
         let dir = Dir::new("nojoin");
         let program = fake(&dir, 1);
@@ -848,7 +916,8 @@ esac
 
     /// The one real download: `cargo test -p app-ui real_download -- --ignored --nocapture`, with `FIGGHOST_TEST_URL` to try
     /// another link than the first video of YouTube and `FIGGHOST_TEST_QUALITY` (`best`, `1080`, `720`, `audio`) for
-    /// another quality than the best. It uses the yt-dlp that is installed and a folder of its own.
+    /// another quality than the best, and `FIGGHOST_TEST_KEEP` for a path to copy the file to before the folder goes. It
+    /// uses the yt-dlp that is installed and a folder of its own.
     #[test]
     #[ignore = "needs the network and an installed yt-dlp"]
     fn real_download_saves_a_video_with_the_installed_yt_dlp() {
@@ -886,6 +955,9 @@ esac
         let file = job.file.expect("the file is named");
         assert!(file.starts_with(&dir.0));
         assert!(fs::metadata(&file).unwrap().len() > 1000);
+        if let Ok(keep) = std::env::var("FIGGHOST_TEST_KEEP") {
+            fs::copy(&file, keep).unwrap();
+        }
         let left: Vec<String> = fs::read_dir(&dir.0)
             .unwrap()
             .map(|e| e.unwrap().file_name().to_string_lossy().into_owned())
