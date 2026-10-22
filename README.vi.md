@@ -10,13 +10,15 @@
 </p>
 
 <p align="center">
-  <a href="README.md">English</a> | Tiếng Việt
+  <a href="README.md"><img src="https://img.shields.io/badge/English-grey?style=for-the-badge" alt="English"></a>
+  <a href="README.vi.md"><img src="https://img.shields.io/badge/Ti%E1%BA%BFng%20Vi%E1%BB%87t-blue?style=for-the-badge" alt="Tiếng Việt (hiện tại)"></a>
 </p>
 
 <p align="center">
   <a href="https://github.com/eliasbui/figghost/releases/latest"><img src="https://img.shields.io/github/v/release/eliasbui/figghost?label=release" alt="Bản phát hành mới nhất"></a>
   <img src="https://img.shields.io/badge/macOS-13%2B-black" alt="macOS 13 trở lên">
   <img src="https://img.shields.io/badge/Apple%20silicon-arm64-black" alt="Apple silicon">
+  <a href="#windows-và-linux-beta"><img src="https://img.shields.io/badge/Windows%20and%20Linux-beta-orange" alt="Windows và Linux: beta"></a>
   <a href="LICENSE"><img src="https://img.shields.io/badge/license-MIT-blue" alt="Giấy phép MIT"></a>
 </p>
 
@@ -26,6 +28,8 @@
 
 Figghost viết bằng Rust với lớp vỏ AppKit thuần (các crate `objc2`). Cửa sổ cài đặt là một trang web trên cửa sổ Liquid Glass; mọi quy tắc phía sau đều nằm trong mã Rust có kiểm thử. Ứng dụng chạy trên thanh menu, dùng khoảng 25 MB khi cửa sổ cài đặt đóng, và có tiếng Anh lẫn tiếng Việt.
 
+Đã có **bản beta đầu tiên cho Windows và Linux** gồm biểu tượng ở khay hệ thống, lịch sử clipboard, ghi chú, AI agents và MCP server; notch và các tính năng macOS khác chưa có. Xem [Windows và Linux (beta)](#windows-và-linux-beta).
+
 ## Mục lục
 
 - [Danh sách tính năng](#danh-sách-tính-năng)
@@ -34,6 +38,7 @@ Figghost viết bằng Rust với lớp vỏ AppKit thuần (các crate `objc2`)
 - [Tính năng chi tiết](#tính-năng-chi-tiết)
 - [Cài đặt](#cài-đặt)
 - [Build và chạy](#build-và-chạy)
+- [Windows và Linux (beta)](#windows-và-linux-beta)
 - [Thiết kế](#thiết-kế)
 - [Cấu hình](#cấu-hình)
 - [Dữ liệu và riêng tư](#dữ-liệu-và-riêng-tư)
@@ -358,6 +363,39 @@ Quyền Trợ năng gắn với chữ ký mã của ứng dụng. Chữ ký ad h
 Quyền Trợ năng cần cho cuộn mượt, dán tự động, chia cửa sổ, giữ cửa sổ luôn trên cùng và chỉ báo âm lượng. Không có nó ứng dụng vẫn chạy: cửa sổ clipboard và notch hoạt động, các mục được chép để dán thủ công, và bộ cuộn tự khởi động khi quyền được cấp. Music và Spotify hỏi một lần xin phép để tab Media đọc được.
 
 Biểu tượng ứng dụng được vẽ bằng mã: `cargo run -p macos-sys --example make_icon -- X.iconset`, rồi `iconutil -c icns X.iconset -o crates/app-ui/assets/Figghost.icns`.
+
+## Windows và Linux (beta)
+
+Figghost cho Windows 10, 11 và Linux đang là **bản beta**. Đây là một chương trình riêng, `figghost` (`crates/desktop`), dùng chung phần Rust đã có kiểm thử với bản macOS (`core-clipboard`, `core-agents`, `core-notes`): một biểu tượng ở khay hệ thống và một cửa sổ là trang web chạy trong web view của hệ thống (WebView2 trên Windows, WebKitGTK trên Linux). Chưa có bộ cài và bản build có chữ ký: hãy build từ mã nguồn như bên dưới.
+
+Có trong bản beta:
+
+- Biểu tượng và menu ở khay hệ thống; đóng cửa sổ là cửa sổ được giải phóng hẳn, nên app nằm ở khay tốn rất ít tài nguyên.
+- Lịch sử clipboard: chữ, liên kết, mã và tệp, và ảnh trên Windows. Ô tìm kiếm nhận cùng bộ lọc như trên macOS (`@link`, `@code`, `@text`, `@image`, `@file`, `@pin`), có ghim và xoá từng mục, và một phím tắt toàn cục (mặc định `ctrl+alt+KeyV`) để mở lịch sử. Nội dung trông giống mật khẩu hoặc khoá được ẩn và xoá sau một giờ, hoặc không bao giờ giữ, hoặc giữ, tuỳ lựa chọn; trên Windows, nội dung trình quản lý mật khẩu đánh dấu riêng tư không bao giờ được đọc.
+- Ghi chú, mỗi ghi chú là một tệp văn bản trong thư mục `notes` của thư mục dữ liệu; ghi chú bị xoá được chuyển vào thùng rác.
+- AI agents: cài và gỡ hook của Claude Code và Codex (và pi, trên Linux), xem các phiên làm việc và trạng thái của từng phiên, cho phép hoặc từ chối các lệnh đang chờ quyền ngay trong cửa sổ.
+- MCP server, `figghost --mcp`, tắt cho đến khi bật trong cài đặt.
+- Mở khi đăng nhập, tiếng Anh và tiếng Việt, giao diện sáng và tối.
+
+Chưa có trong bản beta: notch và các tab, cuộn mượt, snap cửa sổ, âm thanh theo từng app, chụp màn hình, Smart Select, drag wheel, gõ tiếng Việt và các tính năng macOS khác. Mỗi tính năng cần gì trên Windows và Linux được ghi trong [docs/research-linux-windows.md](docs/research-linux-windows.md).
+
+Giới hạn đã biết của bản beta:
+
+- Clipboard được đọc hai lần mỗi giây, không theo từng thay đổi.
+- Trên Linux, lịch sử giữ chữ và tệp, chưa giữ ảnh, và nội dung trình quản lý mật khẩu đánh dấu bí mật không được nhận ra (cài đặt cho mật khẩu là lớp bảo vệ).
+- Trên Wayland, phím tắt toàn cục chỉ chạy khi một app X11 đang được focus: hãy gán một phím trong cài đặt của desktop để chạy lệnh `figghost`, vì lần chạy thứ hai sẽ hiện cửa sổ của app đang chạy. GNOME chỉ hiện biểu tượng ở khay khi có extension AppIndicator.
+- Trên Windows, Claude Code chạy hook bằng Git Bash (vốn là yêu cầu của Claude Code); pi chưa hỗ trợ trên Windows.
+
+Build trên Linux (tên gói của Debian và Ubuntu):
+
+    sudo apt install libwebkit2gtk-4.1-dev libgtk-3-dev libayatana-appindicator3-dev libxdo-dev libsqlite3-dev
+    cargo build --release -p figghost-desktop        # target/release/figghost
+
+Build trên Windows, với Rust cho MSVC (WebView2 có sẵn trên Windows 11; trên Windows 10 có thể phải cài thêm):
+
+    cargo build --release -p figghost-desktop        # target\release\figghost.exe
+
+`figghost --background` mở app ở khay mà không hiện cửa sổ. Dữ liệu nằm ở `%APPDATA%\Figghost` trên Windows và `$XDG_DATA_HOME/figghost` (`~/.local/share/figghost`) trên Linux, cùng các tệp như trên macOS (`config.json`, `history.sqlite`, `images`, `notes`); biến `FIGGHOST_HOME` đổi sang chỗ khác. `scripts/check-desktop-linux.sh` build và chạy test bản beta trong Docker, mở app trên một màn hình ảo và chụp ảnh cửa sổ; thêm `--windows` để build cả `figghost.exe` bằng MinGW.
 
 ## Thiết kế
 

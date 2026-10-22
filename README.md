@@ -10,13 +10,15 @@
 </p>
 
 <p align="center">
-  English | <a href="README.vi.md">Tiếng Việt</a>
+  <a href="README.md"><img src="https://img.shields.io/badge/English-blue?style=for-the-badge" alt="English (current)"></a>
+  <a href="README.vi.md"><img src="https://img.shields.io/badge/Ti%E1%BA%BFng%20Vi%E1%BB%87t-grey?style=for-the-badge" alt="Tiếng Việt"></a>
 </p>
 
 <p align="center">
   <a href="https://github.com/eliasbui/figghost/releases/latest"><img src="https://img.shields.io/github/v/release/eliasbui/figghost?label=release" alt="Latest release"></a>
   <img src="https://img.shields.io/badge/macOS-13%2B-black" alt="macOS 13 or later">
   <img src="https://img.shields.io/badge/Apple%20silicon-arm64-black" alt="Apple silicon">
+  <a href="#windows-and-linux-beta"><img src="https://img.shields.io/badge/Windows%20and%20Linux-beta-orange" alt="Windows and Linux: beta"></a>
   <a href="LICENSE"><img src="https://img.shields.io/badge/license-MIT-blue" alt="MIT License"></a>
 </p>
 
@@ -26,6 +28,8 @@
 
 Figghost is written in Rust with a pure AppKit shell (the `objc2` crates). The settings window is a web page on a Liquid Glass window; every rule behind it lives in tested Rust. It runs in the menu bar, uses about 25 MB with the settings window closed, and is available in English and Vietnamese.
 
+A first **beta for Windows and Linux** has the tray icon, the clipboard history, notes, the AI agents and the MCP server; the notch and the other macOS features are not in it yet. See [Windows and Linux (beta)](#windows-and-linux-beta).
+
 ## Contents
 
 - [Feature list](#feature-list)
@@ -34,6 +38,7 @@ Figghost is written in Rust with a pure AppKit shell (the `objc2` crates). The s
 - [Features in detail](#features-in-detail)
 - [Install](#install)
 - [Build and run](#build-and-run)
+- [Windows and Linux (beta)](#windows-and-linux-beta)
 - [Design](#design)
 - [Configuration](#configuration)
 - [Data and privacy](#data-and-privacy)
@@ -358,6 +363,39 @@ Accessibility access is tied to the code signature of the app. The default ad-ho
 Accessibility is needed for smooth scrolling, automatic paste, window snapping, keeping a window on top and the volume indicator. Without it the app still runs: the popup and the notch work, items are copied for a manual paste, and the scroll engine starts by itself once access is granted. Music and Spotify ask once for permission to be read by the media tab.
 
 The app icon is drawn by code: `cargo run -p macos-sys --example make_icon -- X.iconset`, then `iconutil -c icns X.iconset -o crates/app-ui/assets/Figghost.icns`.
+
+## Windows and Linux (beta)
+
+Figghost for Windows 10 and 11 and for Linux is a **beta**. It is a program of its own, `figghost` (`crates/desktop`), built on the same tested Rust as the macOS app (`core-clipboard`, `core-agents`, `core-notes`): an icon in the tray and one window, which is a web page in the system's web view (WebView2 on Windows, WebKitGTK on Linux). There is no installer and no signed build yet: build it from source as below.
+
+In the beta:
+
+- The tray icon and its menu; the window goes away entirely when it is closed, so the app costs little in the tray.
+- Clipboard history: text, links, code and files, and pictures on Windows. The search takes the same filters as on macOS (`@link`, `@code`, `@text`, `@image`, `@file`, `@pin`), items can be pinned and deleted, and a global shortcut (`ctrl+alt+KeyV` by default) opens the history. A copy that looks like a password or a key is hidden and deleted after an hour, or never kept, or kept, as chosen; on Windows what a password manager marks as private is never read.
+- Notes, each a plain text file in the `notes` folder of the data directory; a deleted note goes to the trash.
+- AI agents: installing and removing the hooks of Claude Code and Codex (and pi, on Linux), the sessions and what each is doing, and the commands that wait for permission, allowed or denied from the window.
+- The MCP server, `figghost --mcp`, off until it is turned on in the settings.
+- Start at login, English and Vietnamese, light and dark.
+
+Not in the beta yet: the notch and its tabs, smooth scrolling, window snapping, per-app sound, capture, Smart Select, the drag wheel, Vietnamese typing and the other macOS features. What each would take on Windows and on Linux is in [docs/research-linux-windows.md](docs/research-linux-windows.md).
+
+Known limits of the beta:
+
+- The clipboard is read twice a second, not at each change.
+- On Linux the history keeps text and files, not pictures, and a copy that a password manager marks as secret is not told apart from another one (the setting for passwords is the guard).
+- Under Wayland the global shortcut only fires while an X11 app has the focus: bind a key in the desktop's settings to the command `figghost` instead, since a second start shows the window of the running one. GNOME shows the tray icon only with the AppIndicator extension.
+- On Windows, Claude Code runs its hooks in Git Bash, which it needs anyway; pi is not supported there yet.
+
+Build on Linux (Debian and Ubuntu package names):
+
+    sudo apt install libwebkit2gtk-4.1-dev libgtk-3-dev libayatana-appindicator3-dev libxdo-dev libsqlite3-dev
+    cargo build --release -p figghost-desktop        # target/release/figghost
+
+Build on Windows, with Rust for MSVC (WebView2 comes with Windows 11; on Windows 10 it may have to be installed):
+
+    cargo build --release -p figghost-desktop        # target\release\figghost.exe
+
+`figghost --background` starts in the tray without the window. The data is in `%APPDATA%\Figghost` on Windows and in `$XDG_DATA_HOME/figghost` (`~/.local/share/figghost`) on Linux, with the same files as on macOS (`config.json`, `history.sqlite`, `images`, `notes`); `FIGGHOST_HOME` points it elsewhere. `scripts/check-desktop-linux.sh` builds and tests the beta in Docker, starts it on a virtual screen and takes a picture of the window; with `--windows` it also builds `figghost.exe` with MinGW.
 
 ## Design
 
