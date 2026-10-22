@@ -14,7 +14,6 @@ mod focus_timer;
 mod history;
 mod i18n;
 mod live_media;
-mod mcp;
 mod media;
 mod menu;
 mod mouse;
@@ -64,7 +63,10 @@ fn main() {
     // An AI assistant starts the app this way to talk to it over standard input and output: no window,
     // no AppKit, and nothing on stdout but the protocol.
     if std::env::args().any(|a| a == "--mcp") {
-        std::process::exit(mcp::run(&home));
+        let dir = home.clone();
+        std::process::exit(core_clipboard::mcp::run(&home, move || {
+            Config::load(&dir).0.mcp.enabled
+        }));
     }
     let mtm = MainThreadMarker::new().expect("main() must run on the main thread");
     let (config, note) = Config::load(&home);

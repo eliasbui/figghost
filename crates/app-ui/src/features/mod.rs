@@ -12,9 +12,9 @@ use serde_json::{Map, Value};
 use std::{
     collections::HashMap,
     fs,
-    io::{self, Read, Write},
+    io::{self, Read},
     os::unix::process::CommandExt,
-    path::{Path, PathBuf},
+    path::Path,
     process::{Command, Stdio},
     rc::{Rc, Weak},
     sync::{Arc, Mutex, PoisonError, mpsc},
@@ -117,32 +117,7 @@ pub(crate) fn read_small(path: &Path, max: u64) -> Option<String> {
     (text.len() as u64 <= max).then_some(text)
 }
 
-/// Writes `text` to `path` through a file of its own (`<name>.part`, made new so that a link left at that name is not
-/// followed, and flushed to the disk) and then renames it over the target, so that a crash or a full disk never leaves
-/// half of what was there, nor an empty file after a power cut.
-pub(crate) fn write_atomically(path: &Path, text: &str) -> io::Result<()> {
-    if let Some(dir) = path.parent() {
-        fs::create_dir_all(dir)?;
-    }
-    let mut name = path.as_os_str().to_owned();
-    name.push(".part");
-    let partial = PathBuf::from(name);
-    // What stands at that name, a leftover of a crash or a link somebody put there, goes first.
-    let _ = fs::remove_file(&partial);
-    let written = fs::OpenOptions::new()
-        .write(true)
-        .create_new(true)
-        .open(&partial)
-        .and_then(|mut file| {
-            file.write_all(text.as_bytes())?;
-            file.sync_all()
-        });
-    written
-        .and_then(|()| fs::rename(&partial, path))
-        .inspect_err(|_| {
-            let _ = fs::remove_file(&partial);
-        })
-}
+pub(crate) use core_notes::write_atomically;
 
 /// Why a command gave no answer.
 #[derive(Debug, Clone, Copy, PartialEq, Eq)]

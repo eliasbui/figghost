@@ -1182,6 +1182,7 @@ mod tests {
         assert_eq!(summary.week.messages, 4_001);
     }
 
+    #[cfg(unix)]
     #[test]
     fn transcripts_are_found_in_sessions_agents_and_workflows_but_links_are_not_followed() {
         let dir = scratch("layout");

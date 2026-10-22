@@ -4,12 +4,12 @@
 //! It is off until the user turns it on in the settings, and the setting is read on every call, so turning
 //! it off takes effect at once without restarting the assistant. It only reads the history.
 
-use crate::{config::Config, history::ago, i18n::Language};
-use core_clipboard::{Item, Kind, Payload, Store};
+use crate::{Item, Kind, Payload, Store};
 use serde_json::{Value, json};
 use std::{
     io::{self, BufRead, Write},
     path::Path,
+    time::{SystemTime, UNIX_EPOCH},
 };
 
 const SERVER_NAME: &str = "figghost";
@@ -77,13 +77,32 @@ fn describe(item: &Item, now: i64) -> String {
     if let Some(app) = &item.app_name {
         tags.push(format!("from {app}"));
     }
-    tags.push(ago(Language::English, now, item.used_at));
+    tags.push(ago(now, item.used_at));
     let body = match item.kind {
         _ if item.masked => "(hidden: a likely secret is not shared with assistants)".to_owned(),
         Kind::Image => format!("image {}x{} pixels", item.width, item.height),
         _ => item.preview.clone(),
     };
     format!("#{} [{}]\n{}", item.id, tags.join(", "), body)
+}
+
+/// How long ago, in English: what an assistant reads.
+fn ago(now: i64, then: i64) -> String {
+    let seconds = ((now - then) / 1000).max(0);
+    let (n, unit) = match seconds {
+        0..=44 => return "just now".into(),
+        45..=3599 => ((seconds / 60).max(1), "minute"),
+        3600..=86_399 => (seconds / 3600, "hour"),
+        86_400..=2_591_999 => (seconds / 86_400, "day"),
+        _ => (seconds / 2_592_000, "month"),
+    };
+    format!("{n} {unit}{} ago", if n == 1 { "" } else { "s" })
+}
+
+fn now_ms() -> i64 {
+    SystemTime::now()
+        .duration_since(UNIX_EPOCH)
+        .map_or(0, |d| d.as_millis() as i64)
 }
 
 fn search(store: &Store, arguments: &Value, now: i64) -> Value {
@@ -202,8 +221,9 @@ pub fn handle(
     Some(json!({ "jsonrpc": "2.0", "id": id, "result": result }))
 }
 
-/// Serves requests from stdin until it closes. Returns the process exit code.
-pub fn run(home: &Path) -> i32 {
+/// Serves requests from stdin until it closes, on the history kept in `home`. `enabled` reads the switch of the
+/// settings. Returns the process exit code.
+pub fn run(home: &Path, enabled: impl Fn() -> bool) -> i32 {
     let store = match Store::open(home) {
         Ok(store) => store,
         Err(e) => {
@@ -211,8 +231,6 @@ pub fn run(home: &Path) -> i32 {
             return 1;
         }
     };
-    let home = home.to_path_buf();
-    let enabled = move || Config::load(&home).0.mcp.enabled;
     let stdin = io::stdin();
     let mut out = io::stdout().lock();
     for line in stdin.lock().lines() {
@@ -223,7 +241,7 @@ pub fn run(home: &Path) -> i32 {
             continue;
         }
         let response = match serde_json::from_str::<Value>(&line) {
-            Ok(request) => handle(&store, &enabled, crate::history::now_ms(), &request),
+            Ok(request) => handle(&store, &enabled, now_ms(), &request),
             Err(_) => Some(error_response(&Value::Null, -32700, "Parse error")),
         };
         if let Some(response) = response
@@ -238,7 +256,7 @@ pub fn run(home: &Path) -> i32 {
 #[cfg(test)]
 mod tests {
     use super::*;
-    use core_clipboard::Capture;
+    use crate::Capture;
     use std::{cell::Cell, env, fs, path::PathBuf};
 
     fn temp_dir(tag: &str) -> PathBuf {
@@ -454,7 +472,7 @@ mod tests {
                     rich: None,
                 },
                 1,
-                core_clipboard::Sensitivity::Mask { minutes: 10 },
+                crate::Sensitivity::Mask { minutes: 10 },
             )
             .unwrap()
             .unwrap();

@@ -7,7 +7,6 @@ use rusqlite::{Connection, OptionalExtension, params, params_from_iter, types::V
 use std::{
     collections::HashSet,
     fmt, fs, io,
-    os::unix::fs::DirBuilderExt,
     path::{Path, PathBuf},
 };
 
@@ -286,13 +285,13 @@ fn check_board_name(name: &str) -> std::result::Result<(String, String), BoardEr
 }
 
 fn copy_private(from: &Path, to: &Path) -> io::Result<()> {
-    use std::os::unix::fs::OpenOptionsExt;
     let mut source = fs::File::open(from)?;
-    let mut target = fs::OpenOptions::new()
-        .write(true)
-        .create_new(true)
-        .mode(0o600)
-        .open(to)?;
+    let mut options = fs::OpenOptions::new();
+    options.write(true).create_new(true);
+    // Windows keeps the data folder private through the ACL of the user profile.
+    #[cfg(unix)]
+    std::os::unix::fs::OpenOptionsExt::mode(&mut options, 0o600);
+    let mut target = options.open(to)?;
     io::copy(&mut source, &mut target)?;
     target.sync_all()
 }
@@ -315,10 +314,11 @@ impl Store {
     pub fn open(dir: &Path) -> Result<Self> {
         let images = dir.join("images");
         // History can hold secrets that bypassed the concealed-type convention: owner-only access.
-        fs::DirBuilder::new()
-            .recursive(true)
-            .mode(0o700)
-            .create(&images)?;
+        let mut folder = fs::DirBuilder::new();
+        folder.recursive(true);
+        #[cfg(unix)]
+        std::os::unix::fs::DirBuilderExt::mode(&mut folder, 0o700);
+        folder.create(&images)?;
         let conn = Connection::open(dir.join("history.sqlite"))?;
         // Before anything touches the file, not even the journal mode.
         Self::back_up_before_upgrade(&conn, dir)?;
@@ -1378,6 +1378,7 @@ mod tests {
         assert_eq!(columns, 0, "the copy is the version 2 file");
     }
 
+    #[cfg(unix)]
     #[test]
     fn the_backup_is_written_once_and_kept_private() {
         use std::os::unix::fs::PermissionsExt;

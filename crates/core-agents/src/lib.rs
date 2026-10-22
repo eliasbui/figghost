@@ -12,6 +12,15 @@ pub mod tracker;
 pub mod usage;
 pub mod wire;
 
+/// The local socket of the hooks. Windows 10 1803 and later have AF_UNIX too, but the standard library does not
+/// expose it there.
+mod sock {
+    #[cfg(unix)]
+    pub use std::os::unix::net::{UnixListener, UnixStream};
+    #[cfg(windows)]
+    pub use uds_windows::{UnixListener, UnixStream};
+}
+
 pub use event::{Agent, EventKind, HookEvent, parse_event};
 pub use wire::Reply;
 

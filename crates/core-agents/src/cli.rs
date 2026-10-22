@@ -5,6 +5,7 @@
 
 use crate::{
     event::{Agent, EventKind, parse_event},
+    sock::UnixStream,
     usage::{self, CLAUDE_USAGE_FILE},
     wire,
 };
@@ -12,7 +13,6 @@ use serde_json::Value;
 use std::{
     fs,
     io::{BufRead, BufReader, Read, Write},
-    os::unix::net::UnixStream,
     path::Path,
     process::{Command, Stdio},
     time::Duration,
@@ -95,7 +95,9 @@ pub fn run_hook(
 }
 
 fn run_chain(command: &str, input: &[u8], stdout: &mut impl Write) -> i32 {
-    let Ok(mut child) = Command::new("/bin/sh")
+    // On Windows the agents run their hooks in Git Bash, whose `sh` is on the PATH.
+    let shell = if cfg!(windows) { "sh" } else { "/bin/sh" };
+    let Ok(mut child) = Command::new(shell)
         .arg("-c")
         .arg(command)
         .stdin(Stdio::piped())

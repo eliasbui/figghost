@@ -769,6 +769,7 @@ mod tests {
         assert_eq!(doc, original);
     }
 
+    #[cfg(unix)]
     #[test]
     fn files_are_backed_up_once_and_keep_their_permissions() {
         use std::os::unix::fs::PermissionsExt;
@@ -892,6 +893,7 @@ mod tests {
         let _ = fs::remove_dir_all(&root);
     }
 
+    #[cfg(unix)]
     #[test]
     fn the_command_runs_in_a_shell_even_when_the_path_has_spaces_and_quotes() {
         use std::os::unix::fs::PermissionsExt;

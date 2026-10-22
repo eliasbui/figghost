@@ -1,6 +1,7 @@
 #![forbid(unsafe_code)]
 //! Maccy engine: capture policy, content classification and the SQLite history store.
 
+pub mod mcp;
 mod search;
 mod sensitive;
 mod store;

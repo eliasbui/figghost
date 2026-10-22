@@ -16,7 +16,6 @@ use serde_json::{Map, Value, json};
 use std::{
     fs,
     io::{self, Write},
-    os::unix::fs::{DirBuilderExt, OpenOptionsExt},
     path::{Path, PathBuf},
 };
 
@@ -402,11 +401,12 @@ fn write_private(path: &Path, bytes: &[u8]) -> io::Result<()> {
     let mut name = path.as_os_str().to_owned();
     name.push(format!(".figghost-{}.tmp", std::process::id()));
     let temp = PathBuf::from(name);
-    let written = fs::OpenOptions::new()
-        .write(true)
-        .create(true)
-        .truncate(true)
-        .mode(0o600)
+    let mut options = fs::OpenOptions::new();
+    options.write(true).create(true).truncate(true);
+    // Windows keeps the user's folders private through their ACL.
+    #[cfg(unix)]
+    std::os::unix::fs::OpenOptionsExt::mode(&mut options, 0o600);
+    let written = options
         .open(&temp)
         .and_then(|mut file| file.write_all(bytes))
         .and_then(|()| fs::rename(&temp, path));
@@ -418,9 +418,11 @@ fn write_private(path: &Path, bytes: &[u8]) -> io::Result<()> {
 
 /// Keeps what is there now before a switch, and the last few such copies only.
 fn save_backup(dir: &Path, agent: Agent, now_ms: i64, content: &Value) -> Result<(), String> {
-    fs::DirBuilder::new()
-        .recursive(true)
-        .mode(0o700)
+    let mut folder = fs::DirBuilder::new();
+    folder.recursive(true);
+    #[cfg(unix)]
+    std::os::unix::fs::DirBuilderExt::mode(&mut folder, 0o700);
+    folder
         .create(dir)
         .map_err(|e| format!("cannot make the backup folder: {e}"))?;
     let path = dir.join(format!("{}-{now_ms:013}.json", agent.id()));
@@ -609,7 +611,9 @@ pub fn restore(places: &Places, agent: Agent, secrets: &dyn Secrets) -> Result<(
 #[cfg(test)]
 mod tests {
     use super::*;
-    use std::{cell::RefCell, collections::HashMap, os::unix::fs::PermissionsExt};
+    use std::{cell::RefCell, collections::HashMap};
+    #[cfg(unix)]
+    use std::os::unix::fs::PermissionsExt;
 
     #[derive(Default)]
     struct FakeKeychain(RefCell<HashMap<String, Vec<u8>>>);
@@ -908,6 +912,7 @@ mod tests {
         assert!(limits_from_usage("<html>", 0).is_none());
     }
 
+    #[cfg(unix)]
     #[test]
     fn a_switch_moves_the_sign_in_and_the_account_and_restore_puts_them_back() {
         let sandbox = Sandbox::new("switch");
@@ -1063,6 +1068,7 @@ mod tests {
         assert_eq!(backups(&sandbox.places.backups, Agent::Codex).len(), 1);
     }
 
+    #[cfg(unix)]
     #[test]
     fn a_codex_switch_copies_auth_json_and_restore_puts_the_old_one_back() {
         let sandbox = Sandbox::new("codex");

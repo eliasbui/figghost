@@ -41,8 +41,9 @@ impl Session {
 
 /// The folder a session works in, by its last component.
 pub fn project_name(cwd: &str) -> String {
-    let trimmed = cwd.trim_end_matches('/');
-    match trimmed.rsplit('/').next() {
+    // Windows paths are separated by backslashes.
+    let trimmed = cwd.trim_end_matches(['/', '\\']);
+    match trimmed.rsplit(['/', '\\']).next() {
         Some(name) if !name.is_empty() => name.to_owned(),
         _ if cwd.is_empty() => "?".to_owned(),
         _ => "/".to_owned(),
@@ -527,5 +528,6 @@ mod tests {
         assert_eq!(project_name("/Users/me/projects/shop/"), "shop");
         assert_eq!(project_name("/"), "/");
         assert_eq!(project_name(""), "?");
+        assert_eq!(project_name("C:\\Users\\me\\shop\\"), "shop");
     }
 }

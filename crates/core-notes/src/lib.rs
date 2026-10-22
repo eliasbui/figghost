@@ -2,10 +2,11 @@
 //! how a title is found in a text, and how the list of them is kept in order while one is being written. Nothing
 //! here draws and nothing here knows a language.
 
-use crate::features::write_atomically;
+#![forbid(unsafe_code)]
 use std::{
     cmp::Reverse,
-    fs, io,
+    fs,
+    io::{self, Write},
     path::{Path, PathBuf},
     time::UNIX_EPOCH,
 };
@@ -184,6 +185,33 @@ impl Folder {
     }
 }
 
+/// Writes `text` to `path` through a file of its own (`<name>.part`, made new so that a link left at that name is not
+/// followed, and flushed to the disk) and then renames it over the target, so that a crash or a full disk never leaves
+/// half of what was there, nor an empty file after a power cut.
+pub fn write_atomically(path: &Path, text: &str) -> io::Result<()> {
+    if let Some(dir) = path.parent() {
+        fs::create_dir_all(dir)?;
+    }
+    let mut name = path.as_os_str().to_owned();
+    name.push(".part");
+    let partial = PathBuf::from(name);
+    // What stands at that name, a leftover of a crash or a link somebody put there, goes first.
+    let _ = fs::remove_file(&partial);
+    let written = fs::OpenOptions::new()
+        .write(true)
+        .create_new(true)
+        .open(&partial)
+        .and_then(|mut file| {
+            file.write_all(text.as_bytes())?;
+            file.sync_all()
+        });
+    written
+        .and_then(|()| fs::rename(&partial, path))
+        .inspect_err(|_| {
+            let _ = fs::remove_file(&partial);
+        })
+}
+
 /// The notes in memory, newest first, and which one is open.
 #[derive(Debug, Default)]
 pub struct Notes {
@@ -215,6 +243,10 @@ impl Notes {
 
     pub fn len(&self) -> usize {
         self.items.len()
+    }
+
+    pub fn is_empty(&self) -> bool {
+        self.items.is_empty()
     }
 
     pub fn current(&self) -> Option<&Note> {

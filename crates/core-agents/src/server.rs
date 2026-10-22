@@ -3,15 +3,12 @@
 
 use crate::{
     event::{Agent, EventKind, HookEvent},
+    sock::{UnixListener, UnixStream},
     wire::{self, MAX_LINE, Reply},
 };
 use std::{
     fs,
     io::{self, BufRead, BufReader, Read, Write},
-    os::unix::{
-        fs::PermissionsExt,
-        net::{UnixListener, UnixStream},
-    },
     path::{Path, PathBuf},
     sync::{
         Arc, OnceLock,
@@ -91,8 +88,12 @@ impl Server {
             fs::remove_file(path)?;
         }
         let listener = UnixListener::bind(path)?;
-        // Only this user may talk to it.
-        fs::set_permissions(path, fs::Permissions::from_mode(0o600))?;
+        // Only this user may talk to it. On Windows the socket file takes the ACL of the user's data folder.
+        #[cfg(unix)]
+        fs::set_permissions(
+            path,
+            <fs::Permissions as std::os::unix::fs::PermissionsExt>::from_mode(0o600),
+        )?;
         let stop = Arc::new(AtomicBool::new(false));
         let wait = Arc::new(AtomicU32::new(wait_seconds));
         let thread = {
@@ -489,8 +490,10 @@ mod tests {
         assert!(seen.lock().unwrap().is_empty());
     }
 
+    #[cfg(unix)]
     #[test]
     fn the_socket_is_private_to_the_user() {
+        use std::os::unix::fs::PermissionsExt;
         let path = socket("mode");
         let (handler, _, _) = recording(None);
         let _server = Server::start(&path, 5, handler).unwrap();

@@ -27,7 +27,7 @@ use std::{
     rc::{Rc, Weak},
 };
 
-pub mod logic;
+pub use core_notes as logic;
 pub mod settings;
 mod text;
 
