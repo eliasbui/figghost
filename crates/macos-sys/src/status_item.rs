@@ -29,6 +29,7 @@ pub struct Item {
     checked: Option<Predicate>,
     visible: Option<Predicate>,
     menu_only: bool,
+    panel_only: bool,
     action: Box<dyn Fn()>,
 }
 
@@ -41,6 +42,7 @@ impl Item {
             checked: None,
             visible: None,
             menu_only: false,
+            panel_only: false,
             action: Box::new(action),
         }
     }
@@ -72,6 +74,13 @@ impl Item {
     /// menu only.
     pub fn menu_only(mut self) -> Self {
         self.menu_only = true;
+        self
+    }
+
+    /// The reverse: the item is in the panel under the icon only, for one press that stands for a whole submenu of
+    /// the menu (a keep-awake of the usual length instead of the list of lengths).
+    pub fn panel_only(mut self) -> Self {
+        self.panel_only = true;
         self
     }
 }
@@ -227,7 +236,10 @@ fn fill(
         // SAFETY: the target is kept alive in `targets` for as long as the menu.
         unsafe { menu_item.setTarget(Some(&target)) };
         set_symbol(&menu_item, spec.symbol);
-        menu.addItem(&menu_item);
+        // A panel-only item still has its menu item, which the panel reads its state through; it is never shown.
+        if !spec.panel_only {
+            menu.addItem(&menu_item);
+        }
         targets.push(target);
         pairs.push((menu_item, spec));
     }

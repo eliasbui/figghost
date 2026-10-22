@@ -672,7 +672,8 @@ impl Feature {
                                 .is_some_and(|s| s.minutes == minutes)
                         })
                     })
-                    .visible_when(move || on(&shown)),
+                    .visible_when(move || on(&shown))
+                    .menu_only(),
                 )
             })
             .collect();
@@ -691,7 +692,8 @@ impl Feature {
                     None => language.util_awake_stop_open().to_owned(),
                 }
             })
-            .visible_when(move || shown.upgrade().is_some_and(|f| f.is_awake())),
+            .visible_when(move || shown.upgrade().is_some_and(|f| f.is_awake()))
+            .menu_only(),
         ));
         let mut snooze_lengths: Vec<Entry> = logic::SNOOZE_MINUTES
             .into_iter()
@@ -712,7 +714,8 @@ impl Feature {
                                 .is_some_and(|s| s.minutes == minutes)
                         })
                     })
-                    .visible_when(move || on(&shown)),
+                    .visible_when(move || on(&shown))
+                    .menu_only(),
                 )
             })
             .collect();
@@ -732,12 +735,46 @@ impl Feature {
                     None => language.util_snooze_wake_open().to_owned(),
                 }
             })
-            .visible_when(move || wake_shown.upgrade().is_some_and(|f| f.is_snoozed())),
+            .visible_when(move || wake_shown.upgrade().is_some_and(|f| f.is_snoozed()))
+            .menu_only(),
         ));
         let (mic_act, mic_mark, mic_shown) = (this.me.clone(), this.me.clone(), this.me.clone());
         let (lock_act, lock_title, lock_shown) =
             (this.me.clone(), this.me.clone(), this.me.clone());
+        // The panel under the icon shows one switch for each of the two instead of their lists of lengths: it starts
+        // the length chosen on the page, or stops what runs. The lists stay in the menu.
+        let panel_toggle = |title: &str,
+                            symbol: &'static str,
+                            toggle: fn(&Feature),
+                            running: fn(&Feature) -> bool| {
+            let (act, mark, shown) = (this.me.clone(), this.me.clone(), this.me.clone());
+            Entry::Item(
+                Item::new(title, move || {
+                    if let Some(feature) = act.upgrade() {
+                        toggle(&feature);
+                    }
+                })
+                .symbol(symbol)
+                .checked(move || mark.upgrade().is_some_and(|f| running(&f)))
+                .visible_when(move || on(&shown))
+                .panel_only(),
+            )
+        };
+        let awake_switch = panel_toggle(
+            language().util_awake_menu(),
+            symbols::AWAKE,
+            Feature::toggle_awake,
+            Feature::is_awake,
+        );
+        let snooze_switch = panel_toggle(
+            language().util_snooze_menu(),
+            symbols::SNOOZE,
+            Feature::toggle_snooze,
+            Feature::is_snoozed,
+        );
         vec![
+            awake_switch,
+            snooze_switch,
             Entry::Submenu {
                 title: language().util_awake_menu().to_owned(),
                 symbol: Some(symbols::AWAKE),
