@@ -1,5 +1,5 @@
 #![forbid(unsafe_code)]
-//! Coding agents (Claude Code, Codex) as the notch sees them: what their hooks report, which sessions exist,
+//! Coding agents (Claude Code, Codex, pi) as the notch sees them: what their hooks report, which sessions exist,
 //! which commands wait for an answer, how much of the usage limits is left, and how the hooks get installed.
 
 pub mod accounts;

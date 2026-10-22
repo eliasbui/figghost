@@ -2,7 +2,7 @@
 //! somebody answers, the wait runs out, or the hook program goes away.
 
 use crate::{
-    event::{EventKind, HookEvent},
+    event::{Agent, EventKind, HookEvent},
     wire::{self, MAX_LINE, Reply},
 };
 use std::{
@@ -14,8 +14,8 @@ use std::{
     },
     path::{Path, PathBuf},
     sync::{
-        Arc,
-        atomic::{AtomicBool, AtomicU32, AtomicUsize, Ordering},
+        Arc, OnceLock,
+        atomic::{AtomicBool, AtomicU32, AtomicU64, AtomicUsize, Ordering},
         mpsc::{self, RecvTimeoutError, Sender},
     },
     thread::{self, JoinHandle},
@@ -26,12 +26,23 @@ use std::{
 const MAX_CONNECTIONS: usize = 32;
 const READ_TIMEOUT: Duration = Duration::from_secs(2);
 const SLICE: Duration = Duration::from_millis(50);
+/// pi asks the same question in its own terminal at the same time, so holding it costs nothing; this only
+/// bounds a pi that never hangs up.
+const PI_QUESTION_WAIT: Duration = Duration::from_secs(60 * 60);
+
+/// Milliseconds on a clock that never goes back, so a deadline can be kept in an atomic and moved.
+fn clock_ms() -> u64 {
+    static START: OnceLock<Instant> = OnceLock::new();
+    START.get_or_init(Instant::now).elapsed().as_millis() as u64
+}
 
 /// The way to answer one permission request, from any thread. It stops working when the wait is over or
 /// the hook program is gone, which is how the app learns that a question no longer needs an answer.
 pub struct Ticket {
     reply: Sender<Reply>,
     open: Arc<AtomicBool>,
+    /// When the server stops waiting and lets the agent ask, on `clock_ms`.
+    deadline: Arc<AtomicU64>,
 }
 
 impl Ticket {
@@ -42,6 +53,13 @@ impl Ticket {
 
     pub fn is_open(&self) -> bool {
         self.open.load(Ordering::SeqCst)
+    }
+
+    /// Keeps the agent waiting at least `wait` from now, while somebody is answering; never brings the end
+    /// closer. The agent's own timeout for the hook still ends it.
+    pub fn wait_at_least(&self, wait: Duration) {
+        let until = clock_ms() + wait.as_millis() as u64;
+        self.deadline.fetch_max(until, Ordering::SeqCst);
     }
 }
 
@@ -182,15 +200,21 @@ fn serve(mut stream: UnixStream, handler: &Handler, wait: Duration) {
     }
     let (reply_tx, reply_rx) = mpsc::channel();
     let open = Arc::new(AtomicBool::new(true));
+    let wait = if event.agent == Agent::Pi && event.kind == EventKind::Question {
+        PI_QUESTION_WAIT
+    } else {
+        wait
+    };
+    let deadline = Arc::new(AtomicU64::new(clock_ms() + wait.as_millis() as u64));
     handler(
         event,
         Some(Ticket {
             reply: reply_tx,
             open: Arc::clone(&open),
+            deadline: Arc::clone(&deadline),
         }),
     );
     let _ = stream.set_nonblocking(true);
-    let deadline = Instant::now() + wait;
     let reply = loop {
         match reply_rx.recv_timeout(SLICE) {
             Ok(reply) => break reply,
@@ -198,7 +222,7 @@ fn serve(mut stream: UnixStream, handler: &Handler, wait: Duration) {
             // The app dropped the ticket without answering.
             Err(RecvTimeoutError::Disconnected) => break Reply::Pass,
         }
-        if Instant::now() >= deadline || peer_closed(&stream) {
+        if clock_ms() >= deadline.load(Ordering::SeqCst) || peer_closed(&stream) {
             break Reply::Pass;
         }
     };
@@ -210,7 +234,6 @@ fn serve(mut stream: UnixStream, handler: &Handler, wait: Duration) {
 #[cfg(test)]
 mod tests {
     use super::*;
-    use crate::event::Agent;
     use std::sync::Mutex;
 
     fn event(kind: EventKind) -> HookEvent {
@@ -329,6 +352,73 @@ mod tests {
             !tickets[0].answer(Reply::Allow),
             "a late answer has nowhere to go"
         );
+    }
+
+    #[test]
+    fn a_wait_kept_moving_by_the_app_outlasts_the_setting_and_ends_when_it_stops() {
+        let path = socket("extend");
+        let (handler, _, kept) = recording(None);
+        let _server = Server::start(&path, 1, handler).unwrap();
+        let keeper = {
+            let kept = Arc::clone(&kept);
+            thread::spawn(move || {
+                // What the page does while the card is on screen: push the end forward every so often.
+                let until = Instant::now() + Duration::from_millis(2_000);
+                while Instant::now() < until {
+                    if let Some(ticket) = kept.lock().unwrap().first() {
+                        ticket.wait_at_least(Duration::from_millis(600));
+                    }
+                    thread::sleep(Duration::from_millis(100));
+                }
+            })
+        };
+        let (reply, took) = ask(&path, &event(EventKind::PermissionRequest));
+        keeper.join().unwrap();
+        assert_eq!(reply, Some(Reply::Pass));
+        assert!(
+            took >= Duration::from_millis(2_000) && took < Duration::from_millis(3_500),
+            "{took:?}"
+        );
+    }
+
+    #[test]
+    fn moving_the_wait_never_brings_the_end_closer() {
+        let (reply, _) = mpsc::channel();
+        let ticket = Ticket {
+            reply,
+            open: Arc::new(AtomicBool::new(true)),
+            deadline: Arc::new(AtomicU64::new(clock_ms() + 60_000)),
+        };
+        ticket.wait_at_least(Duration::from_secs(1));
+        assert!(ticket.deadline.load(Ordering::SeqCst) >= clock_ms() + 50_000);
+        ticket.wait_at_least(Duration::from_secs(120));
+        assert!(ticket.deadline.load(Ordering::SeqCst) >= clock_ms() + 110_000);
+    }
+
+    #[test]
+    fn a_question_from_pi_waits_past_the_setting_until_pi_hangs_up() {
+        let path = socket("pi");
+        let (handler, _, kept) = recording(None);
+        let _server = Server::start(&path, 1, handler).unwrap();
+        let question = HookEvent {
+            agent: Agent::Pi,
+            ..event(EventKind::Question)
+        };
+        let mut stream = UnixStream::connect(&path).unwrap();
+        stream
+            .write_all(wire::encode_request(&question).as_bytes())
+            .unwrap();
+        thread::sleep(Duration::from_millis(1_600));
+        assert!(
+            kept.lock().unwrap()[0].is_open(),
+            "still waiting after the one second the setting gives"
+        );
+        drop(stream);
+        let deadline = Instant::now() + Duration::from_secs(2);
+        while kept.lock().unwrap()[0].is_open() && Instant::now() < deadline {
+            thread::sleep(Duration::from_millis(10));
+        }
+        assert!(!kept.lock().unwrap()[0].is_open());
     }
 
     #[test]

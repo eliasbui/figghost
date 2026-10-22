@@ -39,6 +39,7 @@ use std::{
     path::{Path, PathBuf},
     rc::{Rc, Weak},
     sync::{Arc, mpsc},
+    time::Duration,
 };
 
 /// How often the page prunes answered questions and refreshes its ages, while there is anything to show.
@@ -56,7 +57,6 @@ const DAY_MS: i64 = 86_400_000;
 /// Numbers older than this are shown as "as of ...": the percentage is probably not true any more.
 const STALE_USAGE_MS: i64 = 30 * 60 * 1000;
 const ASK_SOUND: &str = "Ping";
-const DONE_SOUND: &str = "Glass";
 const FAILED_SOUND: &str = "Basso";
 
 thread_local! {
@@ -86,14 +86,31 @@ fn short_name(agent: Agent) -> &'static str {
     match agent {
         Agent::Claude => "Claude",
         Agent::Codex => "Codex",
+        Agent::Pi => "Pi",
     }
 }
 
-/// How far the user is through the questions of one request: the answers so far and, for a question that takes
-/// several choices, the ones ticked.
+/// What the closed notch says when an agent finished or failed: which agent and where, as "Claude figghost". The
+/// ear ends a text too long for it with an ellipsis, so a long project is cut and the agent never is.
+pub fn peek_text(agent: Agent, project: &str) -> String {
+    format!("{} {project}", short_name(agent))
+}
+
+/// The finished or failed notice in the closed notch, until the time given.
+#[derive(Debug, Clone, PartialEq, Eq)]
+struct Peek {
+    done: bool,
+    agent: Agent,
+    project: String,
+    until_ms: i64,
+}
+
+/// How far the user is through the questions of one request: the answers so far, the same by the place of each
+/// choice in its question, and, for a question that takes several choices, the ones ticked.
 #[derive(Debug, Default, Clone, PartialEq, Eq)]
 pub struct Progress {
     pub answers: Vec<String>,
+    pub picked: Vec<Vec<usize>>,
     pub ticked: Vec<usize>,
 }
 
@@ -155,14 +172,28 @@ pub fn approval_card(
     }
 }
 
-pub fn session_row(language: Language, session: &Session, now: i64) -> SessionData {
+/// A row of the sessions list; `approval` is the open request of the session, which a press on the row shows.
+pub fn session_row(
+    language: Language,
+    session: &Session,
+    now: i64,
+    approval: Option<u64>,
+) -> SessionData {
     SessionData {
         tone: tone_of(session.state),
         agent: session.agent.name().to_owned(),
         project: session.project(),
         state: language.agents_state(session.state).to_owned(),
         age: ago(language, now, session.updated_ms),
+        approval,
     }
+}
+
+/// The request on the card: the one the user chose from the sessions list while it is open, else the first.
+pub fn card_approval(approvals: &[Approval], chosen: Option<u64>) -> Option<&Approval> {
+    chosen
+        .and_then(|id| approvals.iter().find(|a| a.id == id))
+        .or_else(|| approvals.first())
 }
 
 /// One bar of the usage section. A window that has started over since it was measured, or numbers that are
@@ -320,6 +351,8 @@ pub struct AgentStatus {
 pub struct Status {
     pub claude: AgentStatus,
     pub codex: AgentStatus,
+    /// pi's extension: one file, so `wanted` is 1.
+    pub pi: AgentStatus,
     /// Our status line program is what Claude Code runs, so its usage limits reach the notch.
     pub usage_tap: bool,
     /// Limits from Claude Code have been received at least once.
@@ -360,6 +393,7 @@ impl Files {
         match agent {
             Agent::Claude => targets.claude_settings,
             Agent::Codex => targets.codex_hooks,
+            Agent::Pi => targets.pi_extension,
         }
     }
 
@@ -368,6 +402,7 @@ impl Files {
         match agent {
             Agent::Claude => targets.claude_dir,
             Agent::Codex => targets.codex_dir,
+            Agent::Pi => targets.pi_dir,
         }
     }
 
@@ -391,6 +426,12 @@ impl Files {
         Status {
             claude: one(Agent::Claude),
             codex: one(Agent::Codex),
+            pi: AgentStatus {
+                found: self.agent_dir(Agent::Pi).is_dir(),
+                installed: usize::from(install::pi_installed(&self.hooks_file(Agent::Pi))),
+                wanted: 1,
+                error: None,
+            },
             usage_tap: claude_doc
                 .as_ref()
                 .is_some_and(install::statusline_installed),
@@ -399,13 +440,27 @@ impl Files {
         }
     }
 
-    /// Adds the hooks to the agent's file, next to whatever is there.
+    /// Adds the hooks to the agent's file, next to whatever is there. pi gets its extension instead, which
+    /// talks to this app's socket.
     pub fn install(&self, agent: Agent, exe: &str) -> Result<Report, String> {
-        install::install_file(&self.hooks_file(agent), agent, exe).map_err(|e| e.to_string())
+        let path = self.hooks_file(agent);
+        if agent == Agent::Pi {
+            let changed = install::install_pi(&path, &socket_path(&self.home)).map_err(|e| e.to_string())?;
+            return Ok(Report {
+                added: usize::from(changed),
+                updated: 0,
+                unchanged: usize::from(!changed),
+            });
+        }
+        install::install_file(&path, agent, exe).map_err(|e| e.to_string())
     }
 
     pub fn remove(&self, agent: Agent) -> Result<usize, String> {
-        install::remove_file(&self.hooks_file(agent)).map_err(|e| e.to_string())
+        let path = self.hooks_file(agent);
+        if agent == Agent::Pi {
+            return install::remove_pi(&path).map_err(|e| e.to_string());
+        }
+        install::remove_file(&path).map_err(|e| e.to_string())
     }
 
     /// Makes our program Claude Code's status line, which runs the previous one after reading the usage
@@ -447,6 +502,8 @@ pub struct AgentsFeature {
     tickets: RefCell<HashMap<u64, Ticket>>,
     /// Where the user is in each question request that is open.
     progress: RefCell<HashMap<u64, Progress>>,
+    /// The request the user brought onto the card from the sessions list; the first one when it is gone.
+    chosen: Cell<Option<u64>>,
     server: RefCell<Option<Server>>,
     ticker: RefCell<Option<app::Timer>>,
     limits: RefCell<UsageCache>,
@@ -456,8 +513,8 @@ pub struct AgentsFeature {
     opened_by_us: Cell<bool>,
     /// Show what the agents do in the closed notch.
     live: Cell<bool>,
-    /// An agent just finished (true) or failed (false); the closed notch says so until the time given.
-    peek: Cell<Option<(bool, i64)>>,
+    /// An agent just finished or failed; the closed notch says so for a while.
+    peek: RefCell<Option<Peek>>,
     counts: RefCell<Counts>,
     /// What the closed notch shows about the agents now, for the trace.
     showing: Cell<&'static str>,
@@ -479,7 +536,8 @@ impl AgentsFeature {
             std::env::var_os("HOME"),
         );
         let feature = Rc::new_cyclic(|me: &Weak<AgentsFeature>| {
-            let (decider, picker, refresher) = (me.clone(), me.clone(), me.clone());
+            let (decider, picker, refresher, chooser) =
+                (me.clone(), me.clone(), me.clone(), me.clone());
             let view = AgentsView::new(
                 mtm,
                 notch.page_frame(),
@@ -499,6 +557,12 @@ impl AgentsFeature {
                             feature.refresh_limits();
                         }
                     }),
+                    on_session: Box::new(move |id| {
+                        if let Some(feature) = chooser.upgrade() {
+                            feature.chosen.set(Some(id));
+                            feature.render();
+                        }
+                    }),
                 },
             );
             Self {
@@ -514,6 +578,7 @@ impl AgentsFeature {
                 tracker: RefCell::default(),
                 tickets: RefCell::default(),
                 progress: RefCell::default(),
+                chosen: Cell::new(None),
                 server: RefCell::default(),
                 ticker: RefCell::default(),
                 limits: RefCell::default(),
@@ -521,7 +586,7 @@ impl AgentsFeature {
                 visible: Cell::new(false),
                 opened_by_us: Cell::new(false),
                 live: Cell::new(true),
-                peek: Cell::new(None),
+                peek: RefCell::new(None),
                 counts: RefCell::default(),
                 showing: Cell::new("nothing"),
                 counter: RefCell::default(),
@@ -592,6 +657,7 @@ impl AgentsFeature {
         for (agent, agent_status) in [
             (Agent::Claude, &status.claude),
             (Agent::Codex, &status.codex),
+            (Agent::Pi, &status.pi),
         ] {
             if agent_status.installed > 0
                 && let Err(e) = self.install(agent)
@@ -619,6 +685,7 @@ impl AgentsFeature {
         ));
         let effect = self.tracker.borrow_mut().apply(&event);
         let settings = self.settings.borrow().clone();
+        let done = matches!(effect, Effect::Finished { .. });
         match effect {
             Effect::Approval(id) => {
                 match ticket {
@@ -638,14 +705,19 @@ impl AgentsFeature {
                     self.open_page();
                 }
             }
-            Effect::Finished { .. } | Effect::Failed { .. } => {
-                let done = matches!(effect, Effect::Finished { .. });
-                if settings.sound {
-                    workspace::play_sound(if done { DONE_SOUND } else { FAILED_SOUND });
+            Effect::Finished { agent, project } | Effect::Failed { agent, project } => {
+                // A finished agent is shown, not heard: the sound is kept for what needs the user.
+                if settings.sound && !done {
+                    workspace::play_sound(FAILED_SOUND);
                 }
                 if settings.peek_when_done {
-                    self.peek
-                        .set(Some((done, now_ms() + (PEEK_SECONDS * 1000.0) as i64)));
+                    // The latest one wins: a second agent finishing during the notice replaces it.
+                    *self.peek.borrow_mut() = Some(Peek {
+                        done,
+                        agent,
+                        project,
+                        until_ms: now_ms() + (PEEK_SECONDS * 1000.0) as i64,
+                    });
                     let weak = self.me.clone();
                     app::after(PEEK_SECONDS + 0.05, move || {
                         if let Some(feature) = weak.upgrade() {
@@ -692,11 +764,10 @@ impl AgentsFeature {
                 sessions.iter().any(|s| s.state == State::Working),
             )
         };
-        let peek = self.peek.get().filter(|(_, until)| *until > now);
+        let peek = self.peek.borrow().clone().filter(|p| p.until_ms > now);
         if peek.is_none() {
-            self.peek.set(None);
+            self.peek.borrow_mut().take();
         }
-        let language = i18n::current();
         let page = Some(self.page);
         let terminal = |tone| Ear::Symbol {
             name: "terminal",
@@ -718,11 +789,12 @@ impl AgentsFeature {
                     priority: 30,
                 }),
             )
-        } else if let Some((done, _)) = peek {
-            let (state, symbol, tone) = if done {
-                (State::Done, "checkmark.circle.fill", Tone::Green)
+        } else if let Some(peek) = peek {
+            let done = peek.done;
+            let (symbol, tone) = if done {
+                ("checkmark.circle.fill", Tone::Green)
             } else {
-                (State::Failed, "xmark.octagon.fill", Tone::Red)
+                ("xmark.octagon.fill", Tone::Red)
             };
             let what = if done {
                 "a finished agent"
@@ -739,7 +811,7 @@ impl AgentsFeature {
                         pulse: false,
                     },
                     right: Ear::Text {
-                        text: language.agents_state(state).to_owned(),
+                        text: peek_text(peek.agent, &peek.project),
                         tone,
                     },
                     page,
@@ -858,9 +930,18 @@ impl AgentsFeature {
         self.finish(id, reply, if allow { "allowed" } else { "denied" });
     }
 
+    /// Gives the person answering request `id` the whole wait again from now.
+    fn hold(&self, id: u64) {
+        if let Some(ticket) = self.tickets.borrow().get(&id) {
+            let wait = self.settings.borrow().approval_wait_seconds;
+            ticket.wait_at_least(Duration::from_secs(u64::from(wait)));
+        }
+    }
+
     /// A choice of the question the user is at: it answers a single-choice question, and ticks or unticks one
     /// of a question that takes several.
     fn pick(&self, id: u64, choice: usize) {
+        self.hold(id);
         let (label, multi) = {
             let tracker = self.tracker.borrow();
             let Some(approval) = tracker.approval(id) else {
@@ -887,13 +968,13 @@ impl AgentsFeature {
             drop(progress);
             self.render();
         } else {
-            self.answer(id, label);
+            self.answer(id, label, vec![choice]);
         }
     }
 
     /// "Done" on a question that takes several choices: the ticked ones, in the order of the question.
     fn confirm(&self, id: u64) {
-        let labels: Vec<String> = {
+        let (labels, ticked): (Vec<String>, Vec<usize>) = {
             let tracker = self.tracker.borrow();
             let progress = self.progress.borrow();
             let Some(progress) = progress.get(&id) else {
@@ -907,16 +988,18 @@ impl AgentsFeature {
             };
             let mut ticked = progress.ticked.clone();
             ticked.sort_unstable();
-            ticked.iter().filter_map(|&n| question.options.get(n).cloned()).collect()
+            ticked.retain(|&n| n < question.options.len());
+            let labels = ticked.iter().map(|&n| question.options[n].clone()).collect();
+            (labels, ticked)
         };
         if !labels.is_empty() {
-            self.answer(id, labels.join(", "));
+            self.answer(id, labels.join(", "), ticked);
         }
     }
 
     /// Takes the answer to the question the user is at, and sends them all once the last one is in.
-    fn answer(&self, id: u64, answer: String) {
-        let (done, total) = {
+    fn answer(&self, id: u64, answer: String, picked: Vec<usize>) {
+        let (done, indexes, total) = {
             let total = match self.tracker.borrow().approval(id) {
                 Some(a) => a.questions.len(),
                 None => return,
@@ -924,11 +1007,19 @@ impl AgentsFeature {
             let mut progress = self.progress.borrow_mut();
             let progress = progress.entry(id).or_default();
             progress.answers.push(answer);
+            progress.picked.push(picked);
             progress.ticked.clear();
-            (progress.answers.clone(), total)
+            (progress.answers.clone(), progress.picked.clone(), total)
         };
         if done.len() >= total {
-            self.finish(id, Reply::Answers { answers: done }, "answered");
+            self.finish(
+                id,
+                Reply::Answers {
+                    answers: done,
+                    indexes,
+                },
+                "answered",
+            );
         } else {
             self.render();
         }
@@ -1099,8 +1190,10 @@ impl AgentsFeature {
         let (approval, more_waiting, sessions) = {
             let tracker = self.tracker.borrow();
             let waiting = tracker.approvals();
+            let shown = card_approval(waiting, self.chosen.get());
+            self.chosen.set(shown.map(|a| a.id));
             (
-                waiting.first().map(|a| {
+                shown.map(|a| {
                     let progress = self.progress.borrow().get(&a.id).cloned().unwrap_or_default();
                     approval_card(language, a, &progress, now)
                 }),
@@ -1111,10 +1204,23 @@ impl AgentsFeature {
                 tracker
                     .sessions()
                     .into_iter()
-                    .map(|s| session_row(language, s, now))
+                    .map(|s| {
+                        let open = waiting
+                            .iter()
+                            .find(|a| a.agent == s.agent && a.session_id == s.id)
+                            .map(|a| a.id);
+                        session_row(language, s, now, open)
+                    })
                     .collect::<Vec<_>>(),
             )
         };
+        // The pointer on the card means somebody is answering it: the agent waits as long as it stays there. A
+        // notch that opened by itself on a question nobody looks at still lets the wait run out.
+        if let Some(card) = &approval
+            && self.notch.upgrade().is_some_and(|notch| notch.pointer_inside())
+        {
+            self.hold(card.id);
+        }
         let usage = self.usage_rows(language, now);
         // With no numbers yet the button stays when Codex can be asked: that is how the first ones come.
         let refresh_label = (!usage.is_empty()
@@ -1264,6 +1370,7 @@ pub fn run_hook_cli(home: &Path, agent: Option<&str>) -> i32 {
         &mut io::stdout().lock(),
         &socket_path(home),
         now_ms(),
+        |key| std::env::var(key).ok(),
     )
 }
 
@@ -1277,9 +1384,8 @@ mod tests {
     use super::*;
     use core_agents::{event::EventKind, tracker::Tracker};
 
-    fn approval() -> Approval {
-        let mut tracker = Tracker::default();
-        let effect = tracker.apply(&HookEvent {
+    fn approval_event() -> HookEvent {
+        HookEvent {
             agent: Agent::Claude,
             kind: EventKind::PermissionRequest,
             session_id: "s".into(),
@@ -1289,7 +1395,12 @@ mod tests {
             message: None,
             questions: Vec::new(),
             at_ms: 1_000,
-        });
+        }
+    }
+
+    fn approval() -> Approval {
+        let mut tracker = Tracker::default();
+        let effect = tracker.apply(&approval_event());
         let Effect::Approval(id) = effect else {
             panic!()
         };
@@ -1326,11 +1437,59 @@ mod tests {
         assert!(!first.confirm, "a single choice answers by itself");
         let seen = Progress {
             answers: vec!["A".into()],
+            picked: vec![vec![0]],
             ticked: vec![1],
         };
         let second = approval_card(Language::English, &a, &seen, 1_000);
         assert_eq!(second.command, "Second?");
         assert!(second.choices[1].selected && !second.choices[0].selected);
+    }
+
+    #[test]
+    fn the_finished_notice_names_the_agent_and_the_project() {
+        // The words are names, the same in every language.
+        assert_eq!(peek_text(Agent::Claude, "figghost"), "Claude figghost");
+        assert_eq!(peek_text(Agent::Codex, "shop"), "Codex shop");
+        assert_eq!(peek_text(Agent::Pi, "figghost"), "Pi figghost");
+    }
+
+    #[test]
+    fn the_card_shows_the_chosen_request_while_it_is_open_and_the_first_after() {
+        let mut tracker = Tracker::default();
+        let ask = |tracker: &mut Tracker, session: &str| match tracker.apply(&HookEvent {
+            session_id: session.into(),
+            ..approval_event()
+        }) {
+            Effect::Approval(id) => id,
+            _ => panic!(),
+        };
+        let (first, second) = (ask(&mut tracker, "a"), ask(&mut tracker, "b"));
+        let shown = |tracker: &Tracker, chosen| card_approval(tracker.approvals(), chosen).map(|a| a.id);
+        assert_eq!(shown(&tracker, None), Some(first));
+        assert_eq!(shown(&tracker, Some(second)), Some(second));
+        tracker.end_approval(second);
+        assert_eq!(shown(&tracker, Some(second)), Some(first), "back to the first once it closes");
+        tracker.end_approval(first);
+        assert_eq!(shown(&tracker, Some(first)), None);
+    }
+
+    #[test]
+    fn the_pi_extension_is_offered_only_where_pi_is_and_talks_to_this_apps_socket() {
+        let sandbox = Sandbox::new("pi", true);
+        let status = sandbox.files.status().pi;
+        assert!(!status.found && status.installed == 0 && status.wanted == 1);
+        assert!(sandbox.files.install(Agent::Pi, EXE).is_err());
+        assert!(!sandbox.files.user_home.join(".pi").exists());
+        fs::create_dir_all(sandbox.files.user_home.join(".pi/agent")).unwrap();
+        assert!(sandbox.files.status().pi.found);
+        assert_eq!(sandbox.files.install(Agent::Pi, EXE).unwrap().added, 1);
+        assert_eq!(sandbox.files.status().pi.installed, 1);
+        let file = sandbox.files.user_home.join(".pi/agent/extensions/figghost.ts");
+        let socket = socket_path(&sandbox.files.home);
+        assert!(fs::read_to_string(&file).unwrap().contains(&*socket.to_string_lossy()));
+        assert_eq!(sandbox.files.remove(Agent::Pi).unwrap(), 1);
+        assert!(!file.exists());
+        assert_eq!(sandbox.files.status().pi.installed, 0);
     }
 
     #[test]

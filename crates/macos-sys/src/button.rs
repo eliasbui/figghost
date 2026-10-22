@@ -30,6 +30,9 @@ pub enum Look {
     Row,
     /// A tile of a grid: a picture (an app's icon, or a glyph) with its name under it.
     Tile,
+    /// Laid over something drawn by its own view, which it makes pressable: only a faint panel while hovered or
+    /// pressed. The label is not drawn; it names the button for assistive tools.
+    Overlay,
 }
 
 const CHIP_PAD: f64 = 12.0;
@@ -255,7 +258,7 @@ impl TouchButton {
             }
             Look::Rect => 15.0,
             Look::Chip => 12.0,
-            Look::Row => 14.0,
+            Look::Row | Look::Overlay => 14.0,
             Look::Tile => 28.0,
         }
     }
@@ -408,6 +411,18 @@ impl TouchButton {
             self.paint_tile();
             return;
         }
+        if look == Look::Overlay {
+            let shade = match (enabled, iv.pressed.get(), iv.hovered.get()) {
+                (false, ..) => 0.0,
+                (true, true, _) => 0.12,
+                (true, false, true) => 0.06,
+                _ => 0.0,
+            };
+            if shade > 0.0 {
+                style::fill_rounded(bounds, 12.0, &white(shade));
+            }
+            return;
+        }
         let solid = matches!(look, Look::Round { filled: true })
             || (matches!(look, Look::Chip | Look::Rect) && iv.selected.get());
         // What separates the looks of a control is only how it is being used.
@@ -452,8 +467,8 @@ impl TouchButton {
             }
             Look::Rect => shape(bounds, BUTTON_RADIUS),
             Look::Chip => shape(bounds, bounds.size.height / 2.0),
-            // Drawn by `paint_row` and `paint_tile` above, which returned already.
-            Look::Row | Look::Tile => {}
+            // Drawn above, which returned already.
+            Look::Row | Look::Tile | Look::Overlay => {}
         }
 
         let glyph_color = match (iv.tone.get(), solid) {

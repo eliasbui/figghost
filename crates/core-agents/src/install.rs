@@ -72,6 +72,8 @@ pub fn subscriptions(agent: Agent) -> &'static [Subscription] {
     match agent {
         Agent::Claude => CLAUDE,
         Agent::Codex => CODEX,
+        // pi is told about by its extension, below.
+        Agent::Pi => &[],
     }
 }
 
@@ -362,17 +364,80 @@ pub struct Targets {
     pub claude_settings: PathBuf,
     pub codex_dir: PathBuf,
     pub codex_hooks: PathBuf,
+    pub pi_dir: PathBuf,
+    /// pi loads every file of its extensions folder; this one is ours.
+    pub pi_extension: PathBuf,
 }
 
 pub fn targets(user_home: &Path) -> Targets {
     let claude_dir = user_home.join(".claude");
     let codex_dir = user_home.join(".codex");
+    let pi_dir = user_home.join(".pi/agent");
     Targets {
         claude_settings: claude_dir.join("settings.json"),
         codex_hooks: codex_dir.join("hooks.json"),
+        pi_extension: pi_dir.join("extensions/figghost.ts"),
         claude_dir,
         codex_dir,
+        pi_dir,
     }
+}
+
+/// The first line of the pi extension, which is how a file of ours is told from one of the user's.
+pub const PI_MARKER: &str = "// figghost-pi-extension";
+const PI_SOURCE: &str = include_str!("pi_extension.ts");
+
+/// The pi extension with the app's socket written in, as the hook command has the program's path.
+pub fn pi_extension(socket: &Path) -> String {
+    let literal = serde_json::to_string(&socket.to_string_lossy()).expect("a string is valid JSON");
+    PI_SOURCE.replacen("\"__FIGGHOST_SOCKET__\"", &literal, 1)
+}
+
+fn is_pi_extension(path: &Path) -> bool {
+    fs::read_to_string(path).is_ok_and(|text| text.starts_with(PI_MARKER))
+}
+
+/// Whether our extension is in pi's folder.
+pub fn pi_installed(path: &Path) -> bool {
+    is_pi_extension(path)
+}
+
+/// Writes the extension, or brings it up to date. A file of that name that is not ours is never replaced, and
+/// nothing is made unless pi's own folder (`.pi/agent`, the parent of `extensions`) is there. True when it changed.
+pub fn install_pi(path: &Path, socket: &Path) -> Result<bool, InstallError> {
+    let folder = path
+        .parent()
+        .ok_or_else(|| InstallError::Shape("no folder".into()))?;
+    require_parent(folder)?;
+    let text = pi_extension(socket);
+    match fs::read_to_string(path) {
+        Ok(old) if old == text => return Ok(false),
+        Ok(old) if !old.starts_with(PI_MARKER) => {
+            return Err(InstallError::Shape(format!(
+                "{} is not Figghost's and was left alone",
+                path.display()
+            )));
+        }
+        _ => {}
+    }
+    fs::create_dir_all(folder)?;
+    let mut name = path.as_os_str().to_owned();
+    name.push(format!(".figghost-{}.tmp", std::process::id()));
+    let temp = PathBuf::from(name);
+    fs::write(&temp, text)?;
+    fs::rename(&temp, path).inspect_err(|_| {
+        let _ = fs::remove_file(&temp);
+    })?;
+    Ok(true)
+}
+
+/// Deletes the extension if it is ours. 1 when it was removed.
+pub fn remove_pi(path: &Path) -> Result<usize, InstallError> {
+    if !is_pi_extension(path) {
+        return Ok(0);
+    }
+    fs::remove_file(path)?;
+    Ok(1)
 }
 
 /// A missing file is an empty document; an unreadable one is an error and is never overwritten.
@@ -784,6 +849,47 @@ mod tests {
         install_file(&path, Agent::Codex, EXE).unwrap();
         assert!(status_file(&path, Agent::Codex).unwrap().complete());
         let _ = fs::remove_dir_all(&dir);
+    }
+
+    #[test]
+    fn the_pi_extension_carries_the_socket_and_is_installed_only_where_pi_is() {
+        let root =
+            std::env::temp_dir().join(format!("core-agents-pi-extension-{}", std::process::id()));
+        let _ = fs::remove_dir_all(&root);
+        let path = targets(&root).pi_extension;
+        let socket = Path::new("/Users/me/Library/Application Support/Figghost/agents.sock");
+        assert!(
+            install_pi(&path, socket).is_err(),
+            "no pi, no folder is made for it"
+        );
+        assert!(!root.join(".pi").exists());
+        fs::create_dir_all(root.join(".pi/agent")).unwrap();
+        assert!(!pi_installed(&path));
+        assert!(install_pi(&path, socket).unwrap());
+        let text = fs::read_to_string(&path).unwrap();
+        assert!(text.starts_with(PI_MARKER));
+        assert!(text.contains(
+            "const SOCKET = \"/Users/me/Library/Application Support/Figghost/agents.sock\";"
+        ));
+        assert!(!text.contains("__FIGGHOST_SOCKET__"));
+        assert!(pi_installed(&path));
+        assert!(
+            !install_pi(&path, socket).unwrap(),
+            "the same file is not written again"
+        );
+        assert!(install_pi(&path, Path::new("/elsewhere.sock")).unwrap());
+        assert_eq!(remove_pi(&path).unwrap(), 1);
+        assert!(!path.exists() && !pi_installed(&path));
+        assert_eq!(remove_pi(&path).unwrap(), 0);
+        // A file of the user's under our name is neither replaced nor removed.
+        fs::write(&path, "export default function () {}\n").unwrap();
+        assert!(install_pi(&path, socket).is_err());
+        assert_eq!(remove_pi(&path).unwrap(), 0);
+        assert_eq!(
+            fs::read_to_string(&path).unwrap(),
+            "export default function () {}\n"
+        );
+        let _ = fs::remove_dir_all(&root);
     }
 
     #[test]

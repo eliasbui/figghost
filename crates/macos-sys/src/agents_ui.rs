@@ -33,7 +33,7 @@ const CARD_PAD: f64 = 16.0;
 const CHOICE_GAP: f64 = 6.0;
 
 /// A command or edit that waits for an answer.
-#[derive(Debug, Clone)]
+#[derive(Debug, Clone, PartialEq)]
 pub struct ApprovalCardData {
     pub id: u64,
     /// "Claude Code wants to use Bash", drawn in capitals.
@@ -49,22 +49,25 @@ pub struct ApprovalCardData {
     pub confirm: bool,
 }
 
-#[derive(Debug, Clone)]
+#[derive(Debug, Clone, PartialEq)]
 pub struct ChoiceData {
     pub label: String,
     pub selected: bool,
 }
 
-#[derive(Debug, Clone)]
+#[derive(Debug, Clone, PartialEq)]
 pub struct SessionData {
     pub tone: Tone,
     pub agent: String,
     pub project: String,
     pub state: String,
     pub age: String,
+    /// The open request of this session that a press on its row brings onto the card; `None` makes the row
+    /// a plain line.
+    pub approval: Option<u64>,
 }
 
-#[derive(Debug, Clone)]
+#[derive(Debug, Clone, PartialEq)]
 pub struct UsageData {
     pub label: String,
     /// How much is used, 0 to 1; `None` when it is not known.
@@ -74,7 +77,7 @@ pub struct UsageData {
 }
 
 /// One line of the tokens section: what an agent used today and this week, and its cost at API list prices.
-#[derive(Debug, Clone)]
+#[derive(Debug, Clone, PartialEq)]
 pub struct TokensData {
     pub label: String,
     /// "1.2M tokens  $3.45" for today.
@@ -83,8 +86,9 @@ pub struct TokensData {
     pub week: String,
 }
 
+#[derive(Debug, Clone, PartialEq)]
 pub struct AgentsDisplay {
-    /// The first command in line; the others wait behind it.
+    /// The request on the card; the others wait behind it.
     pub approval: Option<ApprovalCardData>,
     /// "2 more waiting", or empty.
     pub more_waiting: String,
@@ -109,6 +113,37 @@ pub struct AgentsCallbacks {
     pub on_pick: Box<dyn Fn(u64, usize)>,
     /// The usage limits are to be read again.
     pub on_refresh: Box<dyn Fn()>,
+    /// The row of a session with an open request was pressed: that request, by id, is to go on the card.
+    pub on_session: Box<dyn Fn(u64)>,
+}
+
+/// What a new display does to the card on screen.
+#[derive(Debug, Clone, Copy, PartialEq, Eq)]
+pub enum CardChange {
+    Keep,
+    /// The same request with the same buttons: only its text or the ticks change, drawn on the card that is there,
+    /// so a click that is under way still lands.
+    Refresh,
+    /// Another request, other buttons, or none: the card is made again or taken away.
+    Rebuild,
+}
+
+pub fn card_change(old: Option<&ApprovalCardData>, new: Option<&ApprovalCardData>) -> CardChange {
+    match (old, new) {
+        (None, None) => CardChange::Keep,
+        (Some(old), Some(new)) if old == new => CardChange::Keep,
+        (Some(old), Some(new))
+            if old.id == new.id
+                && old.allow == new.allow
+                && old.deny == new.deny
+                && old.confirm == new.confirm
+                && old.choices.len() == new.choices.len()
+                && old.choices.iter().zip(&new.choices).all(|(a, b)| a.label == b.label) =>
+        {
+            CardChange::Refresh
+        }
+        _ => CardChange::Rebuild,
+    }
 }
 
 fn attrs(
@@ -462,12 +497,35 @@ fn new_view<T>(alloc_and_init: impl FnOnce() -> Retained<T>) -> Retained<T> {
     alloc_and_init()
 }
 
+/// The card on screen, with what it shows and its choice buttons, which a refresh updates in place.
+struct ShownCard {
+    data: ApprovalCardData,
+    view: Retained<ApprovalCard>,
+    choices: Vec<Retained<TouchButton>>,
+}
+
 pub struct AgentsView {
     pub root: Retained<PageRoot>,
     frame: NSRect,
+    /// Everything under the card.
     dynamic: RefCell<Vec<Retained<NSView>>>,
+    card: RefCell<Option<ShownCard>>,
+    /// What is on screen, so that a display that changed nothing changes nothing.
+    shown: RefCell<Option<AgentsDisplay>>,
     first: Cell<Option<u64>>,
     callbacks: Rc<AgentsCallbacks>,
+}
+
+/// The part of a display that lies under the card, which only depends on the card by its height.
+fn below_card(display: &AgentsDisplay) -> (AgentsDisplay, Option<f64>) {
+    let height = display.approval.as_ref().map(card_height);
+    (
+        AgentsDisplay {
+            approval: None,
+            ..display.clone()
+        },
+        height,
+    )
 }
 
 impl AgentsView {
@@ -477,6 +535,8 @@ impl AgentsView {
             root,
             frame,
             dynamic: RefCell::new(Vec::new()),
+            card: RefCell::new(None),
+            shown: RefCell::new(None),
             first: Cell::new(None),
             callbacks: Rc::new(callbacks),
         })
@@ -498,87 +558,132 @@ impl AgentsView {
         Retained::into_super(note)
     }
 
-    /// Replaces what the page shows.
+    /// Shows the display. Only what changed is made again: rebuilding the card under a click that is under way
+    /// would lose it (a button acts when the press and the release land on the same one), and events of other
+    /// sessions and the ticker of the page ask for a display many times a minute.
     pub fn show(&self, mtm: MainThreadMarker, display: &AgentsDisplay) {
+        if self.shown.borrow().as_ref() == Some(display) {
+            return;
+        }
+        self.first.set(display.approval.as_ref().map(|a| a.id));
+        let old = self.shown.replace(Some(display.clone()));
+        let old_card = self.card.borrow().as_ref().map(|c| c.data.clone());
+        match card_change(old_card.as_ref(), display.approval.as_ref()) {
+            CardChange::Keep => {}
+            CardChange::Refresh => {
+                if let (Some(shown), Some(data)) = (self.card.borrow_mut().as_mut(), &display.approval) {
+                    for (button, choice) in shown.choices.iter().zip(&data.choices) {
+                        button.set_symbol(if choice.selected { "checkmark" } else { "circle" });
+                        button.set_selected(choice.selected);
+                    }
+                    *shown.view.ivars().data.borrow_mut() = Some(data.clone());
+                    shown.view.setNeedsDisplay(true);
+                    shown.data = data.clone();
+                }
+            }
+            CardChange::Rebuild => {
+                if let Some(shown) = self.card.borrow_mut().take() {
+                    shown.view.removeFromSuperview();
+                }
+                *self.card.borrow_mut() = display.approval.as_ref().map(|a| self.make_card(mtm, a));
+            }
+        }
+        if old.as_ref().map(below_card) == Some(below_card(display)) {
+            return;
+        }
         for view in self.dynamic.borrow_mut().drain(..) {
             view.removeFromSuperview();
         }
+        let added = self.make_below_card(mtm, display);
+        *self.dynamic.borrow_mut() = added;
+    }
+
+    fn make_card(&self, mtm: MainThreadMarker, approval: &ApprovalCardData) -> ShownCard {
+        let (top, inner) = (self.frame.size.height, self.frame.size.width - 2.0 * MARGIN);
+        let card_height = card_height(approval);
+        let card = {
+            let this = mtm.alloc::<ApprovalCard>().set_ivars(CardIvars {
+                data: RefCell::new(Some(approval.clone())),
+            });
+            let frame = NSRect::new(
+                NSPoint::new(MARGIN, top - card_height),
+                NSSize::new(inner, card_height),
+            );
+            // SAFETY: designated initializer with valid arguments on the main thread.
+            let card: Retained<ApprovalCard> =
+                unsafe { msg_send![super(this), initWithFrame: frame] };
+            card
+        };
+        let buttons_top = card_height - CARD_PAD - BUTTON_HEIGHT;
+        let full = inner - 2.0 * CARD_PAD;
+        let half = if approval.confirm { (full - GAP) / 2.0 } else { full };
+        // The choices stack above the buttons that answer, in the order of the question.
+        let choices_top = buttons_top - approval.choices.len() as f64 * (BUTTON_HEIGHT + CHOICE_GAP);
+        let mut choices = Vec::new();
+        for (n, choice) in approval.choices.iter().enumerate() {
+            let button = TouchButton::new(
+                mtm,
+                NSRect::new(
+                    NSPoint::new(CARD_PAD, choices_top + n as f64 * (BUTTON_HEIGHT + CHOICE_GAP)),
+                    NSSize::new(full, BUTTON_HEIGHT),
+                ),
+                Look::Rect,
+            );
+            button.set_symbol(if choice.selected { "checkmark" } else { "circle" });
+            button.set_title(&choice.label);
+            button.set_selected(choice.selected);
+            let (shared, id) = (Rc::clone(&self.callbacks), approval.id);
+            button.set_on_click(move || (shared.on_pick)(id, n));
+            card.addSubview(&button);
+            choices.push(button);
+        }
+        let deny = TouchButton::new(
+            mtm,
+            NSRect::new(
+                NSPoint::new(CARD_PAD, buttons_top),
+                NSSize::new(half, BUTTON_HEIGHT),
+            ),
+            Look::Rect,
+        );
+        deny.set_title(&approval.deny);
+        deny.set_tone(if approval.choices.is_empty() { Some(Tone::Red) } else { None });
+        let allow = TouchButton::new(
+            mtm,
+            NSRect::new(
+                NSPoint::new(CARD_PAD + half + GAP, buttons_top),
+                NSSize::new(half, BUTTON_HEIGHT),
+            ),
+            Look::Rect,
+        );
+        allow.set_symbol("checkmark");
+        allow.set_title(&approval.allow);
+        allow.set_selected(true);
+        deny.set_symbol(if approval.choices.is_empty() { "xmark" } else { "terminal" });
+        let id = approval.id;
+        let shared = Rc::clone(&self.callbacks);
+        deny.set_on_click(move || (shared.on_decide)(id, false));
+        let shared = Rc::clone(&self.callbacks);
+        allow.set_on_click(move || (shared.on_decide)(id, true));
+        card.addSubview(&deny);
+        if approval.confirm {
+            card.addSubview(&allow);
+        }
+        self.root.addSubview(&card);
+        ShownCard {
+            data: approval.clone(),
+            view: card,
+            choices,
+        }
+    }
+
+    /// The views under the card: what waits behind it, the sessions, the usage limits and the tokens.
+    fn make_below_card(&self, mtm: MainThreadMarker, display: &AgentsDisplay) -> Vec<Retained<NSView>> {
         let mut added: Vec<Retained<NSView>> = Vec::new();
         let (width, top) = (self.frame.size.width, self.frame.size.height);
         let inner = width - 2.0 * MARGIN;
         let mut cursor = 0.0;
-        self.first.set(display.approval.as_ref().map(|a| a.id));
-
         if let Some(approval) = &display.approval {
-            let card_height = card_height(approval);
-            let card = {
-                let this = mtm.alloc::<ApprovalCard>().set_ivars(CardIvars {
-                    data: RefCell::new(Some(approval.clone())),
-                });
-                let frame = NSRect::new(
-                    NSPoint::new(MARGIN, top - cursor - card_height),
-                    NSSize::new(inner, card_height),
-                );
-                // SAFETY: designated initializer with valid arguments on the main thread.
-                let card: Retained<ApprovalCard> =
-                    unsafe { msg_send![super(this), initWithFrame: frame] };
-                card
-            };
-            let buttons_top = card_height - CARD_PAD - BUTTON_HEIGHT;
-            let full = inner - 2.0 * CARD_PAD;
-            let half = if approval.confirm { (full - GAP) / 2.0 } else { full };
-            // The choices stack above the buttons that answer, in the order of the question.
-            let choices_top = buttons_top - approval.choices.len() as f64 * (BUTTON_HEIGHT + CHOICE_GAP);
-            for (n, choice) in approval.choices.iter().enumerate() {
-                let button = TouchButton::new(
-                    mtm,
-                    NSRect::new(
-                        NSPoint::new(CARD_PAD, choices_top + n as f64 * (BUTTON_HEIGHT + CHOICE_GAP)),
-                        NSSize::new(full, BUTTON_HEIGHT),
-                    ),
-                    Look::Rect,
-                );
-                button.set_symbol(if choice.selected { "checkmark" } else { "circle" });
-                button.set_title(&choice.label);
-                button.set_selected(choice.selected);
-                let (shared, id) = (Rc::clone(&self.callbacks), approval.id);
-                button.set_on_click(move || (shared.on_pick)(id, n));
-                card.addSubview(&button);
-            }
-            let deny = TouchButton::new(
-                mtm,
-                NSRect::new(
-                    NSPoint::new(CARD_PAD, buttons_top),
-                    NSSize::new(half, BUTTON_HEIGHT),
-                ),
-                Look::Rect,
-            );
-            deny.set_title(&approval.deny);
-            deny.set_tone(if approval.choices.is_empty() { Some(Tone::Red) } else { None });
-            let allow = TouchButton::new(
-                mtm,
-                NSRect::new(
-                    NSPoint::new(CARD_PAD + half + GAP, buttons_top),
-                    NSSize::new(half, BUTTON_HEIGHT),
-                ),
-                Look::Rect,
-            );
-            allow.set_symbol("checkmark");
-            allow.set_title(&approval.allow);
-            allow.set_selected(true);
-            deny.set_symbol(if approval.choices.is_empty() { "xmark" } else { "terminal" });
-            let id = approval.id;
-            let shared = Rc::clone(&self.callbacks);
-            deny.set_on_click(move || (shared.on_decide)(id, false));
-            let shared = Rc::clone(&self.callbacks);
-            allow.set_on_click(move || (shared.on_decide)(id, true));
-            card.addSubview(&deny);
-            if approval.confirm {
-                card.addSubview(&allow);
-            }
-            self.root.addSubview(&card);
-            added.push(Retained::into_super(card));
-            cursor += card_height + 8.0;
+            cursor += card_height(approval) + 8.0;
             if !display.more_waiting.is_empty() {
                 let more = new_view(|| {
                     let this = mtm.alloc::<HeadingLabel>().set_ivars(HeadingIvars {
@@ -600,18 +705,22 @@ impl AgentsView {
         }
 
         // The section is there for its button too: with nothing read yet, a refresh is how the first numbers come.
-        let usage_shown = !display.usage.is_empty() || display.refresh_label.is_some();
-        let usage_height = if usage_shown {
-            HEADING_HEIGHT + display.usage.len() as f64 * USAGE_ROW + 8.0
-        } else {
+        let mut usage_shown = !display.usage.is_empty() || display.refresh_label.is_some();
+        let usage_section = HEADING_HEIGHT + display.usage.len() as f64 * USAGE_ROW + 8.0;
+        let mut tokens_shown = !display.tokens.is_empty();
+        let tokens_section = HEADING_HEIGHT + display.tokens.len() as f64 * TOKENS_ROW + 8.0;
+        let bottom = top - 28.0;
+        // While several requests wait, their sessions come before the numbers: a press on one is how its request
+        // gets on the card.
+        let choosing = !display.more_waiting.is_empty();
+        let reserved = if choosing {
             0.0
-        } + if display.tokens.is_empty() {
-            0.0
         } else {
-            HEADING_HEIGHT + display.tokens.len() as f64 * TOKENS_ROW + 8.0
+            f64::from(u8::from(usage_shown)) * usage_section
+                + f64::from(u8::from(tokens_shown)) * tokens_section
         };
         if !display.sessions.is_empty() {
-            let room = top - cursor - usage_height - 28.0;
+            let room = bottom - cursor - reserved;
             let rows = (((room - HEADING_HEIGHT) / ROW_HEIGHT).floor().max(0.0) as usize)
                 .min(display.sessions.len());
             if rows > 0 {
@@ -634,8 +743,31 @@ impl AgentsView {
                 };
                 self.root.addSubview(&list);
                 added.push(Retained::into_super(list));
+                // A session that waits for an answer is pressable: it brings its request onto the card.
+                for (i, row) in display.sessions[..rows].iter().enumerate() {
+                    let Some(id) = row.approval else {
+                        continue;
+                    };
+                    let button = TouchButton::new(
+                        mtm,
+                        NSRect::new(
+                            NSPoint::new(MARGIN, top - cursor - (i + 1) as f64 * ROW_HEIGHT + 2.0),
+                            NSSize::new(inner, ROW_HEIGHT - 4.0),
+                        ),
+                        Look::Overlay,
+                    );
+                    button.set_title(&format!("{} {}", row.agent, row.project));
+                    let shared = Rc::clone(&self.callbacks);
+                    button.set_on_click(move || (shared.on_session)(id));
+                    self.root.addSubview(&button);
+                    added.push(Retained::into_super(button));
+                }
                 cursor += rows as f64 * ROW_HEIGHT + 8.0;
             }
+        }
+        if choosing {
+            usage_shown &= cursor + usage_section <= bottom;
+            tokens_shown &= cursor + f64::from(u8::from(usage_shown)) * usage_section + tokens_section <= bottom;
         }
         if usage_shown {
             let heading = self.heading(mtm, &display.usage_heading, cursor);
@@ -682,7 +814,7 @@ impl AgentsView {
             }
             cursor += display.usage.len() as f64 * USAGE_ROW + 8.0;
         }
-        if !display.tokens.is_empty() {
+        if tokens_shown {
             let heading = self.heading(mtm, &display.tokens_heading, cursor);
             self.root.addSubview(&heading);
             added.push(heading);
@@ -723,10 +855,10 @@ impl AgentsView {
             self.root.addSubview(&note);
             added.push(Retained::into_super(note));
         }
-        *self.dynamic.borrow_mut() = added;
+        added
     }
 
-    /// Returns true when the key was consumed: Enter allows the command in line, the delete key (Option+Delete by default) denies it, and
+    /// Returns true when the key was consumed: Enter allows the command on the card, the delete key (Option+Delete by default) denies it, and
     /// Command+R reads the usage limits again.
     pub fn handle_key(&self, key: Key) -> bool {
         if key == Key::Shortcut('r') {
@@ -795,6 +927,54 @@ define_class!(
 #[cfg(test)]
 mod tests {
     use super::*;
+
+    fn card(id: u64, labels: &[&str], ticked: &[usize]) -> ApprovalCardData {
+        ApprovalCardData {
+            id,
+            heading: "Claude Code - Pick".into(),
+            command: "Which?".into(),
+            detail: "shop  -  just now".into(),
+            allow: "Done".into(),
+            deny: "Terminal".into(),
+            choices: labels
+                .iter()
+                .enumerate()
+                .map(|(n, label)| ChoiceData {
+                    label: (*label).into(),
+                    selected: ticked.contains(&n),
+                })
+                .collect(),
+            confirm: true,
+        }
+    }
+
+    #[test]
+    fn the_card_under_a_click_is_kept_while_only_its_text_or_ticks_change() {
+        let shown = card(1, &["A", "B"], &[]);
+        assert_eq!(card_change(Some(&shown), Some(&shown.clone())), CardChange::Keep);
+        assert_eq!(card_change(None, None), CardChange::Keep);
+        let older = ApprovalCardData {
+            detail: "shop  -  1 minute ago".into(),
+            ..shown.clone()
+        };
+        assert_eq!(card_change(Some(&shown), Some(&older)), CardChange::Refresh);
+        assert_eq!(
+            card_change(Some(&shown), Some(&card(1, &["A", "B"], &[1]))),
+            CardChange::Refresh
+        );
+        assert_eq!(
+            card_change(Some(&shown), Some(&card(1, &["C", "D"], &[]))),
+            CardChange::Rebuild,
+            "the next question has other buttons"
+        );
+        assert_eq!(
+            card_change(Some(&shown), Some(&card(2, &["A", "B"], &[]))),
+            CardChange::Rebuild,
+            "another request"
+        );
+        assert_eq!(card_change(Some(&shown), None), CardChange::Rebuild);
+        assert_eq!(card_change(None, Some(&shown)), CardChange::Rebuild);
+    }
 
     #[test]
     fn a_short_command_is_shown_whole() {

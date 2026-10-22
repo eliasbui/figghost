@@ -18,6 +18,10 @@ pub enum Reply {
     /// The chosen labels of a `Question`, one per question in order; several choices of one are joined by ", ".
     Answers {
         answers: Vec<String>,
+        /// The same choices by their place in each question, smallest first: what pi takes. Claude Code reads the
+        /// labels, and a hook from before this field never sees it.
+        #[serde(default, skip_serializing_if = "Vec::is_empty")]
+        indexes: Vec<Vec<usize>>,
     },
     /// No answer: the agent asks the user itself, as if no hook existed.
     Pass,
@@ -60,7 +64,7 @@ pub fn hook_stdout(reply: &Reply) -> Option<String> {
 /// What the hook program prints for a `Question`: the tool goes ahead with the answers filled in, so the agent
 /// does not ask in the terminal. `input` is the tool input the agent sent.
 pub fn question_stdout(reply: &Reply, input: &serde_json::Value) -> Option<String> {
-    let Reply::Answers { answers } = reply else {
+    let Reply::Answers { answers, .. } = reply else {
         return None;
     };
     let mut given = serde_json::Map::new();
@@ -98,7 +102,11 @@ mod tests {
     #[test]
     fn answers_fill_the_tool_input_for_the_agent() {
         let input = json!({ "questions": [ { "question": "Which?", "options": [] } ] });
-        let out = question_stdout(&Reply::Answers { answers: vec!["A".into()] }, &input).unwrap();
+        let reply = Reply::Answers {
+            answers: vec!["A".into()],
+            indexes: vec![vec![0]],
+        };
+        let out = question_stdout(&reply, &input).unwrap();
         let out: Value = serde_json::from_str(&out).unwrap();
         let hook = &out["hookSpecificOutput"];
         assert_eq!(hook["permissionDecision"], "allow");
@@ -122,10 +130,27 @@ mod tests {
                 message: "no".into(),
             },
             Reply::Pass,
+            Reply::Answers {
+                answers: vec!["A, C".into()],
+                indexes: vec![vec![0, 2]],
+            },
         ] {
             assert_eq!(decode_reply(&encode_reply(&reply)).unwrap(), reply);
         }
         assert!(decode_reply("not json").is_err());
+        // What an app from before the indexes sends, and what it gets from one that has them.
+        assert_eq!(
+            decode_reply(r#"{"decision":"answers","answers":["A"]}"#).unwrap(),
+            Reply::Answers {
+                answers: vec!["A".into()],
+                indexes: Vec::new()
+            }
+        );
+        let plain = Reply::Answers {
+            answers: vec!["A".into()],
+            indexes: Vec::new(),
+        };
+        assert!(!encode_reply(&plain).contains("indexes"));
     }
 
     #[test]

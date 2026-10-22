@@ -77,7 +77,8 @@ const COLLAPSED_RADIUS: f64 = 10.0;
 const HOVER_CLOSE_DELAY: f64 = 0.35;
 /// The narrowest an ear beside the cutout gets, as a share of its height; wide enough for a square picture.
 const EAR_MIN_SHARE: f64 = 1.2;
-const EAR_MAX: f64 = 96.0;
+/// Wide enough for an agent and its project ("Claude figghost"); longer text ends in an ellipsis.
+const EAR_MAX: f64 = 128.0;
 const EAR_PAD: f64 = 9.0;
 /// How often moving bars are drawn while they are on screen.
 const BARS_FRAME_SECONDS: f64 = 1.0 / 30.0;
@@ -963,13 +964,14 @@ impl EarView {
             Ear::Text { text, tone } => {
                 let font = style::font(text_size(height), Weight::Semibold);
                 let line = font.ascender() - font.descender();
+                // Text wider than the widest ear ends in an ellipsis inside the padding, instead of being cut at the edge.
                 draw_text(
                     text,
                     NSRect::new(
-                        NSPoint::new(0.0, centre.y - line / 2.0 - 0.5),
-                        NSSize::new(bounds.size.width, line + 1.0),
+                        NSPoint::new(EAR_PAD, centre.y - line / 2.0 - 0.5),
+                        NSSize::new((bounds.size.width - 2.0 * EAR_PAD).max(0.0), line + 1.0),
                     ),
-                    &text_attributes(&font, &tone.color(), Fit::Clip, true),
+                    &text_attributes(&font, &tone.color(), Fit::Tail, true),
                 );
             }
             Ear::Artwork { .. } => {

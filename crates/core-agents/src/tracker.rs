@@ -192,12 +192,18 @@ impl Tracker {
             }
             EventKind::Stop => {
                 let session = self.session_mut(event);
+                // A Stop for a session that is already done, with no prompt in between, was already said once.
+                let again = session.state == State::Done;
                 session.state = State::Done;
                 session.note = None;
                 let (agent, project) = (session.agent, session.project());
                 self.approvals
                     .retain(|a| !(a.agent == agent && a.session_id == event.session_id));
-                Effect::Finished { agent, project }
+                if again {
+                    Effect::None
+                } else {
+                    Effect::Finished { agent, project }
+                }
             }
             EventKind::StopFailure => {
                 let session = self.session_mut(event);
@@ -363,6 +369,16 @@ mod tests {
             }
         );
         assert_eq!(state_of(&t, "a"), State::Done);
+        assert_eq!(
+            t.apply(&event(EventKind::Stop, "a", 4)),
+            Effect::None,
+            "a session that is already done does not finish again"
+        );
+        t.apply(&event(EventKind::PromptSubmit, "a", 5));
+        assert!(matches!(
+            t.apply(&event(EventKind::Stop, "a", 6)),
+            Effect::Finished { .. }
+        ));
     }
 
     #[test]
