@@ -28,6 +28,7 @@ objc2-app-kit.workspace = true
 core-foundation.workspace = true
 libc.workspace = true
 core-capture.workspace = true
+core-typing.workspace = true
 # Reads the lines of the Now Playing adapter.
 serde_json.workspace = true
 

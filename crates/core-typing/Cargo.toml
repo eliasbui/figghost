@@ -1,0 +1,9 @@
+[package]
+name = "core-typing"
+version.workspace = true
+edition.workspace = true
+rust-version.workspace = true
+publish.workspace = true
+
+[dependencies]
+gonhanh-core.workspace = true

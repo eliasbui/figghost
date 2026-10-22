@@ -37,6 +37,7 @@ const FEATURE_SCRIPTS: &[&str] = &[
     include_str!("../../web/features/devices.js"),
     include_str!("../../web/features/displays.js"),
     include_str!("../../web/features/system.js"),
+    include_str!("../../web/features/typing.js"),
 ];
 const FEATURE_STYLES: &[&str] = &[
     include_str!("../../web/features/smart.css"),
@@ -156,6 +157,10 @@ const FEATURE_FIXTURES: &[(&str, &str)] = &[
     (
         "system",
         include_str!("../../web/features/system.fixture.json"),
+    ),
+    (
+        "typing",
+        include_str!("../../web/features/typing.fixture.json"),
     ),
 ];
 

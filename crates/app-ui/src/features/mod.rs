@@ -44,6 +44,7 @@ pub mod snap;
 pub mod stack;
 pub mod system;
 pub mod translate;
+pub mod typing;
 pub mod utilities;
 pub mod vision;
 pub mod weather;
@@ -288,6 +289,7 @@ pub struct Features {
     pub devices: Option<Rc<devices::Feature>>,
     pub displays: Option<Rc<displays::Feature>>,
     pub system: Option<Rc<system::Feature>>,
+    pub typing: Option<Rc<typing::Feature>>,
     /// Where the tabs of the features that are off are taken out of the strip and put back.
     notch: Option<Weak<Notch>>,
 }
@@ -324,6 +326,7 @@ impl Features {
             system: system::attach(env),
             devices: devices::attach(env),
             displays: displays::attach(env),
+            typing: typing::attach(env),
             notch: env.notch.map(Rc::downgrade),
         };
         if let Some(notch) = env.notch {
@@ -405,6 +408,9 @@ impl Features {
         }
         if let Some(f) = &self.screentime {
             out.insert("screentime", f.runtime());
+        }
+        if let Some(f) = &self.typing {
+            out.insert("typing", f.runtime());
         }
         out
     }
@@ -531,6 +537,10 @@ impl Features {
                 .system
                 .as_ref()
                 .map_or(Ok(()), |f| f.configure(&config.system)),
+            "typing" => self
+                .typing
+                .as_ref()
+                .map_or(Ok(()), |f| f.configure(&config.typing)),
             _ => Ok(()),
         }
     }
@@ -579,6 +589,9 @@ impl Features {
         if let Some(f) = &self.pomodoro {
             f.suspend_hotkeys();
         }
+        if let Some(f) = &self.typing {
+            f.suspend_hotkeys();
+        }
     }
 
     pub fn resume_hotkeys(&self, config: &Config) {
@@ -623,6 +636,9 @@ impl Features {
         }
         if let Some(f) = &self.pomodoro {
             f.resume_hotkeys(&config.pomodoro);
+        }
+        if let Some(f) = &self.typing {
+            f.resume_hotkeys(&config.typing);
         }
     }
 
@@ -743,6 +759,11 @@ impl Features {
         {
             return Some(result);
         }
+        if let Some(f) = &self.typing
+            && let Some(result) = f.action(name, &mut config.typing)
+        {
+            return Some(result);
+        }
         None
     }
 
@@ -796,6 +817,9 @@ impl Features {
         }
         if let Some(f) = &self.pomodoro {
             entries.extend(pomodoro::Feature::menu_entries(f));
+        }
+        if let Some(f) = &self.typing {
+            entries.extend(typing::Feature::menu_entries(f));
         }
         entries
     }
@@ -916,6 +940,10 @@ pub fn state(
         "mole".into(),
         mole::settings::state(runtime.get("mole").unwrap_or(&none)),
     );
+    root.insert(
+        "typing".into(),
+        typing::settings::state(&config.typing, runtime.get("typing").unwrap_or(&none)),
+    );
 }
 
 /// A change of a setting whose path starts with a feature id. `None` when no feature owns the path; the
@@ -986,6 +1014,9 @@ pub fn set(config: &mut Config, path: &str, value: &Value) -> Option<Result<&'st
         }
         "displays" => displays::settings::set(&mut config.displays, rest, value)
             .map(|r| r.map(|()| "displays")),
+        "typing" => {
+            typing::settings::set(&mut config.typing, rest, value).map(|r| r.map(|()| "typing"))
+        }
         _ => None,
     }
 }
@@ -1008,6 +1039,7 @@ pub fn shortcut_owner(target: &str) -> Option<&'static str> {
         "pin",
         "utilities",
         "pomodoro",
+        "typing",
     ]
     .into_iter()
     .find(|id| *id == head)
@@ -1030,6 +1062,7 @@ pub fn shortcuts(config: &Config) -> Vec<(String, String)> {
     all.extend(pin::settings::shortcuts(&config.pin));
     all.extend(utilities::settings::shortcuts(&config.utilities));
     all.extend(pomodoro::settings::shortcuts(&config.pomodoro));
+    all.extend(typing::settings::shortcuts(&config.typing));
     all
 }
 
@@ -1069,6 +1102,8 @@ pub fn set_shortcut(
             .map(|r| r.map(|()| "utilities")),
         "pomodoro" => pomodoro::settings::set_shortcut(&mut config.pomodoro, target, value)
             .map(|r| r.map(|()| "pomodoro")),
+        "typing" => typing::settings::set_shortcut(&mut config.typing, target, value)
+            .map(|r| r.map(|()| "typing")),
         _ => None,
     }
 }

@@ -14,6 +14,7 @@ dependencies = [
  "core-lyrics",
  "core-mouse",
  "core-smart",
+ "core-typing",
  "core-window",
  "macos-sys",
  "objc2",
@@ -128,6 +129,13 @@ dependencies = [
 ]
 
 [[package]]
+name = "core-typing"
+version = "1.7.1"
+dependencies = [
+ "gonhanh-core",
+]
+
+[[package]]
 name = "core-window"
 version = "1.7.1"
 
@@ -172,6 +180,11 @@ name = "foldhash"
 version = "0.2.0"
 source = "registry+https://github.com/rust-lang/crates.io-index"
 checksum = "77ce24cb58228fbb8aa041425bb1050850ac19177686ea6e0f41a70416f56fdb"
+
+[[package]]
+name = "gonhanh-core"
+version = "0.1.0"
+source = "git+https://github.com/khaphanspace/gonhanh.org?rev=7ae856713adec91694c50d6ee38290b64b48bb3f#7ae856713adec91694c50d6ee38290b64b48bb3f"
 
 [[package]]
 name = "hashbrown"
@@ -250,6 +263,7 @@ dependencies = [
  "core-calendar",
  "core-capture",
  "core-foundation",
+ "core-typing",
  "core-window",
  "dispatch2",
  "libc",

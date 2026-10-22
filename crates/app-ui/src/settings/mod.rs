@@ -616,6 +616,11 @@ impl SettingsFeature {
             Purpose::Ignore => Message::IgnoredAdd {
                 id: picked.bundle_id,
             },
+            // The feature keeps its own list, through its action.
+            Purpose::Typing => {
+                self.action(&format!("typing_app_add:{}", picked.bundle_id));
+                return;
+            }
         };
         self.edit(&message);
     }
@@ -631,6 +636,7 @@ impl SettingsFeature {
         let purpose = match purpose {
             Purpose::Scroll => "scroll",
             Purpose::Ignore => "ignore",
+            Purpose::Typing => "typing",
         };
         self.post(&json!({ "t": "running", "purpose": purpose, "apps": list }));
     }

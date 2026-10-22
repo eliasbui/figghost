@@ -74,6 +74,7 @@ pub mod system_keys;
 pub mod system_ui;
 pub mod timezone;
 pub mod translate_ui;
+pub mod typing;
 pub mod ui;
 pub mod usage;
 pub mod vision;

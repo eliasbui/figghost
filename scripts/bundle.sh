@@ -33,6 +33,9 @@ cp "$ROOT/crates/app-ui/assets/Figghost.icns" "$APP/Contents/Resources/Figghost.
 # Patrick Hand, the hand-written face of its titles.
 cp "$ROOT/crates/app-ui/assets/Inter-OFL.txt" "$APP/Contents/Resources/Inter-OFL.txt"
 cp "$ROOT/crates/app-ui/assets/PatrickHand-OFL.txt" "$APP/Contents/Resources/PatrickHand-OFL.txt"
+# Vietnamese typing puts its marks with the engine of Gõ Nhanh, whose BSD 3-Clause licence asks every copy of the
+# program to carry its notice.
+cp "$ROOT/crates/app-ui/assets/GoNhanh-LICENSE.txt" "$APP/Contents/Resources/GoNhanh-LICENSE.txt"
 # The licence of Figghost itself travels with the app, as the MIT License asks of every copy.
 cp "$ROOT/LICENSE" "$APP/Contents/Resources/LICENSE.txt"
 

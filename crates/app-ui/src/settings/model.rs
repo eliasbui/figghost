@@ -88,6 +88,8 @@ pub enum RuleField {
 pub enum Purpose {
     Scroll,
     Ignore,
+    /// The apps where Vietnamese typing leaves every key alone.
+    Typing,
 }
 
 /// What the app has to do after a change was written to the config.
@@ -983,6 +985,12 @@ mod tests {
             }
         );
         assert_eq!(
+            msg(r#"{"t":"running","purpose":"typing"}"#),
+            Message::Running {
+                purpose: Purpose::Typing
+            }
+        );
+        assert_eq!(
             msg(r#"{"t":"js_error","message":"x"}"#),
             Message::JsError {
                 message: "x".into(),
@@ -1051,6 +1059,7 @@ mod tests {
             .apps
             .insert("com.a".into(), core_mouse::AppRule::default());
         config.ignored_apps = vec!["com.b".into()];
+        config.typing.apps = vec!["com.c".into()];
         let mut e = env();
         e.agents.spend = vec![crate::agents::Spend {
             agent: "claude",

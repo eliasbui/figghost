@@ -40,6 +40,7 @@ pub mod field {
     pub const SCROLL_MOMENTUM_PHASE: u32 = 123;
 }
 
+const HID_EVENT_TAP: u32 = 0;
 const SESSION_EVENT_TAP: u32 = 1;
 const HEAD_INSERT: u32 = 0;
 const OPTION_DEFAULT: u32 = 0;
@@ -146,10 +147,24 @@ impl EventTap {
         event_mask: u64,
         handler: impl FnMut(u32, &EventView<'_>) -> Verdict + Send + 'static,
     ) -> Result<Self, TapError> {
+        Self::spawn_at(SESSION_EVENT_TAP, event_mask, Box::new(handler))
+    }
+
+    /// The same where the events of the hardware enter the system, ahead of every tap of the session. Events that
+    /// apps post (this one's included) never pass through it, and the next key cannot overtake one that the handler
+    /// holds back while it posts others.
+    pub fn spawn_hid(
+        event_mask: u64,
+        handler: impl FnMut(u32, &EventView<'_>) -> Verdict + Send + 'static,
+    ) -> Result<Self, TapError> {
+        Self::spawn_at(HID_EVENT_TAP, event_mask, Box::new(handler))
+    }
+
+    fn spawn_at(location: u32, event_mask: u64, handler: Handler) -> Result<Self, TapError> {
         let (ready_tx, ready_rx) = mpsc::channel();
         let thread = thread::Builder::new()
             .name("fig-event-tap".into())
-            .spawn(move || run_tap_thread(event_mask, Box::new(handler), ready_tx))
+            .spawn(move || run_tap_thread(location, event_mask, handler, ready_tx))
             .map_err(TapError::Thread)?;
         match ready_rx.recv() {
             Ok(Ok(run_loop)) => Ok(Self {
@@ -185,6 +200,7 @@ impl Drop for EventTap {
 }
 
 fn run_tap_thread(
+    location: u32,
     event_mask: u64,
     handler: Handler,
     ready: mpsc::Sender<Result<RunLoopHandle, TapError>>,
@@ -198,7 +214,7 @@ fn run_tap_thread(
     // SAFETY: `ctx` stays allocated until the run loop below has stopped.
     let port = unsafe {
         CGEventTapCreate(
-            SESSION_EVENT_TAP,
+            location,
             HEAD_INSERT,
             OPTION_DEFAULT,
             event_mask,

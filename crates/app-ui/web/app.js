@@ -727,10 +727,11 @@ function onRunning(m) {
   if (!pendingMenu || pendingMenu.purpose !== m.purpose) return;
   const { anchor, purpose } = pendingMenu;
   pendingMenu = null;
-  const listed = new Set((purpose === 'scroll' ? S.mouse.apps : S.clipboard.ignored).map((a) => a.id));
+  const listed = new Set((purpose === 'scroll' ? S.mouse.apps : purpose === 'typing' ? S.typing.apps : S.clipboard.ignored).map((a) => a.id));
   const free = m.apps.filter((a) => !listed.has(a.id));
   closeMenu();
-  const addMessage = (id) => ({ t: purpose === 'scroll' ? 'app_add' : 'ignored_add', id });
+  // Vietnamese typing keeps its list itself, through an action that carries the app.
+  const addMessage = (id) => (purpose === 'typing' ? { t: 'action', name: 'typing_app_add:' + id } : { t: purpose === 'scroll' ? 'app_add' : 'ignored_add', id });
   menuEl = h('div', { class: 'menu glass', role: 'menu' },
     h('div', { class: 'section-title', style: 'margin:8px 10px 6px', text: t('menu.running') }),
     free.length
@@ -1850,7 +1851,7 @@ Object.assign(I18N.en, {
   'about.license.body': 'Figghost is free, open source software under the MIT License, copyright 2026 Doanh Thai Bui. You may use it for any purpose, at home or at work, copy it, change it, share it and even sell what you make from it. The one condition is that the copyright notice and the licence text stay with every copy or substantial part of it. It comes without any warranty: the authors are not liable for what it does on your Mac.',
   'about.license.show': 'Show the licence text', 'about.license.hide': 'Hide the licence text',
   'about.others.title': 'Other licences',
-  'about.others.body': 'The font Inter is bundled as the fallback of this window, under the SIL Open Font License 1.1 (copyright 2020 The Inter Project Authors); its text is in Resources/Inter-OFL.txt inside the app, and that of Figghost in Resources/LICENSE.txt. The icons of the interface are SF Symbols, which macOS draws itself and which are not part of Figghost. The Rust libraries it is built from keep their own licences.',
+  'about.others.body': 'The font Inter is bundled as the fallback of this window, under the SIL Open Font License 1.1 (copyright 2020 The Inter Project Authors); its text is in Resources/Inter-OFL.txt inside the app, and that of Figghost in Resources/LICENSE.txt. Vietnamese typing puts its marks with the engine of Gõ Nhanh (copyright 2025 Gõ Nhanh Contributors), under the BSD 3-Clause License, whose text is in Resources/GoNhanh-LICENSE.txt. The icons of the interface are SF Symbols, which macOS draws itself and which are not part of Figghost. The Rust libraries it is built from keep their own licences.',
 });
 Object.assign(I18N.vi, {
   'about.sec.what': 'Giới thiệu Figghost',
@@ -1875,7 +1876,7 @@ Object.assign(I18N.vi, {
   'about.license.body': 'Figghost là phần mềm mã nguồn mở, miễn phí, theo Giấy phép MIT, bản quyền 2026 Doanh Thai Bui. Bạn được dùng cho mọi mục đích, ở nhà hay ở nơi làm việc, sao chép, sửa đổi, chia sẻ và thậm chí bán sản phẩm bạn làm ra từ nó. Điều kiện duy nhất là thông báo bản quyền và nội dung giấy phép phải đi kèm mọi bản sao hoặc phần đáng kể của phần mềm. Phần mềm được cung cấp nguyên trạng, không bảo hành: tác giả không chịu trách nhiệm về những gì nó làm trên máy Mac của bạn.',
   'about.license.show': 'Xem nội dung giấy phép', 'about.license.hide': 'Ẩn nội dung giấy phép',
   'about.others.title': 'Các giấy phép khác',
-  'about.others.body': 'Phông Inter đi kèm làm phông dự phòng cho cửa sổ này, theo SIL Open Font License 1.1 (bản quyền 2020 The Inter Project Authors); nội dung giấy phép nằm ở Resources/Inter-OFL.txt trong ứng dụng, còn của Figghost ở Resources/LICENSE.txt. Các biểu tượng của giao diện là SF Symbols do macOS tự vẽ, không thuộc về Figghost. Các thư viện Rust dùng để xây dựng ứng dụng giữ giấy phép riêng của chúng.',
+  'about.others.body': 'Phông Inter đi kèm làm phông dự phòng cho cửa sổ này, theo SIL Open Font License 1.1 (bản quyền 2020 The Inter Project Authors); nội dung giấy phép nằm ở Resources/Inter-OFL.txt trong ứng dụng, còn của Figghost ở Resources/LICENSE.txt. Gõ tiếng Việt đặt dấu bằng bộ máy của Gõ Nhanh (bản quyền 2025 Gõ Nhanh Contributors), theo giấy phép BSD 3-Clause, nội dung nằm ở Resources/GoNhanh-LICENSE.txt. Các biểu tượng của giao diện là SF Symbols do macOS tự vẽ, không thuộc về Figghost. Các thư viện Rust dùng để xây dựng ứng dụng giữ giấy phép riêng của chúng.',
 });
 
 function pageAbout() {
@@ -1918,7 +1919,7 @@ const CATEGORIES = [
   { id: 'scroll', icon: 'computermouse.fill', pages: ['scroll', 'cursor', 'wheel'] },
   { id: 'notch', icon: 'rectangle.topthird.inset.filled', pages: ['notch', 'islands', 'musicwidget'] },
   { id: 'tabs', icon: 'square.grid.2x2.fill', pages: ['calendar', 'dayprogress', 'agents', 'notes', 'launcher', 'weather', 'prs', 'pomodoro', 'screentime', 'system', 'devices', 'displays'] },
-  { id: 'clipboard', icon: 'doc.on.clipboard.fill', pages: ['clipboard', 'smart', 'translate', 'capture', 'vision', 'utilities'] },
+  { id: 'clipboard', icon: 'doc.on.clipboard.fill', pages: ['clipboard', 'smart', 'translate', 'typing', 'capture', 'vision', 'utilities'] },
   { id: 'tiling', icon: 'rectangle.split.2x1.fill', pages: ['tiling', 'pin', 'keys'] },
 ];
 

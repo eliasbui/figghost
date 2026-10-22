@@ -16,6 +16,7 @@ core-calendar.workspace = true
 core-lyrics.workspace = true
 core-smart.workspace = true
 core-audio-fx.workspace = true
+core-typing.workspace = true
 serde.workspace = true
 serde_json.workspace = true
 

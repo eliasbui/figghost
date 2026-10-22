@@ -87,6 +87,7 @@ pub mod symbols {
         POMODORO = "timer",
         MIC_MUTE = "mic.slash",
         KEYBOARD = "keyboard",
+        TYPING = "character.cursor.ibeam",
     }
 }
 
