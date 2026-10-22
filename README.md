@@ -10,6 +10,10 @@
 </p>
 
 <p align="center">
+  English | <a href="README.vi.md">Tiếng Việt</a>
+</p>
+
+<p align="center">
   <a href="https://github.com/eliasbui/figghost/releases/latest"><img src="https://img.shields.io/github/v/release/eliasbui/figghost?label=release" alt="Latest release"></a>
   <img src="https://img.shields.io/badge/macOS-13%2B-black" alt="macOS 13 or later">
   <img src="https://img.shields.io/badge/Apple%20silicon-arm64-black" alt="Apple silicon">
@@ -312,7 +316,7 @@ Small notices that come out of the closed notch for a moment: Caps Lock turning 
 
 ### Utilities
 
-Keep the Mac awake for 15 minutes to 4 hours or until you stop it, mute the microphone itself so every app hears nothing (it is unmuted when Figghost quits, since nothing else on the Mac has a switch for it), lock the keyboard while you wipe it (Command and Escape unlock it at once, and it unlocks by itself after the time you set), and snooze the notch for 5 minutes to 2 hours or until you wake it, so that it does not open when the pointer reaches the top of the screen while you present or play (a click on it, and a coding agent that waits for an answer, still open it). Each has a place in the menu bar panel, a shortcut that works in any app and a notice on the notch (off by default).
+Keep the Mac awake for 15 minutes to 4 hours or until you stop it, mute the microphone itself so every app hears nothing (it is unmuted when Figghost quits, since nothing else on the Mac has a switch for it), lock the keyboard while you wipe it (Command and Escape unlock it at once, and it unlocks by itself after the time you set), and snooze the notch for 5 minutes to 2 hours or until you wake it, so that it does not open when the pointer reaches the top of the screen while you present or play (a click on it, and a coding agent that waits for an answer, still open it). Each has a place in the menu bar panel (one switch for keeping awake and one for snoozing, which start the length chosen on this page; the lists of lengths are in the menu), a shortcut that works in any app and a notice on the notch (off by default).
 
 ![The Utilities page in Vietnamese](docs/images/settings-utilities-vi.png)
 
