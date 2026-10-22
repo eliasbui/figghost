@@ -358,6 +358,7 @@ Object.assign(I18N.en, {
   'notch.rest.hardware': 'This screen has a notch of its own.',
   'notch.rest.notch': 'Notch', 'notch.rest.hidden': 'Hidden',
   'notch.capture.title': 'Hide in screenshots and recordings', 'notch.capture.desc': 'The notch stays out of every screenshot and screen recording, including this app\'s own.',
+  'notch.fullscreen.title': 'Show over full-screen apps', 'notch.fullscreen.desc': 'Off hides the notch completely while the app in front is full screen on its screen, and brings it back when that app leaves full screen.',
   'tabs.desc': 'Turn tabs on or off and change their order. Command + 1 to 9 follow this order.',
   'tab.sound': 'Sound', 'tab.sound.desc': 'Volume, output and equalizer for each app that plays.',
   'tab.media.desc': 'Previous, play and next for whatever plays, browsers included, with its cover, the app it comes from and the time.',
@@ -412,6 +413,7 @@ Object.assign(I18N.vi, {
   'notch.rest.hardware': 'Màn hình này có notch riêng.',
   'notch.rest.notch': 'Notch', 'notch.rest.hidden': 'Ẩn',
   'notch.capture.title': 'Ẩn khi chụp và quay màn hình', 'notch.capture.desc': 'Notch không xuất hiện trong ảnh chụp và video quay màn hình, kể cả của chính ứng dụng này.',
+  'notch.fullscreen.title': 'Hiện khi app toàn màn hình', 'notch.fullscreen.desc': 'Khi tắt, notch ẩn hẳn trong lúc app phía trước đang toàn màn hình trên màn hình của notch, và hiện lại khi app đó thoát toàn màn hình.',
   'tabs.desc': 'Bật, tắt và sắp xếp các tab. Command + 1 đến 9 theo đúng thứ tự này.',
   'tab.sound': 'Âm thanh', 'tab.sound.desc': 'Âm lượng, thiết bị phát và bộ chỉnh âm cho từng ứng dụng đang phát.',
   'tab.media.desc': 'Trước, phát và sau cho mọi thứ đang phát, kể cả trình duyệt, kèm ảnh bìa, ứng dụng nguồn và thời gian.',
@@ -1483,6 +1485,7 @@ function pageNotch() {
           .concat((S.notch.screens || []).map((name) => ({ value: 'screen:' + name, label: name }))),
       }),
       rest,
+      toggleRow('notch.show_in_fullscreen', t('notch.fullscreen.title'), t('notch.fullscreen.desc'), { when: on }),
       toggleRow('notch.hide_in_capture', t('notch.capture.title'), t('notch.capture.desc'), { when: on })),
     sectionTitle(t('sec.notch.live')),
     card(
@@ -2271,6 +2274,10 @@ window.__selftest = function () {
     expect(sent.some((m) => m.path === 'notch.width' && m.value === 800) && sent.some((m) => m.path === 'notch.rest_height' && m.value === 32), 'a style card sends its sizes: ' + JSON.stringify(sent));
     expect(document.querySelectorAll('.style-card')[2].getAttribute('aria-pressed') === 'true', 'and shows as chosen');
     expect($('.notch').classList.contains('mat-accent'), 'the preview follows the material');
+    sent.length = 0;
+    const fullScreen = S.notch.show_in_fullscreen;
+    $(`.switch[aria-label="${t('notch.fullscreen.title')}"]`).click();
+    expect(sent.some((m) => m.t === 'set' && m.path === 'notch.show_in_fullscreen' && m.value === !fullScreen), 'the full-screen switch sends its setting: ' + JSON.stringify(sent));
     S.notch.volume_hud = true;
     runSyncs();
     sent.length = 0;

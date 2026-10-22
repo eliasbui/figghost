@@ -6,7 +6,7 @@ use objc2::{
 };
 use objc2_app_kit::{
     NSApplicationActivationPolicy, NSImage, NSModalResponseOK, NSOpenPanel, NSScreen, NSWorkspace,
-    NSWorkspaceDidActivateApplicationNotification,
+    NSWorkspaceActiveSpaceDidChangeNotification, NSWorkspaceDidActivateApplicationNotification,
 };
 use objc2_foundation::{
     NSArray, NSBundle, NSFileManager, NSNotification, NSNotificationCenter, NSObjectProtocol,
@@ -70,6 +70,23 @@ pub fn observe_frontmost(on_change: impl Fn(App) + 'static) -> Observer {
     let token = unsafe {
         center.addObserverForName_object_queue_usingBlock(
             Some(NSWorkspaceDidActivateApplicationNotification),
+            None,
+            None,
+            &block,
+        )
+    };
+    Observer { center, token }
+}
+
+/// Calls `on_change` on the main thread whenever another space comes to the front, such as when an app goes full
+/// screen or leaves it.
+pub fn observe_space(on_change: impl Fn() + 'static) -> Observer {
+    let block = RcBlock::new(move |_: NonNull<NSNotification>| on_change());
+    let center = NSWorkspace::sharedWorkspace().notificationCenter();
+    // SAFETY: the block is 'static and is invoked on the main thread, where the notification is posted.
+    let token = unsafe {
+        center.addObserverForName_object_queue_usingBlock(
+            Some(NSWorkspaceActiveSpaceDidChangeNotification),
             None,
             None,
             &block,

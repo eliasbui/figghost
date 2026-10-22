@@ -25,7 +25,7 @@
   "notch": {
     "enabled": true, "volume_hud": false, "shelf_count": 4,
     "material": "glass", "hud": "notch", "hud_position": "auto", "shadow": true, "motion": "spring", "open_on_hover": true, "hover_delay_ms": 300, "width": 0, "height": 0, "rest_width": 0, "rest_height": 0,
-    "rest": "notch", "hide_in_capture": false, "haptics": true, "display": "auto", "open_page": "activity",
+    "rest": "notch", "hide_in_capture": false, "show_in_fullscreen": true, "haptics": true, "display": "auto", "open_page": "activity",
     "pages": [
       { "id": "clipboard", "title": "Clipboard", "on": true, "waiting": false },
       { "id": "shelf", "title": "Shelf", "on": true, "waiting": false },
