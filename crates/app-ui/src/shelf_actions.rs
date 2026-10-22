@@ -445,8 +445,8 @@ fn run_native(work: &Native, output: &Path) -> Result<(), String> {
         } => ops::pdf_to_images(source, output, stem, *format).map(|_| ()),
         Native::DocumentToPdf { source } => document_to_pdf(source, output),
         Native::VideoToGif { source } => {
-            use crate::features::capture::record::{GIF_FPS, GIF_MAX_WIDTH};
-            macos_sys::gif::write_gif(source, output, GIF_MAX_WIDTH, GIF_FPS)
+            use macos_sys::gif::{GIF_FPS, GIF_MAX_WIDTH, write_gif};
+            write_gif(source, output, GIF_MAX_WIDTH, GIF_FPS)
         }
     }
 }

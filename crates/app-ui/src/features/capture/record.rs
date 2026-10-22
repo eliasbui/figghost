@@ -22,9 +22,6 @@ use std::{
 };
 
 const FPS: u32 = 30;
-/// GIF frame delays are in hundredths of a second; 8 of them make exactly 12.5 frames per second.
-pub(crate) const GIF_FPS: f64 = 12.5;
-pub(crate) const GIF_MAX_WIDTH: f64 = 960.0;
 const STATUS_SECONDS: f64 = 0.5;
 /// A stopped recording that has not finished its file by then is given up on, so a new one can start.
 const STOP_TIMEOUT_SECONDS: f64 = 15.0;
@@ -300,16 +297,22 @@ impl Recorder {
         };
         capture_ui::toast(feature.mtm, i18n::current().record_making_gif());
         let (me, temporary) = (Rc::downgrade(&feature), video.clone());
-        gif::video_to_gif(&video, &gif_path, GIF_MAX_WIDTH, GIF_FPS, move |result| {
-            let _ = fs::remove_file(&temporary);
-            let Some(feature) = me.upgrade() else {
-                return;
-            };
-            match result {
-                Ok(gif) => feature.deliver_file(gif, poster, screen),
-                Err(e) => capture_ui::toast(feature.mtm, &i18n::current().record_failed(&e)),
-            }
-        });
+        gif::video_to_gif(
+            &video,
+            &gif_path,
+            gif::GIF_MAX_WIDTH,
+            gif::GIF_FPS,
+            move |result| {
+                let _ = fs::remove_file(&temporary);
+                let Some(feature) = me.upgrade() else {
+                    return;
+                };
+                match result {
+                    Ok(gif) => feature.deliver_file(gif, poster, screen),
+                    Err(e) => capture_ui::toast(feature.mtm, &i18n::current().record_failed(&e)),
+                }
+            },
+        );
     }
 
     /// Takes down the bar, the key display and the camera, and lets a new recording start.
