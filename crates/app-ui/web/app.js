@@ -117,7 +117,7 @@ const I18N = {
     'tab.calendar': 'Calendar', 'tab.calendar.desc': 'Today and tomorrow, the reminders that are due, and an alert with a Join button before a meeting. Off until you turn it on in the Calendar page.',
     'fault.agents_failed': 'Could not change the agent files.',
     'page.tiling': 'Window snapping', 'page.tiling.sub': 'Place the focused window on a part of the screen with a shortcut.',
-    'page.about': 'About', 'page.about.sub': 'Mos, Maccy and OneNotch ideas in one small app.',
+    'page.about': 'About', 'page.about.sub': 'One light app for the small tools of a Mac.',
 
     'hero.tagline': 'Smooth scrolling, clipboard history and a notch toolbox in one quiet menu bar app.',
     'chip.version': 'Version {v}', 'chip.access.ok': 'Accessibility on', 'chip.access.no': 'Accessibility needed',
@@ -182,7 +182,7 @@ const I18N = {
     'layout.grid_4': 'Cell 4 · middle left', 'layout.grid_5': 'Cell 5 · center', 'layout.grid_6': 'Cell 6 · middle right',
     'layout.grid_7': 'Cell 7 · bottom left', 'layout.grid_8': 'Cell 8 · bottom middle', 'layout.grid_9': 'Cell 9 · bottom right',
 
-    'about.line': 'Smooth scrolling like Mos, clipboard history like Maccy, a notch toolbox like OneNotch.',
+    'about.line': 'A light native toolbox for the menu bar and the notch of your Mac.',
     'about.version': 'Version', 'about.privacy': 'Privacy', 'about.privacy.val': 'Everything stays on this Mac. The only thing Figghost asks the network by itself is whether a new version exists, once a day.', 'about.quit': 'Quit Figghost',
     'about.quit.desc': 'Stops scrolling, clipboard and notch features until you open the app again.',
     'about.update': 'Check for updates', 'about.update.desc': 'Looks for a new version every day. Press Check now to look at once; a new version is downloaded and installed for you.', 'about.update.check': 'Check now',
@@ -239,7 +239,7 @@ const I18N = {
     'tab.calendar': 'Lịch', 'tab.calendar.desc': 'Hôm nay và ngày mai, các lời nhắc đến hạn và cảnh báo có nút Tham gia trước cuộc họp. Tắt cho đến khi bạn bật ở trang Lịch.',
     'fault.agents_failed': 'Không sửa được tệp của tác tử.',
     'page.tiling': 'Chia cửa sổ', 'page.tiling.sub': 'Đặt cửa sổ đang dùng vào một vùng của màn hình bằng phím tắt.',
-    'page.about': 'Giới thiệu', 'page.about.sub': 'Ý tưởng của Mos, Maccy và OneNotch trong một ứng dụng nhỏ.',
+    'page.about': 'Giới thiệu', 'page.about.sub': 'Một ứng dụng nhẹ cho các công cụ nhỏ của máy Mac.',
 
     'hero.tagline': 'Cuộn mượt, lịch sử clipboard và hộp công cụ notch trong một ứng dụng thanh menu gọn nhẹ.',
     'chip.version': 'Phiên bản {v}', 'chip.access.ok': 'Đã có quyền Trợ năng', 'chip.access.no': 'Cần quyền Trợ năng',
@@ -304,7 +304,7 @@ const I18N = {
     'layout.grid_4': 'Ô 4 · giữa trái', 'layout.grid_5': 'Ô 5 · chính giữa', 'layout.grid_6': 'Ô 6 · giữa phải',
     'layout.grid_7': 'Ô 7 · dưới trái', 'layout.grid_8': 'Ô 8 · dưới giữa', 'layout.grid_9': 'Ô 9 · dưới phải',
 
-    'about.line': 'Cuộn mượt như Mos, lịch sử clipboard như Maccy, hộp công cụ notch như OneNotch.',
+    'about.line': 'Hộp công cụ gọn nhẹ, bản địa, cho thanh menu và notch của máy Mac.',
     'about.version': 'Phiên bản', 'about.privacy': 'Riêng tư', 'about.privacy.val': 'Mọi thứ nằm trên máy Mac này. Thứ duy nhất Figghost tự hỏi qua mạng là đã có bản mới hay chưa, mỗi ngày một lần.', 'about.quit': 'Thoát Figghost',
     'about.quit.desc': 'Dừng cuộn mượt, clipboard và notch cho đến khi bạn mở lại ứng dụng.',
     'about.update': 'Kiểm tra bản mới', 'about.update.desc': 'Mỗi ngày tự hỏi GitHub xem có bản mới chưa. Bấm Kiểm tra để hỏi ngay; bản mới sẽ được tải và cài sẵn cho bạn.', 'about.update.check': 'Kiểm tra',
@@ -1837,13 +1837,16 @@ const MIT_LICENSE = [
 
 Object.assign(I18N.en, {
   'about.sec.what': 'About Figghost',
+  'about.sec.map': 'What is where',
+  'about.map.title': 'Six groups, one dock',
+  'about.map.body': 'The icons of the dock at the foot of this window open six groups of pages. Press one and drag along the dock to look through them; Command-K finds any setting by name.',
   'about.what.title': 'One light app for the small tools of a Mac',
-  'about.what.body': 'Smooth mouse-wheel scrolling, a clipboard history, a panel that grows out of the notch with a file shelf, media, a focus timer, your calendar and your coding agents, sound for each app window snapping, a window kept on top and a cursor of your own live in one place. Screenshots, screen recordings, a colour picker, Smart Select, Translate and more can be switched on when you want them.',
+  'about.what.body': 'Smooth mouse-wheel scrolling and a pointer of your own, a clipboard history, window snapping from the notch, and a panel that grows out of the notch with tabs for files, media, your calendar, coding agents, weather, system health and more. Vietnamese typing in every app, Smart Select, Translate, screenshots, screen recordings, a colour picker, sound for each app and a window kept on top can be switched on when you want them.',
   'about.native.title': 'Native, and kept on this Mac',
   'about.native.body': 'It is written in Rust on AppKit, with no browser engine in the app itself; only this settings window is a web page. It idles light, comes in English and Vietnamese, and everything it keeps stays on this Mac.',
   'about.sec.history': 'How it came to be',
   'about.why.title': 'Why it exists',
-  'about.why.body': 'Smooth scrolling, a clipboard history and a notch toolbox usually come as separate apps: Mos, Maccy and OneNotch gave it its ideas, and SoundSource and CleanShot X those of the sound and capture tools. Figghost brings them into one app with one permission prompt, one login item and one settings window. Their ideas inspired it; its code and artwork are its own.',
+  'about.why.body': 'Smooth scrolling, a clipboard history and a notch toolbox usually come as separate apps: Mos, Maccy and OneNotch gave it its ideas, SoundSource and CleanShot X those of the sound and capture tools, and Gõ Nhanh the engine of its Vietnamese typing, used unchanged. Figghost brings them into one app with one permission prompt, one login item and one settings window. Their ideas inspired it; its code and artwork are its own.',
   'about.versions.title': 'Versions',
   'about.v.0_2': 'Version 0.2, 15 October 2026', 'about.v.0_2.body': 'Sound for each app, screenshots, scrolling capture and screen recordings with an editor, the settings window, AI agents on the notch, Smart Select, a calendar, lyrics, snapping to the notch, a menu bar icon hider and Copy Stack.',
   'about.v.0_4': 'Versions 0.3 and 0.4, 16 October 2026', 'about.v.0_4.body': 'Every surface rebuilt on Liquid Glass, and the clipboard mascot.',
@@ -1853,22 +1856,28 @@ Object.assign(I18N.en, {
   'about.v.0_8': 'Version 0.8, 19 October 2026', 'about.v.0_8.body': 'A new app icon and a sidebar with a name beside every icon.',
   'about.v.0_9': 'Version 0.9, 19 October 2026', 'about.v.0_9.body': 'A hello from the ghost, Translate, Bluetooth in the notch, 3D sound, and window snapping in two steps with layouts of your own.',
   'about.v.1_0': 'Version 1.0, 19 October 2026', 'about.v.1_0.body': 'The first big release: a custom cursor, Always on top, a Shortcuts page, a search field for the settings, and a simpler area picker for screenshots.',
+  'about.v.1_x': 'Versions 1.1 to 1.9, 19 to 22 October 2026', 'about.v.1_x.body': 'Questions answered on the notch, a music widget and more volume indicators, a permissions check, ten more notch tabs (System, Notes, Launcher, Weather, Pull requests, Pomodoro, Screen Time, Day progress, Devices and Displays), live islands, utilities, Orca accounts, pi, and Vietnamese typing.',
+  'about.v.2_0': 'Version 2.0, 22 October 2026', 'about.v.2_0.body': 'A new settings window on Liquid Glass: the page groups are icons in a floating dock with a lens you can drag, and the search is in the title bar.',
+  'about.v.2_0_2': 'Version 2.0.2, 22 October 2026', 'about.v.2_0_2.body': 'The language of Vietnamese typing on the notch and in the menu bar, a shortcut that can be recorded even when the system uses it, Spotlight, and a dock with clearer icons.',
   'about.sec.license': 'Licence',
   'about.license.title': 'MIT License',
   'about.license.body': 'Figghost is free, open source software under the MIT License, copyright 2026 Doanh Thai Bui. You may use it for any purpose, at home or at work, copy it, change it, share it and even sell what you make from it. The one condition is that the copyright notice and the licence text stay with every copy or substantial part of it. It comes without any warranty: the authors are not liable for what it does on your Mac.',
   'about.license.show': 'Show the licence text', 'about.license.hide': 'Hide the licence text',
   'about.others.title': 'Other licences',
-  'about.others.body': 'The font Inter is bundled as the fallback of this window, under the SIL Open Font License 1.1 (copyright 2020 The Inter Project Authors); its text is in Resources/Inter-OFL.txt inside the app, and that of Figghost in Resources/LICENSE.txt. Vietnamese typing puts its marks with the engine of Gõ Nhanh (copyright 2025 Gõ Nhanh Contributors), under the BSD 3-Clause License, whose text is in Resources/GoNhanh-LICENSE.txt. The icons of the interface are SF Symbols, which macOS draws itself and which are not part of Figghost. The Rust libraries it is built from keep their own licences.',
+  'about.others.body': 'The font Inter is bundled as the fallback of this window, under the SIL Open Font License 1.1 (copyright 2020 The Inter Project Authors); its text is in Resources/Inter-OFL.txt inside the app, and that of Figghost in Resources/LICENSE.txt. Patrick Hand, the handwriting of the titles and of the ghost, is under the same licence (Resources/PatrickHand-OFL.txt). Vietnamese typing puts its marks with the engine of Gõ Nhanh (copyright 2025 Gõ Nhanh Contributors), under the BSD 3-Clause License, whose text is in Resources/GoNhanh-LICENSE.txt. The icons of the interface are SF Symbols, which macOS draws itself and which are not part of Figghost. The Rust libraries it is built from keep their own licences.',
 });
 Object.assign(I18N.vi, {
   'about.sec.what': 'Giới thiệu Figghost',
+  'about.sec.map': 'Có gì ở đâu',
+  'about.map.title': 'Sáu nhóm, một dock',
+  'about.map.body': 'Các biểu tượng trên dock ở chân cửa sổ này mở sáu nhóm trang. Nhấn một biểu tượng rồi kéo dọc dock để xem lần lượt; Command-K tìm mọi cài đặt theo tên.',
   'about.what.title': 'Một ứng dụng nhẹ cho các công cụ nhỏ của máy Mac',
-  'about.what.body': 'Cuộn chuột mượt, lịch sử clipboard, một bảng mở ra từ notch với khay tệp, nhạc đang phát, đồng hồ tập trung, lịch và các tác tử lập trình của bạn, âm thanh riêng cho từng ứng dụng, ghim cửa sổ, giữ một cửa sổ luôn trên cùng và con trỏ riêng của bạn, tất cả nằm chung một chỗ. Chụp màn hình, quay màn hình, chọn màu, Smart Select, Dịch và nhiều thứ khác có thể bật khi bạn cần.',
+  'about.what.body': 'Cuộn chuột mượt và con trỏ của riêng bạn, lịch sử clipboard, chia cửa sổ từ notch, và một bảng mở ra từ notch với các tab cho tệp, nhạc, lịch, tác tử lập trình, thời tiết, sức khỏe hệ thống và nhiều thứ khác. Gõ tiếng Việt ở mọi ứng dụng, Chọn thông minh, Dịch, chụp màn hình, quay màn hình, chọn màu, âm thanh riêng cho từng ứng dụng và giữ một cửa sổ luôn trên cùng có thể bật khi bạn cần.',
   'about.native.title': 'Bản địa, và ở lại trên máy này',
   'about.native.body': 'Ứng dụng viết bằng Rust trên AppKit, không có trình duyệt nhúng trong chính ứng dụng; chỉ cửa sổ cài đặt này là một trang web. Nó chạy nhẹ, có tiếng Anh và tiếng Việt, và mọi thứ nó lưu đều ở lại trên máy Mac này.',
   'about.sec.history': 'Vì sao có Figghost',
   'about.why.title': 'Lý do ra đời',
-  'about.why.body': 'Cuộn mượt, lịch sử clipboard và hộp công cụ notch thường là các ứng dụng riêng lẻ: Mos, Maccy và OneNotch gợi ý tưởng cho nó, còn SoundSource và CleanShot X gợi ý cho phần âm thanh và chụp màn hình. Figghost gom chúng vào một ứng dụng với một lần xin quyền, một mục khởi động cùng máy và một cửa sổ cài đặt. Ý tưởng lấy cảm hứng từ các ứng dụng đó; mã nguồn và hình ảnh là của riêng Figghost.',
+  'about.why.body': 'Cuộn mượt, lịch sử clipboard và hộp công cụ notch thường là các ứng dụng riêng lẻ: Mos, Maccy và OneNotch gợi ý tưởng cho nó, SoundSource và CleanShot X gợi ý cho phần âm thanh và chụp màn hình, còn Gõ Nhanh là bộ máy gõ tiếng Việt, dùng nguyên bản. Figghost gom chúng vào một ứng dụng với một lần xin quyền, một mục khởi động cùng máy và một cửa sổ cài đặt. Ý tưởng lấy cảm hứng từ các ứng dụng đó; mã nguồn và hình ảnh là của riêng Figghost.',
   'about.versions.title': 'Các phiên bản',
   'about.v.0_2': 'Phiên bản 0.2, 15/10/2026', 'about.v.0_2.body': 'Âm thanh riêng cho từng ứng dụng, chụp màn hình, chụp cuộn và quay màn hình có trình chỉnh sửa, cửa sổ cài đặt, tác tử AI trên notch, Smart Select, lịch, lời bài hát, ghim cửa sổ lên notch, ẩn biểu tượng thanh menu và Copy Stack.',
   'about.v.0_4': 'Phiên bản 0.3 và 0.4, 16/10/2026', 'about.v.0_4.body': 'Dựng lại mọi bề mặt trên Liquid Glass, và linh vật của clipboard.',
@@ -1878,13 +1887,22 @@ Object.assign(I18N.vi, {
   'about.v.0_8': 'Phiên bản 0.8, 19/10/2026', 'about.v.0_8.body': 'Biểu tượng ứng dụng mới và thanh bên có tên bên cạnh mỗi biểu tượng.',
   'about.v.0_9': 'Phiên bản 0.9, 19/10/2026', 'about.v.0_9.body': 'Lời chào của chú ma, Dịch, Bluetooth trên notch, âm thanh 3D, và ghim cửa sổ hai bước với bố cục của riêng bạn.',
   'about.v.1_0': 'Phiên bản 1.0, 19/10/2026', 'about.v.1_0.body': 'Bản lớn đầu tiên: con trỏ tùy chỉnh, Luôn trên cùng, trang Phím tắt, ô tìm trong cài đặt, và cách chọn vùng chụp màn hình gọn hơn.',
+  'about.v.1_x': 'Phiên bản 1.1 đến 1.9, 19 đến 22/10/2026', 'about.v.1_x.body': 'Trả lời câu hỏi ngay trên notch, widget nhạc và thêm kiểu chỉ báo âm lượng, kiểm tra quyền, thêm mười tab notch (Hệ thống, Ghi chú, Mở nhanh, Thời tiết, Yêu cầu duyệt, Pomodoro, Thời gian dùng, Tiến độ ngày, Thiết bị và Màn hình), đảo trạng thái, tiện ích, tài khoản Orca, pi, và gõ tiếng Việt.',
+  'about.v.2_0': 'Phiên bản 2.0, 22/10/2026', 'about.v.2_0.body': 'Cửa sổ cài đặt mới trên Liquid Glass: các nhóm trang là biểu tượng trong một dock nổi có thấu kính kéo được, và ô tìm nằm ở thanh tiêu đề.',
+  'about.v.2_0_2': 'Phiên bản 2.0.2, 22/10/2026', 'about.v.2_0_2.body': 'Ngôn ngữ gõ tiếng Việt hiện trên notch và ở thanh menu, phím tắt ghi được cả khi hệ thống đang dùng, Spotlight, và dock có biểu tượng rõ hơn.',
   'about.sec.license': 'Giấy phép',
   'about.license.title': 'Giấy phép MIT',
   'about.license.body': 'Figghost là phần mềm mã nguồn mở, miễn phí, theo Giấy phép MIT, bản quyền 2026 Doanh Thai Bui. Bạn được dùng cho mọi mục đích, ở nhà hay ở nơi làm việc, sao chép, sửa đổi, chia sẻ và thậm chí bán sản phẩm bạn làm ra từ nó. Điều kiện duy nhất là thông báo bản quyền và nội dung giấy phép phải đi kèm mọi bản sao hoặc phần đáng kể của phần mềm. Phần mềm được cung cấp nguyên trạng, không bảo hành: tác giả không chịu trách nhiệm về những gì nó làm trên máy Mac của bạn.',
   'about.license.show': 'Xem nội dung giấy phép', 'about.license.hide': 'Ẩn nội dung giấy phép',
   'about.others.title': 'Các giấy phép khác',
-  'about.others.body': 'Phông Inter đi kèm làm phông dự phòng cho cửa sổ này, theo SIL Open Font License 1.1 (bản quyền 2020 The Inter Project Authors); nội dung giấy phép nằm ở Resources/Inter-OFL.txt trong ứng dụng, còn của Figghost ở Resources/LICENSE.txt. Gõ tiếng Việt đặt dấu bằng bộ máy của Gõ Nhanh (bản quyền 2025 Gõ Nhanh Contributors), theo giấy phép BSD 3-Clause, nội dung nằm ở Resources/GoNhanh-LICENSE.txt. Các biểu tượng của giao diện là SF Symbols do macOS tự vẽ, không thuộc về Figghost. Các thư viện Rust dùng để xây dựng ứng dụng giữ giấy phép riêng của chúng.',
+  'about.others.body': 'Phông Inter đi kèm làm phông dự phòng cho cửa sổ này, theo SIL Open Font License 1.1 (bản quyền 2020 The Inter Project Authors); nội dung giấy phép nằm ở Resources/Inter-OFL.txt trong ứng dụng, còn của Figghost ở Resources/LICENSE.txt. Patrick Hand, nét chữ tay của các tiêu đề và của chú ma, theo cùng giấy phép (Resources/PatrickHand-OFL.txt). Gõ tiếng Việt đặt dấu bằng bộ máy của Gõ Nhanh (bản quyền 2025 Gõ Nhanh Contributors), theo giấy phép BSD 3-Clause, nội dung nằm ở Resources/GoNhanh-LICENSE.txt. Các biểu tượng của giao diện là SF Symbols do macOS tự vẽ, không thuộc về Figghost. Các thư viện Rust dùng để xây dựng ứng dụng giữ giấy phép riêng của chúng.',
 });
+
+/** A group of the dock with the pages inside it, as the dock and the tabs name them, so this list cannot drift from them. */
+function mapRow(cat) {
+  const tile = h('span', { 'data-cat': cat.id }, h('span', { class: 'nav-icon map-tile' }, icon(cat.icon)));
+  return row(h('span', { class: 'map-title' }, tile, t('cat.' + cat.id)), cat.pages.map((id) => t('nav.' + id)).join(' · '), null);
+}
 
 function pageAbout() {
   const text = h('pre', { class: 'license', hidden: true, text: MIT_LICENSE.join('\n') });
@@ -1907,11 +1925,13 @@ function pageAbout() {
       row(t('data.title'), S.app.config_dir, button(t('data.open'), () => send({ t: 'action', name: 'open_config' }), { icon: 'folder', small: true }))),
     sectionTitle(t('about.sec.what')),
     card(row(t('about.what.title'), t('about.what.body'), null), row(t('about.native.title'), t('about.native.body'), null)),
+    sectionTitle(t('about.sec.map')),
+    card(row(t('about.map.title'), t('about.map.body'), null), ...CATEGORIES.map(mapRow)),
     sectionTitle(t('about.sec.history')),
     card(row(t('about.why.title'), t('about.why.body'), null)),
     card(
       row(t('about.versions.title'), null, null),
-      ...['0_2', '0_4', '0_5', '0_6', '0_7', '0_8', '0_9', '1_0'].map((v) => version('v.' + v))),
+      ...['2_0_2', '2_0', '1_x', '1_0', '0_9', '0_8', '0_7', '0_6', '0_5', '0_4', '0_2'].map((v) => version('v.' + v))),
     sectionTitle(t('about.sec.license')),
     card(
       row(t('about.license.title'), t('about.license.body'), toggle),
@@ -1922,12 +1942,12 @@ function pageAbout() {
 }
 
 const CATEGORIES = [
-  { id: 'general', icon: 'switch.2', pages: ['general', 'mole', 'about'] },
-  { id: 'scroll', icon: 'scroll.fill', pages: ['scroll', 'cursor', 'wheel'] },
+  { id: 'general', icon: 'gearshape.fill', pages: ['general', 'mole', 'about'] },
+  { id: 'scroll', icon: 'computermouse.fill', pages: ['scroll', 'cursor', 'wheel'] },
   { id: 'notch', icon: 'laptopcomputer', pages: ['notch', 'islands', 'musicwidget'] },
   { id: 'tabs', icon: 'square.stack.3d.up.fill', pages: ['calendar', 'dayprogress', 'agents', 'notes', 'launcher', 'weather', 'prs', 'pomodoro', 'screentime', 'system', 'devices', 'displays'] },
   { id: 'clipboard', icon: 'list.clipboard.fill', pages: ['clipboard', 'smart', 'translate', 'typing', 'capture', 'vision', 'utilities'] },
-  { id: 'tiling', icon: 'square.split.2x2.fill', pages: ['tiling', 'pin', 'keys'] },
+  { id: 'tiling', icon: 'rectangle.lefthalf.inset.filled', pages: ['tiling', 'pin', 'keys'] },
 ];
 
 function categoryOf(pageId) {

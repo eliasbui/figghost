@@ -174,6 +174,7 @@ const SYMBOLS: &[&str] = &[
     "square.stack.3d.up.fill",
     "list.clipboard.fill",
     "square.split.2x2.fill",
+    "rectangle.lefthalf.inset.filled",
     "keyboard",
     "computermouse.fill",
     "doc.on.clipboard.fill",

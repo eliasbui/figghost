@@ -5,7 +5,15 @@
 <h1 align="center">figghost</h1>
 
 <p align="center">
-  One native macOS app for the menu bar and the notch: smooth scrolling, clipboard history, window snapping, per-app sound, screenshots and the tools a notch toolbox needs.
+  A light, native toolbox for the menu bar and the notch of your Mac.<br>
+  Smooth scrolling, clipboard history, window snapping, Vietnamese typing, per-app sound, screenshots and a notch with a tab for every small tool.
+</p>
+
+<p align="center">
+  <a href="https://github.com/eliasbui/figghost/releases/latest"><img src="https://img.shields.io/github/v/release/eliasbui/figghost?label=release" alt="Latest release"></a>
+  <img src="https://img.shields.io/badge/macOS-13%2B-black" alt="macOS 13 or later">
+  <img src="https://img.shields.io/badge/Apple%20silicon-arm64-black" alt="Apple silicon">
+  <a href="LICENSE"><img src="https://img.shields.io/badge/license-MIT-blue" alt="MIT License"></a>
 </p>
 
 <p align="center">
@@ -16,14 +24,97 @@ Figghost is written in Rust with a pure AppKit shell (the `objc2` crates). The s
 
 ## Contents
 
+- [Feature list](#feature-list)
+- [The settings window](#the-settings-window)
 - [Highlights](#highlights)
-- [Features](#features)
+- [Features in detail](#features-in-detail)
 - [Install](#install)
 - [Build and run](#build-and-run)
+- [Design](#design)
 - [Configuration](#configuration)
 - [Data and privacy](#data-and-privacy)
 - [Technology choices](#technology-choices)
 - [Development](#development)
+
+## Feature list
+
+The settings window keeps every feature under six icons in a dock at its foot, and this list follows the same six groups and the same page names: the English name, then the one the Vietnamese interface shows. Features marked "off by default" are switched on from their own page.
+
+### Cài đặt chung (General)
+
+| Page | Vietnamese | What it does |
+| --- | --- | --- |
+| General | Chung | Launch at login, the hello from the ghost, theme and language, a one-press check of every permission, and a tile to switch each main feature |
+| Mole | Mole | Health score of the Mac and clean-up of caches, old build folders and removed apps with the Mole command line tool, always previewed first (off by default) |
+| About | Giới thiệu | Version, a daily look for a new version with install in the app, what is new, privacy, the data folder and the licences |
+
+### Chuột & Thao tác (Mouse & Cursor)
+
+| Page | Vietnamese | What it does |
+| --- | --- | --- |
+| Scrolling | Cuộn chuột | Smooth wheel scrolling with a curve you can see, a reverse direction for external mice only, modifier keys for sideways, faster and zoom, and rules for each app |
+| Cursor | Con trỏ | A rainbow arrow, a pixel character or any picture or GIF as the pointer (off by default) |
+| Drag wheel | Vòng kéo thả | A wheel around the pointer while you drag a file: resize, compress, split or merge PDFs, annotate, copy its text, cut out the subject, strip metadata |
+
+### Notch & Tiện ích (Notch & Island)
+
+| Page | Vietnamese | What it does |
+| --- | --- | --- |
+| Notch | Notch | The shape that grows out of the top edge: size, material, opening rule, behaviour over full-screen apps, the tabs it shows, window snapping and the volume indicator in seven styles |
+| Live islands | Đảo trạng thái | Small notices out of the closed notch: Caps Lock, charger, battery, drives, downloads, camera and microphone (off by default) |
+| Music widget | Widget nhạc | A floating Liquid Glass player on the desktop in five styles, optionally above the lock screen (off by default) |
+
+### Tab của notch (Notch tabs)
+
+The notch always has Clipboard, Shelf, Media (with lyrics), Focus and Sound; these are the pages of the tabs that you add. The ones marked off by default join the strip only when turned on.
+
+| Page | Vietnamese | What it does |
+| --- | --- | --- |
+| Calendar | Lịch | Today's events and reminders, and an alert before a meeting with a button that joins the Zoom, Meet, Teams or Webex link (off by default) |
+| Day progress | Tiến độ ngày | How much of the day has gone, with today's events along a line (off by default) |
+| AI agents | Tác tử AI | Claude Code, Codex and pi sessions, usage limits, tokens and cost, and Allow or Deny and choices answered on the notch; Orca accounts and switching |
+| Notes | Ghi chú | A scratchpad of plain text files (off by default) |
+| Launcher | Mở nhanh | A grid of up to twelve apps, folders and Shortcuts (off by default) |
+| Weather | Thời tiết | Up to eight cities: now, the next hours and days (off by default) |
+| Pull requests | Yêu cầu duyệt | Review requests waiting for you on GitHub and GitLab (off by default) |
+| Pomodoro | Pomodoro | Work sessions and breaks with a ring, a streak and a shortcut (off by default) |
+| Screen Time | Thời gian dùng | How long each app was in front, today and over seven days (off by default) |
+| System | Hệ thống | Processor, memory, network, graphics, disk, heat, fans and battery health (off by default) |
+| Devices | Thiết bị | The charge of connected Bluetooth devices, with a warning when one runs low (off by default) |
+| Displays | Màn hình | Brightness and contrast of external displays over DDC/CI, and the brightness keys for them (off by default) |
+
+### Bảng tạm & Công cụ (Clipboard & Tools)
+
+| Page | Vietnamese | What it does |
+| --- | --- | --- |
+| Clipboard | Clipboard | History of text, links, code, images and files with instant search, pinning, Copy Stack, boards, sensitive data kept out, and an MCP server for AI assistants (off by default) |
+| Smart Select | Chọn thông minh | What the selected text means: units, money, times in other zones, a translation (off by default) |
+| Translate | Dịch | Select text anywhere and a glass window next to the pointer translates it (off by default) |
+| Vietnamese typing | Gõ tiếng Việt | Telex or VNI in every app, VI or EN on the notch and in the menu bar, a shortcut to switch, apps left alone (off by default) |
+| Capture | Chụp màn hình | Screenshots, scrolling capture, recordings as MP4 or GIF, an editor and text recognition in Vietnamese and English (off by default) |
+| Colour picker | Chọn màu | A loupe on a frozen screen that copies HEX, RGB, HSL or HSB (off by default) |
+| Utilities | Tiện ích | Keep the Mac awake, mute the microphone for every app, lock the keyboard while you clean it, snooze the notch (off by default) |
+
+### Cửa sổ & Phím tắt (Window & Keys)
+
+| Page | Vietnamese | What it does |
+| --- | --- | --- |
+| Window snapping | Chia cửa sổ | Layouts per screen from presets or a grid, opened by dragging a window to the top edge or by shortcut |
+| Always on top | Luôn trên cùng | A shortcut keeps a window in front with a red border (off by default) |
+| Shortcuts | Phím tắt | Every shortcut of the clipboard popup and the notch in one place, with conflicts refused |
+
+### Also built in
+
+Sound for each app (volume to 400 %, output device, equalizer, bass and treble, 3D sound for headphones), the clipboard mascot, a hider for menu bar icons, dragging a window onto the notch to snap it, a hello from the ghost each time you open the app, and updates that ask before they install.
+
+## The settings window
+
+Opening the app opens its settings; closing the window sends the app back to the menu bar. The page groups are the six icons of the glass dock at the foot of the window: press one, or press and drag along the dock, and a lens of clear glass follows your finger and opens the group under it. The search in the title bar (Command-K) finds a page by what its settings say.
+
+| | |
+| --- | --- |
+| ![The General page: the hero, the counts and the tiles that switch the main features](docs/images/settings-general.png) | ![The Scrolling page of the Mouse and Cursor group](docs/images/settings-scroll.png) |
+| ![The Vietnamese typing page: the language, the shortcut, the notch and menu bar switches](docs/images/settings-typing.png) | ![The About page with the version, the updates and the list of what is where](docs/images/settings-about.png) |
 
 ## Highlights
 
@@ -59,13 +150,11 @@ Start dragging a file and tap a modifier key: a wheel opens around the pointer w
 
 ### A settings window that follows macOS
 
-Liquid Glass, both themes, a page for every feature, and every feature can be turned off on its own page.
+Liquid Glass, both themes, six groups in a dock, and every feature can be turned off on its own page. See [The settings window](#the-settings-window).
 
-![A tour of the settings pages: general, scrolling, clipboard, window snapping, notch, AI agents, calendar, Smart Select, capture, colour picker, drag wheel and Mole](docs/images/settings-tour.gif)
+## Features in detail
 
-## Features
-
-Every picture here is drawn by the app's own code with no screen (`app-ui/settings_preview`, `macos-sys/render_notch`, `render_snap`, `render_smart`, `render_wheel`, `render_hud`, see [docs/development.md](docs/development.md)); the hero image was generated with agy. The GIFs are frames of those renders.
+Every picture here is drawn by the app's own code with no screen (`app-ui/settings_preview`, `macos-sys/render_notch`, `render_snap`, `render_smart`, `render_wheel`, `render_hud`, see [docs/development.md](docs/development.md)); the hero image was generated with agy. The GIFs are frames of those renders, and the pictures of the settings pages are the Vietnamese interface.
 
 Opening the app opens its settings window; closing the window sends the app back to the menu bar. The features marked "off by default" are switched on in their own page of the settings.
 
@@ -274,7 +363,7 @@ The settings window has a world of its own on top of the system's: the ghost's n
 
 ![The General page in the light theme by day](docs/images/ghost-world-general-light.png)
 
-The window itself is a macOS window on Liquid Glass. The sidebar is a glass pane below the window's three buttons, with a field that finds a page by name; the content is glass cards of grouped sections, a label and its control on each row, over a soft backdrop, and the General and About pages open on a hero card in the app's blue. Controls follow the system: they take the accent colour the user chose in System Settings, a state takes its own system colour (green when something is on or granted), buttons are 24 points tall and pop-up buttons and fields 24 or 28, section headers are 13 pt bold, and every icon, in this window and in the menu bar panel, is an SF Symbol drawn by the system. In the notch, text is white at three levels on black, the faintest still 5.3:1; a page shows its key hints only while the notch has the keyboard, and on a screen with a camera cutout the header sits beside the cutout when it fits, so the open shape has no empty band across its top. Only what the user touches moves, briefly for feedback and with springs for things that travel. Contrast was measured, not guessed: text is at least 4.5:1 and the edge of an off control at least 3:1 on the worst backdrops, in both themes. Every effect has a fallback for Reduce transparency, Increase contrast and Reduce motion, focus is always visible, every control has a name, and the whole window works from the keyboard. All tokens are CSS variables at the top of `crates/app-ui/web/app.css`.
+The window itself is a macOS window on Liquid Glass. A floating glass dock at its foot holds one icon for each of the six page groups, white SF Symbols on coloured tiles, with a lens that follows a press and a drag; the search sits in the middle of the title bar; the content is glass cards of grouped sections, a label and its control on each row, over a soft backdrop, and the General and About pages open on a hero card in the app's blue. Controls follow the system: they take the accent colour the user chose in System Settings, a state takes its own system colour (green when something is on or granted), buttons are 24 points tall and pop-up buttons and fields 24 or 28, section headers are 13 pt bold, and every icon, in this window and in the menu bar panel, is an SF Symbol drawn by the system. In the notch, text is white at three levels on black, the faintest still 5.3:1; a page shows its key hints only while the notch has the keyboard, and on a screen with a camera cutout the header sits beside the cutout when it fits, so the open shape has no empty band across its top. Only what the user touches moves, briefly for feedback and with springs for things that travel. Contrast was measured, not guessed: text is at least 4.5:1 and the edge of an off control at least 3:1 on the worst backdrops, in both themes. Every effect has a fallback for Reduce transparency, Increase contrast and Reduce motion, focus is always visible, every control has a name, and the whole window works from the keyboard. All tokens are CSS variables at the top of `crates/app-ui/web/app.css`.
 
 ## Configuration
 
