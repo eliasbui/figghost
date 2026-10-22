@@ -91,6 +91,8 @@ pub struct NotchConfig {
     pub rest: String,
     /// Keeps the notch out of screenshots and screen recordings.
     pub hide_in_capture: bool,
+    /// The notch while the app in front is full screen on its screen; off takes it off the screen until then.
+    pub show_in_fullscreen: bool,
     pub haptics: bool,
     /// Which screen: `auto` (the built-in one with a notch, else the main one), `main` or `pointer`.
     pub display: String,
@@ -131,6 +133,7 @@ impl Default for NotchConfig {
             rest_height: 0,
             rest: "notch".into(),
             hide_in_capture: false,
+            show_in_fullscreen: true,
             haptics: true,
             display: "auto".into(),
             open_page: "activity".into(),
@@ -225,6 +228,7 @@ impl From<serde_json::Value> for NotchConfig {
             rest_height: size_or_auto(&v["rest_height"], 20, 48, d.rest_height),
             rest: word(&v["rest"], &["notch", "hidden"], &d.rest),
             hide_in_capture: flag("hide_in_capture", d.hide_in_capture),
+            show_in_fullscreen: flag("show_in_fullscreen", d.show_in_fullscreen),
             haptics: flag("haptics", d.haptics),
             display: screen_choice(&v["display"], &d.display),
             open_page,
@@ -314,6 +318,7 @@ impl NotchConfig {
                 page => OpenPage::Page(page.to_owned()),
             },
             pages: self.pages.clone(),
+            show_in_fullscreen: self.show_in_fullscreen,
         }
     }
 
@@ -1092,7 +1097,7 @@ mod tests {
             dir.join("config.json"),
             r#"{"version": 3, "hotkey": "cmd+shift+v", "notch": {"enabled": "yes", "material": 7, "motion": "bouncy",
                 "hover_delay_ms": 99999, "pages": ["media", "nope", "media", 3, "clipboard"],
-                "open_page": "agents", "shortcut": "  ctrl+opt+n "}}"#,
+                "open_page": "agents", "shortcut": "  ctrl+opt+n ", "show_in_fullscreen": "no"}}"#,
         )
         .unwrap();
         let (cfg, note) = Config::load(&dir);
@@ -1104,8 +1109,15 @@ mod tests {
         assert_eq!(notch.pages, ["media", "clipboard"]);
         assert_eq!(notch.open_page, "agents");
         assert_eq!(notch.shortcut, "ctrl+opt+n");
+        assert!(
+            notch.show_in_fullscreen,
+            "a word is not a switch: today's behaviour stays"
+        );
         let style = notch.style();
         assert_eq!(style.hover_delay, 1.0);
+        let hidden: NotchConfig =
+            serde_json::from_value(serde_json::json!({ "show_in_fullscreen": false })).unwrap();
+        assert!(!hidden.style().show_in_fullscreen);
         assert_eq!(
             style.open_page,
             macos_sys::notch::OpenPage::Page("agents".into())

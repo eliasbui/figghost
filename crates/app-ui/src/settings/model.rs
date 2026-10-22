@@ -361,6 +361,7 @@ fn notch_state(config: &Config, env: &Env) -> Value {
         "rest_height": n.rest_height,
         "rest": n.rest,
         "hide_in_capture": n.hide_in_capture,
+        "show_in_fullscreen": n.show_in_fullscreen,
         "haptics": n.haptics,
         "display": n.display,
         "open_page": n.open_page,
@@ -692,6 +693,7 @@ fn set(config: &mut Config, path: &str, value: &Value) -> Outcome {
         "notch.shadow"
         | "notch.open_on_hover"
         | "notch.hide_in_capture"
+        | "notch.show_in_fullscreen"
         | "notch.haptics"
         | "notch.live_media"
         | "notch.live_agents" => {
@@ -701,6 +703,7 @@ fn set(config: &mut Config, path: &str, value: &Value) -> Outcome {
                 "notch.shadow" => n.shadow = on,
                 "notch.open_on_hover" => n.open_on_hover = on,
                 "notch.hide_in_capture" => n.hide_in_capture = on,
+                "notch.show_in_fullscreen" => n.show_in_fullscreen = on,
                 "notch.haptics" => n.haptics = on,
                 "notch.live_media" => n.live_media = on,
                 _ => n.live_agents = on,
@@ -1152,6 +1155,11 @@ mod tests {
             Ok(Effect::Notch)
         );
         assert!(!config.notch.enabled);
+        assert_eq!(
+            set_value(&mut config, "notch.show_in_fullscreen", json!(false)),
+            Ok(Effect::Notch)
+        );
+        assert!(!config.notch.show_in_fullscreen);
         assert_eq!(
             set_value(&mut config, "tiling.enabled", json!(false)),
             Ok(Effect::Tiling)

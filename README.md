@@ -87,7 +87,7 @@ The Shelf tab keeps dropped files as references to where they live. Right-click 
 
 ### Notch panel (like OneNotch)
 
-Seven tabs, nine more that join them when their feature is turned on (System, Notes, Launcher, Weather, Pull requests, Pomodoro, Screen Time, Day progress and Devices), window snapping, an optional volume indicator, lyrics, live activities in the closed shape, and a size you choose (compact, standard, wide or custom).
+Seven tabs, nine more that join them when their feature is turned on (System, Notes, Launcher, Weather, Pull requests, Pomodoro, Screen Time, Day progress and Devices), window snapping, an optional volume indicator, lyrics, live activities in the closed shape, and a size you choose (compact, standard, wide or custom). It shows over full-screen apps too, unless Show over full-screen apps on the Notch page is off: then it goes away completely while the app in front is full screen on its screen, and comes back, with its tabs and activities as they were, when that app leaves full screen or another one comes to the front.
 
 ![The Media tab of the notch with a cover, the title and playback buttons](docs/images/notch-media.png)
 

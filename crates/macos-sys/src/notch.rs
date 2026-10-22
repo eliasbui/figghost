@@ -11,11 +11,14 @@ use crate::{
     app, labels,
     panel::{FigPanel, Key},
     pasteboard::file_paths,
+    pin_ui::{self, Listed},
     silhouette::{self, Outline},
     style::{self, PANEL_RADIUS, Tone, Weight, white},
     switcher::{self, NotchOrb, PageSwitcher},
     ui::{AppCallbacks, Callbacks, ClipUi, ClipView, ListStyle, handle_key},
     widgets::{Fit, draw_text, text_attributes},
+    window::Frame,
+    workspace,
 };
 use block2::RcBlock;
 use objc2::{
@@ -33,7 +36,7 @@ use objc2_app_kit::{
     NSHapticFeedbackPerformer, NSImage, NSMenu, NSPasteboardTypeFileURL, NSScreen, NSStatusBar,
     NSStringDrawing, NSTrackingArea, NSTrackingAreaOptions, NSView, NSVisualEffectBlendingMode,
     NSVisualEffectMaterial, NSVisualEffectState, NSVisualEffectView,
-    NSWindowDidResignKeyNotification, NSWindowSharingType,
+    NSWindowDidResignKeyNotification, NSWindowSharingType, NSWorkspace,
 };
 use objc2_foundation::{
     NSArray, NSData, NSDictionary, NSNotification, NSNotificationCenter, NSNumber, NSObject,
@@ -51,6 +54,9 @@ use std::{
 };
 
 pub const EXPANDED_SIZE: NSSize = NSSize::new(500.0, 440.0);
+/// How long after a space comes to the front the windows are looked at again: about the time macOS takes to grow a
+/// window to full screen.
+const FULL_SCREEN_SETTLE: f64 = 1.0;
 /// The width of the clipboard page, a strip of cards that scrolls sideways.
 const STRIP_WIDTH: f64 = 660.0;
 /// What the strip page needs below the room the header takes: the chips, the cards and the hint.
@@ -205,6 +211,9 @@ pub struct Style {
     /// The size of the resting shape on a screen without a hardware notch; 0 keeps the default for that side.
     pub rest_width: f64,
     pub rest_height: f64,
+    /// Off takes the notch off the screen while the app in front is full screen on the notch's screen, and puts it
+    /// back when that app leaves full screen or another one comes to the front.
+    pub show_in_fullscreen: bool,
 }
 
 impl Default for Style {
@@ -225,6 +234,7 @@ impl Default for Style {
             min_height: 0.0,
             rest_width: 0.0,
             rest_height: 0.0,
+            show_in_fullscreen: true,
         }
     }
 }
@@ -1164,6 +1174,9 @@ struct Inner {
     inside: Cell<bool>,
     /// Off removes the panel from the screen and ignores the pointer.
     enabled: Cell<bool>,
+    /// Set while an app is full screen on the notch's screen and the style asks not to show over it: the panel is
+    /// off the screen as when it is not enabled, and its pages and activities carry on unseen.
+    covered: Cell<bool>,
     /// While something else is using the top edge (window snapping), the pointer does not open the notch.
     suppressed: Cell<bool>,
     /// The person asked the notch not to open when the pointer reaches it, for a while.
@@ -1900,7 +1913,7 @@ impl Inner {
         }
         if shape != Shape::Open {
             self.content.setHidden(true);
-            if !self.enabled.get() {
+            if !self.shows() {
                 return;
             }
             self.set_window(self.window_size(shape));
@@ -1958,7 +1971,7 @@ impl Inner {
         self.right.set(&right);
         self.detail
             .set(activity.as_ref().and_then(|a| a.detail.clone()));
-        if !self.is_open() && self.enabled.get() {
+        if !self.is_open() && self.shows() {
             let target = self.closed_shape();
             if target != self.shape.get() {
                 self.move_to(target);
@@ -1970,7 +1983,7 @@ impl Inner {
     /// Runs the bars' clock only while bars are on screen.
     fn sync_bars(&self) {
         let wanted = matches!(self.shape.get(), Shape::Compact { .. })
-            && self.enabled.get()
+            && self.shows()
             && self.current_activity().is_some_and(|a| {
                 matches!(a.left, Ear::Bars { .. }) || matches!(a.right, Ear::Bars { .. })
             });
@@ -2098,8 +2111,62 @@ impl Inner {
         }
     }
 
+    /// Whether the panel is on the screen: enabled, and not covered by a full-screen app.
+    fn shows(&self) -> bool {
+        self.enabled.get() && !self.covered.get()
+    }
+
+    /// Puts the panel on the screen or takes it off after `enabled` or `covered` changed; `was` is whether it showed
+    /// before the change.
+    fn sync_shown(&self, was: bool) {
+        if self.shows() == was {
+            return;
+        }
+        if was {
+            self.inside.set(false);
+            self.collapse();
+            self.panel.orderOut(None);
+            self.sync_bars();
+        } else {
+            self.panel.orderFrontRegardless();
+            let target = self.closed_shape();
+            self.move_to(target);
+        }
+    }
+
+    /// Looks again at whether the app in front is full screen on the notch's screen. The list of windows is read only
+    /// while the style asks to hide over full-screen apps.
+    fn check_full_screen(&self) {
+        let covered = !self.style.borrow().show_in_fullscreen && {
+            let geometry = self.geometry.get();
+            let front = NSWorkspace::sharedWorkspace()
+                .frontmostApplication()
+                .map_or(0, |app| app.processIdentifier());
+            let primary = NSScreen::screens(self.mtm)
+                .firstObject()
+                .map_or(0.0, |s| s.frame().size.height);
+            let s = geometry.screen;
+            let screen = Frame {
+                x: s.origin.x,
+                y: primary - (s.origin.y + s.size.height),
+                w: s.size.width,
+                h: s.size.height,
+            };
+            full_screen_on(
+                &pin_ui::on_screen_windows(),
+                front,
+                std::process::id() as i32,
+                screen,
+            )
+        };
+        let was = self.shows();
+        if self.covered.replace(covered) != covered {
+            self.sync_shown(was);
+        }
+    }
+
     fn expand(&self, focus: bool, page: Option<usize>) {
-        if !self.enabled.get() {
+        if !self.shows() {
             return;
         }
         let first = !self.is_open();
@@ -2158,6 +2225,8 @@ impl Inner {
                 0.0,
             );
         }
+        // A notch that moved to another screen may have left a full-screen app behind, or found one.
+        self.check_full_screen();
     }
 
     fn handle_key(&self, key: Key) -> bool {
@@ -2514,6 +2583,26 @@ impl Alphas {
     }
 }
 
+/// Whether the app running as `front` is full screen on `screen`, from the list of windows on the screens (all in
+/// `window::Frame` coordinates). macOS parks the title bar of a full-screen window just above the top edge of its
+/// screen, so a window of that app there, with one of its windows as wide as the screen reaching the bottom edge, is
+/// a full-screen app: this holds below a cutout, where the window starts under the cutout as a zoomed one does, and
+/// for a browser whose top bar is a window of its own. A window exactly as large as the screen is full screen too,
+/// title bar or not. This app in front (its settings window) is never full screen.
+pub fn full_screen_on(windows: &[Listed], front: i32, own: i32, screen: Frame) -> bool {
+    let near = |a: f64, b: f64| (a - b).abs() < 1.0;
+    let across = |f: &Frame| near(f.x, screen.x) && near(f.w, screen.w);
+    let theirs = || windows.iter().filter(|w| w.pid == front && w.layer == 0);
+    let parked_title = theirs().any(|w| across(&w.frame) && near(w.frame.y + w.frame.h, screen.y));
+    front != own
+        && theirs().any(|w| {
+            let f = w.frame;
+            let whole = near(f.y, screen.y) && near(f.h, screen.h);
+            let to_bottom = f.y >= screen.y - 1.0 && near(f.y + f.h, screen.y + screen.h);
+            w.alpha > 0.0 && across(&f) && (whole || (parked_title && to_bottom))
+        })
+}
+
 /// Edges are inclusive: a pointer pushed against the top of the screen sits exactly on the boundary.
 fn contains(rect: NSRect, p: NSPoint) -> bool {
     p.x >= rect.origin.x
@@ -2547,6 +2636,10 @@ fn pointer_moved(inner: &Rc<Inner>, p: NSPoint) {
     {
         inner.relayout(found);
         geometry = found;
+    }
+    // Hidden over a full-screen app, after following the pointer so that the notch can show on another screen.
+    if inner.covered.get() {
+        return;
     }
     let area = if inner.is_open() {
         geometry.frame(inner.open_size.get().width, inner.open_size.get().height)
@@ -2597,6 +2690,8 @@ pub struct Notch {
     page_observers: RefCell<Vec<Observer>>,
     /// Global pointer monitor; sees movement over other apps' windows, which tracking areas cannot.
     monitor: Option<Retained<AnyObject>>,
+    /// Space changes and app activations, after which an app may be full screen or no longer.
+    _workspace: [workspace::Observer; 2],
 }
 
 impl Drop for Notch {
@@ -2748,6 +2843,7 @@ impl Notch {
             shape: Cell::new(Shape::Rest),
             inside: Cell::new(false),
             enabled: Cell::new(true),
+            covered: Cell::new(false),
             suppressed: Cell::new(false),
             snoozed: Cell::new(false),
             activities: RefCell::new(Vec::new()),
@@ -2828,12 +2924,35 @@ impl Notch {
                 }
             });
         }
+        let activated = Rc::downgrade(&inner);
+        let spaced = Rc::downgrade(&inner);
+        let workspace = [
+            workspace::observe_frontmost(move |_| {
+                if let Some(inner) = activated.upgrade() {
+                    inner.check_full_screen();
+                }
+            }),
+            workspace::observe_space(move || {
+                let Some(inner) = spaced.upgrade() else {
+                    return;
+                };
+                inner.check_full_screen();
+                // The space can come to the front before the window that went full screen has its final size.
+                let later = Rc::downgrade(&inner);
+                app::after(FULL_SCREEN_SETTLE, move || {
+                    if let Some(inner) = later.upgrade() {
+                        inner.check_full_screen();
+                    }
+                });
+            }),
+        ];
         let mut this = Self {
             inner: Rc::clone(&inner),
             ui,
             observers: Vec::new(),
             page_observers: RefCell::new(Vec::new()),
             monitor: None,
+            _workspace: workspace,
         };
 
         let key_inner = Rc::clone(&inner);
@@ -3163,18 +3282,9 @@ impl Notch {
 
     /// Shows or removes the notch panel. While it is off, hovering the top edge does nothing.
     pub fn set_enabled(&self, enabled: bool) {
-        if self.inner.enabled.replace(enabled) == enabled {
-            return;
-        }
-        if enabled {
-            self.inner.panel.orderFrontRegardless();
-            let target = self.inner.closed_shape();
-            self.inner.move_to(target);
-        } else {
-            self.inner.collapse();
-            self.inner.panel.orderOut(None);
-            self.inner.sync_bars();
-        }
+        let was = self.inner.shows();
+        self.inner.enabled.set(enabled);
+        self.inner.sync_shown(was);
     }
 
     /// Keeps the notch closed and deaf to the pointer while the top edge belongs to something else, such as the
@@ -3274,6 +3384,84 @@ impl Notch {
 #[cfg(test)]
 mod tests {
     use super::*;
+
+    fn listed(pid: i32, layer: i32, x: f64, y: f64, w: f64, h: f64, alpha: f64) -> Listed {
+        Listed {
+            id: 1,
+            pid,
+            layer,
+            frame: Frame { x, y, w, h },
+            alpha,
+        }
+    }
+
+    #[test]
+    fn a_window_as_large_as_the_screen_is_full_screen() {
+        let screen = Frame {
+            x: 0.0,
+            y: 0.0,
+            w: 1920.0,
+            h: 1080.0,
+        };
+        // As read from a full-screen app: the title bar parked above the top edge, then the window itself.
+        let windows = [
+            listed(20, 25, 845.0, 0.0, 230.0, 30.0, 1.0),
+            listed(7, 0, 0.0, -32.0, 1920.0, 32.0, 0.0),
+            listed(7, 0, 0.0, 0.0, 1920.0, 1080.0, 1.0),
+        ];
+        assert!(full_screen_on(&windows, 7, 20, screen));
+        // Another app in front, this app in front, or the notch on another screen.
+        assert!(!full_screen_on(&windows, 8, 20, screen));
+        assert!(!full_screen_on(&windows, 20, 20, screen));
+        let right = Frame {
+            x: 1920.0,
+            ..screen
+        };
+        assert!(!full_screen_on(&windows, 7, 20, right));
+        // A window of the menu bar's level, or one that is invisible, is not the app's full-screen window.
+        let over = [listed(7, 24, 0.0, 0.0, 1920.0, 1080.0, 1.0)];
+        assert!(!full_screen_on(&over, 7, 20, screen));
+        let invisible = [listed(7, 0, 0.0, 0.0, 1920.0, 1080.0, 0.0)];
+        assert!(!full_screen_on(&invisible, 7, 20, screen));
+        // A zoomed window below the menu bar.
+        let zoomed = [listed(7, 0, 0.0, 30.0, 1920.0, 1050.0, 1.0)];
+        assert!(!full_screen_on(&zoomed, 7, 20, screen));
+    }
+
+    #[test]
+    fn the_parked_title_bar_tells_full_screen_from_zoomed() {
+        // A second screen above the primary one, whose top edge is at y -982, with a cutout 32 high.
+        let screen = Frame {
+            x: 0.0,
+            y: -982.0,
+            w: 1512.0,
+            h: 982.0,
+        };
+        // Zoomed below the menu bar with the Dock hidden, and the same window full screen below the cutout.
+        let zoomed = [listed(7, 0, 0.0, -950.0, 1512.0, 950.0, 1.0)];
+        assert!(!full_screen_on(&zoomed, 7, 20, screen));
+        let full = [
+            listed(7, 0, 0.0, -1014.0, 1512.0, 32.0, 0.0),
+            listed(7, 0, 0.0, -950.0, 1512.0, 950.0, 1.0),
+        ];
+        assert!(full_screen_on(&full, 7, 20, screen));
+        // A browser full screen, as read from Edge: its top bar is a window of its own above the page.
+        let primary = Frame {
+            x: 0.0,
+            y: 0.0,
+            w: 1920.0,
+            h: 1080.0,
+        };
+        let browser = [
+            listed(9, 3, 1221.0, 36.0, 360.0, 178.0, 1.0),
+            listed(9, 0, 0.0, -40.0, 1920.0, 40.0, 1.0),
+            listed(9, 0, 0.0, 0.0, 1920.0, 72.0, 1.0),
+            listed(9, 0, 0.0, 72.0, 1920.0, 1008.0, 1.0),
+        ];
+        assert!(full_screen_on(&browser, 9, 20, primary));
+        // The title bar parked above the other screen says nothing about this one.
+        assert!(!full_screen_on(&full, 7, 20, primary));
+    }
 
     fn geometry(hardware: bool) -> NotchGeometry {
         NotchGeometry {
