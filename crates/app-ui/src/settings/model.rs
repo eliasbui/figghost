@@ -1071,6 +1071,12 @@ mod tests {
         // The places a search found only exist while the settings page is looking at one.
         e.runtime
             .insert("weather", json!({ "found": [{ "label": "Hue, Vietnam" }] }));
+        // The list of downloads is only there while something was downloaded in this run.
+        e.runtime.insert(
+            "download",
+            json!({ "jobs": [{ "id": 1, "url": "", "title": "", "status": "done", "percent": 100.0,
+                "speed": null, "eta": null, "error": "", "needs_ffmpeg": false }] }),
+        );
         config.weather.places = vec![crate::features::weather::logic::Place {
             name: "Hanoi".into(),
             region: String::new(),
@@ -1632,6 +1638,7 @@ mod tests {
             "devices",
             "displays",
             "system",
+            "download",
         ] {
             assert!(state[id].is_object(), "{id} is missing from the state");
             assert!(state[id]["enabled"].is_boolean(), "{id} has no switch");

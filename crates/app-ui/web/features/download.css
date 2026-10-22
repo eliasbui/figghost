@@ -1,0 +1,24 @@
+/* Video download. Styles for the page in web/features/download.js, using the variables at the top of app.css. */
+.download-state { color: var(--text-2); font-size: var(--fs-small); max-width: 260px; overflow: hidden; text-overflow: ellipsis; white-space: nowrap; }
+.row[data-state="ready"] .download-state { color: var(--good); }
+.row[data-state="missing"] .download-state { color: var(--warn); }
+.download-link { display: flex; gap: 8px; align-items: center; width: 100%; }
+.download-link input.text-field { flex: 1 1 auto; width: auto; min-width: 0; }
+.download-folder { display: flex; align-items: center; gap: 8px; }
+.download-path { color: var(--text-2); font-size: var(--fs-small); max-width: 260px; overflow: hidden; text-overflow: ellipsis; white-space: nowrap; }
+.download-gap { display: none; }
+.download-list { display: flex; flex-direction: column; }
+.download-item { display: flex; align-items: center; gap: 10px; padding: 8px var(--row-inset); }
+.download-item + .download-item { border-top: 0.5px solid var(--stroke); }
+.download-text { display: flex; flex-direction: column; flex: 1; min-width: 0; }
+.download-name { overflow: hidden; text-overflow: ellipsis; white-space: nowrap; }
+.download-note { color: var(--text-2); font-size: var(--fs-small); font-variant-numeric: tabular-nums; }
+.download-item[data-status="failed"] .download-note { color: var(--bad); }
+.download-item[data-status="done"] .download-note { color: var(--good); }
+.download-bar { display: block; height: 4px; margin-top: 5px; border-radius: 999px; background: var(--field); overflow: hidden; }
+.download-bar[hidden] { display: none; }
+.download-bar > span { display: block; height: 100%; border-radius: 999px; background: var(--accent); transition: width 0.3s; }
+.download-tools { display: flex; gap: 6px; flex: none; }
+.download-tools .btn[hidden], .download-folder .btn[hidden] { display: none; }
+.download-toolbar { display: flex; justify-content: flex-end; padding: 8px var(--row-inset); border-top: 0.5px solid var(--stroke); }
+.download-item .empty, .download-list .empty { padding: 14px var(--row-inset); }

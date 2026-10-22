@@ -27,6 +27,7 @@ pub mod cursor;
 pub mod dayprogress;
 pub mod devices;
 pub mod displays;
+pub mod download;
 pub mod islands;
 pub mod launcher;
 pub mod lyrics;
@@ -265,6 +266,7 @@ pub struct Features {
     pub displays: Option<Rc<displays::Feature>>,
     pub system: Option<Rc<system::Feature>>,
     pub typing: Option<Rc<typing::Feature>>,
+    pub download: Option<Rc<download::Feature>>,
     /// Where the tabs of the features that are off are taken out of the strip and put back.
     notch: Option<Weak<Notch>>,
 }
@@ -302,6 +304,7 @@ impl Features {
             devices: devices::attach(env),
             displays: displays::attach(env),
             typing: typing::attach(env),
+            download: download::attach(env),
             notch: env.notch.map(Rc::downgrade),
         };
         if let Some(notch) = env.notch {
@@ -386,6 +389,9 @@ impl Features {
         }
         if let Some(f) = &self.typing {
             out.insert("typing", f.runtime());
+        }
+        if let Some(f) = &self.download {
+            out.insert("download", f.runtime());
         }
         out
     }
@@ -516,6 +522,10 @@ impl Features {
                 .typing
                 .as_ref()
                 .map_or(Ok(()), |f| f.configure(&config.typing)),
+            "download" => self
+                .download
+                .as_ref()
+                .map_or(Ok(()), |f| f.configure(&config.download)),
             _ => Ok(()),
         }
     }
@@ -739,6 +749,11 @@ impl Features {
         {
             return Some(result);
         }
+        if let Some(f) = &self.download
+            && let Some(result) = f.action(name)
+        {
+            return Some(result);
+        }
         None
     }
 
@@ -795,6 +810,9 @@ impl Features {
         }
         if let Some(f) = &self.typing {
             entries.extend(typing::Feature::menu_entries(f));
+        }
+        if let Some(f) = &self.download {
+            entries.extend(download::Feature::menu_entries(f));
         }
         entries
     }
@@ -919,6 +937,10 @@ pub fn state(
         "typing".into(),
         typing::settings::state(&config.typing, runtime.get("typing").unwrap_or(&none)),
     );
+    root.insert(
+        "download".into(),
+        download::settings::state(&config.download, runtime.get("download").unwrap_or(&none)),
+    );
 }
 
 /// A change of a setting whose path starts with a feature id. `None` when no feature owns the path; the
@@ -992,6 +1014,8 @@ pub fn set(config: &mut Config, path: &str, value: &Value) -> Option<Result<&'st
         "typing" => {
             typing::settings::set(&mut config.typing, rest, value).map(|r| r.map(|()| "typing"))
         }
+        "download" => download::settings::set(&mut config.download, rest, value)
+            .map(|r| r.map(|()| "download")),
         _ => None,
     }
 }

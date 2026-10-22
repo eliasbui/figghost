@@ -8,7 +8,8 @@ use objc2::{
 };
 use objc2_app_kit::{
     NSApplication, NSApplicationActivationPolicy, NSApplicationDelegate,
-    NSApplicationDidFinishLaunchingNotification, NSEventModifierFlags, NSMenu, NSMenuItem,
+    NSApplicationDidFinishLaunchingNotification, NSApplicationWillTerminateNotification,
+    NSEventModifierFlags, NSMenu, NSMenuItem,
 };
 use objc2_foundation::{
     NSAppleEventManager, NSNotification, NSNotificationCenter, NSObject, NSObjectProtocol,
@@ -65,6 +66,23 @@ pub fn run_accessory<T: 'static>(mtm: MainThreadMarker, setup: impl FnOnce() -> 
         )
     };
     app.run();
+}
+
+/// Runs `f` on the main thread when the app is about to quit, for what must not outlive it, such as a command it started.
+/// A crash or a kill does not reach it.
+pub fn on_terminate(f: impl Fn() + 'static) {
+    let block = RcBlock::new(move |_: NonNull<NSNotification>| f());
+    // SAFETY: the block is 'static and the notification is posted on the main thread; the observer lives as long as the
+    // process, so it is leaked on purpose.
+    let observer = unsafe {
+        NSNotificationCenter::defaultCenter().addObserverForName_object_queue_usingBlock(
+            Some(NSApplicationWillTerminateNotification),
+            None,
+            None,
+            &block,
+        )
+    };
+    std::mem::forget(observer);
 }
 
 pub fn quit(mtm: MainThreadMarker) {
