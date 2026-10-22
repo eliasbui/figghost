@@ -366,7 +366,7 @@ Biểu tượng ứng dụng được vẽ bằng mã: `cargo run -p macos-sys -
 
 ## Windows và Linux (beta)
 
-Figghost cho Windows 10, 11 và Linux đang là **bản beta**. Đây là một chương trình riêng, `figghost` (`crates/desktop`), dùng chung phần Rust đã có kiểm thử với bản macOS (`core-clipboard`, `core-agents`, `core-notes`): một biểu tượng ở khay hệ thống và một cửa sổ là trang web chạy trong web view của hệ thống (WebView2 trên Windows, WebKitGTK trên Linux). Chưa có bộ cài và bản build có chữ ký: hãy build từ mã nguồn như bên dưới.
+Figghost cho Windows 10, 11 và Linux đang là **bản beta**. Đây là một chương trình riêng, `figghost` (`crates/desktop`), dùng chung phần Rust đã có kiểm thử với bản macOS (`core-clipboard`, `core-agents`, `core-notes`): một biểu tượng ở khay hệ thống và một cửa sổ là trang web chạy trong web view của hệ thống (WebView2 trên Windows, WebKitGTK trên Linux). Từ 2.0.4, mỗi [bản phát hành trên GitHub](https://github.com/eliasbui/figghost/releases/latest) có kèm bản beta cho Windows (`figghost-<version>-windows-x86_64.zip`) và cho Linux (`figghost-<version>-linux-<arch>.tar.gz`); giải nén rồi chạy `figghost`. Các bản này chưa có chữ ký và chưa có bộ cài: Windows SmartScreen sẽ hỏi một lần, còn trên Linux cần cài các thư viện WebKitGTK, GTK và AppIndicator trong danh sách build bên dưới (bỏ hậu tố `-dev`). Hoặc build từ mã nguồn như bên dưới.
 
 Có trong bản beta:
 

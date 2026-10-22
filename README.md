@@ -366,7 +366,7 @@ The app icon is drawn by code: `cargo run -p macos-sys --example make_icon -- X.
 
 ## Windows and Linux (beta)
 
-Figghost for Windows 10 and 11 and for Linux is a **beta**. It is a program of its own, `figghost` (`crates/desktop`), built on the same tested Rust as the macOS app (`core-clipboard`, `core-agents`, `core-notes`): an icon in the tray and one window, which is a web page in the system's web view (WebView2 on Windows, WebKitGTK on Linux). There is no installer and no signed build yet: build it from source as below.
+Figghost for Windows 10 and 11 and for Linux is a **beta**. It is a program of its own, `figghost` (`crates/desktop`), built on the same tested Rust as the macOS app (`core-clipboard`, `core-agents`, `core-notes`): an icon in the tray and one window, which is a web page in the system's web view (WebView2 on Windows, WebKitGTK on Linux). From 2.0.4 each [GitHub release](https://github.com/eliasbui/figghost/releases/latest) has the beta for Windows (`figghost-<version>-windows-x86_64.zip`) and for Linux (`figghost-<version>-linux-<arch>.tar.gz`); unzip it and run `figghost`. They are not signed and there is no installer yet: Windows SmartScreen asks once, and on Linux the WebKitGTK, GTK and AppIndicator libraries of the build list below (without `-dev`) must be installed. Or build it from source as below.
 
 In the beta:
 
