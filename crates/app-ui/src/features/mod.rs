@@ -41,6 +41,7 @@ pub mod prs;
 pub mod screentime;
 pub mod smart;
 pub mod snap;
+pub mod snippets;
 pub mod stack;
 pub mod system;
 pub mod translate;
@@ -265,6 +266,7 @@ pub struct Features {
     pub displays: Option<Rc<displays::Feature>>,
     pub system: Option<Rc<system::Feature>>,
     pub typing: Option<Rc<typing::Feature>>,
+    pub snippets: Option<Rc<snippets::Feature>>,
     /// Where the tabs of the features that are off are taken out of the strip and put back.
     notch: Option<Weak<Notch>>,
 }
@@ -273,6 +275,8 @@ impl Features {
     pub fn attach(env: &AttachEnv) -> Self {
         // The wheel opens images in the capture editor, so it is given the capture feature.
         let capture = capture::attach(env);
+        // Snippets are typed through the keyboard that Vietnamese typing owns.
+        let typing = typing::attach(env);
         let features = Self {
             smart: smart::attach(env),
             wheel: wheel::attach(env, capture.as_ref()),
@@ -301,7 +305,8 @@ impl Features {
             system: system::attach(env),
             devices: devices::attach(env),
             displays: displays::attach(env),
-            typing: typing::attach(env),
+            snippets: snippets::attach(typing.as_ref()),
+            typing,
             notch: env.notch.map(Rc::downgrade),
         };
         if let Some(notch) = env.notch {
@@ -386,6 +391,9 @@ impl Features {
         }
         if let Some(f) = &self.typing {
             out.insert("typing", f.runtime());
+        }
+        if let Some(f) = &self.snippets {
+            out.insert("snippets", f.runtime());
         }
         out
     }
@@ -516,6 +524,10 @@ impl Features {
                 .typing
                 .as_ref()
                 .map_or(Ok(()), |f| f.configure(&config.typing)),
+            "snippets" => self
+                .snippets
+                .as_ref()
+                .map_or(Ok(()), |f| f.configure(&config.snippets)),
             _ => Ok(()),
         }
     }
@@ -919,6 +931,10 @@ pub fn state(
         "typing".into(),
         typing::settings::state(&config.typing, runtime.get("typing").unwrap_or(&none)),
     );
+    root.insert(
+        "snippets".into(),
+        snippets::settings::state(&config.snippets, runtime.get("snippets").unwrap_or(&none)),
+    );
 }
 
 /// A change of a setting whose path starts with a feature id. `None` when no feature owns the path; the
@@ -992,6 +1008,8 @@ pub fn set(config: &mut Config, path: &str, value: &Value) -> Option<Result<&'st
         "typing" => {
             typing::settings::set(&mut config.typing, rest, value).map(|r| r.map(|()| "typing"))
         }
+        "snippets" => snippets::settings::set(&mut config.snippets, rest, value)
+            .map(|r| r.map(|()| "snippets")),
         _ => None,
     }
 }

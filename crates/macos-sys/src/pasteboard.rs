@@ -40,6 +40,10 @@ pub enum Write<'a> {
     Files(&'a [String]),
 }
 
+/// The type that tells clipboard managers (this app's history among them) not to keep what is on the pasteboard
+/// (nspasteboard.org).
+const TRANSIENT_TYPE: &str = "org.nspasteboard.TransientType";
+
 pub struct Pasteboard(Retained<NSPasteboard>);
 
 /// Everything on a pasteboard, every item with every type it offers, so that it can be put back as it was.
@@ -105,6 +109,18 @@ impl Pasteboard {
         if !items.is_empty() {
             self.0.writeObjects(&NSArray::from_retained_slice(&items));
         }
+        self.0.changeCount()
+    }
+
+    /// Replaces the content with plain text that is marked as passing, so that no clipboard history keeps it, and
+    /// returns the new change count.
+    pub fn write_transient(&self, text: &str) -> isize {
+        self.0.clearContents();
+        // SAFETY: extern statics are process-lifetime constants.
+        self.0
+            .setString_forType(&NSString::from_str(text), unsafe { NSPasteboardTypeString });
+        self.0
+            .setString_forType(&NSString::new(), &NSString::from_str(TRANSIENT_TYPE));
         self.0.changeCount()
     }
 

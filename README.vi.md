@@ -100,6 +100,7 @@ Notch luôn có Clipboard, Khay tệp, Media (kèm lời bài hát), Tập trung
 | Chọn thông minh | Smart Select | Hiểu chữ đang chọn: đơn vị, tiền tệ, giờ ở các múi khác, bản dịch (tắt mặc định) |
 | Dịch | Translate | Chọn chữ ở bất kỳ đâu và một cửa sổ kính cạnh con trỏ dịch nó (tắt mặc định) |
 | Gõ tiếng Việt | Vietnamese typing | Telex hoặc VNI ở mọi ứng dụng, VI hoặc EN trên notch và ở thanh menu, phím tắt để chuyển, các ứng dụng giữ nguyên (tắt mặc định) |
+| Gõ tắt | Snippets | Gõ một viết tắt ở mọi ứng dụng và nó thành đoạn văn bạn đã lưu, khi gõ tiếng Việt bật hay tắt; danh sách có xem trước, trình sửa và báo lỗi rõ ràng (tắt mặc định) |
 | Chụp màn hình | Capture | Chụp màn hình, chụp cuộn, quay màn hình ra MP4 hoặc GIF, trình chỉnh sửa và nhận dạng chữ tiếng Việt, tiếng Anh (tắt mặc định) |
 | Chọn màu | Colour picker | Kính lúp trên màn hình đóng băng, chép màu dạng HEX, RGB, HSL hoặc HSB (tắt mặc định) |
 | Tiện ích | Utilities | Giữ máy thức, tắt tiếng micro cho mọi ứng dụng, khóa bàn phím khi lau, tạm ẩn notch (tắt mặc định) |
@@ -294,6 +295,10 @@ Sự kiện và lời nhắc hôm nay trên notch, và báo trước cuộc họ
 ### Gõ tiếng Việt (như Gõ Nhanh)
 
 Telex hoặc VNI ở mọi ứng dụng mà không cần bộ gõ nào khác, qua bộ máy của [Gõ Nhanh](https://github.com/khaphanspace/gonhanh.org) (tắt mặc định). Dấu được đặt theo quy tắc mới (`hoà`, `khoẻ`) hoặc cách cũ, từ tiếng Anh trở lại khi hết từ (`text`, `with`), một phím tắt (mặc định Control+Space, do chính ứng dụng ghi để cách hệ thống dùng cùng phím không lấy mất được) hoặc bảng thanh menu chuyển sang tiếng Anh và ngược lại kèm một chữ trên notch, VI hoặc EN nằm sẵn trên notch đóng và trong một mục riêng nhỏ ở thanh menu (bấm vào để chuyển; mỗi nơi tắt được), và các ứng dụng bạn liệt kê được để yên. Thanh địa chỉ, ô tìm kiếm, Spotlight (ghi qua Trợ năng, dự phòng bằng phím), trình soạn dựng trên web view, terminal và ứng dụng Adobe, mỗi thứ nhận cách gõ mà Gõ Nhanh đã chốt cho nó. Khi một bộ gõ tiếng Việt khác đang chạy, Figghost để yên mọi phím.
+
+### Gõ tắt (như TextExpander)
+
+Gõ một viết tắt ngắn ở bất kỳ ứng dụng nào, Figghost xóa nó và chèn một đoạn văn dài hơn vào chỗ đó: thư trả lời, địa chỉ, chữ ký, đoạn code (tắt mặc định). Chạy được cả khi gõ tiếng Việt bật hay tắt, vì viết tắt được nhận theo các phím bạn nhấn chứ không theo chữ hiện ra: với Telex, `;dd` hiện là `;đ`, và việc thay xóa đúng những gì các phím đó đã đưa lên màn hình, không ăn mất ký tự đứng trước. Viết tắt dài hơn khớp trước viết tắt ngắn là đuôi của nó (`;sig` trước `sig`). Viết tắt được bắt đầu lại khi nhấp chuột, nhấn phím mũi tên, Return, Tab, dấu cách, phím tắt có Command, Control hoặc Option, hay khi ứng dụng khác lên trước; Backspace lùi lại một phím. Đoạn một dòng ngắn được gõ ra; đoạn khác được dán, vì gõ xuống dòng là nhấn Return, mà Return gửi tin trong ứng dụng chat. Dán là mượn clipboard: clipboard được lưu trước, đoạn văn nằm trên đó nửa giây và được đánh dấu là tạm thời để lịch sử clipboard không giữ bản sao, rồi clipboard được trả về như cũ trừ khi bạn đã sao chép gì đó trong lúc ấy. Cần quyền Trợ năng như Gõ tiếng Việt, dùng chung bộ nghe phím với nó, và macOS tự giữ nó ngoài ô mật khẩu. Trang cài đặt liệt kê các đoạn văn kèm xem trước, thêm, sửa, xóa, nói rõ vì sao một viết tắt bị từ chối (trùng, quá dài, có dấu cách) và vì sao một viết tắt không bao giờ gõ đủ được, và gợi ý bắt đầu viết tắt bằng ký tự như `;` để chữ thường không bị thay nhầm. Phím được đọc theo vị trí trên bàn phím Mỹ. Chưa có chỗ giữ như ngày hay clipboard, chưa đồng bộ và chưa nhập từ TextExpander.
 
 ### Chụp màn hình (như CleanShot X)
 

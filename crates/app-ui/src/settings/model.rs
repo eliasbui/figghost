@@ -1060,6 +1060,10 @@ mod tests {
             .insert("com.a".into(), core_mouse::AppRule::default());
         config.ignored_apps = vec!["com.b".into()];
         config.typing.apps = vec!["com.c".into()];
+        config.snippets.items = vec![crate::features::snippets::Item {
+            abbr: ";a".into(),
+            text: "A".into(),
+        }];
         let mut e = env();
         e.agents.spend = vec![crate::agents::Spend {
             agent: "claude",
@@ -1632,6 +1636,7 @@ mod tests {
             "devices",
             "displays",
             "system",
+            "snippets",
         ] {
             assert!(state[id].is_object(), "{id} is missing from the state");
             assert!(state[id]["enabled"].is_boolean(), "{id} has no switch");

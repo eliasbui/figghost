@@ -1,0 +1,16 @@
+{
+  "enabled": true,
+  "items": [
+    { "abbr": ";sig", "text": "Best regards,\nAn Nguyen\nProduct Designer\nhello@example.com", "shadowed_by": "" },
+    { "abbr": ";addr", "text": "12 Le Loi Street, District 1, Ho Chi Minh City", "shadowed_by": "" },
+    { "abbr": ";ty", "text": "Thank you for your message. I will get back to you by the end of the day.", "shadowed_by": "" },
+    { "abbr": ";tyx", "text": "Unreachable: ;ty is finished first.", "shadowed_by": ";ty" },
+    { "abbr": ";log", "text": "console.log('debug:', value);", "shadowed_by": "" }
+  ],
+  "max_items": 500,
+  "max_abbr": 32,
+  "max_text": 20000,
+  "running": true,
+  "accessibility": true,
+  "other": null
+}

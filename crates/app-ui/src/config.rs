@@ -473,6 +473,8 @@ pub struct Config {
     pub system: crate::features::system::Config,
     #[serde(deserialize_with = "lenient_section")]
     pub typing: crate::features::typing::Config,
+    #[serde(deserialize_with = "lenient_section")]
+    pub snippets: crate::features::snippets::Config,
     /// Replace the system volume indicator with one in the notch. Needs Accessibility access.
     pub volume_hud: bool,
     /// Unpinned items kept in history.
@@ -529,6 +531,7 @@ impl Default for Config {
             displays: crate::features::displays::Config::default(),
             system: crate::features::system::Config::default(),
             typing: crate::features::typing::Config::default(),
+            snippets: crate::features::snippets::Config::default(),
             volume_hud: false,
             history_limit: 500,
             ignored_apps: Vec::new(),
@@ -587,6 +590,7 @@ impl Config {
                 cfg.devices = cfg.devices.sanitized();
                 cfg.system = cfg.system.sanitized();
                 cfg.typing = cfg.typing.sanitized();
+                cfg.snippets = cfg.snippets.sanitized();
                 if !["auto", "light", "dark"].contains(&cfg.theme.as_str()) {
                     cfg.theme = "auto".into();
                 }
