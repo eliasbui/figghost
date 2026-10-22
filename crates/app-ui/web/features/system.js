@@ -1,4 +1,4 @@
-// System: a tab of the notch with the processor, the memory, the network, the disk and the heat.
+// System: a tab of the notch with the processor, the memory, the network, the disk, the heat and the fans.
 (window.__plugins = window.__plugins || []).push({
   id: 'system',
   icon: 'cpu',
@@ -10,7 +10,7 @@
     'system.processor.title': 'Processor', 'system.processor.desc': 'The load of each core, with the efficiency cores apart from the performance ones.',
     'system.memory.title': 'Memory', 'system.memory.desc': 'What apps hold, what is wired and what is compressed, with the pressure and the swap.',
     'system.network.title': 'Network', 'system.network.desc': 'Speed down and up, and the last readings drawn as a line.',
-    'system.details.title': 'Graphics, disk, heat and battery', 'system.details.desc': 'A row of small figures. The battery is there only on a Mac that has one.',
+    'system.details.title': 'Graphics, disk, heat, fans and battery', 'system.details.desc': 'A row of small figures: the heat of the processor in degrees, and the speed of the fans. The fans and the battery are there only on a Mac that has them.',
     'sec.system.how': 'Readings',
     'system.seconds.title': 'How often', 'system.seconds.desc': 'A short wait follows a spike closely and a long one reads less.',
     'system.every.one': 'Every second', 'system.every.many': 'Every {n} seconds',
@@ -23,7 +23,7 @@
     'system.processor.title': 'Bộ xử lý', 'system.processor.desc': 'Mức tải từng lõi, tách lõi tiết kiệm khỏi lõi hiệu năng.',
     'system.memory.title': 'Bộ nhớ', 'system.memory.desc': 'Phần ứng dụng giữ, phần hệ thống ghim và phần bị nén, cùng áp lực và swap.',
     'system.network.title': 'Mạng', 'system.network.desc': 'Tốc độ tải xuống và tải lên, và các lần đọc gần nhất vẽ thành một đường.',
-    'system.details.title': 'Đồ họa, ổ đĩa, nhiệt và pin', 'system.details.desc': 'Một hàng số liệu nhỏ. Pin chỉ có trên máy Mac có pin.',
+    'system.details.title': 'Đồ họa, ổ đĩa, nhiệt, quạt và pin', 'system.details.desc': 'Một hàng số liệu nhỏ: nhiệt độ bộ xử lý tính bằng độ C, và tốc độ quạt. Quạt và pin chỉ có trên máy Mac có chúng.',
     'sec.system.how': 'Lần đọc',
     'system.seconds.title': 'Đọc bao lâu một lần', 'system.seconds.desc': 'Đọc dày thì bắt kịp những đợt tăng vọt, đọc thưa thì máy ít việc hơn.',
     'system.every.one': 'Mỗi giây', 'system.every.many': 'Mỗi {n} giây',

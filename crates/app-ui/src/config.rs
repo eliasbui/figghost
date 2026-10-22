@@ -45,7 +45,7 @@ impl TilingConfig {
 }
 
 /// The tabs of the notch, in their default order.
-pub const NOTCH_PAGES: [&str; 16] = [
+pub const NOTCH_PAGES: [&str; 17] = [
     "clipboard",
     "shelf",
     "media",
@@ -61,6 +61,7 @@ pub const NOTCH_PAGES: [&str; 16] = [
     "screentime",
     "system",
     "devices",
+    "displays",
     "sound",
 ];
 
@@ -468,6 +469,7 @@ pub struct Config {
     pub dayprogress: crate::features::dayprogress::Config,
     #[serde(deserialize_with = "lenient_section")]
     pub devices: crate::features::devices::Config,
+    pub displays: crate::features::displays::Config,
     #[serde(deserialize_with = "lenient_section")]
     pub system: crate::features::system::Config,
     /// Replace the system volume indicator with one in the notch. Needs Accessibility access.
@@ -523,6 +525,7 @@ impl Default for Config {
             screentime: crate::features::screentime::Config::default(),
             dayprogress: crate::features::dayprogress::Config::default(),
             devices: crate::features::devices::Config::default(),
+            displays: crate::features::displays::Config::default(),
             system: crate::features::system::Config::default(),
             volume_hud: false,
             history_limit: 500,

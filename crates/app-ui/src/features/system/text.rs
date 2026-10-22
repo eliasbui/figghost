@@ -117,6 +117,23 @@ impl Language {
         }
     }
 
+    pub fn system_fan(self) -> &'static str {
+        match self {
+            Language::English => "Fan",
+            Language::Vietnamese => "Quạt",
+        }
+    }
+
+    /// Under the speed of the fastest fan: how many there are and the fastest that one can turn.
+    pub fn system_fan_detail(self, count: usize, max: &str) -> String {
+        match (self, count) {
+            (Language::English, 0 | 1) => format!("of {max}"),
+            (Language::English, n) => format!("{n} fans, of {max}"),
+            (Language::Vietnamese, 0 | 1) => format!("tối đa {max}"),
+            (Language::Vietnamese, n) => format!("{n} quạt, tối đa {max}"),
+        }
+    }
+
     pub fn system_battery(self) -> &'static str {
         match self {
             Language::English => "Battery health",

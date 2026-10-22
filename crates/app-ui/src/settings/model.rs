@@ -1621,6 +1621,7 @@ mod tests {
             "screentime",
             "dayprogress",
             "devices",
+            "displays",
             "system",
         ] {
             assert!(state[id].is_object(), "{id} is missing from the state");

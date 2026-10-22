@@ -1,5 +1,5 @@
 //! The System tab of the notch: the processor core by core, the memory and the swap, the network, and a row of
-//! smaller figures (graphics, startup disk, heat, battery). It is off until the person turns it on, and even then
+//! smaller figures (graphics, startup disk, heat, fans, battery). It is off until the person turns it on, and even then
 //! nothing is read while the tab is not showing: the readings start when the tab opens and stop when it closes,
 //! so an idle app does no work for it.
 //!
@@ -14,7 +14,7 @@ use crate::{
     trace,
 };
 use macos_sys::{
-    app,
+    app, sensors,
     style::Tone,
     sysinfo::{self, Interface, Pressure, Thermal},
     system_ui::{
@@ -50,7 +50,7 @@ pub struct Config {
     pub processor: bool,
     pub memory: bool,
     pub network: bool,
-    /// The row of small figures: graphics, startup disk, heat and battery.
+    /// The row of small figures: graphics, startup disk, heat, fans and battery.
     pub details: bool,
 }
 
@@ -321,10 +321,16 @@ fn details(language: Language) -> Vec<Stat> {
         });
     }
     let thermal = sysinfo::thermal();
+    let state = language.system_thermal_state(thermal).to_owned();
+    // With a reading of the die, the figure is the heat and the state goes under it.
+    let (value, detail) = match sensors::processor_celsius() {
+        Some(celsius) => (logic::celsius_text(celsius), state),
+        None => (state, String::new()),
+    };
     stats.push(Stat {
         title: language.system_thermal().to_owned(),
-        value: language.system_thermal_state(thermal).to_owned(),
-        detail: String::new(),
+        value,
+        detail,
         fraction: None,
         tone: match thermal {
             Thermal::Nominal => Tone::Green,
@@ -332,6 +338,16 @@ fn details(language: Language) -> Vec<Stat> {
             Thermal::Serious | Thermal::Critical => Tone::Red,
         },
     });
+    let fans = sensors::fans();
+    if let Some((fan, share)) = logic::fastest(&fans) {
+        stats.push(Stat {
+            title: language.system_fan().to_owned(),
+            value: logic::rpm_text(fan.rpm),
+            detail: language.system_fan_detail(fans.len(), &logic::rpm_text(fan.max)),
+            fraction: Some(share),
+            tone: Tone::Blue,
+        });
+    }
     if let Some(wear) = sysinfo::battery_wear() {
         stats.push(Stat {
             title: language.system_battery().to_owned(),
