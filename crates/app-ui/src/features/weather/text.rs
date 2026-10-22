@@ -143,6 +143,28 @@ impl Language {
         }
     }
 
+    /// The button under the note of a tab that has nothing to show until something is chosen in the settings.
+    pub fn weather_open_settings(self) -> &'static str {
+        match self {
+            Language::English => "Open Settings",
+            Language::Vietnamese => "Mở Cài đặt",
+        }
+    }
+
+    pub fn weather_previous(self) -> &'static str {
+        match self {
+            Language::English => "Previous city",
+            Language::Vietnamese => "Thành phố trước",
+        }
+    }
+
+    pub fn weather_next(self) -> &'static str {
+        match self {
+            Language::English => "Next city",
+            Language::Vietnamese => "Thành phố sau",
+        }
+    }
+
     pub fn weather_off_title(self) -> &'static str {
         match self {
             Language::English => "The Weather tab is off",

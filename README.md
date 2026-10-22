@@ -115,7 +115,7 @@ The Pull requests tab lists the review requests that wait for you on GitHub and 
 
 ![The Pull requests tab of the notch](docs/images/notch-prs.png)
 
-The Weather tab shows the weather of one city: now, the next six hours and the next five days, in Celsius or Fahrenheit. It is the only tab that goes online, so it is off until it is turned on and a city is chosen in Settings, under Notch tabs, Weather. The forecast comes from Open-Meteo, which needs no account or key, through the system's `curl`; what is sent is the name typed when searching for a city and then the coordinates of the city chosen, never the location of the Mac, and it asks only while the tab is open and no more than once in ten minutes.
+The Weather tab shows the weather of up to eight cities, one at a time: now, the next six hours and the next five days, in Celsius or Fahrenheit. With more than one city, the arrows beside the name (or the Left and Right keys) flip to the next, and "2/3" says where you are; the tab opens on the first city of the list, and remembers the one shown while the app runs. It is the only tab that goes online, so it is off until it is turned on and a city is added in Settings, under Notch tabs, Weather, where cities are searched for, added, moved up and removed; until then its Open Settings button goes there. The forecast comes from Open-Meteo, which needs no account or key, through the system's `curl`; what is sent is the name typed when searching for a city and then the coordinates of the city on screen, never the location of the Mac, and it asks only while the tab is open, only for the city it shows, and no more than once in ten minutes for each city.
 
 ![The Weather tab of the notch](docs/images/notch-weather.png)
 

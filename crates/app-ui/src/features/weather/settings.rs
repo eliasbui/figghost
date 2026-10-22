@@ -12,7 +12,8 @@ pub fn state(config: &Config, runtime: &Value) -> Value {
     json!({
         "enabled": config.enabled,
         "units": config.units,
-        "place": config.place.as_ref().map(|p| p.label()),
+        "places": config.places.iter().map(|p| json!({ "label": p.label() })).collect::<Vec<_>>(),
+        "full": config.places.len() >= super::logic::MAX_CITIES,
         "searching": runtime.get("searching").and_then(Value::as_bool).unwrap_or(false),
         "found": runtime.get("found").cloned().unwrap_or_else(|| json!([])),
         "problem": runtime.get("problem").and_then(Value::as_str).unwrap_or_default(),
@@ -20,7 +21,7 @@ pub fn state(config: &Config, runtime: &Value) -> Value {
 }
 
 /// A change from the page. `path` is relative to the feature. Values must be validated here; the page is not
-/// trusted. The place is not set here: it is picked from a search, which only the running feature knows.
+/// trusted. The cities are not set here: they are added from a search, which only the running feature knows.
 pub fn set(config: &mut Config, path: &str, value: &Value) -> Option<Result<(), Fault>> {
     let bad = || Fault::new("invalid_value", path);
     Some(match path {
@@ -57,30 +58,40 @@ mod tests {
             keys(&fixture),
             keys(&state(&Config::default(), &Value::Null))
         );
-        let found = &fixture["found"][0];
-        assert_eq!(keys(found), ["label"]);
+        assert_eq!(keys(&fixture["found"][0]), ["label"]);
+        assert_eq!(keys(&fixture["places"][0]), ["label"]);
     }
 
     #[test]
     fn the_state_starts_off_with_no_place_and_says_what_the_running_feature_knows() {
         let s = state(&Config::default(), &Value::Null);
         assert_eq!(s["enabled"], json!(false));
-        assert_eq!(s["place"], Value::Null);
+        assert_eq!(s["places"], json!([]));
+        assert_eq!(s["full"], json!(false));
         assert_eq!(s["units"], json!("metric"));
         assert_eq!(s["found"], json!([]));
+        let city = |name: &str, latitude: f64| Place {
+            name: name.into(),
+            region: name.into(),
+            country: "Vietnam".into(),
+            latitude,
+            longitude: 105.8,
+        };
         let config = Config {
-            place: Some(Place {
-                name: "Hanoi".into(),
-                region: "Hanoi".into(),
-                country: "Vietnam".into(),
-                latitude: 21.0,
-                longitude: 105.8,
-            }),
+            places: vec![city("Hanoi", 21.0), city("Hue", 16.4)],
             ..Config::default()
         };
         let runtime = json!({ "searching": true, "found": [{ "label": "Hue, Vietnam" }], "problem": "offline" });
         let s = state(&config, &runtime);
-        assert_eq!(s["place"], json!("Hanoi, Vietnam"));
+        assert_eq!(
+            s["places"],
+            json!([{ "label": "Hanoi, Vietnam" }, { "label": "Hue, Vietnam" }])
+        );
+        let full = Config {
+            places: (0..20).map(|i| city("C", f64::from(i))).collect(),
+            ..Config::default()
+        };
+        assert_eq!(state(&full, &Value::Null)["full"], json!(true));
         assert_eq!(s["searching"], json!(true));
         assert_eq!(s["found"][0]["label"], json!("Hue, Vietnam"));
         assert_eq!(s["problem"], json!("offline"));
@@ -102,8 +113,8 @@ mod tests {
         }
         assert_eq!(config.units, "imperial", "a refused value changes nothing");
         assert!(
-            set(&mut config, "place", &json!("Hue")).is_none(),
-            "a place is picked from a search, never set"
+            set(&mut config, "places", &json!(["Hue"])).is_none(),
+            "a city is added from a search, never set"
         );
         assert!(set(&mut config, "nonsense", &json!(1)).is_none());
     }

@@ -1061,6 +1061,13 @@ mod tests {
         // The places a search found only exist while the settings page is looking at one.
         e.runtime
             .insert("weather", json!({ "found": [{ "label": "Hue, Vietnam" }] }));
+        config.weather.places = vec![crate::features::weather::logic::Place {
+            name: "Hanoi".into(),
+            region: String::new(),
+            country: "Vietnam".into(),
+            latitude: 21.0,
+            longitude: 105.8,
+        }];
         config.launcher.items = vec![crate::features::launcher::logic::Item {
             kind: crate::features::launcher::logic::Kind::App,
             target: "com.apple.Notes".into(),

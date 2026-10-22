@@ -1,7 +1,8 @@
 {
   "enabled": true,
   "units": "metric",
-  "place": "Hanoi, Vietnam",
+  "places": [{ "label": "Hanoi, Vietnam" }, { "label": "Ho Chi Minh City, Vietnam" }, { "label": "Tokyo, Japan" }],
+  "full": false,
   "searching": false,
   "found": [{ "label": "Hue, Thua Thien Hue, Vietnam" }, { "label": "Hue, Indiana, United States" }],
   "problem": ""
