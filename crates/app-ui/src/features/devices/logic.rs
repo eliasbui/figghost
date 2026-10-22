@@ -237,10 +237,230 @@ pub fn parse(text: &str) -> Result<Vec<Gadget>, Unreadable> {
     Ok(found)
 }
 
+/// A charge the power system has for an accessory, as `pmset -g accps -xml` prints it. Many devices that tell
+/// `system_profiler` nothing, a mouse or a headset, tell this, and it is what the menu bar shows.
+#[derive(Debug, Clone, PartialEq, Eq)]
+pub struct Accessory {
+    pub name: String,
+    pub kind: Kind,
+    pub charge: u8,
+}
+
+/// The text of a plist element, with the five entities and numeric ones undone.
+fn unescape(text: &str) -> String {
+    let mut out = String::new();
+    let mut rest = text;
+    while let Some(at) = rest.find('&') {
+        out.push_str(&rest[..at]);
+        rest = &rest[at..];
+        let Some(end) = rest.find(';').filter(|e| *e <= 10) else {
+            break;
+        };
+        let decoded = match &rest[1..end] {
+            "amp" => Some('&'),
+            "lt" => Some('<'),
+            "gt" => Some('>'),
+            "quot" => Some('"'),
+            "apos" => Some('\''),
+            code => code
+                .strip_prefix("#x")
+                .map(|hex| u32::from_str_radix(hex, 16).ok())
+                .unwrap_or_else(|| code.strip_prefix('#').and_then(|d| d.parse().ok()))
+                .and_then(char::from_u32),
+        };
+        match decoded {
+            Some(c) => {
+                out.push(c);
+                rest = &rest[end + 1..];
+            }
+            None => break,
+        }
+    }
+    out.push_str(rest);
+    out
+}
+
+/// Each `<dict>` of what `pmset` printed, as its keys with the text of the value after each.
+fn plist_dicts(text: &str) -> Vec<Vec<(String, String)>> {
+    let element = |s: &str, tag: &str| -> Option<(String, usize)> {
+        let open = format!("<{tag}>");
+        let close = format!("</{tag}>");
+        let rest = s.strip_prefix(&open)?;
+        let end = rest.find(&close)?;
+        Some((unescape(&rest[..end]), open.len() + end + close.len()))
+    };
+    let mut dicts = Vec::new();
+    for block in text.split("<dict>").skip(1) {
+        let body = block.split("</dict>").next().unwrap_or_default();
+        let mut pairs = Vec::new();
+        let mut rest = body.trim_start();
+        while let Some((key, used)) = element(rest, "key") {
+            rest = rest[used..].trim_start();
+            let value = ["string", "integer"]
+                .iter()
+                .find_map(|tag| element(rest, tag));
+            if let Some((value, used)) = value {
+                rest = rest[used..].trim_start();
+                pairs.push((key, value));
+            } else if let Some(next) = rest.find("<key>") {
+                rest = &rest[next..];
+            } else {
+                break;
+            }
+        }
+        dicts.push(pairs);
+    }
+    dicts
+}
+
+/// The accessories `pmset -g accps -xml` reports a charge for. What cannot be read is left out.
+pub fn parse_accessories(text: &str) -> Vec<Accessory> {
+    plist_dicts(text)
+        .into_iter()
+        .filter_map(|pairs| {
+            let get = |key: &str| pairs.iter().find(|(k, _)| k == key).map(|(_, v)| v.trim());
+            let current: u64 = get("Current Capacity")?.parse().ok()?;
+            let max: u64 = get("Max Capacity")
+                .and_then(|m| m.parse().ok())
+                .unwrap_or(100);
+            let charge = u8::try_from(current.checked_mul(100)? / max.max(1))
+                .ok()
+                .filter(|c| *c <= 100)?;
+            let name = clean_name(get("Name").unwrap_or_default());
+            Some(Accessory {
+                kind: kind_of(get("Accessory Category").unwrap_or_default(), &name),
+                name,
+                charge,
+            })
+        })
+        .take(MAX_DEVICES)
+        .collect()
+}
+
+/// Gives each device that reports no charge of its own the one the power system has for it: the accessory of the same
+/// name, or, when one accessory with no name of a device is left and one device that could be it has no charge, that one.
+/// A headset can be listed with no name at all.
+pub fn add_charges(gadgets: &mut [Gadget], accessories: &[Accessory]) {
+    let mut left: Vec<&Accessory> = Vec::new();
+    for accessory in accessories {
+        let same = gadgets.iter_mut().find(|g| {
+            !g.reports_a_charge()
+                && !accessory.name.is_empty()
+                && g.name.to_lowercase() == accessory.name.to_lowercase()
+        });
+        match same {
+            Some(g) => g.main = Some(accessory.charge),
+            None => left.push(accessory),
+        }
+    }
+    let [only] = left[..] else { return };
+    let named = |g: &Gadget| {
+        accessories
+            .iter()
+            .any(|a| a.name.to_lowercase() == g.name.to_lowercase())
+    };
+    let mut could = gadgets.iter_mut().filter(|g| {
+        !g.reports_a_charge() && !named(g) && (only.kind == Kind::Other || g.kind == only.kind)
+    });
+    if let (Some(g), None) = (could.next(), could.next()) {
+        if only.name.is_empty() || only.kind != Kind::Other {
+            g.main = Some(only.charge);
+        }
+    }
+}
+
 #[cfg(test)]
 mod tests {
     use super::*;
     use serde_json::json;
+
+    fn entry(category: &str, name: &str, current: u32) -> String {
+        format!(
+            "<dict><key>Accessory Category</key><string>{category}</string><key>Current Capacity</key>\
+             <integer>{current}</integer><key>Max Capacity</key><integer>100</integer><key>Name</key>\
+             <string>{name}</string><key>Type</key><string>Accessory Source</string></dict>"
+        )
+    }
+
+    #[test]
+    fn the_power_system_gives_a_charge_to_a_device_that_reports_none_itself() {
+        let text = format!(
+            "<?xml version=\"1.0\"?><plist version=\"1.0\">{}</plist><plist>{}</plist>",
+            entry("Mouse", "BT5.0 Mouse", 68),
+            "<dict><key>Current Capacity</key><integer>89</integer><key>Name</key><string></string></dict>"
+        );
+        let accessories = parse_accessories(&text);
+        assert_eq!(
+            accessories,
+            [
+                Accessory {
+                    name: "BT5.0 Mouse".into(),
+                    kind: Kind::Mouse,
+                    charge: 68
+                },
+                Accessory {
+                    name: String::new(),
+                    kind: Kind::Other,
+                    charge: 89
+                },
+            ]
+        );
+        let quiet = |name: &str, kind| Gadget {
+            name: name.into(),
+            kind,
+            main: None,
+            left: None,
+            right: None,
+            case: None,
+        };
+        let mut gadgets = vec![
+            quiet("Buds Core của Bui", Kind::Headphones),
+            quiet("BT5.0 Mouse", Kind::Mouse),
+        ];
+        add_charges(&mut gadgets, &accessories);
+        assert_eq!((gadgets[0].main, gadgets[1].main), (Some(89), Some(68)));
+
+        let mut two = vec![quiet("A", Kind::Headphones), quiet("B", Kind::Headphones)];
+        add_charges(&mut two, &accessories[1..]);
+        assert!(
+            two.iter().all(|g| g.main.is_none()),
+            "a charge with no name is not guessed between two"
+        );
+
+        let mut reported = vec![Gadget {
+            main: Some(40),
+            ..quiet("BT5.0 Mouse", Kind::Mouse)
+        }];
+        add_charges(&mut reported, &accessories);
+        assert_eq!(
+            reported[0].main,
+            Some(40),
+            "what a device reports itself is kept"
+        );
+
+        let mut other = vec![quiet("Keys", Kind::Keyboard)];
+        add_charges(
+            &mut other,
+            &parse_accessories(&entry("Mouse", "Some Mouse", 50)),
+        );
+        assert_eq!(
+            other[0].main, None,
+            "a named accessory of another kind is not given away"
+        );
+
+        assert_eq!(
+            parse_accessories(&entry("Mouse", "A &amp; B", 7))[0].name,
+            "A & B"
+        );
+        for bad in [
+            "",
+            "nonsense",
+            &entry("Mouse", "X", 101),
+            "<dict><key>Name</key><string>X</string></dict>",
+        ] {
+            assert!(parse_accessories(bad).is_empty(), "{bad}");
+        }
+    }
 
     /// A real answer of this Mac, with the names and addresses replaced; the devices that are only paired were given a
     /// charge, to be sure it is not read.

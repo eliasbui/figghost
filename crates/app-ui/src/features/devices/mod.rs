@@ -2,7 +2,7 @@
 //! mouse that is about to die or a pair of earbuds that is flat is seen before it is needed. It is off until the person
 //! turns it on.
 //!
-//! The devices are asked of the system's own `system_profiler`, run with fixed arguments and no shell, off the main
+//! The devices are asked of the system's own `system_profiler`, and their charges also of `pmset`, run with fixed arguments and no shell, off the main
 //! thread and stopped after a few seconds; what it prints is read as data. It is asked when the tab opens and then every
 //! half minute while the tab shows, and never otherwise. No permission is needed and nothing is written to disk. A device
 //! shows a charge only when it reports one to the system, which many keyboards, mice and speakers do not.
@@ -14,7 +14,9 @@ use crate::{
     settings::model::Fault,
     trace,
 };
-use logic::{Gadget, Kind, LOW_AT, Memory, Seen, parse, with_memory};
+use logic::{
+    Gadget, Kind, LOW_AT, Memory, Seen, add_charges, parse, parse_accessories, with_memory,
+};
 use macos_sys::{
     app,
     devices_ui::{Card, DevicesDisplay, DevicesView, MAX_CARDS, PAGE_SIZE, Reading},
@@ -30,6 +32,7 @@ pub mod settings;
 mod text;
 
 const PROFILER: &str = "/usr/sbin/system_profiler";
+const PMSET: &str = "/usr/bin/pmset";
 const COMMAND_SECONDS: u64 = 15;
 /// While the tab shows, the devices are asked for again this often, in seconds.
 const TICK_SECONDS: f64 = 30.0;
@@ -190,7 +193,17 @@ impl Feature {
         std::thread::spawn(move || {
             let outcome =
                 match run_bounded(PROFILER, &["SPBluetoothDataType", "-json"], COMMAND_SECONDS) {
-                    Ok(text) => parse(&text).map_err(|_| Problem::Unreadable),
+                    Ok(text) => parse(&text)
+                        .map_err(|_| Problem::Unreadable)
+                        .map(|mut gadgets| {
+                            // A charge the device does not tell `system_profiler` the power system may still know.
+                            if let Ok(power) =
+                                run_bounded(PMSET, &["-g", "accps", "-xml"], COMMAND_SECONDS)
+                            {
+                                add_charges(&mut gadgets, &parse_accessories(&power));
+                            }
+                            gadgets
+                        }),
                     Err(Ran::Slow) => Err(Problem::Slow),
                     Err(Ran::Failed) => Err(Problem::Failed),
                 };
