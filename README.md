@@ -307,7 +307,7 @@ A loupe on a frozen screen; the colour is copied as HEX, RGB, HSL or HSB (off by
 
 ### Mole
 
-Checks the health of the Mac and frees disk space, after the features of [Mole](https://github.com/tw93/Mole) but done by Figghost itself, so nothing needs installing: caches and logs, old build folders of projects, installer files, apps with what they left behind, and what takes the disk. The lists fill in as the page opens; choose rows, or all of them, and remove them together. Caches and build folders are deleted, everything else goes to the Trash (off by default).
+Checks the health of the Mac and frees disk space, after the features of [Mole](https://github.com/tw93/Mole) but done by Figghost itself, so nothing needs installing: caches and logs, old build folders of projects, installer files, apps with what they left behind, and what takes the disk, shown as a ring you can hover and click to open a folder. The lists fill in as the page opens; choose rows, or all of them, and remove them together. Caches and build folders are deleted, everything else goes to the Trash (off by default).
 
 ![The Mole page with the health score and the lists to clean](docs/images/settings-mole.png)
 

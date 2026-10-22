@@ -307,7 +307,7 @@ Kính lúp trên màn hình đóng băng; màu được chép dạng HEX, RGB, H
 
 ### Mole
 
-Kiểm tra sức khỏe máy Mac và giải phóng dung lượng, theo các tính năng của [Mole](https://github.com/tw93/Mole) nhưng do chính Figghost làm nên không cần cài gì thêm: bộ nhớ đệm và nhật ký, thư mục build cũ của dự án, tệp cài đặt, ứng dụng cùng những gì nó để lại, và cái gì chiếm chỗ trên ổ đĩa. Danh sách tự hiện ra khi mở trang; chọn từng dòng hoặc chọn tất cả rồi xóa cùng lúc. Bộ nhớ đệm và thư mục build bị xóa hẳn, còn lại được chuyển vào Thùng rác (tắt mặc định).
+Kiểm tra sức khỏe máy Mac và giải phóng dung lượng, theo các tính năng của [Mole](https://github.com/tw93/Mole) nhưng do chính Figghost làm nên không cần cài gì thêm: bộ nhớ đệm và nhật ký, thư mục build cũ của dự án, tệp cài đặt, ứng dụng cùng những gì nó để lại, và cái gì chiếm chỗ trên ổ đĩa, hiện thành biểu đồ vòng để rê chuột và bấm lát mở thư mục. Danh sách tự hiện ra khi mở trang; chọn từng dòng hoặc chọn tất cả rồi xóa cùng lúc. Bộ nhớ đệm và thư mục build bị xóa hẳn, còn lại được chuyển vào Thùng rác (tắt mặc định).
 
 ![Trang Mole với điểm sức khỏe và các danh sách để dọn](docs/images/settings-mole.png)
 

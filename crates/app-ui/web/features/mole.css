@@ -28,3 +28,14 @@
 .mole-item .mole-bar { height: 3px; margin-top: 4px; }
 .mole-item-size { flex: none; min-width: 64px; text-align: right; color: var(--text-2); font-size: var(--fs-small); font-variant-numeric: tabular-nums; }
 .mole-item input, .mole-all input { flex: none; width: 15px; height: 15px; margin: 0; accent-color: var(--accent); }
+.mole-chart { display: flex; justify-content: center; padding: 12px var(--row-inset); border-top: 0.5px solid var(--stroke); }
+.mole-chart svg { width: 200px; height: 200px; overflow: visible; animation: mole-ring-in 0.35s ease-out; }
+@keyframes mole-ring-in { from { opacity: 0; transform: scale(0.94); } }
+.mole-slice { stroke: var(--solid); stroke-width: 1.5; cursor: default; transition: opacity 0.15s, transform 0.15s; transform-origin: 100px 100px; }
+.mole-slice:not(.file) { cursor: pointer; }
+.mole-chart:has(.lit) .mole-slice:not(.lit) { opacity: 0.55; }
+.mole-slice.lit { transform: scale(1.03); }
+.mole-chart-mid { display: flex; flex-direction: column; align-items: center; justify-content: center; height: 60px; text-align: center; color: var(--text); font-size: var(--fs-small); }
+.mole-chart-name { max-width: 100%; overflow: hidden; text-overflow: ellipsis; white-space: nowrap; font-weight: 600; }
+.mole-chart-size { color: var(--text-2); font-variant-numeric: tabular-nums; }
+.mole-item.lit { background: var(--fill); }

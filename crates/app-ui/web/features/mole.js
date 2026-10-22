@@ -47,6 +47,7 @@
     'mole.analyze.empty': 'This folder is empty.',
     'mole.analyze.remove': 'Move to Trash',
     'mole.analyze.body': 'The chosen files and folders go to the Trash, where they can be put back.',
+    'mole.analyze.other': 'Other', 'mole.analyze.chart': 'Disk usage of {path}: {total}. Largest: {top}.',
     'mole.analyze.up': 'Up', 'mole.analyze.open': 'Open {name}', 'mole.analyze.home': 'Home',
     'mole.scanning': 'Scanning...',
     'mole.search': 'Filter',
@@ -102,6 +103,7 @@
     'mole.analyze.empty': 'Thư mục này trống.',
     'mole.analyze.remove': 'Chuyển vào Thùng rác',
     'mole.analyze.body': 'Các tệp và thư mục đã chọn được chuyển vào Thùng rác nên có thể khôi phục.',
+    'mole.analyze.other': 'Khác', 'mole.analyze.chart': 'Dung lượng của {path}: {total}. Lớn nhất: {top}.',
     'mole.analyze.up': 'Lên trên', 'mole.analyze.open': 'Mở {name}', 'mole.analyze.home': 'Thư mục nhà',
     'mole.scanning': 'Đang quét...',
     'mole.search': 'Lọc',
@@ -214,7 +216,7 @@
         const fill = h('span');
         fill.style.width = Math.max(1, (i.size / top) * 100) + '%';
         const go = open && i.dir ? button('', (e) => { e.preventDefault(); open(i); }, { icon: 'folder', small: true, aria: t('mole.analyze.open', { name: i.name }) }) : null;
-        return h('label', { class: 'mole-item', title: tilde(i.path) }, pick, lead ? lead(i) : null,
+        return h('label', { class: 'mole-item', title: tilde(i.path), 'data-path': i.path }, pick, lead ? lead(i) : null,
           h('span', { class: 'mole-item-text' }, h('span', { class: 'mole-item-name', text: i.name }), h('span', { class: 'mole-item-note', text: detail(i) }),
             h('span', { class: 'mole-bar' }, fill)),
           h('span', { class: 'mole-item-size', text: size(i.size) }), go);
@@ -237,6 +239,91 @@
 
   const age = (i) => (i.age == null ? '' : i.age ? t('mole.age', { n: i.age }) : t('mole.age.today'));
 
+  const MAX_SLICES = 12;
+  const MIN_SHARE = 0.01;
+
+  /** The slices of the ring: the biggest entries, then one "Other" for the rest and for what is too thin to see. */
+  function slices(a) {
+    const list = [...a.entries].filter((i) => i.size > 0).sort((x, y) => y.size - x.size);
+    const whole = Math.max(a.total || 0, sum(list));
+    if (!list.length || !whole) return [];
+    const out = [];
+    let rest = whole;
+    for (const i of list) {
+      if (out.length >= MAX_SLICES - 1 || i.size / whole < MIN_SHARE) break;
+      out.push({ entry: i, name: i.name, size: i.size });
+      rest -= i.size;
+    }
+    if (rest > 0) out.push({ entry: null, name: t('mole.analyze.other'), size: rest });
+    return out.map((x) => ({ ...x, share: x.size / whole }));
+  }
+
+  const R_OUT = 90;
+  const R_IN = 58;
+  const point = (r, turn) => (100 + r * Math.sin(turn * 2 * Math.PI)).toFixed(2) + ' ' + (100 - r * Math.cos(turn * 2 * Math.PI)).toFixed(2);
+  function arc(from, to) {
+    const end = Math.min(to, from + 0.9999);
+    const big = end - from > 0.5 ? 1 : 0;
+    return 'M' + point(R_OUT, from) + 'A' + R_OUT + ' ' + R_OUT + ' 0 ' + big + ' 1 ' + point(R_OUT, end)
+      + 'L' + point(R_IN, end) + 'A' + R_IN + ' ' + R_IN + ' 0 ' + big + ' 0 ' + point(R_IN, from) + 'Z';
+  }
+  const esc = (v) => String(v).replace(/[&<>"]/g, (c) => ({ '&': '&amp;', '<': '&lt;', '>': '&gt;', '"': '&quot;' })[c]);
+
+  /** The ring above the list. The list stays the way in for the keyboard, so the slices are not tab stops. */
+  function analyzeChart() {
+    const wrap = h('div', { class: 'mole-chart' });
+    let cut = [];
+    let last = null;
+    const rowOf = (path) => [...(wrap.closest('.card') || document).querySelectorAll('.mole-item')].find((r) => r.dataset.path === path);
+    const light = (k) => {
+      wrap.querySelectorAll('.mole-slice').forEach((el) => el.classList.toggle('lit', el.dataset.k === k));
+      const x = cut[k];
+      const name = wrap.querySelector('.mole-chart-name');
+      const num = wrap.querySelector('.mole-chart-size');
+      const a = mole().analyze;
+      name.textContent = x ? x.name : tilde(a.path).split('/').pop() || '/';
+      num.textContent = x ? size(x.size) + ' / ' + Math.round(x.share * 100) + '%' : size(a.total);
+      wrap.querySelectorAll('.mole-item.lit').forEach((r) => r.classList.remove('lit'));
+      const row = x && x.entry && rowOf(x.entry.path);
+      if (row) row.classList.add('lit');
+    };
+    wrap.addEventListener('mouseover', (e) => { const el = e.target.closest('.mole-slice'); if (el) light(el.dataset.k); });
+    wrap.addEventListener('mouseout', (e) => { if (e.target.closest('.mole-slice')) light(null); });
+    wrap.addEventListener('click', (e) => {
+      const el = e.target.closest('.mole-slice');
+      const x = el && cut[el.dataset.k];
+      if (!x || !x.entry) return;
+      if (x.entry.dir) { act('mole_analyze:' + x.entry.path); return; }
+      const row = rowOf(x.entry.path);
+      const pick = row && row.querySelector('input');
+      if (pick && !pick.checked) pick.click();
+      if (row) row.scrollIntoView({ block: 'nearest' });
+    });
+    reg(() => {
+      const a = mole().analyze;
+      cut = a && !busy('analyze') ? slices(a) : [];
+      const stamp = JSON.stringify([cut.map((x) => [x.name, x.size]), a && a.path, a && a.total, lang]);
+      if (stamp === last) return;
+      last = stamp;
+      wrap.hidden = !cut.length;
+      if (!cut.length) { wrap.replaceChildren(); return; }
+      let at = 0;
+      const paths = cut.map((x, k) => {
+        const d = arc(at, at + x.share);
+        at += x.share;
+        const fill = x.entry ? 'hsl(' + Math.round((k * 360) / MAX_SLICES + 215) % 360 + ' 62% 56%)' : 'var(--text-2)';
+        return '<path class="mole-slice' + (x.entry && !x.entry.dir ? ' file' : '') + '" data-k="' + k + '" d="' + d + '" style="fill:' + fill + '"></path>';
+      }).join('');
+      const top = cut.filter((x) => x.entry).slice(0, 3).map((x) => x.name + ' ' + size(x.size)).join(', ');
+      wrap.innerHTML = '<svg viewBox="0 0 200 200" role="img" aria-label="'
+        + esc(t('mole.analyze.chart', { path: tilde(a.path), total: size(a.total), top })) + '">' + paths
+        + '<foreignObject x="46" y="70" width="108" height="60"><div xmlns="http://www.w3.org/1999/xhtml" class="mole-chart-mid" aria-hidden="true">'
+        + '<span class="mole-chart-name"></span><span class="mole-chart-size"></span></div></foreignObject></svg>';
+      light(null);
+    });
+    return wrap;
+  }
+
   function analyzeHead() {
     const where = h('span', { class: 'mole-path' });
     const up = button(t('mole.analyze.up'), () => act('mole_analyze:' + (mole().analyze.path.replace(/\/[^/]+\/?$/, '') || '/')), { icon: 'chevron.up', small: true });
@@ -247,7 +334,7 @@
       up.disabled = !a || a.path === '/' || busy('analyze');
       home.disabled = !a || a.path === mole().home || busy('analyze');
     });
-    return h('div', { class: 'mole-toolbar' }, where, up, home);
+    return h('div', {}, analyzeChart(), h('div', { class: 'mole-toolbar' }, where, up, home));
   }
 
   (window.__plugins = window.__plugins || []).push({
@@ -321,6 +408,23 @@
       sent.length = 0;
       section('analyze').querySelector('.mole-item .btn').click();
       expect(sent.some((m) => m.name === 'mole_analyze:' + home + '/Library'), 'mole: a folder opens: ' + JSON.stringify(sent));
+      const ring = () => section('analyze').querySelectorAll('.mole-slice');
+      expect(ring().length === 2, 'mole: one entry and what is left make two slices');
+      expect(section('analyze').querySelector('svg[role=img]').getAttribute('aria-label').includes('Library'), 'mole: the ring is described for a reader');
+      sent.length = 0;
+      ring()[0].dispatchEvent(new MouseEvent('click', { bubbles: true }));
+      expect(sent.some((m) => m.name === 'mole_analyze:' + home + '/Library'), 'mole: a folder slice opens it: ' + JSON.stringify(sent));
+      S.mole.analyze = { path: home, total: 1000, entries: Array.from({ length: 20 }, (_, n) => ({ path: home + '/f' + n, name: 'f' + n, note: '', size: 100 - n * 4, dir: n % 2 === 0, age: 0, extra: 0 })) };
+      runSyncs();
+      expect(ring().length === 12 && ring()[11].getAttribute('style').includes('var(--text-2)'), 'mole: twenty entries make eleven slices and Other: ' + ring().length);
+      sent.length = 0;
+      ring()[11].dispatchEvent(new MouseEvent('click', { bubbles: true }));
+      ring()[1].dispatchEvent(new MouseEvent('click', { bubbles: true }));
+      expect(!sent.length && section('analyze').querySelectorAll('.mole-item input:checked').length === 1
+        && section('analyze').querySelector('.mole-item input:checked').closest('.mole-item').dataset.path === home + '/f1', 'mole: a file slice chooses its row, Other does nothing');
+      S.mole.analyze = { path: home, total: 0, entries: [] }; runSyncs();
+      expect(!ring().length, 'mole: an empty folder has no ring');
+      S.mole.analyze = { path: home, total: 300, entries: [{ path: home + '/Library', name: 'Library', note: '', size: 200, dir: true, age: 0, extra: 0 }] }; runSyncs();
       sent.length = 0;
       btn(section('installers'), '').click();
       expect(sent.some((m) => m.name === 'mole_scan:installers'), 'mole: each list has its own refresh: ' + JSON.stringify(sent));
