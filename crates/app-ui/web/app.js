@@ -1780,7 +1780,7 @@ const CATEGORIES = [
   { id: 'general', icon: 'gearshape.fill', pages: ['general', 'mole', 'about'] },
   { id: 'scroll', icon: 'computermouse.fill', pages: ['scroll', 'cursor', 'wheel'] },
   { id: 'notch', icon: 'rectangle.topthird.inset.filled', pages: ['notch', 'islands', 'musicwidget'] },
-  { id: 'tabs', icon: 'square.grid.2x2.fill', pages: ['calendar', 'dayprogress', 'agents', 'notes', 'launcher', 'weather', 'prs', 'pomodoro', 'screentime', 'system', 'devices'] },
+  { id: 'tabs', icon: 'square.grid.2x2.fill', pages: ['calendar', 'dayprogress', 'agents', 'notes', 'launcher', 'weather', 'prs', 'pomodoro', 'screentime', 'system', 'devices', 'displays'] },
   { id: 'clipboard', icon: 'doc.on.clipboard.fill', pages: ['clipboard', 'smart', 'translate', 'capture', 'vision', 'utilities'] },
   { id: 'tiling', icon: 'rectangle.split.2x1.fill', pages: ['tiling', 'pin', 'keys'] },
 ];

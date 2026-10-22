@@ -2,7 +2,7 @@
 //! seconds so that `pmset -g assertions` can be looked at from another terminal. Nothing is changed except the
 //! assertion, which goes when the program ends. Run: `cargo run -p macos-sys --example system_check [seconds]`.
 
-use macos_sys::{awake::Awake, camera, modifiers, power, sysinfo, usage, volume, volumes};
+use macos_sys::{awake::Awake, camera, modifiers, power, sensors, sysinfo, usage, volume, volumes};
 use std::{thread, time::Duration};
 
 fn main() {
@@ -37,6 +37,16 @@ fn main() {
         ),
         None => println!("processor: not readable"),
     }
+    let started = std::time::Instant::now();
+    let (celsius, fans) = (sensors::processor_celsius(), sensors::fans());
+    println!(
+        "heat: {} (read in {:?}), fans: {fans:?}",
+        celsius.map_or("no sensors".into(), |c| format!("{c:.1} C")),
+        started.elapsed()
+    );
+    let again = std::time::Instant::now();
+    let _ = (sensors::processor_celsius(), sensors::fans());
+    println!("read again in {:?}", again.elapsed());
     if let Some(m) = sysinfo::memory() {
         println!(
             "memory: {:.1} of {:.1} GB used (apps {:.1}, wired {:.1}, compressed {:.1}), pressure {:?}",

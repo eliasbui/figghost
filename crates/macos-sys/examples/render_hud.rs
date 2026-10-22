@@ -1,4 +1,4 @@
-//! Draws the volume indicator in every style into PNGs, without showing anything on screen.
+//! Draws the volume indicator in every style, and once with the brightness of a display, into PNGs, without showing anything on screen.
 //! `cargo run -p macos-sys --example render_hud -- /tmp/hud`
 //!
 //! The glass styles appear as their content on black: Liquid Glass is drawn by the window server, not by the
@@ -29,12 +29,13 @@ fn main() {
             (HudStyle::Equalizer, "equalizer"),
             (HudStyle::Wide, "wide"),
         ] {
-            for (level, muted, suffix) in [
-                (0.62, false, ""),
-                (0.0, true, "-muted"),
-                (0.95, false, "-loud"),
+            for (level, muted, sun, suffix) in [
+                (0.62, false, false, ""),
+                (0.0, true, false, "-muted"),
+                (0.95, false, false, "-loud"),
+                (0.75, false, true, "-brightness"),
             ] {
-                let Some(png) = hud.snapshot_png(style, level, muted) else {
+                let Some(png) = hud.snapshot_png(style, level, muted, sun) else {
                     eprintln!("{name}{suffix}: the snapshot failed");
                     continue;
                 };

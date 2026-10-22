@@ -26,6 +26,7 @@ pub mod capture;
 pub mod cursor;
 pub mod dayprogress;
 pub mod devices;
+pub mod displays;
 pub mod islands;
 pub mod launcher;
 pub mod lyrics;
@@ -50,7 +51,7 @@ pub mod wheel;
 
 /// The tabs of the notch that have a place in the strip only while their feature is on, so that a tab which would only
 /// say "this is off" is not there to be opened. Each follows the `enabled` of its own feature.
-pub(crate) const OPT_IN_TABS: [&str; 9] = [
+pub(crate) const OPT_IN_TABS: [&str; 10] = [
     "notes",
     "launcher",
     "weather",
@@ -60,6 +61,7 @@ pub(crate) const OPT_IN_TABS: [&str; 9] = [
     "dayprogress",
     "system",
     "devices",
+    "displays",
 ];
 
 /// Whether this tab is out of the strip for now because its feature is off.
@@ -74,6 +76,7 @@ pub fn tab_waits(id: &str, config: &Config) -> bool {
         "dayprogress" => !config.dayprogress.enabled,
         "system" => !config.system.enabled,
         "devices" => !config.devices.enabled,
+        "displays" => !config.displays.enabled,
         _ => false,
     }
 }
@@ -283,6 +286,7 @@ pub struct Features {
     pub screentime: Option<Rc<screentime::Feature>>,
     pub dayprogress: Option<Rc<dayprogress::Feature>>,
     pub devices: Option<Rc<devices::Feature>>,
+    pub displays: Option<Rc<displays::Feature>>,
     pub system: Option<Rc<system::Feature>>,
     /// Where the tabs of the features that are off are taken out of the strip and put back.
     notch: Option<Weak<Notch>>,
@@ -319,6 +323,7 @@ impl Features {
             dayprogress: dayprogress::attach(env),
             system: system::attach(env),
             devices: devices::attach(env),
+            displays: displays::attach(env),
             notch: env.notch.map(Rc::downgrade),
         };
         if let Some(notch) = env.notch {
@@ -518,6 +523,10 @@ impl Features {
                 .devices
                 .as_ref()
                 .map_or(Ok(()), |f| f.configure(&config.devices)),
+            "displays" => self
+                .displays
+                .as_ref()
+                .map_or(Ok(()), |f| f.configure(&config.displays)),
             "system" => self
                 .system
                 .as_ref()
@@ -900,6 +909,10 @@ pub fn state(
     );
     root.insert("devices".into(), devices::settings::state(&config.devices));
     root.insert(
+        "displays".into(),
+        displays::settings::state(&config.displays),
+    );
+    root.insert(
         "mole".into(),
         mole::settings::state(runtime.get("mole").unwrap_or(&none)),
     );
@@ -971,6 +984,8 @@ pub fn set(config: &mut Config, path: &str, value: &Value) -> Option<Result<&'st
         "devices" => {
             devices::settings::set(&mut config.devices, rest, value).map(|r| r.map(|()| "devices"))
         }
+        "displays" => displays::settings::set(&mut config.displays, rest, value)
+            .map(|r| r.map(|()| "displays")),
         _ => None,
     }
 }

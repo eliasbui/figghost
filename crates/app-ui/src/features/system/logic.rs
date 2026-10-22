@@ -1,7 +1,10 @@
 //! The arithmetic of the System tab: loads from counters, rates from byte counts, and how a figure is said. Plain
 //! data in and out, so that tests can drive it with pretend readings.
 
-use macos_sys::sysinfo::{Interface, Memory};
+use macos_sys::{
+    sensors::Fan,
+    sysinfo::{Interface, Memory},
+};
 use std::collections::VecDeque;
 
 /// How busy one core was between two readings of its ticks (user, system, idle, nice), 0 to 1. The counters are 32
@@ -134,6 +137,20 @@ pub fn memory_text(bytes: u64) -> String {
 
 pub fn percent_text(fraction: f64) -> String {
     format!("{:.0}%", (fraction * 100.0).clamp(0.0, 100.0))
+}
+
+/// The fan card: the fastest fan, as a share of the fastest it can turn. `None` for a Mac without fans.
+pub fn fastest(fans: &[Fan]) -> Option<(Fan, f64)> {
+    let fan = *fans.iter().max_by(|a, b| a.rpm.total_cmp(&b.rpm))?;
+    Some((fan, (fan.rpm / fan.max).clamp(0.0, 1.0)))
+}
+
+pub fn rpm_text(rpm: f64) -> String {
+    format!("{:.0} rpm", rpm.max(0.0))
+}
+
+pub fn celsius_text(celsius: f64) -> String {
+    format!("{celsius:.0} °C")
 }
 
 /// What apps hold, what is wired and what is compressed, each as a share of all the memory.
@@ -279,6 +296,22 @@ mod tests {
         assert_eq!(percent_text(0.374), "37%");
         assert_eq!(percent_text(1.7), "100%");
         assert_eq!(percent_text(-1.0), "0%");
+    }
+
+    #[test]
+    fn the_fan_card_follows_the_fastest_fan() {
+        let fan = |rpm| Fan {
+            rpm,
+            min: 1000.0,
+            max: 5000.0,
+        };
+        assert!(fastest(&[]).is_none());
+        let (top, share) = fastest(&[fan(1200.0), fan(2500.0)]).unwrap();
+        assert_eq!((top.rpm, share), (2500.0, 0.5));
+        assert_eq!(fastest(&[fan(9000.0)]).unwrap().1, 1.0);
+        assert_eq!(rpm_text(1501.6), "1502 rpm");
+        assert_eq!(rpm_text(-3.0), "0 rpm");
+        assert_eq!(celsius_text(82.94), "83 °C");
     }
 
     #[test]

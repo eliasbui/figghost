@@ -242,6 +242,8 @@ pub struct HudIvars {
     style: Cell<HudStyle>,
     level: Cell<f64>,
     muted: Cell<bool>,
+    /// The brightness of a display is shown, with a sun in place of the speaker.
+    sun: Cell<bool>,
     /// Stands in for the glass while a snapshot is drawn, since the window server, which draws the glass, is
     /// not part of a bitmap offscreen.
     backdrop: Cell<bool>,
@@ -261,6 +263,37 @@ fn waves(level: f64, muted: bool) -> u8 {
         2
     } else {
         3
+    }
+}
+
+/// The speaker for the volume, or the sun for the brightness of a display.
+fn draw_glyph(sun: bool, left: f64, middle: f64, level: f64, muted: bool) {
+    if sun {
+        draw_sun(left, middle, level);
+    } else {
+        draw_speaker(left, middle, level, muted);
+    }
+}
+
+/// A small sun in the speaker's room: a disc, and rays that grow longer as the level rises.
+fn draw_sun(left: f64, middle: f64, level: f64) {
+    NSColor::whiteColor().set();
+    let centre = NSPoint::new(left + 10.0, middle);
+    NSBezierPath::bezierPathWithOvalInRect(NSRect::new(
+        NSPoint::new(centre.x - 4.0, centre.y - 4.0),
+        NSSize::new(8.0, 8.0),
+    ))
+    .fill();
+    let reach = 7.5 + 2.0 * level;
+    for ray in 0..8 {
+        let angle = f64::from(ray) * std::f64::consts::FRAC_PI_4;
+        let (sin, cos) = angle.sin_cos();
+        let path = NSBezierPath::bezierPath();
+        path.moveToPoint(NSPoint::new(centre.x + 6.0 * cos, centre.y + 6.0 * sin));
+        path.lineToPoint(NSPoint::new(centre.x + reach * cos, centre.y + reach * sin));
+        path.setLineWidth(1.7);
+        path.setLineCapStyle(NSLineCapStyle::Round);
+        path.stroke();
     }
 }
 
@@ -304,7 +337,7 @@ fn draw_speaker(left: f64, middle: f64, level: f64, muted: bool) {
 
 /// The slider on the right edge: the number on top, the column that the level fills from below, the speaker at
 /// the foot.
-fn draw_side(size: NSSize, level: f64, muted: bool) {
+fn draw_side(size: NSSize, level: f64, muted: bool, sun: bool) {
     let x = (size.width - TRACK_HEIGHT) / 2.0;
     let track = NSRect::new(
         NSPoint::new(x, SIDE_TRACK_Y),
@@ -321,7 +354,7 @@ fn draw_side(size: NSSize, level: f64, muted: bool) {
         NSColor::whiteColor().setFill();
         rounded(fill, TRACK_HEIGHT / 2.0).fill();
     }
-    draw_speaker(size.width / 2.0 - 11.0, 28.0, level, muted);
+    draw_glyph(sun, size.width / 2.0 - 11.0, 28.0, level, muted);
     if !muted {
         // SAFETY: extern static weight constant.
         let font =
@@ -339,7 +372,7 @@ fn draw_side(size: NSSize, level: f64, muted: bool) {
 }
 
 /// The tile: the speaker drawn large, and under it the level as a row of segments.
-fn draw_tile(size: NSSize, level: f64, muted: bool) {
+fn draw_tile(size: NSSize, level: f64, muted: bool, sun: bool) {
     NSGraphicsContext::saveGraphicsState_class();
     let place = objc2_foundation::NSAffineTransform::transform();
     place.translateXBy_yBy(size.width / 2.0, size.height * 0.58);
@@ -348,7 +381,7 @@ fn draw_tile(size: NSSize, level: f64, muted: bool) {
         use objc2_app_kit::NSAffineTransformNSAppKitAdditions as _;
         place.concat();
     }
-    draw_speaker(-11.0, 0.0, level, muted);
+    draw_glyph(sun, -11.0, 0.0, level, muted);
     NSGraphicsContext::restoreGraphicsState_class();
 
     let gap = 2.0;
@@ -369,7 +402,7 @@ fn draw_tile(size: NSSize, level: f64, muted: bool) {
 }
 
 /// The speaker drawn `scale` times as large, centred on `at`.
-fn draw_speaker_scaled(at: NSPoint, scale: f64, level: f64, muted: bool) {
+fn draw_speaker_scaled(at: NSPoint, scale: f64, level: f64, muted: bool, sun: bool) {
     NSGraphicsContext::saveGraphicsState_class();
     let place = objc2_foundation::NSAffineTransform::transform();
     place.translateXBy_yBy(at.x, at.y);
@@ -378,7 +411,7 @@ fn draw_speaker_scaled(at: NSPoint, scale: f64, level: f64, muted: bool) {
         use objc2_app_kit::NSAffineTransformNSAppKitAdditions as _;
         place.concat();
     }
-    draw_speaker(-11.0, 0.0, level, muted);
+    draw_glyph(sun, -11.0, 0.0, level, muted);
     NSGraphicsContext::restoreGraphicsState_class();
 }
 
@@ -391,7 +424,7 @@ fn draw_number(level: f64, size: f64, area: NSRect) {
 }
 
 /// The dial: the ring is the level, filling clockwise from the top; the speaker and the number sit inside.
-fn draw_ring(size: NSSize, level: f64, muted: bool) {
+fn draw_ring(size: NSSize, level: f64, muted: bool, sun: bool) {
     let centre = NSPoint::new(size.width / 2.0, size.height / 2.0);
     let radius = size.width / 2.0 - 14.0;
     let ring = |from: f64, to: f64, white: f64| {
@@ -414,6 +447,7 @@ fn draw_ring(size: NSSize, level: f64, muted: bool) {
         1.5,
         level,
         muted,
+        sun,
     );
     if !muted {
         draw_number(
@@ -428,8 +462,8 @@ fn draw_ring(size: NSSize, level: f64, muted: bool) {
 }
 
 /// The meter: a staircase of bars, the speaker at its foot, the bars lit up to the level.
-fn draw_equalizer(size: NSSize, level: f64, muted: bool) {
-    draw_speaker(16.0, size.height / 2.0, level, muted);
+fn draw_equalizer(size: NSSize, level: f64, muted: bool, sun: bool) {
+    draw_glyph(sun, 16.0, size.height / 2.0, level, muted);
     let left = 52.0;
     let gap = 3.0;
     let width = (size.width - left - 18.0 - gap * (EQ_BARS as f64 - 1.0)) / EQ_BARS as f64;
@@ -464,6 +498,7 @@ define_class!(
             let ivars = self.ivars();
             let style = ivars.style.get();
             let (level, muted) = (ivars.level.get().clamp(0.0, 1.0), ivars.muted.get());
+            let sun = ivars.sun.get();
             let bounds = self.bounds();
             let corner = style.radius(bounds.size.height);
 
@@ -498,25 +533,25 @@ define_class!(
             }
 
             if style == HudStyle::Side {
-                draw_side(bounds.size, level, muted);
+                draw_side(bounds.size, level, muted, sun);
                 return;
             }
             if style == HudStyle::Tile {
-                draw_tile(bounds.size, level, muted);
+                draw_tile(bounds.size, level, muted, sun);
                 return;
             }
             if style == HudStyle::Ring {
-                draw_ring(bounds.size, level, muted);
+                draw_ring(bounds.size, level, muted, sun);
                 return;
             }
             if style == HudStyle::Equalizer {
-                draw_equalizer(bounds.size, level, muted);
+                draw_equalizer(bounds.size, level, muted, sun);
                 return;
             }
             let middle = bounds.size.height / 2.0;
             let compact = style.compact();
             let (icon_x, track_x, track_width, readout_x, readout_width) = style.row_layout();
-            draw_speaker(icon_x, middle, level, muted);
+            draw_glyph(sun, icon_x, middle, level, muted);
 
             // The meter style has already drawn the level; the others get the thin track.
             if style != HudStyle::Bar {
@@ -603,6 +638,7 @@ impl HudView {
             style: Cell::new(style),
             level: Cell::new(0.0),
             muted: Cell::new(false),
+            sun: Cell::new(false),
             backdrop: Cell::new(false),
         };
         // SAFETY: designated initializer with valid arguments on the main thread.
@@ -715,12 +751,22 @@ impl Hud {
     }
 
     pub fn show(self: &Rc<Self>, level: f32, muted: bool) {
+        self.show_glyph(level, muted, false);
+    }
+
+    /// Shows the brightness of a display, with a sun in place of the speaker.
+    pub fn show_brightness(self: &Rc<Self>, level: f32) {
+        self.show_glyph(level, false, true);
+    }
+
+    fn show_glyph(self: &Rc<Self>, level: f32, muted: bool, sun: bool) {
         let Some(geometry) = NotchGeometry::detect(self.mtm) else {
             return;
         };
         let ivars = self.view.ivars();
         ivars.level.set(f64::from(level));
         ivars.muted.set(muted);
+        ivars.sun.set(sun);
         self.view.setNeedsDisplay(true);
         let style = self.style.get();
         let size = style.size(geometry.top_inset());
@@ -768,6 +814,16 @@ fn frame_for(geometry: &NotchGeometry, style: HudStyle, position: HudPosition, s
     NSRect::new(NSPoint::new(x, y), size)
 }
 
+/// Shows the indicator for a new brightness from any thread, such as a worker's.
+pub fn show_brightness_from_any_thread(level: f32) {
+    DispatchQueue::main().exec_async(move || {
+        let hud = CURRENT.with(|current| current.borrow().upgrade());
+        if let Some(hud) = hud {
+            hud.show_brightness(level);
+        }
+    });
+}
+
 /// Shows the indicator for a new volume from any thread, such as the event tap's.
 pub fn show_from_any_thread(level: f32, muted: bool) {
     DispatchQueue::main().exec_async(move || {
@@ -782,13 +838,20 @@ impl Hud {
     /// Draws the indicator of one style with one level into PNG bytes, without showing anything on screen.
     /// The glass is drawn by the window server, which is not part of a bitmap offscreen, so a glass style is
     /// drawn with the black shape standing in for it; the layout and the ink are what this checks.
-    pub fn snapshot_png(&self, style: HudStyle, level: f32, muted: bool) -> Option<Vec<u8>> {
+    pub fn snapshot_png(
+        &self,
+        style: HudStyle,
+        level: f32,
+        muted: bool,
+        sun: bool,
+    ) -> Option<Vec<u8>> {
         self.set_style(style);
         // The panel sizes its content, so it takes the size of the style as `show` would give it.
         self.panel
             .setFrame_display(NSRect::new(NSPoint::ZERO, style.size(0.0)), false);
         self.view.ivars().level.set(f64::from(level));
         self.view.ivars().muted.set(muted);
+        self.view.ivars().sun.set(sun);
         self.view.ivars().backdrop.set(true);
         self.view.setNeedsDisplay(true);
         let bounds = self.view.bounds();

@@ -1,4 +1,4 @@
-//! System-defined keys: media keys (play, next, previous) and volume keys. macOS delivers these as
+//! System-defined keys: media keys (play, next, previous), volume and brightness keys. macOS delivers these as
 //! NX_SYSDEFINED events with a packed data word instead of ordinary key events.
 
 use crate::synth;
@@ -15,11 +15,13 @@ const SUBTYPE_AUX_CONTROL_BUTTONS: i16 = 8;
 pub enum SystemKey {
     SoundUp,
     SoundDown,
+    BrightnessUp,
+    BrightnessDown,
     Mute,
     PlayPause,
     Next,
     Previous,
-    /// Brightness, illumination and other keys this app does not handle.
+    /// Illumination and other keys this app does not handle.
     Other(u8),
 }
 
@@ -28,6 +30,8 @@ impl SystemKey {
         match code {
             0 => SystemKey::SoundUp,
             1 => SystemKey::SoundDown,
+            2 => SystemKey::BrightnessUp,
+            3 => SystemKey::BrightnessDown,
             7 => SystemKey::Mute,
             16 => SystemKey::PlayPause,
             17 => SystemKey::Next,
@@ -40,6 +44,8 @@ impl SystemKey {
         match self {
             SystemKey::SoundUp => 0,
             SystemKey::SoundDown => 1,
+            SystemKey::BrightnessUp => 2,
+            SystemKey::BrightnessDown => 3,
             SystemKey::Mute => 7,
             SystemKey::PlayPause => 16,
             SystemKey::Next => 17,
@@ -149,7 +155,9 @@ mod tests {
             SystemKey::PlayPause,
             SystemKey::Next,
             SystemKey::Previous,
-            SystemKey::Other(3),
+            SystemKey::BrightnessUp,
+            SystemKey::BrightnessDown,
+            SystemKey::Other(21),
         ] {
             for down in [true, false] {
                 let press = decode(encode(key, down));

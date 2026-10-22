@@ -314,7 +314,7 @@ mod tests {
             SystemKey::PlayPause,
             SystemKey::Next,
             SystemKey::Previous,
-            SystemKey::Other(3),
+            SystemKey::BrightnessDown,
         ] {
             assert_eq!(target(key, HALF, false), None);
         }

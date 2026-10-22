@@ -21,6 +21,8 @@ struct Words {
     gpu: &'static str,
     disk: &'static str,
     thermal: &'static str,
+    fan: &'static str,
+    fan_of: &'static str,
     battery: &'static str,
     efficiency: &'static str,
     performance: &'static str,
@@ -43,6 +45,8 @@ fn words(vi: bool) -> Words {
             gpu: "GPU",
             disk: "Ổ khởi động",
             thermal: "Nhiệt",
+            fan: "Quạt",
+            fan_of: "tối đa",
             battery: "Pin",
             efficiency: "Tiết kiệm",
             performance: "Hiệu năng",
@@ -63,6 +67,8 @@ fn words(vi: bool) -> Words {
             gpu: "GPU",
             disk: "Startup disk",
             thermal: "Thermal",
+            fan: "Fan",
+            fan_of: "of",
             battery: "Battery",
             efficiency: "Efficiency",
             performance: "Performance",
@@ -111,10 +117,25 @@ fn scene(vi: bool, busy: bool, with_battery: bool) -> SystemDisplay {
         },
         Stat {
             title: w.thermal.into(),
-            value: w.nominal.into(),
-            detail: String::new(),
+            value: if busy {
+                "86 °C".into()
+            } else {
+                "48 °C".into()
+            },
+            detail: w.nominal.into(),
             fraction: None,
             tone: Tone::Green,
+        },
+        Stat {
+            title: w.fan.into(),
+            value: if busy {
+                "3120 rpm".into()
+            } else {
+                "1500 rpm".into()
+            },
+            detail: format!("{} 4900 rpm", w.fan_of),
+            fraction: Some(if busy { 0.64 } else { 0.31 }),
+            tone: Tone::Blue,
         },
     ];
     if with_battery {

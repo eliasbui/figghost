@@ -54,16 +54,16 @@ Danh sách tính năng chính thức của Notchy (notchy.dev, trang chủ liệ
 | Tắt tiếng micro toàn hệ thống | Notchy | Có (Tiện ích) | | Xong, lô 1 |
 | Khóa bàn phím để lau, đếm ngược, mở bằng Command-Escape | Notchy | Có (Tiện ích) | | Xong, lô 1 |
 | HUD phím bấm khi trình chiếu (bỏ qua ô mật khẩu) | Notchy | Một phần (có ở thanh ghi hình) | Vừa | 2 |
-| Số liệu hệ thống: CPU từng lõi, bộ nhớ và swap, mạng, ổ đĩa, GPU, nhiệt, sức khỏe pin | Notchy, Atoll, MacNotch, Seam | Có (tab System của notch, tắt theo mặc định, mỗi thẻ bật tắt riêng; không có nhiệt độ CPU, xem dưới) | | Xong |
-| Nhiệt độ CPU qua SMC | Atoll | Chưa | Khó: cần truy cập SMC không công khai | - |
+| Số liệu hệ thống: CPU từng lõi, bộ nhớ và swap, mạng, ổ đĩa, GPU, nhiệt, sức khỏe pin | Notchy, Atoll, MacNotch, Seam | Có (tab System của notch, tắt theo mặc định, mỗi thẻ bật tắt riêng; nhiệt độ CPU và tốc độ quạt từ 1.6.0, xem dưới) | | Xong |
+| Nhiệt độ CPU và tốc độ quạt | Atoll, Stats, Macs Fan Control | Có (thẻ Nhiệt và thẻ Quạt của tab System, chỉ đọc: nhiệt độ die qua cảm biến HID, quạt qua SMC; không cần root, không chỉnh tốc độ quạt) | Ngoại lệ có chủ ý cho nguyên tắc 3, theo yêu cầu | Xong |
 | Ẩn khỏi ảnh chụp và chia sẻ màn hình | Notchy | Có (cài đặt Notch, `hide_in_capture`; macOS mới vẫn cho một số app chụp) | | |
 | Ẩn notch phần cứng bằng thanh menu đen | Notchy | Chưa | Vừa | 5 |
 | Ẩn biểu tượng thanh menu | Notchy | Có | | |
 | Tạm tắt notch một lúc (snooze), có phím tắt | MacNotch | Có (Tiện ích; chỉ chặn mở khi rê chuột, bấm và tác tử vẫn mở được) | | Xong |
-| Độ sáng màn hình ngoài qua DDC | Notchy | Chưa | Không làm: cần IOAVService riêng tư | - |
+| Độ sáng màn hình ngoài qua DDC | Notchy, MonitorControl | Có (tab Displays, tắt theo mặc định; độ sáng và độ tương phản qua `IOAVService` trên Apple silicon) | Ngoại lệ có chủ ý cho nguyên tắc 3, theo yêu cầu | Xong |
 | Đèn nền bàn phím | Notchy | Chưa | Không làm: cần CoreBrightness riêng tư | - |
 | HUD âm lượng, nhiều kiểu | Tất cả | Có (bảy kiểu) | | |
-| HUD độ sáng, thay HUD gốc của macOS | Notchy, Boring Notch | Chưa | Khó: đọc và đặt độ sáng cần API riêng tư | - |
+| HUD độ sáng, thay HUD gốc của macOS | Notchy, Boring Notch | Một phần (phím độ sáng chỉnh màn hình rời qua DDC và hiện HUD kiểu bảng âm lượng; màn hình liền máy vẫn dùng HUD gốc) | | Một phần |
 | Gương camera | Notchy, Boring Notch, NotchNook | Chưa | Vừa | 4 |
 | Nhắc nghỉ mắt toàn màn hình (20-20-20) | MacNotch | Chưa | Vừa | 4 |
 
@@ -129,8 +129,8 @@ Danh sách tính năng chính thức của Notchy (notchy.dev, trang chủ liệ
 | Gương chiếu thông báo, đảo tin nhắn có trả lời, đảo cuộc gọi FaceTime bấm nghe hoặc từ chối | Phải đọc cơ sở dữ liệu thông báo bằng Full Disk Access hoặc điều khiển giao diện của app khác qua Accessibility; mong manh và xâm phạm quyền riêng tư. |
 | Widget màn hình khóa đầy đủ (đồng hồ, pin, thời tiết, lịch) | Cần cửa sổ ở tầng riêng tư của window server (SkyLight, `CGSSpace`). Figghost đã có lớp màn hình khóa cho widget nhạc từ 1.4.1; mở rộng thêm cùng một cơ chế thì cân nhắc sau. |
 | Widget WidgetKit trên màn hình nền | Cần tiện ích mở rộng được ký bằng Developer ID và có chứng nhận; app ký ad hoc không nạp được. |
-| Độ sáng màn hình ngoài (DDC), đèn nền bàn phím, HUD độ sáng thay cho HUD gốc | API riêng tư. |
-| Nhiệt độ CPU qua SMC | Truy cập SMC không công khai. |
+| Đèn nền bàn phím, độ sáng màn hình liền máy | API riêng tư (CoreBrightness, DisplayServices). Độ sáng màn hình rời và nhiệt độ, quạt đã làm từ 1.6.0 như một ngoại lệ có chủ ý. |
+| Chỉnh tốc độ quạt | Cần một tiến trình chạy quyền root và ghi SMC; trên M3 trở lên còn phải vượt khóa của `thermalmonitord`. Rủi ro quá nóng nếu sai. |
 | Đọc mức dùng của Cursor và Copilot | Không có nguồn đọc ổn định, công khai. |
 | Chặn camera khi có app mở | macOS không có API công khai chặn camera của app khác. Chỉ có thể cảnh báo. |
 
