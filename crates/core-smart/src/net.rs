@@ -1,6 +1,6 @@
 //! One GET request through the system's curl. It reads its arguments from standard input, so the text that is
-//! being translated never appears in the list of processes, and it only talks https (loopback http is for
-//! the tests).
+//! being translated and the headers (which may carry a sign-in) never appear in the list of processes, and it
+//! only talks https (loopback http is for the tests).
 
 use std::{
     io::{Read, Write},
@@ -41,8 +41,14 @@ fn quote(value: &str) -> String {
     out
 }
 
-fn config(url: &str, query: &[(&str, String)]) -> String {
+fn config(url: &str, query: &[(&str, String)], headers: &[(&str, &str)]) -> String {
     let mut config = format!("url = {}\n", quote(url));
+    for (name, value) in headers {
+        config.push_str(&format!(
+            "header = {}\n",
+            quote(&format!("{name}: {value}"))
+        ));
+    }
     for (name, value) in query {
         config.push_str(&format!(
             "data-urlencode = {}\n",
@@ -54,6 +60,16 @@ fn config(url: &str, query: &[(&str, String)]) -> String {
 
 /// The body of `url` with `query` added to it, at most a mebibyte, within `seconds`.
 pub fn get(url: &str, query: &[(&str, String)], seconds: u64) -> Result<String, NetError> {
+    get_with_headers(url, query, &[], seconds)
+}
+
+/// The same GET with request headers added.
+pub fn get_with_headers(
+    url: &str,
+    query: &[(&str, String)],
+    headers: &[(&str, &str)],
+    seconds: u64,
+) -> Result<String, NetError> {
     let protocol = if url.starts_with("http://127.0.0.1") {
         "=http"
     } else {
@@ -88,7 +104,7 @@ pub fn get(url: &str, query: &[(&str, String)], seconds: u64) -> Result<String, 
         })?;
     if let Some(mut stdin) = child.stdin.take() {
         // A write that fails means curl has already stopped; its exit status tells why.
-        let _ = stdin.write_all(config(url, query).as_bytes());
+        let _ = stdin.write_all(config(url, query, headers).as_bytes());
     }
     let mut body = Vec::new();
     if let Some(stdout) = child.stdout.take() {
@@ -121,7 +137,7 @@ mod tests {
         time::{Duration, Instant},
     };
 
-    /// Serves one request on a free loopback port and hands back the request line that was received.
+    /// Serves one request on a free loopback port and hands back the request line and headers that were received.
     fn serve(
         respond: impl FnOnce(&mut TcpStream) + Send + 'static,
     ) -> (String, thread::JoinHandle<String>) {
@@ -140,6 +156,7 @@ mod tests {
                 if reader.read_line(&mut line).unwrap_or(0) == 0 || line == "\r\n" {
                     break;
                 }
+                first.push_str(&line);
             }
             respond(&mut stream);
             first
@@ -210,6 +227,19 @@ mod tests {
     }
 
     #[test]
+    fn headers_reach_the_server() {
+        let (url, server) = serve(answer("200 OK", "{}"));
+        let body = get_with_headers(&url, &[], &[("anthropic-beta", "oauth-2025-04-20")], 10);
+        assert_eq!(body.as_deref(), Ok("{}"));
+        assert!(
+            server
+                .join()
+                .unwrap()
+                .contains("anthropic-beta: oauth-2025-04-20\r\n")
+        );
+    }
+
+    #[test]
     fn an_error_status_is_an_error() {
         let (url, server) = serve(answer("404 Not Found", "nope"));
         assert_eq!(get(&url, &[], 10), Err(NetError::Status));
@@ -268,8 +298,12 @@ mod tests {
     fn values_are_quoted_for_a_curl_file() {
         assert_eq!(quote("a\"b\\c\nd\te\u{7}"), "\"a\\\"b\\\\c\\nd\\te\"");
         assert_eq!(
-            config("https://x/y", &[("q", "hi".to_owned())]),
+            config("https://x/y", &[("q", "hi".to_owned())], &[]),
             "url = \"https://x/y\"\ndata-urlencode = \"q=hi\"\n"
+        );
+        assert_eq!(
+            config("https://x/y", &[], &[("Authorization", "Bearer a\"b")]),
+            "url = \"https://x/y\"\nheader = \"Authorization: Bearer a\\\"b\"\n"
         );
     }
 }

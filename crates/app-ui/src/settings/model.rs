@@ -163,6 +163,8 @@ pub struct Env {
     pub screens: Vec<String>,
     /// What the running features know that the page needs, by feature id.
     pub runtime: HashMap<&'static str, Value>,
+    /// The accounts Orca keeps, for the AI agents page (see `crate::accounts`).
+    pub accounts: Value,
 }
 
 fn login_name(login: LoginItem) -> &'static str {
@@ -290,6 +292,7 @@ pub fn state(config: &Config, env: &Env) -> Value {
                 "today_cost": s.today_cost,
                 "week_cost": s.week_cost,
             })).collect::<Vec<Value>>(),
+            "accounts": env.accounts,
         },
         "tiling": {
             "enabled": config.tiling.enabled,
@@ -926,6 +929,7 @@ mod tests {
             notch_hardware: false,
             screens: Vec::new(),
             runtime: HashMap::new(),
+            accounts: Value::Null,
         }
     }
 
@@ -1062,6 +1066,7 @@ mod tests {
             target: "com.apple.Notes".into(),
             name: "Notes".into(),
         }];
+        e.accounts = crate::accounts::sample_json();
         let real = state(&config, &e);
         let (mut a, mut b) = (Vec::new(), Vec::new());
         key_paths(&sample, "", &mut a);

@@ -280,6 +280,8 @@ struct UsageCache {
     /// What Codex's server said when the refresh button last asked. It is newer than the logs until they catch up.
     codex_live: Option<Limits>,
     read_at_ms: i64,
+    /// The short name of the account the plain `claude` command uses, which its rows are labelled with.
+    claude_account: Option<String>,
 }
 
 impl UsageCache {
@@ -330,7 +332,7 @@ pub struct Status {
 /// the paths of the hooks it installed, so a private instance (`FIGGHOST_HOME` set, which is how every test
 /// runs) must never reach the real files: it gets an empty folder inside its own data directory, unless a
 /// test points it somewhere on purpose with `FIGGHOST_AGENTS_HOME`.
-fn agents_home(
+pub(crate) fn agents_home(
     agents: Option<std::ffi::OsString>,
     private_data: Option<&Path>,
     real: Option<std::ffi::OsString>,
@@ -1011,6 +1013,7 @@ impl AgentsFeature {
         }
         cache.read_at_ms = now;
         cache.claude = usage::read_limits(&self.files.home.join(CLAUDE_USAGE_FILE));
+        cache.claude_account = core_agents::accounts::cli_account_name(&self.files.user_home);
         cache.codex = usage::codex_limits(&self.files.user_home.join(".codex/sessions"));
     }
 
@@ -1073,7 +1076,14 @@ impl AgentsFeature {
                 continue;
             };
             for limit in [&limits.primary, &limits.secondary].into_iter().flatten() {
-                rows.push(usage_row(language, agent, limit, limits.observed_ms, now));
+                let mut row = usage_row(language, agent, limit, limits.observed_ms, now);
+                // The window comes first because the narrow label column cuts off the end of a long name.
+                if let (Agent::Claude, Some(name), Some(minutes)) =
+                    (agent, &cache.claude_account, limit.window_minutes)
+                {
+                    row.label = format!("{} {name}", language.agents_window(minutes));
+                }
+                rows.push(row);
             }
         }
         rows

@@ -1,6 +1,7 @@
 #![forbid(unsafe_code)]
 //! Composition root: starts each feature and keeps its handles alive.
 
+mod accounts;
 mod agents;
 mod audio;
 mod bluetooth;

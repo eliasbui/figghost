@@ -25,6 +25,7 @@ pub mod gif;
 pub mod hello;
 pub mod hotkey;
 pub mod hud;
+pub mod keychain;
 pub mod keylock;
 pub mod labels;
 pub mod launcher_ui;

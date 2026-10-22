@@ -49,7 +49,24 @@
     "spend": [
       { "agent": "claude", "today": 1240000, "week": 9800000, "today_cost": 3.45, "week_cost": 21.3 },
       { "agent": "codex", "today": 380000, "week": 2100000, "today_cost": null, "week_cost": null }
-    ]
+    ],
+    "accounts": {
+      "list": [
+        { "agent": "claude", "id": "a1", "email": "work@example.com", "name": "work", "plan": "Max 20x", "orca": true, "cli": true, "note": "",
+          "limits": [
+            { "label": "5 h", "fraction": 0.42, "value": "42%", "reset": "resets in 2 h 10 min" },
+            { "label": "7 d", "fraction": 0.81, "value": "81%", "reset": "resets in 3 d" }
+          ] },
+        { "agent": "claude", "id": "a2", "email": "home@example.com", "name": "home", "plan": "Pro", "orca": false, "cli": false, "note": "expired", "limits": [] },
+        { "agent": "codex", "id": "c1", "email": "codex@example.com", "name": "", "plan": "", "orca": false, "cli": false, "note": "", "limits": [] }
+      ],
+      "cli": "work@example.com",
+      "restore": { "claude": true, "codex": false },
+      "busy": false,
+      "updated": "2 minutes ago",
+      "outcome": { "ok": true, "what": "switched", "detail": "" },
+      "keychain": true
+    }
   },
   "tiling": {
     "enabled": true,
