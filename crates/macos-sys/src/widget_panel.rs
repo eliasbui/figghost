@@ -21,7 +21,58 @@ use objc2_app_kit::{
 use objc2_foundation::{
     NSNotification, NSNotificationCenter, NSObjectProtocol, NSPoint, NSRect, NSSize,
 };
-use std::{cell::RefCell, ptr::NonNull, rc::Rc};
+use core_foundation::{array::CFArray, base::TCFType, number::CFNumber};
+use std::{
+    cell::{Cell, RefCell},
+    ffi::c_void,
+    ptr::NonNull,
+    rc::Rc,
+    sync::OnceLock,
+};
+
+type Cid = i32;
+type SpaceId = u32;
+
+/// The private SkyLight calls that put a window in a Space of its own above the lock screen. A level alone is
+/// not enough: the lock screen draws in another Space, which hides every window of an ordinary one.
+struct Sky {
+    connection: Cid,
+    create: unsafe extern "C" fn(Cid, i32, i32) -> SpaceId,
+    set_level: unsafe extern "C" fn(Cid, SpaceId, i32),
+    show: unsafe extern "C" fn(Cid, *const c_void),
+    add: unsafe extern "C" fn(Cid, SpaceId, *const c_void, i32),
+    remove: unsafe extern "C" fn(Cid, *const c_void, *const c_void),
+}
+
+/// Looked up at run time so the app still runs where SkyLight changes; `None` falls back to the plain level.
+fn sky() -> Option<&'static Sky> {
+    static SKY: OnceLock<Option<Sky>> = OnceLock::new();
+    SKY.get_or_init(|| {
+        // SAFETY: dlopen/dlsym only look names up; a missing one returns null and ends the lookup. The
+        // signatures are those SkyLight has exported since macOS 10.x and window managers rely on.
+        unsafe {
+            libc::dlopen(
+                c"/System/Library/PrivateFrameworks/SkyLight.framework/SkyLight".as_ptr(),
+                libc::RTLD_LAZY,
+            );
+            let find = |name: &std::ffi::CStr| {
+                let p = libc::dlsym(libc::RTLD_DEFAULT, name.as_ptr());
+                (!p.is_null()).then_some(p)
+            };
+            let main: unsafe extern "C" fn() -> Cid =
+                std::mem::transmute(find(c"SLSMainConnectionID")?);
+            Some(Sky {
+                connection: main(),
+                create: std::mem::transmute(find(c"SLSSpaceCreate")?),
+                set_level: std::mem::transmute(find(c"SLSSpaceSetAbsoluteLevel")?),
+                show: std::mem::transmute(find(c"SLSShowSpaces")?),
+                add: std::mem::transmute(find(c"SLSSpaceAddWindowsAndRemoveFromSpaces")?),
+                remove: std::mem::transmute(find(c"SLSRemoveWindowsFromSpaces")?),
+            })
+        }
+    })
+    .as_ref()
+}
 
 /// How far above the rest of the screen the panel is.
 #[derive(Debug, Clone, Copy, PartialEq, Eq)]
@@ -96,6 +147,8 @@ pub struct WidgetPanel {
     panel: Retained<FigPanel>,
     glass: Retained<NSGlassEffectView>,
     radius: RefCell<f64>,
+    /// The Space above the lock screen this panel was moved into, if it is there.
+    lock_space: Cell<Option<SpaceId>>,
     observers: RefCell<Vec<Retained<ProtocolObject<dyn NSObjectProtocol>>>>,
 }
 
@@ -142,6 +195,7 @@ impl WidgetPanel {
             panel,
             glass,
             radius: RefCell::new(0.0),
+            lock_space: Cell::new(None),
             observers: RefCell::default(),
         });
         let on_frame = Rc::new(on_frame);
@@ -205,6 +259,30 @@ impl WidgetPanel {
                 | NSWindowCollectionBehavior::IgnoresCycle
                 | stay,
         );
+        self.set_lock_space(layer == Layer::LockScreen);
+    }
+
+    fn set_lock_space(&self, on: bool) {
+        let Some(sky) = sky() else { return };
+        let windows = CFArray::from_CFTypes(&[CFNumber::from(self.panel.windowNumber() as i32)]);
+        // SAFETY: the connection and the window number are live, and the arrays outlive the calls.
+        unsafe {
+            if on && self.lock_space.get().is_none() {
+                let space = (sky.create)(sky.connection, 1, 0);
+                (sky.set_level)(sky.connection, space, i32::MAX);
+                (sky.add)(sky.connection, space, windows.as_concrete_TypeRef().cast(), 7);
+                let spaces = CFArray::from_CFTypes(&[CFNumber::from(space as i32)]);
+                (sky.show)(sky.connection, spaces.as_concrete_TypeRef().cast());
+                self.lock_space.set(Some(space));
+            } else if !on && let Some(space) = self.lock_space.take() {
+                let spaces = CFArray::from_CFTypes(&[CFNumber::from(space as i32)]);
+                (sky.remove)(
+                    sky.connection,
+                    windows.as_concrete_TypeRef().cast(),
+                    spaces.as_concrete_TypeRef().cast(),
+                );
+            }
+        }
     }
 
     /// How see-through the whole panel is, 0.3 to 1.
