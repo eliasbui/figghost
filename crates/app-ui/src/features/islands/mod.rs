@@ -72,8 +72,13 @@ pub struct Config {
     pub power: bool,
     pub drives: bool,
     pub downloads: bool,
-    /// The camera and the microphone.
-    pub privacy: bool,
+    /// An app using the camera.
+    pub camera: bool,
+    /// An app using the microphone.
+    pub microphone: bool,
+    /// The one switch of both before they had one each; read from older files and never written back.
+    #[serde(skip_serializing)]
+    pub privacy: Option<bool>,
     /// The charge, in percent, that is announced as full while plugged in.
     pub full_at: u8,
     /// The charge, in percent, at and under which a Mac on battery is announced as low.
@@ -90,7 +95,9 @@ impl Default for Config {
             power: true,
             drives: true,
             downloads: true,
-            privacy: true,
+            camera: true,
+            microphone: true,
+            privacy: None,
             full_at: 100,
             low_at: 20,
             seconds: 3.6,
@@ -102,6 +109,10 @@ impl Config {
     /// A config file can say anything; whatever is unusable is replaced by the default.
     pub fn sanitized(mut self) -> Self {
         let defaults = Self::default();
+        if self.privacy.take() == Some(false) {
+            self.camera = false;
+            self.microphone = false;
+        }
         self.full_at = self.full_at.clamp(FULL_RANGE.0, FULL_RANGE.1);
         self.low_at = self.low_at.clamp(LOW_RANGE.0, LOW_RANGE.1);
         self.seconds = if self.seconds.is_finite() {
@@ -277,7 +288,7 @@ impl Feature {
             self.tick_downloads();
             timers.push(every(FILES_SECONDS, Feature::tick_downloads));
         }
-        if config.privacy {
+        if config.camera || config.microphone {
             self.tick_privacy();
             timers.push(every(PRIVACY_SECONDS, Feature::tick_privacy));
         }
@@ -586,10 +597,15 @@ impl Feature {
     // -- camera and microphone --------------------------------------------------------------------------------
 
     fn tick_privacy(&self) {
-        let change = self
-            .privacy
-            .borrow_mut()
-            .update(camera::in_use(), volume::microphone_in_use());
+        let (show_camera, show_mic) = {
+            let config = self.config.borrow();
+            (config.camera, config.microphone)
+        };
+        // A device whose notice is off is not looked at, so its use never shows.
+        let change = self.privacy.borrow_mut().update(
+            show_camera && camera::in_use(),
+            show_mic && volume::microphone_in_use(),
+        );
         if let Some((camera, mic)) = change {
             self.privacy_island(camera, mic, false);
         }
@@ -660,15 +676,15 @@ impl Feature {
                 false,
             ),
             "download" => self.download_island("Figghost-1.5.0.dmg", 48_300_000, 0),
-            "privacy" => {
-                self.privacy_island(true, true, true);
+            "camera" | "mic" => {
+                self.privacy_island(sample == "camera", sample == "mic", true);
                 // When the sample has gone by, what is really going on comes back: a camera that is in use must not
                 // lose its island to a button.
                 let me = self.me.clone();
                 app::after(self.seconds() + 0.3, move || {
                     if let Some(feature) = me.upgrade() {
                         let config = feature.config.borrow().clone();
-                        if config.enabled && config.privacy {
+                        if config.enabled && (config.camera || config.microphone) {
                             let (camera, mic) = feature.privacy.borrow().current();
                             feature.privacy_island(camera, mic, false);
                         }

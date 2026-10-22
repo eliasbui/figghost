@@ -11,12 +11,13 @@
     'islands.power.title': 'Power and battery', 'islands.power.desc': 'When the charger is plugged in or out, and when the battery is full or low.',
     'islands.drives.title': 'Drives', 'islands.drives.desc': 'When a drive arrives or leaves. A drive that is plugged in can be ejected from the menu bar panel.',
     'islands.downloads.title': 'Finished downloads', 'islands.downloads.desc': 'When a file in the Downloads folder has stopped growing. Only names and sizes are looked at.',
-    'islands.privacy.title': 'Camera and microphone', 'islands.privacy.desc': 'Stays on the notch while an app is using either. It says that one is in use, not which app.',
+    'islands.camera.title': 'Camera', 'islands.camera.desc': 'Stays on the notch while an app is using the camera. It says that it is in use, not which app.',
+    'islands.microphone.title': 'Microphone', 'islands.microphone.desc': 'Stays on the notch while an app is using the microphone. It says that it is in use, not which app.',
     'islands.sample': 'Show a sample',
     'sec.islands.battery': 'Battery', 'islands.full.title': 'Full at', 'islands.full.desc': 'Say the battery is full when it reaches this charge while plugged in.',
     'islands.low.title': 'Low at', 'islands.low.desc': 'Say the battery is low when it falls to this charge on battery.',
     'islands.nobattery': 'This Mac has no battery, so the notices about it never appear.',
-    'sec.islands.time': 'Time', 'islands.seconds.title': 'How long a notice stays', 'islands.seconds.desc': 'The camera and microphone notice stays as long as either is in use.',
+    'sec.islands.time': 'Time', 'islands.seconds.title': 'How long a notice stays', 'islands.seconds.desc': 'The camera and microphone notices stay as long as they are in use.',
   },
   vi: {
     'nav.islands': 'Đảo trạng thái', 'page.islands': 'Đảo trạng thái',
@@ -27,7 +28,8 @@
     'islands.power.title': 'Sạc và pin', 'islands.power.desc': 'Khi cắm hoặc rút sạc, và khi pin đầy hoặc yếu.',
     'islands.drives.title': 'Ổ đĩa', 'islands.drives.desc': 'Khi một ổ đĩa được cắm vào hoặc tháo ra. Ổ đang cắm có thể tháo từ bảng ở thanh menu.',
     'islands.downloads.title': 'Tải xong', 'islands.downloads.desc': 'Khi một tệp trong thư mục Downloads đã ngừng lớn thêm. Chỉ xem tên và dung lượng.',
-    'islands.privacy.title': 'Camera và micro', 'islands.privacy.desc': 'Nằm trên notch khi có ứng dụng đang dùng một trong hai. Chỉ báo là có, không nói ứng dụng nào.',
+    'islands.camera.title': 'Camera', 'islands.camera.desc': 'Nằm trên notch khi có ứng dụng đang dùng camera. Chỉ báo là có, không nói ứng dụng nào.',
+    'islands.microphone.title': 'Micro', 'islands.microphone.desc': 'Nằm trên notch khi có ứng dụng đang dùng micro. Chỉ báo là có, không nói ứng dụng nào.',
     'islands.sample': 'Xem thử',
     'sec.islands.battery': 'Pin', 'islands.full.title': 'Đầy ở mức', 'islands.full.desc': 'Báo pin đầy khi đạt mức sạc này lúc đang cắm sạc.',
     'islands.low.title': 'Yếu ở mức', 'islands.low.desc': 'Báo pin yếu khi tụt xuống mức này lúc dùng pin.',
@@ -53,7 +55,7 @@
     return [
       card(toggleRow('islands.enabled', t('islands.enable.title'), t('islands.enable.desc'))),
       sectionTitle(t('sec.islands.which')),
-      card(notice('caps', 'caps'), notice('power', 'plug'), notice('drives', 'drive'), notice('downloads', 'download'), notice('privacy', 'privacy')),
+      card(notice('caps', 'caps'), notice('power', 'plug'), notice('drives', 'drive'), notice('downloads', 'download'), notice('camera', 'camera'), notice('microphone', 'mic')),
       sectionTitle(t('sec.islands.battery')),
       battery,
       none,
@@ -72,9 +74,17 @@
     master.click();
 
     // Each notice has a switch of its own and a sample.
-    expect(page.querySelectorAll('.switch').length === 6, 'islands: one switch for the feature and one for each of five notices');
+    expect(page.querySelectorAll('.switch').length === 7, 'islands: one switch for the feature and one for each of six notices');
     const samples = [...page.querySelectorAll('.btn')].filter((b) => b.textContent === t('islands.sample'));
-    expect(samples.length === 5, 'islands: a sample for each notice');
+    expect(samples.length === 6, 'islands: a sample for each notice');
+    sent.length = 0;
+    const mic = [...page.querySelectorAll('.row')].find((r) => r.textContent.includes(t('islands.microphone.title')) && !r.textContent.includes(t('islands.camera.title')));
+    mic.querySelector('.switch').click();
+    expect(sent.some((m) => m.t === 'set' && m.path === 'islands.microphone'), 'islands: the microphone has a switch of its own: ' + JSON.stringify(sent));
+    mic.querySelector('.switch').click();
+    sent.length = 0;
+    samples[5].click();
+    expect(sent.some((m) => m.t === 'action' && m.name === 'islands_sample:mic'), 'islands: the microphone sample sends its action: ' + JSON.stringify(sent));
     sent.length = 0;
     samples[1].click();
     expect(sent.some((m) => m.t === 'action' && m.name === 'islands_sample:plug'), 'islands: the power sample sends its action: ' + JSON.stringify(sent));

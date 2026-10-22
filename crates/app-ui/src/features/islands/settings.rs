@@ -14,7 +14,8 @@ pub fn state(config: &Config, runtime: &Value) -> Value {
         "power": config.power,
         "drives": config.drives,
         "downloads": config.downloads,
-        "privacy": config.privacy,
+        "camera": config.camera,
+        "microphone": config.microphone,
         "full_at": config.full_at,
         "low_at": config.low_at,
         "seconds": config.seconds,
@@ -33,7 +34,8 @@ pub fn set(config: &mut Config, path: &str, value: &Value) -> Option<Result<(), 
         "power" => switch(&mut config.power),
         "drives" => switch(&mut config.drives),
         "downloads" => switch(&mut config.downloads),
-        "privacy" => switch(&mut config.privacy),
+        "camera" => switch(&mut config.camera),
+        "microphone" => switch(&mut config.microphone),
         "full_at" => whole(value, FULL_RANGE)
             .map(|n| config.full_at = n)
             .ok_or_else(bad),
@@ -88,7 +90,12 @@ mod tests {
         let config = Config::default();
         assert!(!config.enabled);
         assert!(
-            config.caps_lock && config.power && config.drives && config.downloads && config.privacy
+            config.caps_lock
+                && config.power
+                && config.drives
+                && config.downloads
+                && config.camera
+                && config.microphone
         );
         assert_eq!(state(&config, &Value::Null)["has_battery"], json!(false));
     }
@@ -108,6 +115,33 @@ mod tests {
                 .is_err()
         );
         assert!(set(&mut config, "nonsense", &json!(true)).is_none());
+    }
+
+    #[test]
+    fn the_camera_and_the_microphone_have_a_switch_each() {
+        let mut config = Config::default();
+        set(&mut config, "microphone", &json!(false))
+            .unwrap()
+            .unwrap();
+        assert!(config.camera && !config.microphone);
+        let s = state(&config, &Value::Null);
+        assert_eq!((&s["camera"], &s["microphone"]), (&json!(true), &json!(false)));
+    }
+
+    #[test]
+    fn the_one_switch_of_older_files_still_counts_and_is_not_written_back() {
+        let old: Config = serde_json::from_str(r#"{ "enabled": true, "privacy": false }"#).unwrap();
+        let old = old.sanitized();
+        assert!(!old.camera && !old.microphone);
+        assert!(serde_json::to_value(&old).unwrap().get("privacy").is_none());
+        let on: Config = serde_json::from_str(r#"{ "privacy": true }"#).unwrap();
+        let on = on.sanitized();
+        assert!(on.camera && on.microphone);
+        // A file written after the split keeps what it says.
+        let new: Config =
+            serde_json::from_str(r#"{ "camera": false, "microphone": true }"#).unwrap();
+        let new = new.sanitized();
+        assert!(!new.camera && new.microphone);
     }
 
     #[test]

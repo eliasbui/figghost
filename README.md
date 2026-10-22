@@ -205,7 +205,7 @@ Checks the health of the Mac and frees disk space with the Mole command line too
 
 ### Live islands
 
-Small notices that come out of the closed notch for a moment: Caps Lock turning on or off, the charger plugged in or out, a battery that is full (at a level you choose) or low, a drive that arrives or leaves (and an Eject entry for each drive in the menu bar panel), a finished download in the Downloads folder, and an app starting to use the camera or the microphone. Each one can be switched off on its own and shown as a sample; nothing reads what is on the screen or what is typed (off by default).
+Small notices that come out of the closed notch for a moment: Caps Lock turning on or off, the charger plugged in or out, a battery that is full (at a level you choose) or low, a drive that arrives or leaves (and an Eject entry for each drive in the menu bar panel), a finished download in the Downloads folder, and an app starting to use the camera or the microphone (each with a switch of its own). Each one can be switched off on its own and shown as a sample; nothing reads what is on the screen or what is typed (off by default).
 
 ![The closed notch with eighteen live islands: Caps Lock, power, battery, drives, a download, camera and microphone, keep awake, microphone muted and the keyboard lock](docs/images/live-islands.png)
 
