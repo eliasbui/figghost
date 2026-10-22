@@ -1,6 +1,6 @@
 //! Draws the closed notch in each of its states into PNGs, without showing anything on screen: at rest, with a
-//! symbol and a value in its ears, with the cover and bars of playing music, and with the name of the track that
-//! has just started under them. For a screen with a hardware notch and for one without.
+//! working agent's sprite and a value in its ears, with a symbol, a value and two lines of text under them. For a
+//! screen with a hardware notch and for one without.
 //! `cargo run -p macos-sys --example render_closed -- /tmp/closed`
 
 use macos_sys::{
@@ -61,10 +61,9 @@ fn main() {
                         notch.set_activity(
                             "a",
                             Some(Activity {
-                                left: Ear::Symbol {
-                                    name: "terminal",
-                                    tone: Tone::Blue,
-                                    pulse: false,
+                                left: Ear::Sprite {
+                                    sheet: include_bytes!("../../app-ui/assets/agents/claude.png"),
+                                    frame: 0,
                                 },
                                 right: Ear::Text {
                                     text: "38%".into(),

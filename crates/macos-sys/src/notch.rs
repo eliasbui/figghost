@@ -9,6 +9,7 @@
 
 use crate::{
     app, labels,
+    mascot::Sheet,
     panel::{FigPanel, Key},
     pasteboard::file_paths,
     pin_ui::{self, Listed},
@@ -31,11 +32,11 @@ use objc2_app_kit::{
     NSAnimatablePropertyContainer, NSAnimationContext, NSApplication,
     NSApplicationDidChangeScreenParametersNotification, NSBezierPath, NSBitmapImageFileType,
     NSColor, NSCompositingOperation, NSDragOperation, NSDraggingDestination, NSDraggingInfo,
-    NSEvent, NSEventMask, NSGlassEffectView, NSGlassEffectViewStyle, NSGradient,
+    NSEvent, NSEventMask, NSGlassEffectView, NSGlassEffectViewStyle, NSGradient, NSGraphicsContext,
     NSHapticFeedbackManager, NSHapticFeedbackPattern, NSHapticFeedbackPerformanceTime,
-    NSHapticFeedbackPerformer, NSImage, NSMenu, NSPasteboardTypeFileURL, NSScreen, NSStatusBar,
-    NSStringDrawing, NSTrackingArea, NSTrackingAreaOptions, NSView, NSVisualEffectBlendingMode,
-    NSVisualEffectMaterial, NSVisualEffectState, NSVisualEffectView,
+    NSHapticFeedbackPerformer, NSImage, NSImageInterpolation, NSMenu, NSPasteboardTypeFileURL,
+    NSScreen, NSStatusBar, NSStringDrawing, NSTrackingArea, NSTrackingAreaOptions, NSView,
+    NSVisualEffectBlendingMode, NSVisualEffectMaterial, NSVisualEffectState, NSVisualEffectView,
     NSWindowDidResignKeyNotification, NSWindowSharingType, NSWorkspace,
 };
 use objc2_foundation::{
@@ -409,6 +410,12 @@ pub enum Ear {
         id: u64,
         bytes: Arc<Vec<u8>>,
     },
+    /// A frame of pixel art from `sheet`, a PNG of square frames in a row, drawn with hard edges. Frames of one
+    /// sheet replace each other without the fade, the way the steps of an animation do.
+    Sprite {
+        sheet: &'static [u8],
+        frame: usize,
+    },
     /// Bars that move with `levels` (0 to 1 each), asked about 30 times a second while they are on screen.
     Bars {
         levels: Levels,
@@ -739,6 +746,8 @@ struct EarState {
     ear: Ear,
     image: Option<Retained<NSImage>>,
     image_id: u64,
+    /// The last sprite sheet drawn, by the bytes it was read from.
+    sprite: Option<(&'static [u8], Sheet)>,
     levels: [f32; BAR_COUNT],
 }
 
@@ -876,6 +885,7 @@ fn same_look(a: &Ear, b: &Ear) -> bool {
         ) => x == y && s == t && p == q,
         (Ear::Text { text: x, tone: s }, Ear::Text { text: y, tone: t }) => x == y && s == t,
         (Ear::Artwork { id: x, .. }, Ear::Artwork { id: y, .. }) => x == y,
+        (Ear::Sprite { sheet: x, .. }, Ear::Sprite { sheet: y, .. }) => std::ptr::eq(*x, *y),
         (Ear::Bars { .. }, Ear::Bars { .. }) => true,
         _ => false,
     }
@@ -888,6 +898,7 @@ impl EarView {
                 ear: Ear::Empty,
                 image: None,
                 image_id: 0,
+                sprite: None,
                 levels: [0.0; BAR_COUNT],
             }),
         });
@@ -911,6 +922,14 @@ impl EarView {
             if !matches!(ear, Ear::Artwork { .. }) {
                 state.image = None;
                 state.image_id = 0;
+            }
+            if let Ear::Sprite { sheet, .. } = ear
+                && !state
+                    .sprite
+                    .as_ref()
+                    .is_some_and(|(read, _)| std::ptr::eq(*read, *sheet))
+            {
+                state.sprite = Sheet::from_png(sheet).map(|art| (*sheet, art));
             }
             state.ear = ear.clone();
         }
@@ -1001,6 +1020,41 @@ impl EarView {
                         path.fill();
                     }
                 }
+            }
+            Ear::Sprite { frame, .. } => {
+                let (Some((_, sheet)), Some(context)) =
+                    (&state.sprite, NSGraphicsContext::currentContext())
+                else {
+                    return;
+                };
+                let backing = self.window().map_or(2.0, |w| w.backingScaleFactor());
+                let room = (height - 4.0).max(8.0);
+                // A whole number of device pixels to each pixel of the art keeps every pixel the same size; art too
+                // big for one device pixel each is fitted and smoothed instead.
+                let device = (room * backing / sheet.cell()).floor();
+                let side = if device >= 1.0 {
+                    sheet.cell() * device / backing
+                } else {
+                    room
+                };
+                let on_device = |v: f64| (v * backing).round() / backing;
+                context.saveGraphicsState();
+                context.setImageInterpolation(if device >= 1.0 {
+                    NSImageInterpolation::None
+                } else {
+                    NSImageInterpolation::High
+                });
+                sheet.draw(
+                    *frame,
+                    NSRect::new(
+                        NSPoint::new(
+                            on_device(centre.x - side / 2.0),
+                            on_device(centre.y - side / 2.0),
+                        ),
+                        NSSize::new(side, side),
+                    ),
+                );
+                context.restoreGraphicsState();
             }
             Ear::Bars { color, .. } => {
                 let ink =

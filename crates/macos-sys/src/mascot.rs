@@ -80,6 +80,23 @@ impl Sheet {
     pub fn frames(&self) -> usize {
         self.count
     }
+
+    /// Draws one frame into `dest` of the current context, smoothed or not as the context says.
+    pub fn draw(&self, frame: usize, dest: NSRect) {
+        let from = rect(frame as f64 * self.cell, 0.0, self.cell, self.cell);
+        // SAFETY: plain drawing of an image into the current context.
+        unsafe {
+            self.image
+                .drawInRect_fromRect_operation_fraction_respectFlipped_hints(
+                    dest,
+                    from,
+                    NSCompositingOperation::SourceOver,
+                    1.0,
+                    true,
+                    None,
+                )
+        };
+    }
 }
 
 /// How a character reaches for things.
@@ -739,26 +756,15 @@ impl MascotView {
                 Shape::Sprite { frame, at, scale } => {
                     let side = sheet.cell * scale;
                     let p = local(*at);
-                    let dest = rect(
-                        on_device(p.x - side / 2.0),
-                        on_device(p.y - side / 2.0),
-                        side,
-                        side,
+                    sheet.draw(
+                        *frame,
+                        rect(
+                            on_device(p.x - side / 2.0),
+                            on_device(p.y - side / 2.0),
+                            side,
+                            side,
+                        ),
                     );
-                    let from = rect(*frame as f64 * sheet.cell, 0.0, sheet.cell, sheet.cell);
-                    // SAFETY: plain drawing of an image into the current context.
-                    unsafe {
-                        sheet
-                            .image
-                            .drawInRect_fromRect_operation_fraction_respectFlipped_hints(
-                                dest,
-                                from,
-                                NSCompositingOperation::SourceOver,
-                                1.0,
-                                true,
-                                None,
-                            )
-                    };
                 }
                 Shape::Ray {
                     kind,

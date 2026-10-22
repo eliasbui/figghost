@@ -90,6 +90,32 @@ fn short_name(agent: Agent) -> &'static str {
     }
 }
 
+/// Each agent in pixel art (docs/agents/build.py): a row of square frames, two for each of typing, plowing,
+/// asking, done and failed.
+fn sprites(agent: Agent) -> &'static [u8] {
+    match agent {
+        Agent::Claude => include_bytes!("../assets/agents/claude.png"),
+        Agent::Codex => include_bytes!("../assets/agents/codex.png"),
+        Agent::Pi => include_bytes!("../assets/agents/pi.png"),
+    }
+}
+
+/// The agent in the pose of `state` at the time `now`: the two frames of a pose take turns every second, and an
+/// agent at work types for a while, then plows for a while.
+pub fn sprite(agent: Agent, state: State, now: i64) -> Ear {
+    let pose = match state {
+        State::Working if now / 8_000 % 2 == 1 => 1,
+        State::Working => 0,
+        State::Waiting => 2,
+        State::Done | State::Idle => 3,
+        State::Failed => 4,
+    };
+    Ear::Sprite {
+        sheet: sprites(agent),
+        frame: 2 * pose + (now / 1_000 % 2) as usize,
+    }
+}
+
 /// What the closed notch says when an agent finished or failed: which agent and where, as "Claude figghost". The
 /// ear ends a text too long for it with an ellipsis, so a long project is cut and the agent never is.
 pub fn peek_text(agent: Agent, project: &str) -> String {
@@ -744,8 +770,9 @@ impl AgentsFeature {
         self.sync_activity();
     }
 
-    /// What the closed notch shows about the agents: a question that waits (it breathes until answered), an agent
-    /// that just finished or failed, or agents at work with the share of the five-hour limit used so far.
+    /// What the closed notch shows about the agents, each as its sprite: a question that waits (the hand beside it
+    /// breathes until answered), an agent that just finished or failed, or agents at work with the share of the
+    /// five-hour limit used so far.
     fn sync_activity(&self) {
         let Some(notch) = self.notch.upgrade() else {
             return;
@@ -755,13 +782,24 @@ impl AgentsFeature {
             return;
         }
         let now = now_ms();
-        let (waiting, working) = {
+        // With Reduce Motion on, every pose holds its first frame.
+        let clock = if workspace::display_options().reduce_motion {
+            0
+        } else {
+            now
+        };
+        // The agent of the question on the card, and the agent that worked last.
+        let (asking, working) = {
             let tracker = self.tracker.borrow();
             let sessions = tracker.sessions();
+            let first = |state| sessions.iter().find(|s| s.state == state).map(|s| s.agent);
             (
-                !tracker.approvals().is_empty()
-                    || sessions.iter().any(|s| s.state == State::Waiting),
-                sessions.iter().any(|s| s.state == State::Working),
+                tracker
+                    .approvals()
+                    .first()
+                    .map(|a| a.agent)
+                    .or_else(|| first(State::Waiting)),
+                first(State::Working),
             )
         };
         let peek = self.peek.borrow().clone().filter(|p| p.until_ms > now);
@@ -769,17 +807,12 @@ impl AgentsFeature {
             self.peek.borrow_mut().take();
         }
         let page = Some(self.page);
-        let terminal = |tone| Ear::Symbol {
-            name: "terminal",
-            tone,
-            pulse: false,
-        };
-        let (what, activity) = if waiting {
+        let (what, activity) = if let Some(agent) = asking {
             (
                 "a waiting question",
                 Some(Activity {
                     detail: None,
-                    left: terminal(Tone::Orange),
+                    left: sprite(agent, State::Waiting, clock),
                     right: Ear::Symbol {
                         name: "hand.raised.fill",
                         tone: Tone::Orange,
@@ -790,26 +823,17 @@ impl AgentsFeature {
                 }),
             )
         } else if let Some(peek) = peek {
-            let done = peek.done;
-            let (symbol, tone) = if done {
-                ("checkmark.circle.fill", Tone::Green)
+            let (state, what) = if peek.done {
+                (State::Done, "a finished agent")
             } else {
-                ("xmark.octagon.fill", Tone::Red)
+                (State::Failed, "a failed agent")
             };
-            let what = if done {
-                "a finished agent"
-            } else {
-                "a failed agent"
-            };
+            let tone = tone_of(state);
             (
                 what,
                 Some(Activity {
                     detail: None,
-                    left: Ear::Symbol {
-                        name: symbol,
-                        tone,
-                        pulse: false,
-                    },
+                    left: sprite(peek.agent, state, clock),
                     right: Ear::Text {
                         text: peek_text(peek.agent, &peek.project),
                         tone,
@@ -818,7 +842,7 @@ impl AgentsFeature {
                     priority: 25,
                 }),
             )
-        } else if working {
+        } else if let Some(agent) = working {
             let right = match self.five_hour_used(now) {
                 Some(used) => Ear::Text {
                     text: format!("{used:.0}%"),
@@ -840,7 +864,7 @@ impl AgentsFeature {
                 "a working agent",
                 Some(Activity {
                     detail: None,
-                    left: terminal(Tone::Blue),
+                    left: sprite(agent, State::Working, clock),
                     right,
                     page,
                     priority: 10,
@@ -1451,6 +1475,31 @@ mod tests {
         assert_eq!(peek_text(Agent::Claude, "figghost"), "Claude figghost");
         assert_eq!(peek_text(Agent::Codex, "shop"), "Codex shop");
         assert_eq!(peek_text(Agent::Pi, "figghost"), "Pi figghost");
+    }
+
+    #[test]
+    fn every_agent_has_two_frames_for_each_pose_and_the_pose_follows_the_state() {
+        for agent in Agent::ALL {
+            let png = sprites(agent);
+            let size = |at: usize| u32::from_be_bytes(png[at..at + 4].try_into().unwrap());
+            // The width and the height in the PNG header: ten square frames in a row.
+            assert_eq!(size(16), 10 * size(20), "{agent:?}");
+        }
+        let frame = |state, now| match sprite(Agent::Pi, state, now) {
+            Ear::Sprite { frame, .. } => frame,
+            _ => unreachable!(),
+        };
+        assert_eq!(
+            (frame(State::Working, 0), frame(State::Working, 1_000)),
+            (0, 1)
+        );
+        assert_eq!(
+            (frame(State::Working, 8_000), frame(State::Working, 9_000)),
+            (2, 3)
+        );
+        assert_eq!(frame(State::Waiting, 0), 4);
+        assert_eq!(frame(State::Done, 1_000), 7);
+        assert_eq!(frame(State::Failed, 0), 8);
     }
 
     #[test]
