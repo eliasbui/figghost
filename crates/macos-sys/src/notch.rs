@@ -93,7 +93,7 @@ const FLARE: f64 = 20.0;
 /// as closed, and in between it is mid-movement (see `silhouette::openness`).
 const OPEN_REFERENCE: f64 = 150.0;
 /// How far below the top edge the black that joins the shape to the screen's edge reaches, past the cutout.
-const BAND_DEPTH: f64 = 46.0;
+const BAND_DEPTH: f64 = 72.0;
 /// The height a detail line pair adds below the ears, and the room it leaves at the sides of its text.
 const DETAIL_DROP: f64 = 34.0;
 const DETAIL_PAD: f64 = 16.0;
@@ -679,9 +679,17 @@ define_class!(
                 Paint::Band => {
                     // Solid over the first stretch, so the header sits on black, then gone into the glass.
                     let ink = |alpha: f64| NSColor::colorWithSRGBRed_green_blue_alpha(0.0, 0.0, 0.0, alpha);
-                    let colors = NSArray::from_retained_slice(&[ink(0.0), ink(0.55), ink(0.94), ink(1.0)]);
-                    let locations = [0.0_f64, 0.35, 0.62, 1.0];
-                    // SAFETY: four locations for four colours, each between 0 and 1 and increasing.
+                    let colors = NSArray::from_retained_slice(&[
+                        ink(0.0),
+                        ink(0.12),
+                        ink(0.40),
+                        ink(0.72),
+                        ink(0.92),
+                        ink(1.0),
+                        ink(1.0),
+                    ]);
+                    let locations = [0.0_f64, 0.2, 0.4, 0.55, 0.68, 0.8, 1.0];
+                    // SAFETY: seven locations for seven colours, each between 0 and 1 and increasing.
                     let gradient = unsafe {
                         NSGradient::initWithColors_atLocations_colorSpace(
                             NSGradient::alloc(),
