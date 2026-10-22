@@ -3,13 +3,18 @@
 //!
 //! `--hardware` draws them as on a screen with a camera cutout (185 by 32, as `render_closed` uses), where the
 //! header sits beside the cutout when it fits there.
+//!
+//! On the agents page it also checks that a click on a choice that spans a redraw (another session's event
+//! arriving between the press and the release) still lands, and that the row of a waiting session is a button.
 
 use macos_sys::{
-    MainThreadMarker, NSSize,
+    MainThreadMarker, NSPoint, NSRect, NSSize,
     agents_ui::{
-        AgentsCallbacks, AgentsDisplay, AgentsView, ApprovalCardData, SessionData, TokensData,
-        UsageData,
+        AgentsCallbacks, AgentsDisplay, AgentsView, ApprovalCardData, ChoiceData, SessionData,
+        TokensData, UsageData,
     },
+    button::TouchButton,
+    panel::FigPanel,
     app,
     focus_ui::{FocusCallbacks, FocusDisplay, FocusView},
     media_ui::{MediaCallbacks, MediaView},
@@ -19,7 +24,43 @@ use macos_sys::{
     style::Tone,
     ui::{AppCallbacks, Row},
 };
-use std::{env, fs, path::PathBuf, process, rc::Rc, time::Instant};
+use objc2::{msg_send, rc::Retained};
+use objc2_app_kit::{NSEvent, NSEventModifierFlags, NSEventType, NSView};
+use objc2_foundation::NSString;
+use std::{cell::RefCell, env, fs, path::PathBuf, process, rc::Rc, time::Instant};
+
+/// The button under `view` that assistive tools call `name`.
+fn find_button(view: &NSView, name: &str) -> Option<Retained<TouchButton>> {
+    for sub in view.subviews().iter() {
+        if let Ok(button) = sub.clone().downcast::<TouchButton>() {
+            // SAFETY: accessibilityLabel takes no arguments and returns an optional string.
+            let label: Option<Retained<NSString>> = unsafe { msg_send![&*button, accessibilityLabel] };
+            if label.is_some_and(|l| l.to_string() == name) {
+                return Some(button);
+            }
+        }
+        if let Some(found) = find_button(&sub, name) {
+            return Some(found);
+        }
+    }
+    None
+}
+
+/// A press or a release of the left button in the middle of `button`, given to its window.
+fn mouse(button: &TouchButton, kind: NSEventType) {
+    let bounds = button.bounds();
+    let middle = NSPoint::new(bounds.size.width / 2.0, bounds.size.height / 2.0);
+    let at = button.convertPoint_toView(middle, None);
+    let window = button.window().map_or(0, |w| w.windowNumber());
+    let event = NSEvent::mouseEventWithType_location_modifierFlags_timestamp_windowNumber_context_eventNumber_clickCount_pressure(
+        kind, at, NSEventModifierFlags::empty(), 0.0, window, None, 0, 1, 1.0,
+    )
+    .expect("mouse event");
+    // Through the window, which picks the view that gets it, as for a real click.
+    if let Some(window) = button.window() {
+        window.sendEvent(&event);
+    }
+}
 
 const ROOT: &str = env!("CARGO_MANIFEST_DIR");
 
@@ -189,8 +230,28 @@ fn main() {
                 on_decide: Box::new(|_, _| {}),
                 on_pick: Box::new(|_, _| {}),
                 on_refresh: Box::new(|| {}),
+                on_session: Box::new(|_| {}),
             },
         );
+        // The same page in a panel outside every screen, where clicks are delivered by its window.
+        let pressed: Rc<RefCell<Vec<String>>> = Rc::default();
+        let (picks, chosen) = (Rc::clone(&pressed), Rc::clone(&pressed));
+        let clicked = AgentsView::new(
+            mtm,
+            notch.page_frame(),
+            AgentsCallbacks {
+                on_decide: Box::new(|_, _| {}),
+                on_pick: Box::new(move |id, n| picks.borrow_mut().push(format!("pick {id} {n}"))),
+                on_refresh: Box::new(|| {}),
+                on_session: Box::new(move |id| chosen.borrow_mut().push(format!("session {id}"))),
+            },
+        );
+        let panel = FigPanel::new(
+            mtm,
+            NSRect::new(NSPoint::new(-30_000.0, 0.0), notch.page_frame().size),
+        );
+        panel.setContentView(Some(&clicked.root));
+        panel.orderFrontRegardless();
         notch.add_page(agents.page(|| {}, || {}));
 
         let sessions = vec![
@@ -200,6 +261,7 @@ fn main() {
                 project: "shop".into(),
                 state: "Waiting for you".into(),
                 age: "just now".into(),
+                approval: Some(1),
             },
             SessionData {
                 tone: Tone::Blue,
@@ -207,6 +269,7 @@ fn main() {
                 project: "figghost".into(),
                 state: "Working".into(),
                 age: "2 min".into(),
+                approval: None,
             },
             SessionData {
                 tone: Tone::Green,
@@ -214,6 +277,7 @@ fn main() {
                 project: "api-gateway".into(),
                 state: "Done".into(),
                 age: "14 min".into(),
+                approval: None,
             },
         ];
         let usage = vec![
@@ -304,6 +368,70 @@ fn main() {
                 ),
             );
             save("agents_approval", 4);
+            let question = ApprovalCardData {
+                id: 7,
+                heading: "Claude Code - Database".into(),
+                command: "Which database should the shop use?".into(),
+                detail: "shop  -  just now".into(),
+                allow: "Done".into(),
+                deny: "Answer in the terminal".into(),
+                choices: ["Postgres", "SQLite"]
+                    .map(|label| ChoiceData {
+                        label: label.into(),
+                        selected: false,
+                    })
+                    .to_vec(),
+                confirm: false,
+            };
+            view.show(
+                mtm,
+                &display(Some(question.clone()), "", sessions.clone(), usage.clone()),
+            );
+            save("agents_question", 4);
+            clicked.show(
+                mtm,
+                &display(Some(question.clone()), "", sessions.clone(), usage.clone()),
+            );
+            let _keep = &panel;
+            let choice = find_button(&clicked.root, "Postgres").expect("a button per choice");
+            mouse(&choice, NSEventType::LeftMouseDown);
+            mouse(&choice, NSEventType::LeftMouseUp);
+            assert_eq!(pressed.borrow().as_slice(), ["pick 7 0"], "a click lands");
+            pressed.borrow_mut().clear();
+            mouse(&choice, NSEventType::LeftMouseDown);
+            // Another session reports in the middle of the click, and a minute has gone by on the card.
+            let mut busier = sessions.clone();
+            busier[1].state = "Done".into();
+            busier[1].tone = Tone::Green;
+            clicked.show(
+                mtm,
+                &display(
+                    Some(ApprovalCardData {
+                        detail: "shop  -  1 minute ago".into(),
+                        ..question.clone()
+                    }),
+                    "",
+                    busier,
+                    usage.clone(),
+                ),
+            );
+            mouse(&choice, NSEventType::LeftMouseUp);
+            assert_eq!(
+                pressed.borrow().as_slice(),
+                ["pick 7 0"],
+                "the click that spanned the redraw landed"
+            );
+            pressed.borrow_mut().clear();
+            clicked.show(mtm, &display(None, "", sessions.clone(), usage.clone()));
+            let row = find_button(&clicked.root, "Claude Code shop").expect("the waiting session is a button");
+            // SAFETY: an accessibility press takes no arguments.
+            let _: bool = unsafe { msg_send![&*row, accessibilityPerformPress] };
+            assert_eq!(pressed.borrow().as_slice(), ["session 1"]);
+            assert!(
+                find_button(&clicked.root, "Codex figghost").is_none(),
+                "a session that waits for nothing is a plain line"
+            );
+            println!("ok: a click across a redraw lands, and a waiting session's row is pressable");
             view.show(mtm, &display(None, "", sessions.clone(), usage.clone()));
             save("agents_overview", 4);
             let mut busy = display(None, "", sessions.clone(), usage.clone());

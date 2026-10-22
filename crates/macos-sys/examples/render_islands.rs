@@ -207,6 +207,31 @@ fn main() {
                     "Command and Escape unlock it",
                 ),
             ),
+            // The notices of the agents feature, which name the agent and its project, cut to the ear.
+            (
+                "agent-done",
+                Activity {
+                    detail: None,
+                    ..island(
+                        symbol("checkmark.circle.fill", Tone::Green, false),
+                        text("Claude figghost", Tone::Green),
+                        "",
+                        "",
+                    )
+                },
+            ),
+            (
+                "agent-failed",
+                Activity {
+                    detail: None,
+                    ..island(
+                        symbol("xmark.octagon.fill", Tone::Red, false),
+                        text("Pi shop", Tone::Red),
+                        "",
+                        "",
+                    )
+                },
+            ),
             (
                 "unlocked",
                 island(

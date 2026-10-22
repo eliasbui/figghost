@@ -12,15 +12,18 @@ const MESSAGE_CHARS: usize = 300;
 pub enum Agent {
     Claude,
     Codex,
+    /// Reported by the extension Figghost installs into pi, not by hooks: pi has no hook file and no usage limits.
+    Pi,
 }
 
 impl Agent {
-    pub const ALL: [Agent; 2] = [Agent::Claude, Agent::Codex];
+    pub const ALL: [Agent; 3] = [Agent::Claude, Agent::Codex, Agent::Pi];
 
     pub fn id(self) -> &'static str {
         match self {
             Agent::Claude => "claude",
             Agent::Codex => "codex",
+            Agent::Pi => "pi",
         }
     }
 
@@ -32,6 +35,7 @@ impl Agent {
         match self {
             Agent::Claude => "Claude Code",
             Agent::Codex => "Codex",
+            Agent::Pi => "Pi",
         }
     }
 }
@@ -43,7 +47,7 @@ pub enum EventKind {
     PromptSubmit,
     /// A command or edit is about to ask the user; the hook may answer for them.
     PermissionRequest,
-    /// A question with choices that the agent put to the user (Claude Code's AskUserQuestion).
+    /// A question with choices that the agent put to the user (Claude Code's AskUserQuestion, pi's ask_user_question).
     Question,
     Notification,
     /// A tool finished, which also means a pending question was answered, wherever it was answered.

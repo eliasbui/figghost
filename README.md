@@ -135,7 +135,9 @@ The volume indicator has seven styles, each drawn at three levels:
 
 ### AI agents
 
-The Agents tab shows Claude Code and Codex sessions (working, waiting, done), their usage limits with a refresh button, and the tokens and cost at API prices. A permission request from either agent is answered from the notch with Allow or Deny, and the closed notch shows that a question is waiting.
+The Agents tab shows Claude Code, Codex and pi sessions (working, waiting, done), the usage limits of Claude Code and Codex with a refresh button, and the tokens and cost at API prices. A permission request from Claude Code or Codex is answered from the notch with Allow or Deny, and a question with choices (Claude Code's AskUserQuestion, pi's ask_user_question) with a button per choice; the closed notch shows that a question is waiting. The card stays put while other sessions report, and while the pointer is on it the agent keeps waiting for the answer; with several requests open, a press on the row of a waiting session brings its request onto the card. When an agent finishes or fails, the closed notch says which one and where for a few seconds, with a green check or a red mark and, for example, "Claude figghost" or "Pi shop"; a finished agent plays no sound, and a session that was already done does not say so again.
+
+pi is connected from the same settings page: Figghost writes an extension to `~/.pi/agent/extensions/figghost.ts` that reports pi's sessions and puts its questions on the notch while pi asks them in its terminal too, so the first answer wins either way. When pi runs Claude Code through its claude-bridge provider, the Claude Code hooks inside it stay quiet, since pi reports that session itself.
 
 ![The Agents tab with three sessions, usage limit bars and token cost](docs/images/notch-agents-overview.png)
 

@@ -28,14 +28,27 @@ const ACK_WAIT: Duration = Duration::from_millis(1500);
 /// Where the install step leaves the status line command that was there before ours.
 pub const CHAIN_FILE: &str = "statusline-chain";
 
+/// Whether this hook runs inside a Claude Code that pi drives through the Agent SDK (its claude-bridge provider),
+/// which reads the user's settings and so runs our hooks for every query. Those are pi's sessions, which pi's
+/// own extension reports; the hooks would only add short-lived sessions and repeated finished notices.
+pub fn driven_by_pi(env: impl Fn(&str) -> Option<String>) -> bool {
+    env("PI_CODING_AGENT").as_deref() == Some("true")
+        && env("CLAUDE_CODE_ENTRYPOINT").is_some_and(|entry| entry.starts_with("sdk"))
+}
+
 /// Reads the hook's input, tells the app, and for a permission request prints its answer. Always returns 0.
+/// `env` reads the hook's environment.
 pub fn run_hook(
     agent: Agent,
     stdin: impl Read,
     stdout: &mut impl Write,
     socket: &Path,
     now_ms: i64,
+    env: impl Fn(&str) -> Option<String>,
 ) -> i32 {
+    if driven_by_pi(env) {
+        return 0;
+    }
     let mut raw = Vec::new();
     if stdin.take(MAX_STDIN).read_to_end(&mut raw).is_err() {
         return 0;
@@ -136,6 +149,59 @@ mod tests {
         time::Instant,
     };
 
+    fn no_env(_: &str) -> Option<String> {
+        None
+    }
+
+    #[test]
+    fn only_a_claude_code_that_pi_drives_through_the_sdk_is_left_out() {
+        let env = |vars: &'static [(&'static str, &'static str)]| {
+            move |key: &str| {
+                vars.iter()
+                    .find(|(k, _)| *k == key)
+                    .map(|(_, v)| (*v).to_owned())
+            }
+        };
+        assert!(driven_by_pi(env(&[
+            ("PI_CODING_AGENT", "true"),
+            ("CLAUDE_CODE_ENTRYPOINT", "sdk-ts")
+        ])));
+        // A Claude Code started by hand from a pi terminal is the user's own session.
+        assert!(!driven_by_pi(env(&[
+            ("PI_CODING_AGENT", "true"),
+            ("CLAUDE_CODE_ENTRYPOINT", "cli")
+        ])));
+        assert!(!driven_by_pi(env(&[("CLAUDE_CODE_ENTRYPOINT", "sdk-ts")])));
+        assert!(!driven_by_pi(env(&[
+            ("PI_CODING_AGENT", "false"),
+            ("CLAUDE_CODE_ENTRYPOINT", "sdk-ts")
+        ])));
+        assert!(!driven_by_pi(no_env));
+    }
+
+    #[test]
+    fn a_hook_inside_pi_tells_the_app_nothing() {
+        let dir = scratch("bridge");
+        let socket = dir.join("a.sock");
+        let (handler, seen) = answering(Reply::Allow);
+        let server = Server::start(&socket, 5, handler).unwrap();
+        let mut out = Vec::new();
+        let bridge = |key: &str| match key {
+            "PI_CODING_AGENT" => Some("true".to_owned()),
+            "CLAUDE_CODE_ENTRYPOINT" => Some("sdk-ts".to_owned()),
+            _ => None,
+        };
+        assert_eq!(
+            run_hook(Agent::Claude, &request_json()[..], &mut out, &socket, 1, bridge),
+            0
+        );
+        assert!(out.is_empty(), "the agent asks for itself");
+        thread::sleep(Duration::from_millis(100));
+        assert!(seen.lock().unwrap().is_empty());
+        drop(server);
+        let _ = fs::remove_dir_all(&dir);
+    }
+
     fn scratch(name: &str) -> PathBuf {
         let dir =
             std::env::temp_dir().join(format!("core-agents-cli-{name}-{}", std::process::id()));
@@ -176,7 +242,7 @@ mod tests {
         let server = Server::start(&socket, 5, handler).unwrap();
         let mut out = Vec::new();
         assert_eq!(
-            run_hook(Agent::Claude, &request_json()[..], &mut out, &socket, 1),
+            run_hook(Agent::Claude, &request_json()[..], &mut out, &socket, 1, no_env),
             0
         );
         let printed: Value = serde_json::from_slice(&out).unwrap();
@@ -202,7 +268,7 @@ mod tests {
         });
         let server = Server::start(&socket, 5, handler).unwrap();
         let mut out = Vec::new();
-        run_hook(Agent::Codex, &request_json()[..], &mut out, &socket, 1);
+        run_hook(Agent::Codex, &request_json()[..], &mut out, &socket, 1, no_env);
         let printed: Value = serde_json::from_slice(&out).unwrap();
         assert_eq!(
             printed["hookSpecificOutput"]["decision"]["behavior"],
@@ -226,7 +292,8 @@ mod tests {
                 &request_json()[..],
                 &mut out,
                 &dir.join("none.sock"),
-                1
+                1,
+                no_env
             ),
             0
         );
@@ -242,7 +309,7 @@ mod tests {
         let server = Server::start(&socket, 5, handler).unwrap();
         for junk in [&b"not json"[..], b"{}", b"[1,2]", b""] {
             let mut out = Vec::new();
-            assert_eq!(run_hook(Agent::Claude, junk, &mut out, &socket, 1), 0);
+            assert_eq!(run_hook(Agent::Claude, junk, &mut out, &socket, 1, no_env), 0);
             assert!(out.is_empty());
         }
         assert!(seen.lock().unwrap().is_empty());
@@ -259,7 +326,7 @@ mod tests {
         let stop = json!({ "session_id": "s", "cwd": "/w", "hook_event_name": "Stop" }).to_string();
         let started = Instant::now();
         let mut out = Vec::new();
-        run_hook(Agent::Claude, stop.as_bytes(), &mut out, &socket, 1);
+        run_hook(Agent::Claude, stop.as_bytes(), &mut out, &socket, 1, no_env);
         assert!(started.elapsed() < Duration::from_secs(1));
         assert!(out.is_empty());
         let deadline = Instant::now() + Duration::from_secs(2);
@@ -283,7 +350,7 @@ mod tests {
         })
         .to_string();
         let mut out = Vec::new();
-        run_hook(Agent::Claude, payload.as_bytes(), &mut out, &socket, 1);
+        run_hook(Agent::Claude, payload.as_bytes(), &mut out, &socket, 1, no_env);
         assert!(
             !out.is_empty(),
             "the request still got through and was answered"

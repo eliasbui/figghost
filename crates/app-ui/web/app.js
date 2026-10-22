@@ -104,6 +104,7 @@ const I18N = {
     'sec.agents.follow': 'Following', 'agents.enable.title': 'Follow coding agents', 'agents.enable.desc': 'Listen for what Claude Code and Codex report and show it on the Agents tab of the notch.',
     'sec.agents.connect': 'Connect', 'agents.claude.title': 'Claude Code', 'agents.claude.desc': 'Adds hooks to ~/.claude/settings.json. Your other hooks stay as they are.',
     'agents.codex.title': 'Codex', 'agents.codex.desc': 'Adds hooks to ~/.codex/hooks.json. Codex asks you to review new hooks the first time it runs.',
+    'agents.pi.title': 'Pi', 'agents.pi.desc': 'Adds an extension to ~/.pi/agent/extensions/figghost.ts. Pi loads it the next time it starts; its questions can then be answered on the notch as well as in its terminal.',
     'agents.install': 'Install', 'agents.remove': 'Remove', 'agents.repair': 'Repair',
     'agents.status.on': 'Connected', 'agents.status.off': 'Not connected', 'agents.status.partial': 'Incomplete ({n} of {m})', 'agents.status.missing': 'Not found', 'agents.status.error': 'Cannot read its file',
     'sec.agents.answer': 'Answering', 'agents.wait.title': 'Wait for an answer', 'agents.wait.desc': 'A command waits this long on the notch. Without an answer the agent asks in its own terminal, as usual.', 'agents.wait.n': '{n} seconds',
@@ -225,6 +226,7 @@ const I18N = {
     'sec.agents.follow': 'Theo dõi', 'agents.enable.title': 'Theo dõi các tác tử lập trình', 'agents.enable.desc': 'Lắng nghe những gì Claude Code và Codex báo về và hiện trên tab Tác tử của notch.',
     'sec.agents.connect': 'Kết nối', 'agents.claude.title': 'Claude Code', 'agents.claude.desc': 'Thêm hook vào ~/.claude/settings.json. Các hook khác của bạn được giữ nguyên.',
     'agents.codex.title': 'Codex', 'agents.codex.desc': 'Thêm hook vào ~/.codex/hooks.json. Codex sẽ hỏi bạn xem lại hook mới ở lần chạy đầu tiên.',
+    'agents.pi.title': 'Pi', 'agents.pi.desc': 'Thêm một extension vào ~/.pi/agent/extensions/figghost.ts. Pi nạp nó ở lần khởi động tiếp theo; sau đó câu hỏi của Pi trả lời được trên notch cũng như trong terminal của nó.',
     'agents.install': 'Cài', 'agents.remove': 'Gỡ', 'agents.repair': 'Sửa',
     'agents.status.on': 'Đã kết nối', 'agents.status.off': 'Chưa kết nối', 'agents.status.partial': 'Chưa đủ ({n}/{m})', 'agents.status.missing': 'Không tìm thấy', 'agents.status.error': 'Không đọc được tệp của nó',
     'sec.agents.answer': 'Trả lời', 'agents.wait.title': 'Thời gian chờ câu trả lời', 'agents.wait.desc': 'Một lệnh chờ chừng này trên notch. Không có câu trả lời thì tác tử hỏi trong terminal của nó như bình thường.', 'agents.wait.n': '{n} giây',
@@ -1575,7 +1577,7 @@ function pageAgents() {
   const body = [
     card(toggleRow('agents.enabled', t('agents.enable.title'), t('agents.enable.desc'))),
     sectionTitle(t('sec.agents.connect')),
-    card(agentLine('claude'), agentLine('codex')),
+    card(agentLine('claude'), agentLine('codex'), agentLine('pi')),
     sectionTitle(t('sec.agents.answer')),
     card(
       row(t('agents.wait.title'), t('agents.wait.desc'), waitSelect(), { when: () => S.agents.enabled }),
@@ -2253,6 +2255,15 @@ window.__selftest = function () {
     S.agents.codex.found = false; S.agents.codex.installed = 0; runSyncs();
     expect(lines[1].querySelector('button').disabled, 'an agent that is not installed cannot be connected');
     S.agents.codex.found = true; runSyncs();
+    const piLine = [...document.querySelectorAll('.card .row')].find((r) => r.querySelector('.row-title').textContent === t('agents.pi.title'));
+    sent.length = 0;
+    piLine.querySelector('button').click();
+    expect(sent.some((m) => m.t === 'action' && m.name === 'agents_install_pi'), 'pi offers its extension: ' + JSON.stringify(sent));
+    S.agents.pi.installed = 1; runSyncs();
+    sent.length = 0;
+    piLine.querySelector('button').click();
+    expect(sent.some((m) => m.t === 'action' && m.name === 'agents_remove_pi'), 'an installed extension offers to remove: ' + JSON.stringify(sent));
+    S.agents.pi.installed = 0; runSyncs();
     const wait = $('select.pick');
     wait.value = '60';
     wait.dispatchEvent(new Event('change'));

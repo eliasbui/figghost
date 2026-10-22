@@ -509,6 +509,8 @@ impl SettingsFeature {
             "agents_remove_claude" => self.agent_hooks(Agent::Claude, false),
             "agents_install_codex" => self.agent_hooks(Agent::Codex, true),
             "agents_remove_codex" => self.agent_hooks(Agent::Codex, false),
+            "agents_install_pi" => self.agent_hooks(Agent::Pi, true),
+            "agents_remove_pi" => self.agent_hooks(Agent::Pi, false),
             "agents_usage_on" => self.agent_usage(true),
             "agents_usage_off" => self.agent_usage(false),
             "restart" => relaunch(mtm, "--show-settings"),
