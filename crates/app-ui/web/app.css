@@ -1197,7 +1197,7 @@ html.reduce-motion *::after {
 [data-cat="mole"] .nav-icon { background: linear-gradient(135deg, #71717a, #3f3f46); }
 [data-cat="about"] .nav-icon { background: linear-gradient(135deg, #0a84ff, #0060df); }
 
-/* The top bar: the wordmark beside the window buttons, the search in the middle, the access pill on the right. Only
+/* The top bar: the search in the middle, the access pill on the right. Only
    its controls take the pointer, so the rest of the strip still moves the window. */
 .topbar {
   position: absolute;
@@ -1215,8 +1215,8 @@ html.reduce-motion *::after {
 }
 .topbar > .search,
 .topbar > .status-pill { pointer-events: auto; }
-.topbar > .wordmark { justify-self: start; white-space: nowrap; }
-.topbar > .status-pill { justify-self: end; width: auto; max-width: 100%; overflow: hidden; }
+.topbar > .search { grid-column: 2; }
+.topbar > .status-pill { grid-column: 3; justify-self: end; width: auto; max-width: 100%; overflow: hidden; }
 
 .search { position: relative; }
 .top-search {
@@ -1433,8 +1433,7 @@ html.reduce-transparency .lens { background: var(--fill); -webkit-backdrop-filte
 .found { box-shadow: inset 0 0 0 2px var(--tint); border-radius: 12px; transition: box-shadow 0.4s var(--ease-out); }
 
 /* Pages and headers */
-.page-head { padding: calc(var(--titlebar) + 10px) var(--gutter) 14px; }
-.page-title { font-size: 28px; font-weight: 700; letter-spacing: -0.025em; line-height: 1.1; color: var(--text); }
+.page-head { padding: calc(var(--titlebar) + 6px) var(--gutter) 10px; }
 .page-sub { display: none; }
 .section-title { margin: 22px 14px 7px; font-size: 12.5px; font-weight: 650; letter-spacing: -0.01em; color: var(--text-2); text-transform: none; }
 
@@ -1769,7 +1768,6 @@ html[data-sky="night"] { --aurora-1: rgba(112, 124, 238, 0.30); --aurora-2: rgba
 }
 
 /* Handwriting for the names of things. One weight only: Patrick Hand has no bold, so nothing is faked. */
-.page-title,
 .section-title,
 .feat-name,
 .hero-ghost h2,
@@ -1781,18 +1779,6 @@ html[data-sky="night"] { --aurora-1: rgba(112, 124, 238, 0.30); --aurora-2: rgba
   font-weight: 400;
   font-synthesis: none;
 }
-.page-title { font-size: 38px; line-height: 1; letter-spacing: 0; }
-.page-title::after {
-  content: "";
-  display: block;
-  width: 84px;
-  height: 9px;
-  margin-top: 3px;
-  background-color: var(--tint);
-  -webkit-mask: var(--squiggle) left center / contain no-repeat;
-  mask: var(--squiggle) left center / contain no-repeat;
-  opacity: 0.85;
-}
 .section-title { margin: 24px 14px 6px; font-size: 18px; letter-spacing: 0.01em; }
 .feat-name { font-size: 17px; }
 .hero-ghost h2 { font-size: 34px; letter-spacing: 0; }
@@ -1800,12 +1786,15 @@ html[data-sky="night"] { --aurora-1: rgba(112, 124, 238, 0.30); --aurora-2: rgba
 /* Holds the SVG filter of the ghost; it draws nothing itself. */
 .defs { position: absolute; width: 0; height: 0; overflow: hidden; }
 
-/* The wordmark beside the window buttons, in the top bar. */
-.topbar > .wordmark {
-  font-size: 22px;
+/* The wordmark in the bottom left corner, quiet, opposite the ghost. */
+.wordmark {
+  position: absolute;
+  left: 18px;
+  bottom: 14px;
+  z-index: 4;
+  font-size: 17px;
   line-height: 1;
-  letter-spacing: 0.02em;
-  color: var(--text-2);
+  color: var(--text-3);
   pointer-events: none;
 }
 .wordmark::after { content: "."; color: var(--tint); }
@@ -1836,24 +1825,18 @@ html[data-sky="night"] { --aurora-1: rgba(112, 124, 238, 0.30); --aurora-2: rgba
   .guide-ghost .ghost { filter: url(#wobble) drop-shadow(0 0 7px rgba(150, 160, 255, 0.5)); }
 }
 
-/* The guide: the ghost at the top right of every page says in a bubble what the page is for. A click makes it
-   hop and say something else for a moment. */
-.page-head { position: relative; }
+/* The guide: a small ghost in the bottom right corner. A click makes it hop and say a line in a bubble above it,
+   which goes away by itself; hovering it shows what the page is for. */
 .guide {
   position: absolute;
-  top: calc(var(--titlebar) + 2px);
-  right: var(--gutter);
-  display: flex;
-  align-items: flex-end;
-  gap: 10px;
-  max-width: min(380px, 50%);
-  pointer-events: none;
+  right: 18px;
+  bottom: 14px;
+  z-index: 4;
 }
-.guide > * { pointer-events: auto; }
 .guide-ghost {
-  flex: none;
-  width: 46px;
-  height: 52px;
+  display: block;
+  width: 30px;
+  height: 34px;
   padding: 0;
   border: 0;
   background: none;
@@ -1861,36 +1844,31 @@ html[data-sky="night"] { --aurora-1: rgba(112, 124, 238, 0.30); --aurora-2: rgba
 }
 .guide-ghost .ghost-wrap { width: 100%; height: 100%; }
 .bubble {
-  position: relative;
-  margin: 0 0 12px;
+  position: absolute;
+  right: 0;
+  bottom: calc(100% + 10px);
+  width: max-content;
+  max-width: 260px;
+  margin: 0;
   padding: 7px 12px 8px;
-  max-width: 300px;
   border: 1.6px solid var(--bubble-line);
   border-radius: 16px 16px 4px 16px;
   background: var(--bubble-fill);
   color: var(--text);
   font-size: 15.5px;
   line-height: 1.2;
-  transition: transform var(--motion) var(--spring);
+  opacity: 0;
+  pointer-events: none;
+  transform: translateY(6px);
+  transition: transform var(--motion) var(--spring), opacity var(--motion-fast);
 }
 .bubble-text {
   display: -webkit-box;
-  -webkit-line-clamp: 2;
+  -webkit-line-clamp: 3;
   -webkit-box-orient: vertical;
   overflow: hidden;
 }
-.bubble::before,
-.bubble::after {
-  content: "";
-  position: absolute;
-  bottom: 9px;
-  border: 7px solid transparent;
-  border-right: 0;
-}
-.bubble::before { right: -9px; border-left-color: var(--bubble-line); }
-.bubble::after { right: -6px; border-left-color: var(--bubble-fill); }
-.bubble.quip { transform: rotate(-1.5deg) scale(1.03); }
-@media (max-width: 900px) { .guide .bubble { display: none; } }
+.bubble.quip { opacity: 1; transform: rotate(-1.5deg); }
 
 /* The pill in the top bar: the ghost wakes when the app has the access it needs and sleeps when it does not,
    and the words say the same, so the colour is not the only sign. */
@@ -1969,7 +1947,6 @@ html[data-sky="night"] { --aurora-1: rgba(112, 124, 238, 0.30); --aurora-2: rgba
 /* Reduce Motion and Reduce Transparency are handled by the rules of the glass theme above (every animation ends
    at once, the canvas turns solid). Increase Contrast draws the outline of the bubble in the text colour. */
 html.increase-contrast { --bubble-line: var(--text); }
-html.increase-contrast .page-title::after { opacity: 1; }
 
 /* The limits of one Orca account on the AI agents page: the window, a bar, the share used and when it starts over. */
 .acct-limit { display: grid; grid-template-columns: 56px minmax(60px, 1fr) 40px minmax(0, 150px); align-items: center; gap: 8px; margin-top: 6px; color: var(--text-2); font-size: var(--fs-small); }

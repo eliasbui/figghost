@@ -2264,18 +2264,15 @@ function buildShell() {
     h('div', { id: 'app' },
       h('main', { id: 'main' },
         h('div', { class: 'dragzone', 'data-drag': '' }),
-        h('div', { class: 'topbar' },
-          h('span', { class: 'wordmark', 'aria-hidden': 'true', text: 'figghost' }),
-          navSearch(),
-          accessPill()),
+        h('div', { class: 'topbar' }, navSearch(), accessPill()),
         h('header', { class: 'page-head' },
-          h('h1', { class: 'page-title', id: 'title' }),
           h('div', { id: 'subtabs', class: 'page-subtabs' }),
-          h('p', { class: 'page-sub', id: 'subtitle' }),
-          h('div', { class: 'guide' },
-            h('p', { class: 'bubble' }, h('span', { class: 'bubble-text', id: 'guide-text' })),
-            h('button', { class: 'guide-ghost', 'aria-label': t('guide.label'), onclick: poke }, ghost()))),
-        h('div', { id: 'scroller' })),
+          h('p', { class: 'page-sub', id: 'subtitle' })),
+        h('div', { id: 'scroller' }),
+        h('span', { class: 'wordmark', 'aria-hidden': 'true', text: 'figghost' }),
+        h('div', { class: 'guide' },
+          h('p', { class: 'bubble' }, h('span', { class: 'bubble-text', id: 'guide-text' })),
+          h('button', { class: 'guide-ghost', 'aria-label': t('guide.label'), onclick: poke }, ghost()))),
       dockLens(h('nav', { id: 'nav', 'aria-label': 'Figghost' }, ...renderNavItems()))),
     h('div', { id: 'toast', 'aria-live': 'polite' }),
     h('div', { id: 'modal' }),
@@ -2291,13 +2288,13 @@ function go(id) {
   cat.lastPage = current;
   dropSyncs(pageSyncs);
   graphs.clear();
-  $('#title').textContent = t('cat.' + cat.id);
   const sub = $('#subtitle');
   if (sub) sub.textContent = t('page.' + page.id + '.sub');
   renderSubtabs(cat, current);
   const say = $('#guide-text');
   if (say && !say.parentElement.classList.contains('quip')) say.textContent = guideLine(page.id);
-  if (say) say.parentElement.title = t('page.' + page.id + '.sub');
+  const guide = $('.guide-ghost');
+  if (guide) guide.title = t('page.' + page.id + '.sub');
   const scroller = $('#scroller');
   // A page rises into place only when a person chose it; a page that is built for any other reason (the first one, a
   // new language, a check or a picture) is simply there, so nothing waits on an animation clock.
