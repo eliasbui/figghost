@@ -23,6 +23,7 @@ mod shelf_actions;
 mod tiling;
 mod trace;
 mod update;
+mod usage;
 mod volume_hud;
 
 use agents::AgentsFeature;

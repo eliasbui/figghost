@@ -167,6 +167,8 @@ pub struct Env {
     pub runtime: HashMap<&'static str, Value>,
     /// The accounts Orca keeps, for the AI agents page (see `crate::accounts`).
     pub accounts: Value,
+    /// What the app itself is using, for the About page (see `crate::usage`); null before the first reading.
+    pub usage: Value,
 }
 
 fn login_name(login: LoginItem) -> &'static str {
@@ -228,6 +230,7 @@ pub fn state(config: &Config, env: &Env) -> Value {
             "version": env.version,
             "bundled": env.bundled,
             "config_dir": env.config_dir,
+            "usage": env.usage,
         },
         "env": {
             "accessibility": env.accessibility,
@@ -933,6 +936,7 @@ mod tests {
             screens: Vec::new(),
             runtime: HashMap::new(),
             accounts: Value::Null,
+            usage: json!({ "cpu": 3.4, "gpu": 0.6, "memory": 61_865_984, "disk_read": 0, "disk_write": 20480, "net": 1536, "fps": 0 }),
         }
     }
 

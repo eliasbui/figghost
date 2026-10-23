@@ -76,6 +76,8 @@ pub struct SettingsFeature {
     /// A page asked for before the window's script was ready to take it.
     pending_page: RefCell<Option<String>>,
     accounts: crate::accounts::Accounts,
+    /// What the app is using, read on each refresh while the window is open.
+    usage: RefCell<crate::usage::Sampler>,
 }
 
 impl SettingsFeature {
@@ -92,6 +94,7 @@ impl SettingsFeature {
             menu_icon: RefCell::default(),
             pending_page: RefCell::default(),
             accounts,
+            usage: RefCell::default(),
         });
         FEATURE.with(|slot| *slot.borrow_mut() = Rc::downgrade(&feature));
         // The About page follows the update, which goes on whether or not this window is open.
@@ -262,6 +265,7 @@ impl SettingsFeature {
             accounts: self
                 .accounts
                 .snapshot(i18n::current(), crate::history::now_ms()),
+            usage: self.usage.borrow_mut().sample(),
         }
     }
 

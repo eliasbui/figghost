@@ -184,6 +184,7 @@ define_class!(
             // The last frame lets go of the display link, which lets go of this object: both are kept alive
             // until this call returns.
             let (_alive, _link) = (self.retain(), link.retain());
+            crate::sysinfo::count_frame();
             if let Some(switcher) = self.ivars().switcher.load() {
                 switcher.step();
             }

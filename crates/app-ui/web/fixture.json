@@ -1,5 +1,5 @@
 {
-  "app": { "version": "0.2.0", "bundled": true, "config_dir": "/Users/you/Library/Application Support/Figghost" },
+  "app": { "version": "0.2.0", "bundled": true, "config_dir": "/Users/you/Library/Application Support/Figghost", "usage": { "cpu": 3.4, "gpu": 0.6, "memory": 61865984, "disk_read": 0, "disk_write": 20480, "net": 1536, "fps": 0 } },
   "env": { "accessibility": true, "login": "disabled", "language": "en", "reduce_transparency": false, "reduce_motion": false, "increase_contrast": false },
   "general": { "language": "auto", "show_on_launch": true, "launch_effect": true, "menu_icon": true, "theme": "auto" },
   "keys": {

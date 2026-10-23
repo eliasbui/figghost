@@ -32,20 +32,22 @@ use objc2_app_kit::{
     NSAnimatablePropertyContainer, NSAnimationContext, NSApplication,
     NSApplicationDidChangeScreenParametersNotification, NSBezierPath, NSBitmapImageFileType,
     NSColor, NSCompositingOperation, NSDragOperation, NSDraggingDestination, NSDraggingInfo,
-    NSEvent, NSEventMask, NSGlassEffectView, NSGlassEffectViewStyle, NSGradient, NSGraphicsContext,
+    NSEvent, NSEventMask, NSGlassEffectView, NSGlassEffectViewStyle, NSGraphicsContext,
     NSHapticFeedbackManager, NSHapticFeedbackPattern, NSHapticFeedbackPerformanceTime,
     NSHapticFeedbackPerformer, NSImage, NSImageInterpolation, NSMenu, NSPasteboardTypeFileURL,
     NSScreen, NSStatusBar, NSStringDrawing, NSTrackingArea, NSTrackingAreaOptions, NSView,
     NSVisualEffectBlendingMode, NSVisualEffectMaterial, NSVisualEffectState, NSVisualEffectView,
     NSWindowDidResignKeyNotification, NSWindowSharingType, NSWorkspace,
 };
+use objc2_core_foundation::CGPoint;
+use objc2_core_graphics::CGColor;
 use objc2_foundation::{
     NSArray, NSData, NSDictionary, NSNotification, NSNotificationCenter, NSNumber, NSObject,
     NSObjectProtocol, NSPoint, NSRect, NSRunLoop, NSRunLoopCommonModes, NSSize, NSString,
 };
 use objc2_quartz_core::{
-    CABasicAnimation, CACornerMask, CACurrentMediaTime, CADisplayLink, CALayer, CAMediaTiming,
-    CAMediaTimingFunction, CAShapeLayer, CATransaction, kCACornerCurveContinuous,
+    CABasicAnimation, CACornerMask, CACurrentMediaTime, CADisplayLink, CAGradientLayer, CALayer,
+    CAMediaTiming, CAMediaTimingFunction, CAShapeLayer, CATransaction, kCACornerCurveContinuous,
 };
 use std::{
     cell::{Cell, RefCell},
@@ -670,46 +672,36 @@ define_class!(
     struct FillView;
 
     impl FillView {
-        #[unsafe(method(drawRect:))]
-        fn draw_rect(&self, _dirty: NSRect) {
-            let bounds = self.bounds();
-            let gradient = |top: &NSColor, bottom: &NSColor| {
-                if let Some(g) = NSGradient::initWithStartingColor_endingColor(NSGradient::alloc(), bottom, top) {
-                    g.drawInRect_angle(bounds, 90.0);
-                }
-            };
-            match self.ivars().paint.get() {
-                Paint::Slate => gradient(
-                    &style::black(1.0),
-                    &NSColor::colorWithSRGBRed_green_blue_alpha(0.17, 0.18, 0.20, 1.0),
+        // The gradient is a layer the window server draws on the GPU, so the surface can change size on every frame of
+        // a movement without being painted again on the processor.
+        #[unsafe(method_id(makeBackingLayer))]
+        fn make_backing_layer(&self) -> Retained<CALayer> {
+            let ink = |alpha: f64| NSColor::colorWithSRGBRed_green_blue_alpha(0.0, 0.0, 0.0, alpha);
+            // From the bottom of the view to its top.
+            let (colors, locations): (Vec<Retained<NSColor>>, Vec<f64>) = match self.ivars().paint.get() {
+                // Black where it joins the edge of the screen, slate at the bottom.
+                Paint::Slate => (
+                    vec![NSColor::colorWithSRGBRed_green_blue_alpha(0.17, 0.18, 0.20, 1.0), ink(1.0)],
+                    vec![0.0, 1.0],
                 ),
-                Paint::Band => {
-                    // Solid over the first stretch, so the header sits on black, then gone into the glass.
-                    let ink = |alpha: f64| NSColor::colorWithSRGBRed_green_blue_alpha(0.0, 0.0, 0.0, alpha);
-                    let colors = NSArray::from_retained_slice(&[
-                        ink(0.0),
-                        ink(0.12),
-                        ink(0.40),
-                        ink(0.72),
-                        ink(0.92),
-                        ink(1.0),
-                        ink(1.0),
-                    ]);
-                    let locations = [0.0_f64, 0.2, 0.4, 0.55, 0.68, 0.8, 1.0];
-                    // SAFETY: seven locations for seven colours, each between 0 and 1 and increasing.
-                    let gradient = unsafe {
-                        NSGradient::initWithColors_atLocations_colorSpace(
-                            NSGradient::alloc(),
-                            &colors,
-                            locations.as_ptr(),
-                            &objc2_app_kit::NSColorSpace::sRGBColorSpace(),
-                        )
-                    };
-                    if let Some(gradient) = gradient {
-                        gradient.drawInRect_angle(bounds, 90.0);
-                    }
-                }
-            }
+                // Solid over the first stretch, so the header sits on black, then gone into the glass.
+                Paint::Band => (
+                    [0.0, 0.12, 0.40, 0.72, 0.92, 1.0, 1.0].map(ink).to_vec(),
+                    vec![0.0, 0.2, 0.4, 0.55, 0.68, 0.8, 1.0],
+                ),
+            };
+            let layer = CAGradientLayer::new();
+            let cg: Vec<_> = colors.iter().map(|c| c.CGColor()).collect();
+            // SAFETY: a CGColor is a Core Foundation object, bridged toll-free to an Objective-C one.
+            let objects: Vec<&AnyObject> =
+                cg.iter().map(|c| unsafe { &*(&**c as *const CGColor).cast::<AnyObject>() }).collect();
+            // SAFETY: the array holds CGColors, which is what the property takes.
+            unsafe { layer.setColors(Some(&NSArray::from_slice(&objects))) };
+            let numbers: Vec<Retained<NSNumber>> = locations.into_iter().map(NSNumber::new_f64).collect();
+            layer.setLocations(Some(&NSArray::from_retained_slice(&numbers)));
+            layer.setStartPoint(CGPoint::new(0.5, 0.0));
+            layer.setEndPoint(CGPoint::new(0.5, 1.0));
+            Retained::into_super(layer)
         }
     }
 );
@@ -1724,6 +1716,7 @@ impl Inner {
 
     /// One frame of the movement under way, for the frame shown at `target` (display time).
     fn tick(&self, now: f64, target: f64) {
+        crate::sysinfo::count_frame();
         let Some(mut flight) = self.flight.get() else {
             self.driver.borrow_mut().take();
             return;
@@ -2867,6 +2860,10 @@ impl Notch {
         content.addSubview(&switcher);
         let orb = NotchOrb::new(mtm, NSPoint::new(SWITCHER_INSET, header_y));
         content.addSubview(&orb);
+        // Each in a layer of its own: they ride the edges of the shape on every frame of a movement, and a view drawn
+        // into the content's layer would make the window server ask for the content to be painted again each time.
+        switcher.setWantsLayer(true);
+        orb.setWantsLayer(true);
         ui.view.root.setHidden(true);
 
         let inner = Rc::new_cyclic(|me| Inner {
