@@ -45,7 +45,7 @@ impl TilingConfig {
 }
 
 /// The tabs of the notch, in their default order.
-pub const NOTCH_PAGES: [&str; 16] = [
+pub const NOTCH_PAGES: [&str; 17] = [
     "clipboard",
     "shelf",
     "media",
@@ -56,6 +56,7 @@ pub const NOTCH_PAGES: [&str; 16] = [
     "launcher",
     "weather",
     "prs",
+    "updates",
     "pomodoro",
     "screentime",
     "system",
@@ -461,6 +462,8 @@ pub struct Config {
     #[serde(deserialize_with = "lenient_section")]
     pub prs: crate::features::prs::Config,
     #[serde(deserialize_with = "lenient_section")]
+    pub updates: crate::features::updates::Config,
+    #[serde(deserialize_with = "lenient_section")]
     pub pomodoro: crate::features::pomodoro::Config,
     #[serde(deserialize_with = "lenient_section")]
     pub screentime: crate::features::screentime::Config,
@@ -525,6 +528,7 @@ impl Default for Config {
             launcher: crate::features::launcher::Config::default(),
             weather: crate::features::weather::Config::default(),
             prs: crate::features::prs::Config::default(),
+            updates: crate::features::updates::Config::default(),
             pomodoro: crate::features::pomodoro::Config::default(),
             screentime: crate::features::screentime::Config::default(),
             dayprogress: crate::features::dayprogress::Config::default(),

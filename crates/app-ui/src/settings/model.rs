@@ -1636,6 +1636,7 @@ mod tests {
             "launcher",
             "weather",
             "prs",
+            "updates",
             "pomodoro",
             "screentime",
             "dayprogress",

@@ -442,12 +442,12 @@ fn tool_dirs() -> Vec<PathBuf> {
     dirs
 }
 
-fn is_executable(path: &Path) -> bool {
+pub(crate) fn is_executable(path: &Path) -> bool {
     std::fs::metadata(path).is_ok_and(|m| m.is_file() && m.permissions().mode() & 0o111 != 0)
 }
 
 /// The first of `dirs` that holds an executable file called `name`.
-fn locate(dirs: &[PathBuf], name: &str) -> Option<PathBuf> {
+pub(crate) fn locate(dirs: &[PathBuf], name: &str) -> Option<PathBuf> {
     dirs.iter()
         .map(|dir| dir.join(name))
         .find(|path| is_executable(path))

@@ -131,7 +131,7 @@ Mở ứng dụng là mở cửa sổ cài đặt; đóng cửa sổ thì ứng 
 
 ### Notch, với một tab cho mỗi công cụ
 
-Một hình khối đen mọc ra từ mép trên màn hình khi con trỏ chạm tới: clipboard, khay tệp, media, tác tử AI, lịch, ghi chú, mở nhanh, thời tiết, yêu cầu duyệt, pomodoro, thời gian dùng, âm thanh và hệ thống, mỗi thứ là một tab. Khi đóng, nó cho thấy bài đang phát và việc các tác tử lập trình của bạn đang làm.
+Một hình khối đen mọc ra từ mép trên màn hình khi con trỏ chạm tới: clipboard, khay tệp, media, tác tử AI, lịch, ghi chú, mở nhanh, thời tiết, yêu cầu duyệt, cập nhật, pomodoro, thời gian dùng, âm thanh và hệ thống, mỗi thứ là một tab. Khi đóng, nó cho thấy bài đang phát và việc các tác tử lập trình của bạn đang làm.
 
 ![Notch mở lần lượt từng tab: clipboard, khay tệp, media, tập trung, tác tử AI với giới hạn sử dụng, một yêu cầu cấp quyền và lịch](docs/images/notch-tabs.gif)
 

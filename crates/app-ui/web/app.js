@@ -1943,7 +1943,7 @@ const CATEGORIES = [
   { id: 'general', icon: 'gearshape.fill', pages: ['general', 'mole', 'about'] },
   { id: 'scroll', icon: 'computermouse.fill', pages: ['scroll', 'cursor', 'wheel'] },
   { id: 'notch', icon: 'laptopcomputer', pages: ['notch', 'islands', 'musicwidget'] },
-  { id: 'tabs', icon: 'square.stack.3d.up.fill', pages: ['calendar', 'dayprogress', 'agents', 'notes', 'launcher', 'weather', 'prs', 'pomodoro', 'screentime', 'system', 'devices', 'displays'] },
+  { id: 'tabs', icon: 'square.stack.3d.up.fill', pages: ['calendar', 'dayprogress', 'agents', 'notes', 'launcher', 'weather', 'prs', 'updates', 'pomodoro', 'screentime', 'system', 'devices', 'displays'] },
   { id: 'clipboard', icon: 'list.clipboard.fill', pages: ['clipboard', 'smart', 'translate', 'typing', 'snippets', 'capture', 'vision', 'download', 'utilities'] },
   { id: 'tiling', icon: 'rectangle.lefthalf.inset.filled', pages: ['tiling', 'pin', 'keys'] },
 ];
