@@ -198,17 +198,41 @@ impl Feature {
     }
 
     pub fn runtime(&self) -> Value {
+        let language = i18n::current();
+        let list: Vec<Value> = self
+            .found
+            .borrow()
+            .as_ref()
+            .map(|f| {
+                f.updates
+                    .iter()
+                    .map(|u| {
+                        json!({ "key": u.key(), "name": u.name, "source": language.updates_source(u.source),
+                            "current": u.current, "latest": u.latest })
+                    })
+                    .collect()
+            })
+            .unwrap_or_default();
         json!({
-            "count": self.found.borrow().as_ref().map_or(0, |f| f.updates.len()),
+            "count": list.len(),
+            "list": list,
             "busy": self.work.get() != Work::Idle,
         })
     }
 
+    /// `updates_check`, `updates_all`, or `updates_run:` and the keys of the chosen rows, one per line. A key that
+    /// is not one of the rows found is ignored, since the page is not trusted.
     pub fn action(&self, name: &str) -> Option<Result<(), Fault>> {
-        if name != "updates_check" {
-            return None;
+        match name.split_once(':').map_or((name, ""), |(v, a)| (v, a)) {
+            ("updates_check", _) => self.look(),
+            ("updates_all", _) => self.update(true),
+            ("updates_run", keys) => {
+                *self.chosen.borrow_mut() = keys.lines().map(str::to_owned).collect();
+                self.update(false);
+            }
+            _ => return None,
         }
-        self.look();
+        self.render();
         Some(Ok(()))
     }
 

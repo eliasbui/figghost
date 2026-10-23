@@ -2,5 +2,11 @@
   "enabled": true,
   "daily": false,
   "count": 4,
-  "busy": false
+  "busy": false,
+  "list": [
+    { "key": "Cask:figghost", "name": "figghost", "source": "Homebrew cask", "current": "2.0.9", "latest": "2.0.10" },
+    { "key": "Npm:pnpm", "name": "pnpm", "source": "npm", "current": "12.9.1", "latest": "12.15.0" },
+    { "key": "Agent:droid", "name": "Droid", "source": "Coding agent", "current": "0.245.0", "latest": "0.248.0" },
+    { "key": "Apple:Safari", "name": "Safari", "source": "Apple", "current": "", "latest": "18.5" }
+  ]
 }

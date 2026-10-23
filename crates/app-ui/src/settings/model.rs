@@ -1080,6 +1080,11 @@ mod tests {
         // The places a search found only exist while the settings page is looking at one.
         e.runtime
             .insert("weather", json!({ "found": [{ "label": "Hue, Vietnam" }] }));
+        // What can be updated is only known once the Updates tab has looked.
+        e.runtime.insert(
+            "updates",
+            json!({ "list": [{ "key": "Npm:pnpm", "name": "pnpm", "source": "npm", "current": "1", "latest": "2" }] }),
+        );
         // The list of downloads is only there while something was downloaded in this run.
         e.runtime.insert(
             "download",

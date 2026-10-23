@@ -1,0 +1,15 @@
+/* Updates: the list of what can be updated, for web/features/updates.js. */
+.upd-toolbar { display: flex; align-items: center; gap: 8px; padding: 8px var(--row-inset); }
+.upd-all { display: flex; align-items: center; gap: 8px; flex: 1; color: var(--text-2); font-size: var(--fs-small); }
+.upd-list { max-height: 420px; overflow-y: auto; border-top: 0.5px solid var(--stroke); }
+.upd-item { display: flex; align-items: center; gap: 10px; padding: 7px var(--row-inset); }
+.upd-item + .upd-item { border-top: 0.5px solid var(--stroke); }
+.upd-item:has(input:checked) { background: color-mix(in srgb, var(--accent) 10%, transparent); }
+.upd-item input, .upd-all input { flex: none; width: 15px; height: 15px; margin: 0; accent-color: var(--accent); }
+.upd-text { display: flex; flex-direction: column; flex: 1; min-width: 0; }
+.upd-name, .upd-source { overflow: hidden; text-overflow: ellipsis; white-space: nowrap; }
+.upd-source { color: var(--text-2); font-size: var(--fs-small); }
+.upd-versions { display: flex; gap: 6px; flex: none; font-variant-numeric: tabular-nums; font-size: var(--fs-small); }
+.upd-old { color: var(--bad); }
+.upd-arrow { color: var(--text-3); }
+.upd-new { color: var(--good); font-weight: 600; }

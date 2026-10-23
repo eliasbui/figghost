@@ -64,6 +64,7 @@ const FEATURE_STYLES: &[&str] = &[
     include_str!("../../web/features/weather.css"),
     include_str!("../../web/features/launcher.css"),
     include_str!("../../web/features/prs.css"),
+    include_str!("../../web/features/updates.css"),
     include_str!("../../web/features/snippets.css"),
     include_str!("../../web/features/download.css"),
 ];

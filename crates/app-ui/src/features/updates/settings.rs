@@ -11,6 +11,7 @@ pub fn state(config: &Config, runtime: &Value) -> Value {
         "daily": config.daily,
         "count": runtime.get("count").and_then(Value::as_u64).unwrap_or(0),
         "busy": runtime.get("busy").and_then(Value::as_bool).unwrap_or(false),
+        "list": runtime.get("list").filter(|l| l.is_array()).cloned().unwrap_or_else(|| json!([])),
     })
 }
 
