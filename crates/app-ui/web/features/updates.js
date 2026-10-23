@@ -2,7 +2,7 @@
 // and the coding agents, ticked and updated from the notch.
 (window.__plugins = window.__plugins || []).push({
   id: 'updates',
-  icon: 'arrow.down.circle',
+  icon: 'shippingbox.fill',
   en: {
     'nav.updates': 'Updates', 'page.updates': 'Updates',
     'page.updates.sub': 'See what has a newer version on this Mac and update it from the notch.',
@@ -33,7 +33,7 @@
     const chosen = new Set();
     const all = h('input', { type: 'checkbox', 'aria-label': t('updates.pick.all') });
     const run = button('', () => send({ t: 'action', name: 'updates_run:' + [...chosen].join('\n') }), { small: true, primary: true });
-    const every = button(t('updates.all'), () => send({ t: 'action', name: 'updates_all' }), { small: true, icon: 'arrow.down.circle' });
+    const every = button(t('updates.all'), () => send({ t: 'action', name: 'updates_all' }), { small: true, icon: 'arrow.down.app.fill' });
     const box = h('div', { class: 'upd-list' });
     const items = () => S.updates.list || [];
     const paint = () => {

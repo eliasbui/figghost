@@ -2,7 +2,7 @@
 // for them.
 (window.__plugins = window.__plugins || []).push({
   id: 'displays',
-  icon: 'display',
+  icon: 'sun.max.fill',
   en: {
     'nav.displays': 'Displays', 'page.displays': 'Displays',
     'page.displays.sub': 'Set the brightness and contrast of an external display from a tab of the notch, as its own buttons would.',

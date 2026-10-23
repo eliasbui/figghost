@@ -152,16 +152,37 @@ h1 {
   background: var(--control-hover);
 }
 .perm-icon {
-  width: 32px;
-  height: 32px;
-  border-radius: 8px;
-  background: var(--control);
+  width: 34px;
+  height: 34px;
+  border-radius: 9px;
+  background: linear-gradient(145deg, #0a84ff, #0060df);
+  color: #ffffff;
   display: flex;
   align-items: center;
   justify-content: center;
-  font-size: 16px;
   flex: none;
+  box-shadow:
+    inset 0 1px 0.5px rgba(255, 255, 255, 0.65),
+    inset 0 0 0 0.5px rgba(255, 255, 255, 0.28),
+    inset 0 -2px 4px rgba(0, 0, 0, 0.2),
+    0 2px 6px -1px rgba(0, 0, 0, 0.22);
 }
+.perm-icon .glyph {
+  width: 17px;
+  height: 17px;
+  background-color: #ffffff;
+  -webkit-mask: var(--glyph) center / contain no-repeat;
+  mask: var(--glyph) center / contain no-repeat;
+  filter: drop-shadow(0 1px 1.5px rgba(0, 0, 0, 0.22));
+}
+.perm-icon[data-id="accessibility"] { background: radial-gradient(120% 100% at 20% 0%, rgba(255,255,255,0.32) 0%, transparent 55%), linear-gradient(145deg, #0a84ff, #0055cc); }
+.perm-icon[data-id="screen_recording"] { background: radial-gradient(120% 100% at 20% 0%, rgba(255,255,255,0.32) 0%, transparent 55%), linear-gradient(145deg, #5e5ce6, #3d3ab8); }
+.perm-icon[data-id="microphone"] { background: radial-gradient(120% 100% at 20% 0%, rgba(255,255,255,0.32) 0%, transparent 55%), linear-gradient(145deg, #ff9f0a, #d97706); }
+.perm-icon[data-id="camera"] { background: radial-gradient(120% 100% at 20% 0%, rgba(255,255,255,0.32) 0%, transparent 55%), linear-gradient(145deg, #30d158, #16a34a); }
+.perm-icon[data-id="calendar"] { background: radial-gradient(120% 100% at 20% 0%, rgba(255,255,255,0.32) 0%, transparent 55%), linear-gradient(145deg, #ff453a, #c81e1e); }
+.perm-icon[data-id="reminders"] { background: radial-gradient(120% 100% at 20% 0%, rgba(255,255,255,0.32) 0%, transparent 55%), linear-gradient(145deg, #32ade6, #0284c7); }
+.perm-icon[data-id="bluetooth"] { background: radial-gradient(120% 100% at 20% 0%, rgba(255,255,255,0.32) 0%, transparent 55%), linear-gradient(145deg, #2563eb, #1d4ed8); }
+.perm-icon[data-id="automation"] { background: radial-gradient(120% 100% at 20% 0%, rgba(255,255,255,0.32) 0%, transparent 55%), linear-gradient(145deg, #a855f7, #7e22ce); }
 .perm-info {
   flex: 1;
   min-width: 0;
@@ -270,16 +291,7 @@ footer {
 </footer>
 
 <script>
-const ICONS = {
-  accessibility: '♿️',
-  screen_recording: '🖥️',
-  microphone: '🎙️',
-  camera: '📷',
-  calendar: '📅',
-  reminders: '✅',
-  bluetooth: '🎧',
-  automation: '⚡️'
-};
+const SYMBOLS = /*__SYMBOLS__*/;
 
 const STR = {
   en: {
@@ -356,7 +368,12 @@ function render(data) {
 
     const iconDiv = document.createElement('div');
     iconDiv.className = 'perm-icon';
-    iconDiv.textContent = ICONS[item.id] || '⚙️';
+    iconDiv.dataset.id = item.id;
+    const glyph = document.createElement('span');
+    glyph.className = 'glyph';
+    const src = SYMBOLS && SYMBOLS[item.id];
+    if (src) glyph.style.setProperty('--glyph', `url("${src}")`);
+    iconDiv.appendChild(glyph);
 
     const infoDiv = document.createElement('div');
     infoDiv.className = 'perm-info';

@@ -1,7 +1,7 @@
 // Translate: select text anywhere, press the shortcut, and a glass window translates it.
 (window.__plugins = window.__plugins || []).push({
   id: 'translate',
-  icon: 'character.bubble',
+  icon: 'character.bubble.fill',
   en: {
     'nav.translate': 'Translate', 'page.translate': 'Translate',
     'page.translate.sub': 'Select text anywhere and press the shortcut: a glass window next to the pointer translates it into the language you choose.',

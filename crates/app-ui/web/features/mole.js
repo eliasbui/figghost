@@ -624,7 +624,7 @@
 
   (window.__plugins = window.__plugins || []).push({
     id: 'mole',
-    icon: 'sparkles',
+    icon: 'wand.and.stars',
     en,
     vi,
     build() {

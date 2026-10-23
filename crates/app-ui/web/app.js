@@ -25,7 +25,17 @@ function h(tag, attrs, ...kids) {
 
 // Glyphs are SF Symbols drawn by the system (window.__symbols, see settings/page.rs), used as a mask so they
 // take the text colour.
-const SYMBOL_ALIASES = { close: 'xmark', refresh: 'arrow.clockwise' };
+const SYMBOL_ALIASES = {
+  close: 'xmark',
+  refresh: 'arrow.clockwise',
+  folder: 'folder.fill',
+  trash: 'trash.fill',
+  keyboard: 'keyboard.fill',
+  pin: 'pin.fill',
+  cpu: 'cpu.fill',
+  'checkmark.shield': 'checkmark.shield.fill',
+  'character.bubble': 'character.bubble.fill',
+};
 const missingSymbols = new Set();
 function icon(name, cls) {
   const src = (window.__symbols || {})[SYMBOL_ALIASES[name] || name];
@@ -845,7 +855,7 @@ function metricsStrip() {
     tile('sparkles', 'metric.features', ratio(features)),
     tile('rectangle.topthird.inset.filled', 'metric.tabs', ratio(tabs)),
     tile('doc.on.clipboard.fill', 'metric.clips', (value) => { value.textContent = String((S.clipboard && S.clipboard.count) || 0); }),
-    tile('checkmark.shield', 'metric.access', (value, el) => {
+    tile('checkmark.shield.fill', 'metric.access', (value, el) => {
       value.classList.add('word');
       value.textContent = S.env.accessibility ? t('access.granted') : t('access.missing');
       el.classList.toggle('warn', !S.env.accessibility);
@@ -1978,18 +1988,18 @@ function pageAbout() {
 
 const CATEGORIES = [
   { id: 'general', sec: 'overview', icon: 'gearshape.fill', pages: ['general', 'about'] },
-  { id: 'mole', sec: 'overview', icon: 'sparkles', pages: ['mole'] },
-  { id: 'keys', sec: 'overview', icon: 'keyboard', pages: ['keys'] },
-  { id: 'notch', sec: 'notch', icon: 'laptopcomputer', pages: ['notch', 'islands', 'musicwidget'] },
+  { id: 'mole', sec: 'overview', icon: 'wand.and.stars', pages: ['mole'] },
+  { id: 'keys', sec: 'overview', icon: 'keyboard.fill', pages: ['keys'] },
+  { id: 'notch', sec: 'notch', icon: 'rectangle.topthird.inset.filled', pages: ['notch', 'islands', 'musicwidget'] },
   { id: 'agents', sec: 'notch', icon: 'terminal.fill', pages: ['agents', 'prs'] },
-  { id: 'calendar', sec: 'notch', icon: 'calendar', pages: ['calendar', 'pomodoro', 'dayprogress', 'screentime'] },
+  { id: 'calendar', sec: 'notch', icon: 'calendar.badge.clock', pages: ['calendar', 'pomodoro', 'dayprogress', 'screentime'] },
   { id: 'tabs', sec: 'notch', icon: 'square.stack.3d.up.fill', pages: ['notes', 'launcher', 'weather', 'video'] },
-  { id: 'system', sec: 'notch', icon: 'cpu', pages: ['system', 'updates', 'devices', 'displays'] },
+  { id: 'system', sec: 'notch', icon: 'cpu.fill', pages: ['system', 'updates', 'devices', 'displays'] },
   { id: 'scroll', sec: 'mouse', icon: 'computermouse.fill', pages: ['scroll', 'cursor', 'wheel'] },
-  { id: 'tiling', sec: 'mouse', icon: 'rectangle.lefthalf.inset.filled', pages: ['tiling', 'pin'] },
-  { id: 'clipboard', sec: 'tools', icon: 'list.clipboard.fill', pages: ['clipboard', 'typing', 'snippets'] },
+  { id: 'tiling', sec: 'mouse', icon: 'rectangle.split.2x1.fill', pages: ['tiling', 'pin'] },
+  { id: 'clipboard', sec: 'tools', icon: 'doc.on.clipboard.fill', pages: ['clipboard', 'typing', 'snippets'] },
   { id: 'smart', sec: 'tools', icon: 'sparkles', pages: ['smart', 'translate', 'utilities'] },
-  { id: 'capture', sec: 'tools', icon: 'camera.viewfinder', pages: ['capture', 'vision', 'download'] },
+  { id: 'capture', sec: 'tools', icon: 'camera.fill', pages: ['capture', 'vision', 'download'] },
 ];
 
 function categoryOf(pageId) {
@@ -1998,7 +2008,7 @@ function categoryOf(pageId) {
 
 const PAGES = [
   { id: 'general', icon: 'gearshape.fill', build: pageGeneral },
-  { id: 'keys', icon: 'keyboard', build: pageKeys },
+  { id: 'keys', icon: 'keyboard.fill', build: pageKeys },
   { id: 'scroll', icon: 'computermouse.fill', build: pageScroll },
   { id: 'clipboard', icon: 'doc.on.clipboard.fill', build: pageClipboard },
   { id: 'notch', icon: 'rectangle.topthird.inset.filled', build: pageNotch },
@@ -2100,7 +2110,7 @@ function applySearch(query) {
       onmousedown: (e) => e.preventDefault(),
       onclick: () => openResult(pid),
     },
-    h('span', { class: 'nav-icon' }, icon(cat.icon)),
+    h('span', { class: 'nav-icon' }, icon((PAGES.find((p) => p.id === pid) || cat).icon)),
     h('span', { class: 'result-text' },
       h('span', { class: 'result-name', text: t('nav.' + pid) }),
       h('span', { class: 'result-cat', text: t('cat.' + cat.id) })),
@@ -2276,12 +2286,13 @@ function renderSubtabs(cat, activeId) {
   container.hidden = false;
   const pills = cat.pages.map((pid) => {
     const isCur = pid === activeId;
+    const page = PAGES.find((p) => p.id === pid);
     return h('button', {
       class: 'subtab' + (isCur ? ' active' : ''),
       'aria-pressed': String(isCur),
       'aria-label': t('nav.' + pid),
       onclick: () => { go.rise = true; go(pid); },
-    }, t('nav.' + pid));
+    }, page && page.icon ? icon(page.icon) : null, t('nav.' + pid));
   });
   const bar = h('div', { class: 'subtabs-bar' }, ...pills);
   // A mouse wheel turns sideways here when the bar is longer than the window.

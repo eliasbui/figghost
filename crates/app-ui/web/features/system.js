@@ -1,7 +1,7 @@
 // System: a tab of the notch with the processor, the memory, the network, the disk, the heat and the fans.
 (window.__plugins = window.__plugins || []).push({
   id: 'system',
-  icon: 'cpu',
+  icon: 'cpu.fill',
   en: {
     'nav.system': 'System', 'page.system': 'System',
     'page.system.sub': 'See the processor, memory, network and disk at work in a tab of the notch.',

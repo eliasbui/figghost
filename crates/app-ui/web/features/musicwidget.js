@@ -1,7 +1,7 @@
 // Music widget: a player in Liquid Glass that floats on the desktop, in a few styles, anywhere on the screen.
 (window.__plugins = window.__plugins || []).push({
   id: 'musicwidget',
-  icon: 'music.note',
+  icon: 'music.quarternote.3',
   en: {
     'nav.musicwidget': 'Music widget', 'page.musicwidget': 'Music widget',
     'page.musicwidget.sub': 'A player of Liquid Glass that floats on your desktop with the cover, the song and the controls of whatever plays. Drag it where you like and pull its corner to resize it.',

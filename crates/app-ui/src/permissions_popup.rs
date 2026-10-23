@@ -3,12 +3,11 @@
 
 use crate::i18n;
 use macos_sys::{
-    MainThreadMarker, app,
-    permissions,
+    MainThreadMarker, app, permissions,
     webview::{WebWindow, WindowSpec},
-    widgets::{base64, image_png},
+    widgets::{base64, image_png, symbol_png},
 };
-use serde_json::{Value, json};
+use serde_json::{Map, Value, json};
 use std::{
     cell::RefCell,
     rc::{Rc, Weak},
@@ -18,6 +17,18 @@ const PAGE: &str = include_str!("../web/permissions.html");
 const APP_ICON: &[u8] = include_bytes!("../assets/Figghost.icns");
 const ICON_POINTS: f64 = 48.0;
 const ICON_SCALE: f64 = 2.0;
+const SYMBOL_POINTS: f64 = 18.0;
+
+const PERMISSION_SYMBOLS: &[(&str, &str)] = &[
+    ("accessibility", "hand.raised.fill"),
+    ("screen_recording", "record.circle.fill"),
+    ("microphone", "mic.fill"),
+    ("camera", "video.fill"),
+    ("calendar", "calendar"),
+    ("reminders", "checklist"),
+    ("bluetooth", "airpodspro"),
+    ("automation", "bolt.fill"),
+];
 
 const WIDTH: f64 = 480.0;
 const HEIGHT: f64 = 620.0;
@@ -29,7 +40,18 @@ fn html() -> String {
     let icon = image_png(APP_ICON, ICON_POINTS, ICON_SCALE).map_or_else(String::new, |png| {
         format!("data:image/png;base64,{}", base64(&png))
     });
+    let symbols: Map<String, Value> = PERMISSION_SYMBOLS
+        .iter()
+        .filter_map(|&(id, name)| {
+            let png = symbol_png(name, SYMBOL_POINTS, ICON_SCALE)?;
+            Some((
+                id.into(),
+                Value::String(format!("data:image/png;base64,{}", base64(&png))),
+            ))
+        })
+        .collect();
     PAGE.replace("/*__ICON__*/", &icon)
+        .replace("/*__SYMBOLS__*/", &Value::Object(symbols).to_string())
 }
 
 pub struct PermissionsPopup {
@@ -264,10 +286,16 @@ mod tests {
     #[test]
     fn the_permissions_page_is_self_contained() {
         let content = html();
-        assert!(!content.contains("/*__ICON__*/"));
+        assert!(!content.contains("/*__ICON__*/") && !content.contains("/*__SYMBOLS__*/"));
         assert!(content.contains("Content-Security-Policy"));
         for forbidden in ["src=\"http", "href=\"http", "url(http", "@import", "<link "] {
             assert!(!content.contains(forbidden), "found {forbidden}");
+        }
+        for &(_, name) in PERMISSION_SYMBOLS {
+            assert!(
+                symbol_png(name, SYMBOL_POINTS, ICON_SCALE).is_some(),
+                "{name} is not an SF Symbol on this system"
+            );
         }
     }
 }

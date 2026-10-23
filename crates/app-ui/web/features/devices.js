@@ -1,7 +1,7 @@
 // Devices: a tab of the notch with the charge of the Bluetooth devices that are connected.
 (window.__plugins = window.__plugins || []).push({
   id: 'devices',
-  icon: 'headphones',
+  icon: 'airpodspro',
   en: {
     'nav.devices': 'Devices', 'page.devices': 'Devices',
     'page.devices.sub': 'See the charge of your Bluetooth mouse, keyboard and headphones in a tab of the notch.',

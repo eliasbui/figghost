@@ -110,7 +110,7 @@ impl Feature {
     pub fn menu_entries(_this: &Rc<Self>) -> Vec<Entry> {
         let title = crate::i18n::current().mole_menu();
         vec![Entry::Item(
-            Item::new(title, || crate::settings::show_page("mole")).symbol("sparkles"),
+            Item::new(title, || crate::settings::show_page("mole")).symbol("wand.and.stars"),
         )]
     }
 

@@ -1,7 +1,7 @@
 // Live islands: small notices that come out of the closed notch when something happens on the Mac.
 (window.__plugins = window.__plugins || []).push({
   id: 'islands',
-  icon: 'sparkles',
+  icon: 'bell.badge.fill',
   en: {
     'nav.islands': 'Live islands', 'page.islands': 'Live islands',
     'page.islands.sub': 'Small notices that come out of the closed notch for a moment: Caps Lock, the charger, a full or low battery, a drive, a finished download, a camera or microphone in use.',

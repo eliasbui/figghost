@@ -1,7 +1,7 @@
 // Always on top: a shortcut keeps the window in front above the others, with a red border round it.
 (window.__plugins = window.__plugins || []).push({
   id: 'pin',
-  icon: 'pin',
+  icon: 'pin.fill',
   en: {
     'nav.pin': 'Always on top', 'page.pin': 'Always on top',
     'page.pin.sub': 'Press the shortcut and the window in front stays above all the others, with a red border round it. Press it again to let go.',

@@ -1,7 +1,7 @@
 // Utilities: keep the Mac awake, mute the microphone for every app, lock the keyboard to clean it, snooze the notch.
 (window.__plugins = window.__plugins || []).push({
   id: 'utilities',
-  icon: 'sparkles',
+  icon: 'slider.horizontal.3',
   en: {
     'nav.utilities': 'Utilities', 'page.utilities': 'Utilities',
     'page.utilities.sub': 'Keep the Mac awake, mute the microphone for every app at once, lock the keyboard while you wipe it, and snooze the notch.',
