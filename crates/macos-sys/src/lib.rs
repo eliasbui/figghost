@@ -38,6 +38,7 @@ pub mod media_ui;
 pub mod menubar;
 pub mod mixer_ui;
 pub mod modifiers;
+pub mod mux;
 pub mod notch;
 pub mod notes_ui;
 pub mod now_playing;

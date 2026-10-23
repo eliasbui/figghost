@@ -39,6 +39,7 @@ const FEATURE_SCRIPTS: &[&str] = &[
     include_str!("../../web/features/system.js"),
     include_str!("../../web/features/typing.js"),
     include_str!("../../web/features/snippets.js"),
+    include_str!("../../web/features/download.js"),
 ];
 const FEATURE_STYLES: &[&str] = &[
     include_str!("../../web/features/smart.css"),
@@ -62,6 +63,7 @@ const FEATURE_STYLES: &[&str] = &[
     include_str!("../../web/features/launcher.css"),
     include_str!("../../web/features/prs.css"),
     include_str!("../../web/features/snippets.css"),
+    include_str!("../../web/features/download.css"),
 ];
 const FEATURE_FIXTURES: &[(&str, &str)] = &[
     (
@@ -168,6 +170,10 @@ const FEATURE_FIXTURES: &[(&str, &str)] = &[
         "snippets",
         include_str!("../../web/features/snippets.fixture.json"),
     ),
+    (
+        "download",
+        include_str!("../../web/features/download.fixture.json"),
+    ),
 ];
 
 /// The SF Symbols the page draws (app.js `icon()`): page icons and button glyphs. The page's self-test fails
@@ -220,6 +226,7 @@ const SYMBOLS: &[&str] = &[
     "arrow.triangle.pull",
     "text.cursor",
     "pencil",
+    "arrow.down.circle.fill",
 ];
 /// Symbols are drawn this many points on their longer side, for Retina screens; CSS fits them to their box.
 const SYMBOL_POINTS: f64 = 16.0;
