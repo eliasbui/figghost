@@ -64,7 +64,11 @@ fn parse_feed(feed: &str) -> Option<Release> {
     if !is_version(version) {
         return None;
     }
-    let content = entry.split("<content type=\"html\">").nth(1)?.split("</content>").next()?;
+    let content = entry
+        .split("<content type=\"html\">")
+        .nth(1)?
+        .split("</content>")
+        .next()?;
     let html = content
         .replace("&lt;", "<")
         .replace("&gt;", ">")
@@ -390,11 +394,23 @@ mod tests {
   <entry><link href="https://github.com/eliasbui/figghost/releases/tag/v2.1.2"/></entry></feed>"#;
         let release = parse_feed(feed).unwrap();
         assert_eq!(release.version, "2.1.3");
-        assert_eq!(release.url, "https://github.com/eliasbui/figghost/releases/tag/v2.1.3");
-        assert!(release.asset.is_none(), "the feed has no assets, so it is downloaded by hand");
-        assert_eq!(release.changes, ["Updates: a list & boxes", "Mole: its own item"]);
+        assert_eq!(
+            release.url,
+            "https://github.com/eliasbui/figghost/releases/tag/v2.1.3"
+        );
+        assert!(
+            release.asset.is_none(),
+            "the feed has no assets, so it is downloaded by hand"
+        );
+        assert_eq!(
+            release.changes,
+            ["Updates: a list & boxes", "Mole: its own item"]
+        );
         assert!(parse_feed("<feed></feed>").is_none());
-        assert!(parse_feed(r#"<entry><link href="https://example.com/releases/tag/v9.9.9"/>"#).is_none());
+        assert!(
+            parse_feed(r#"<entry><link href="https://example.com/releases/tag/v9.9.9"/>"#)
+                .is_none()
+        );
     }
 
     #[test]
