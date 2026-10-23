@@ -7,6 +7,9 @@ use core_smart::net::{self, NetError};
 use serde_json::Value;
 
 const LATEST: &str = "https://api.github.com/repos/eliasbui/figghost/releases/latest";
+/// The same releases as a feed, which is not counted against the API's sixty calls an hour for a Mac that is not
+/// signed in; it has no assets, so a release read from it is downloaded by hand.
+const FEED: &str = "https://github.com/eliasbui/figghost/releases.atom";
 /// Every address taken from the answer, for a person or for curl, has to be under this one.
 const RELEASES: &str = "https://github.com/eliasbui/figghost/releases/";
 /// Long enough for a slow connection, short enough that the row never looks stuck.
@@ -35,15 +38,64 @@ pub struct Asset {
     pub sha256: Option<String>,
 }
 
-/// The latest published release.
+/// The latest published release, from the API, or from the feed when the API says no (most often its limit).
 pub fn latest() -> Result<Release, String> {
-    let body = net::get(LATEST, &[], SECONDS).map_err(|e| match e {
+    let api = net::get(LATEST, &[], SECONDS).map_err(|e| match e {
         NetError::NoCurl => "curl is missing".to_owned(),
         NetError::Unreachable => "GitHub could not be reached".to_owned(),
         NetError::Status => "GitHub has no release to show".to_owned(),
         other => format!("{other:?}"),
-    })?;
-    parse(&body)
+    });
+    match api.and_then(|body| parse(&body)) {
+        Ok(release) => Ok(release),
+        Err(e) => net::get(FEED, &[], SECONDS)
+            .ok()
+            .and_then(|feed| parse_feed(&feed))
+            .ok_or(e),
+    }
+}
+
+/// The newest entry of the releases feed: its version from the link to its tag, and its notes, whose list items
+/// are turned back into the `- ` lines `changes` reads.
+fn parse_feed(feed: &str) -> Option<Release> {
+    let entry = feed.split("<entry>").nth(1)?;
+    let href = entry.split("href=\"").nth(1)?.split('"').next()?;
+    let version = href.strip_prefix(RELEASES)?.strip_prefix("tag/v")?;
+    if !is_version(version) {
+        return None;
+    }
+    let content = entry.split("<content type=\"html\">").nth(1)?.split("</content>").next()?;
+    let html = content
+        .replace("&lt;", "<")
+        .replace("&gt;", ">")
+        .replace("&quot;", "\"")
+        .replace("&#39;", "'")
+        // The feed escapes the HTML, which escapes the text: this undoes the first, the end the second.
+        .replace("&amp;", "&");
+    let mut notes = String::new();
+    let mut rest = html.as_str();
+    // Text outside tags, with each list item and paragraph on a line of its own.
+    while let Some(open) = rest.find('<') {
+        notes.push_str(&rest[..open]);
+        let Some(close) = rest[open..].find('>') else {
+            break;
+        };
+        let tag = &rest[open + 1..open + close];
+        if tag == "li" {
+            notes.push_str("\n- ");
+        } else if matches!(tag, "/li" | "p" | "/p" | "br") {
+            notes.push('\n');
+        }
+        rest = &rest[open + close + 1..];
+    }
+    notes.push_str(rest);
+    let notes = notes.replace("&amp;", "&");
+    Some(Release {
+        version: version.to_owned(),
+        url: href.to_owned(),
+        asset: None,
+        changes: changes(&notes),
+    })
 }
 
 /// A version is dotted numbers and nothing else, since it ends up in file names and is compared with the app's.
@@ -324,6 +376,28 @@ mod tests {
 
     /// The real call. Run it by hand: `cargo test -p app-ui -- --ignored --nocapture github_answers`.
     #[test]
+    fn the_feed_gives_the_newest_version_and_its_changes() {
+        let feed = r#"<feed><entry><id>x</id>
+    <link rel="alternate" type="text/html" href="https://github.com/eliasbui/figghost/releases/tag/v2.1.3"/>
+    <title>Figghost 2.1.3</title>
+    <content type="html">&lt;p&gt;Figghost 2.1.3.&lt;/p&gt;
+&lt;p&gt;Changes:&lt;/p&gt;
+&lt;ul&gt;
+&lt;li&gt;Updates: a list &amp;amp; boxes&lt;/li&gt;
+&lt;li&gt;Mole: its own item&lt;/li&gt;
+&lt;/ul&gt;
+&lt;p&gt;The app is signed ad hoc.&lt;/p&gt;</content></entry>
+  <entry><link href="https://github.com/eliasbui/figghost/releases/tag/v2.1.2"/></entry></feed>"#;
+        let release = parse_feed(feed).unwrap();
+        assert_eq!(release.version, "2.1.3");
+        assert_eq!(release.url, "https://github.com/eliasbui/figghost/releases/tag/v2.1.3");
+        assert!(release.asset.is_none(), "the feed has no assets, so it is downloaded by hand");
+        assert_eq!(release.changes, ["Updates: a list & boxes", "Mole: its own item"]);
+        assert!(parse_feed("<feed></feed>").is_none());
+        assert!(parse_feed(r#"<entry><link href="https://example.com/releases/tag/v9.9.9"/>"#).is_none());
+    }
+
+    #[test]
     #[ignore = "asks GitHub over the network"]
     fn github_answers_with_a_release() {
         let release = latest().expect("GitHub answered");
@@ -344,7 +418,11 @@ mod tests {
             "{} is not a three number version",
             release.version
         );
-        let asset = release.asset.expect("the release carries the app");
+        // Read from the feed while the API's limit is reached, the release has no assets.
+        let Some(asset) = release.asset else {
+            println!("read from the feed, which has no assets");
+            return;
+        };
         println!("zip: {} bytes, sha256 {:?}", asset.size, asset.sha256);
         assert!(asset.size > 1_000_000, "{} bytes is not an app", asset.size);
     }
