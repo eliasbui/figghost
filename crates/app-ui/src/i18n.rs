@@ -251,11 +251,50 @@ impl Language {
         }
     }
 
-    /// The button that sends the choices ticked on a question that takes several.
-    pub fn agents_done(self) -> &'static str {
+    /// The button that goes back to the question before.
+    pub fn agents_back(self) -> &'static str {
         match self {
-            Language::English => "Done",
-            Language::Vietnamese => "Xong",
+            Language::English => "Back",
+            Language::Vietnamese => "Trước",
+        }
+    }
+
+    /// The button that goes on to the next question.
+    pub fn agents_next(self) -> &'static str {
+        match self {
+            Language::English => "Next",
+            Language::Vietnamese => "Sau",
+        }
+    }
+
+    /// The button that sends the answers, on the last question.
+    pub fn agents_submit(self) -> &'static str {
+        match self {
+            Language::English => "Submit",
+            Language::Vietnamese => "Gửi",
+        }
+    }
+
+    pub fn agents_cancel(self) -> &'static str {
+        match self {
+            Language::English => "Cancel",
+            Language::Vietnamese => "Hủy",
+        }
+    }
+
+    /// The placeholder of the field for an answer that is not one of the choices.
+    pub fn agents_other(self) -> &'static str {
+        match self {
+            Language::English => "Type your own answer",
+            Language::Vietnamese => "Nhập câu trả lời khác",
+        }
+    }
+
+    /// What the agent is told when the user cancels its question from the notch.
+    pub fn agents_cancelled_message(self) -> &'static str {
+        match self {
+            Language::English => "The user cancelled this question from the notch.",
+            Language::Vietnamese => "Người dùng đã hủy câu hỏi này từ notch.",
         }
     }
 
@@ -813,7 +852,12 @@ mod tests {
                 language.agents_allow().to_owned(),
                 language.agents_deny().to_owned(),
                 language.agents_terminal().to_owned(),
-                language.agents_done().to_owned(),
+                language.agents_back().to_owned(),
+                language.agents_next().to_owned(),
+                language.agents_submit().to_owned(),
+                language.agents_cancel().to_owned(),
+                language.agents_other().to_owned(),
+                language.agents_cancelled_message().to_owned(),
                 language.agents_denied_message().to_owned(),
                 language.agents_more_waiting(2),
                 language.agents_sessions().to_owned(),

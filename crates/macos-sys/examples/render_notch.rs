@@ -10,8 +10,8 @@
 use macos_sys::{
     MainThreadMarker, NSPoint, NSRect, NSSize,
     agents_ui::{
-        AgentsCallbacks, AgentsDisplay, AgentsView, ApprovalCardData, ChoiceData, SessionData,
-        TokensData, UsageData,
+        AgentsCallbacks, AgentsDisplay, AgentsView, ApprovalCardData, ChoiceData, QuestionData,
+        SessionData, TokensData, UsageData,
     },
     button::TouchButton,
     panel::FigPanel,
@@ -25,7 +25,7 @@ use macos_sys::{
     ui::{AppCallbacks, Row},
 };
 use objc2::{msg_send, rc::Retained};
-use objc2_app_kit::{NSEvent, NSEventModifierFlags, NSEventType, NSView};
+use objc2_app_kit::{NSEvent, NSEventModifierFlags, NSEventType, NSTextField, NSView};
 use objc2_foundation::NSString;
 use std::{cell::RefCell, env, fs, path::PathBuf, process, rc::Rc, time::Instant};
 
@@ -40,6 +40,19 @@ fn find_button(view: &NSView, name: &str) -> Option<Retained<TouchButton>> {
             }
         }
         if let Some(found) = find_button(&sub, name) {
+            return Some(found);
+        }
+    }
+    None
+}
+
+/// The first text field under `view`.
+fn find_field(view: &NSView) -> Option<Retained<NSTextField>> {
+    for sub in view.subviews().iter() {
+        if let Ok(field) = sub.clone().downcast::<NSTextField>() {
+            return Some(field);
+        }
+        if let Some(found) = find_field(&sub) {
             return Some(found);
         }
     }
@@ -229,19 +242,23 @@ fn main() {
             AgentsCallbacks {
                 on_decide: Box::new(|_, _| {}),
                 on_pick: Box::new(|_, _| {}),
+                on_step: Box::new(|_, _, _| {}),
                 on_refresh: Box::new(|| {}),
                 on_session: Box::new(|_| {}),
             },
         );
         // The same page in a panel outside every screen, where clicks are delivered by its window.
         let pressed: Rc<RefCell<Vec<String>>> = Rc::default();
-        let (picks, chosen) = (Rc::clone(&pressed), Rc::clone(&pressed));
+        let (picks, steps, chosen) = (Rc::clone(&pressed), Rc::clone(&pressed), Rc::clone(&pressed));
         let clicked = AgentsView::new(
             mtm,
             notch.page_frame(),
             AgentsCallbacks {
                 on_decide: Box::new(|_, _| {}),
                 on_pick: Box::new(move |id, n| picks.borrow_mut().push(format!("pick {id} {n}"))),
+                on_step: Box::new(move |id, step, typed| {
+                    steps.borrow_mut().push(format!("{step:?} {id} {typed}"));
+                }),
                 on_refresh: Box::new(|| {}),
                 on_session: Box::new(move |id| chosen.borrow_mut().push(format!("session {id}"))),
             },
@@ -310,7 +327,7 @@ fn main() {
             allow: "Allow".into(),
             deny: "Deny".into(),
             choices: Vec::new(),
-            confirm: true,
+            question: None,
         };
         let display = |approval: Option<ApprovalCardData>,
                        more: &str,
@@ -370,18 +387,30 @@ fn main() {
             save("agents_approval", 4);
             let question = ApprovalCardData {
                 id: 7,
-                heading: "Claude Code - Database".into(),
+                heading: "Claude Code - Database 2/3".into(),
                 command: "Which database should the shop use?".into(),
                 detail: "shop  -  just now".into(),
-                allow: "Done".into(),
-                deny: "Answer in the terminal".into(),
-                choices: ["Postgres", "SQLite"]
-                    .map(|label| ChoiceData {
-                        label: label.into(),
-                        selected: false,
-                    })
-                    .to_vec(),
-                confirm: false,
+                allow: "Next".into(),
+                deny: "Answer in terminal".into(),
+                choices: [
+                    "Postgres",
+                    "SQLite",
+                    "A managed MySQL cluster with read replicas in two regions and nightly backups (Recommended)",
+                ]
+                .map(|label| ChoiceData {
+                    label: label.into(),
+                    selected: label == "SQLite",
+                })
+                .to_vec(),
+                question: Some(QuestionData {
+                    back: Some("Back".into()),
+                    can_back: true,
+                    cancel: Some("Cancel".into()),
+                    other: Some("Type your own answer".into()),
+                    typed: String::new(),
+                    single: true,
+                    last: false,
+                }),
             };
             view.show(
                 mtm,
@@ -431,7 +460,24 @@ fn main() {
                 find_button(&clicked.root, "Codex figghost").is_none(),
                 "a session that waits for nothing is a plain line"
             );
-            println!("ok: a click across a redraw lands, and a waiting session's row is pressable");
+            clicked.show(
+                mtm,
+                &display(Some(question.clone()), "", sessions.clone(), usage.clone()),
+            );
+            let field = find_field(&clicked.root).expect("a field for an answer of one's own");
+            field.setStringValue(&NSString::from_str("  MariaDB  "));
+            let next = find_button(&clicked.root, "Next").expect("a next button");
+            mouse(&next, NSEventType::LeftMouseDown);
+            mouse(&next, NSEventType::LeftMouseUp);
+            let cancel = find_button(&clicked.root, "Cancel").expect("a cancel button");
+            mouse(&cancel, NSEventType::LeftMouseDown);
+            mouse(&cancel, NSEventType::LeftMouseUp);
+            assert_eq!(
+                pressed.borrow().as_slice(),
+                ["session 1", "Next 7 MariaDB", "Cancel 7 MariaDB"],
+                "next and cancel carry what was typed"
+            );
+            println!("ok: a click across a redraw lands, a waiting session's row is pressable, next sends what was typed");
             view.show(mtm, &display(None, "", sessions.clone(), usage.clone()));
             save("agents_overview", 4);
             let mut busy = display(None, "", sessions.clone(), usage.clone());

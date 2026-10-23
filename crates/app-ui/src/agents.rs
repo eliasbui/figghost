@@ -11,6 +11,7 @@ use crate::{
 use core_agents::{
     Agent, HookEvent, Reply,
     cli::CHAIN_FILE,
+    event::Question,
     install::{self, Report},
     server::{Handler, Server, Ticket},
     socket_path,
@@ -21,8 +22,8 @@ use core_agents::{
 use macos_sys::{
     MainThreadMarker,
     agents_ui::{
-        AgentsCallbacks, AgentsDisplay, AgentsView, ApprovalCardData, ChoiceData, SessionData,
-        TokensData, UsageData,
+        AgentsCallbacks, AgentsDisplay, AgentsView, ApprovalCardData, ChoiceData, QuestionData,
+        SessionData, Step, TokensData, UsageData,
     },
     app,
     notch::{Activity, Ear, Notch},
@@ -132,13 +133,103 @@ struct Peek {
     until_ms: i64,
 }
 
-/// How far the user is through the questions of one request: the answers so far, the same by the place of each
-/// choice in its question, and, for a question that takes several choices, the ones ticked.
+/// Where the user is in the questions of one request: the question on the card, and for each question the choices
+/// ticked, by their place in it, and an answer of one's own typed in.
 #[derive(Debug, Default, Clone, PartialEq, Eq)]
 pub struct Progress {
-    pub answers: Vec<String>,
+    pub at: usize,
     pub picked: Vec<Vec<usize>>,
-    pub ticked: Vec<usize>,
+    pub typed: Vec<String>,
+}
+
+impl Progress {
+    /// The answer to question `n` as the agent reads it: the choices ticked, in the order of the question, then what
+    /// was typed, joined by ", "; empty while there is none.
+    pub fn answer(&self, question: &Question, n: usize) -> String {
+        let mut ticked = self.picked.get(n).cloned().unwrap_or_default();
+        ticked.sort_unstable();
+        ticked
+            .iter()
+            .filter_map(|&c| question.options.get(c).cloned())
+            .chain(self.typed.get(n).filter(|t| !t.is_empty()).cloned())
+            .collect::<Vec<_>>()
+            .join(", ")
+    }
+
+    /// Room for every question, so each has a place for its choices and its typed answer.
+    fn fit(&mut self, questions: usize) {
+        self.picked
+            .resize(questions.max(self.picked.len()), Vec::new());
+        self.typed
+            .resize(questions.max(self.typed.len()), String::new());
+    }
+
+    /// A choice of the question on the card: on a question that takes one it is the answer, in place of anything
+    /// typed, and the card goes on to the next question if there is one; on one that takes several it is ticked or
+    /// unticked. A choice the question does not have changes nothing.
+    pub fn pick(&mut self, choice: usize, questions: &[Question]) {
+        let Some(question) = questions.get(self.at) else {
+            return;
+        };
+        if choice >= question.options.len() {
+            return;
+        }
+        self.fit(questions.len());
+        let at = self.at;
+        if question.multi {
+            let ticked = &mut self.picked[at];
+            match ticked.iter().position(|&n| n == choice) {
+                Some(place) => {
+                    ticked.remove(place);
+                }
+                None => ticked.push(choice),
+            }
+        } else {
+            self.picked[at] = vec![choice];
+            self.typed[at].clear();
+            if at + 1 < questions.len() {
+                self.at += 1;
+            }
+        }
+    }
+
+    /// Back or next from the question on the card, with what is typed for it. Next goes on only from a question
+    /// that has an answer; on the last one it gives the reply with every answer, or goes to the first question
+    /// still without one.
+    pub fn step(&mut self, step: Step, typed: String, questions: &[Question]) -> Option<Reply> {
+        if questions.is_empty() {
+            return None;
+        }
+        self.fit(questions.len());
+        let at = self.at.min(questions.len() - 1);
+        self.typed[at] = typed;
+        let answers: Vec<String> = questions
+            .iter()
+            .enumerate()
+            .map(|(n, question)| self.answer(question, n))
+            .collect();
+        match step {
+            Step::Back => self.at = at.saturating_sub(1),
+            Step::Next if answers[at].is_empty() => {}
+            Step::Next if at + 1 < questions.len() => self.at = at + 1,
+            Step::Next => match answers.iter().position(String::is_empty) {
+                Some(n) => self.at = n,
+                None => {
+                    let indexes = self.picked[..questions.len()]
+                        .iter()
+                        .map(|ticked| {
+                            let mut ticked = ticked.clone();
+                            ticked.sort_unstable();
+                            ticked
+                        })
+                        .collect();
+                    return Some(Reply::Answers { answers, indexes });
+                }
+            },
+            Step::Cancel => {}
+        }
+        None
+    }
 }
 
 /// The card for a command that waits for an answer, or for the question the user is at.
@@ -154,22 +245,32 @@ pub fn approval_card(
         approval.project(),
         ago(language, now, approval.requested_ms)
     );
-    if let Some(question) = approval.questions.get(progress.answers.len()) {
-        let of = match approval.questions.len() {
+    if let Some(question) = approval.questions.get(progress.at) {
+        let total = approval.questions.len();
+        let of = match total {
             1 => String::new(),
-            n => format!(" {}/{n}", progress.answers.len() + 1),
+            n => format!(" {}/{n}", progress.at + 1),
         };
         let heading = if question.header.is_empty() {
             format!("{name}{of}")
         } else {
             format!("{name} - {}{of}", question.header)
         };
+        let last = progress.at + 1 >= total;
+        let picked = progress.picked.get(progress.at);
+        // Only Claude Code reads a typed answer or a refusal; pi takes the choices by their place.
+        let claude = approval.agent == Agent::Claude;
         return ApprovalCardData {
             id: approval.id,
             heading,
             command: question.question.clone(),
             detail,
-            allow: language.agents_done().to_owned(),
+            allow: if last {
+                language.agents_submit()
+            } else {
+                language.agents_next()
+            }
+            .to_owned(),
             deny: language.agents_terminal().to_owned(),
             choices: question
                 .options
@@ -177,10 +278,18 @@ pub fn approval_card(
                 .enumerate()
                 .map(|(n, label)| ChoiceData {
                     label: label.clone(),
-                    selected: progress.ticked.contains(&n),
+                    selected: picked.is_some_and(|p| p.contains(&n)),
                 })
                 .collect(),
-            confirm: question.multi,
+            question: Some(QuestionData {
+                back: (total > 1).then(|| language.agents_back().to_owned()),
+                can_back: progress.at > 0,
+                cancel: claude.then(|| language.agents_cancel().to_owned()),
+                other: claude.then(|| language.agents_other().to_owned()),
+                typed: progress.typed.get(progress.at).cloned().unwrap_or_default(),
+                single: !question.multi,
+                last,
+            }),
         };
     }
     ApprovalCardData {
@@ -195,7 +304,7 @@ pub fn approval_card(
         allow: language.agents_allow().to_owned(),
         deny: language.agents_deny().to_owned(),
         choices: Vec::new(),
-        confirm: true,
+        question: None,
     }
 }
 
@@ -568,8 +677,8 @@ impl AgentsFeature {
             std::env::var_os("HOME"),
         );
         let feature = Rc::new_cyclic(|me: &Weak<AgentsFeature>| {
-            let (decider, picker, refresher, chooser) =
-                (me.clone(), me.clone(), me.clone(), me.clone());
+            let (decider, picker, stepper, refresher, chooser) =
+                (me.clone(), me.clone(), me.clone(), me.clone(), me.clone());
             let view = AgentsView::new(
                 mtm,
                 notch.page_frame(),
@@ -582,6 +691,11 @@ impl AgentsFeature {
                     on_pick: Box::new(move |id, choice| {
                         if let Some(feature) = picker.upgrade() {
                             feature.pick(id, choice);
+                        }
+                    }),
+                    on_step: Box::new(move |id, step, typed| {
+                        if let Some(feature) = stepper.upgrade() {
+                            feature.step(id, step, typed);
                         }
                     }),
                     on_refresh: Box::new(move || {
@@ -944,12 +1058,11 @@ impl AgentsFeature {
             .approval(id)
             .is_some_and(|a| !a.questions.is_empty());
         if asks {
-            // Allow is "Done" on a question that takes several choices; deny is leaving it to the terminal.
-            return if allow {
-                self.confirm(id)
-            } else {
-                self.finish(id, Reply::Pass, "left to the terminal")
-            };
+            // A question goes on with its own buttons (`step`); deny is leaving it to the terminal.
+            if !allow {
+                self.finish(id, Reply::Pass, "left to the terminal");
+            }
+            return;
         }
         let reply = if allow {
             Reply::Allow
@@ -969,97 +1082,50 @@ impl AgentsFeature {
         }
     }
 
-    /// A choice of the question the user is at: it answers a single-choice question, and ticks or unticks one
-    /// of a question that takes several.
+    /// A choice of the question on the card (`Progress::pick`).
     fn pick(&self, id: u64, choice: usize) {
         self.hold(id);
-        let (label, multi) = {
-            let tracker = self.tracker.borrow();
-            let Some(approval) = tracker.approval(id) else {
-                return;
-            };
-            let step = self
-                .progress
-                .borrow()
-                .get(&id)
-                .map_or(0, |p| p.answers.len());
-            let Some(question) = approval.questions.get(step) else {
-                return;
-            };
-            let Some(label) = question.options.get(choice) else {
-                return;
-            };
-            (label.clone(), question.multi)
+        let Some(questions) = self
+            .tracker
+            .borrow()
+            .approval(id)
+            .map(|a| a.questions.clone())
+        else {
+            return;
         };
-        if multi {
-            let mut progress = self.progress.borrow_mut();
-            let ticked = &mut progress.entry(id).or_default().ticked;
-            match ticked.iter().position(|&n| n == choice) {
-                Some(at) => {
-                    ticked.remove(at);
-                }
-                None => ticked.push(choice),
-            }
-            drop(progress);
-            self.render();
-        } else {
-            self.answer(id, label, vec![choice]);
-        }
+        self.progress
+            .borrow_mut()
+            .entry(id)
+            .or_default()
+            .pick(choice, &questions);
+        self.render();
     }
 
-    /// "Done" on a question that takes several choices: the ticked ones, in the order of the question.
-    fn confirm(&self, id: u64) {
-        let (labels, ticked): (Vec<String>, Vec<usize>) = {
-            let tracker = self.tracker.borrow();
-            let progress = self.progress.borrow();
-            let Some(progress) = progress.get(&id) else {
-                return;
-            };
-            let Some(question) = tracker
-                .approval(id)
-                .and_then(|a| a.questions.get(progress.answers.len()))
-            else {
-                return;
-            };
-            let mut ticked = progress.ticked.clone();
-            ticked.sort_unstable();
-            ticked.retain(|&n| n < question.options.len());
-            let labels = ticked
-                .iter()
-                .map(|&n| question.options[n].clone())
-                .collect();
-            (labels, ticked)
-        };
-        if !labels.is_empty() {
-            self.answer(id, labels.join(", "), ticked);
+    /// Back, next or cancel on a question, with what is typed in its field; the answers go once the last question
+    /// has its answer (`Progress::step`).
+    fn step(&self, id: u64, step: Step, typed: String) {
+        self.hold(id);
+        if step == Step::Cancel {
+            let message = i18n::current().agents_cancelled_message().to_owned();
+            return self.finish(id, Reply::Deny { message }, "cancelled");
         }
-    }
-
-    /// Takes the answer to the question the user is at, and sends them all once the last one is in.
-    fn answer(&self, id: u64, answer: String, picked: Vec<usize>) {
-        let (done, indexes, total) = {
-            let total = match self.tracker.borrow().approval(id) {
-                Some(a) => a.questions.len(),
-                None => return,
-            };
-            let mut progress = self.progress.borrow_mut();
-            let progress = progress.entry(id).or_default();
-            progress.answers.push(answer);
-            progress.picked.push(picked);
-            progress.ticked.clear();
-            (progress.answers.clone(), progress.picked.clone(), total)
+        let Some(questions) = self
+            .tracker
+            .borrow()
+            .approval(id)
+            .map(|a| a.questions.clone())
+        else {
+            return;
         };
-        if done.len() >= total {
-            self.finish(
-                id,
-                Reply::Answers {
-                    answers: done,
-                    indexes,
-                },
-                "answered",
-            );
-        } else {
-            self.render();
+        let reply = self
+            .progress
+            .borrow_mut()
+            .entry(id)
+            .or_default()
+            .step(step, typed, &questions);
+        match reply {
+            Some(reply) => self.finish(id, reply, "answered"),
+            None => self.render(),
         }
     }
 
@@ -1500,15 +1566,112 @@ mod tests {
         assert_eq!(first.heading, "Claude Code - Pick 1/2");
         assert_eq!(first.command, "First?");
         assert_eq!(first.choices.len(), 2);
-        assert!(!first.confirm, "a single choice answers by itself");
+        assert_eq!(first.allow, "Next");
+        let buttons = first.question.unwrap();
+        assert!(
+            buttons.back.is_some() && !buttons.can_back,
+            "back is there but off on the first"
+        );
+        assert!(
+            buttons.cancel.is_some() && buttons.other.is_some(),
+            "Claude Code takes both"
+        );
         let seen = Progress {
-            answers: vec!["A".into()],
-            picked: vec![vec![0]],
-            ticked: vec![1],
+            at: 1,
+            picked: vec![vec![0], vec![1]],
+            typed: vec![String::new(), "mine".into()],
         };
         let second = approval_card(Language::English, &a, &seen, 1_000);
-        assert_eq!(second.command, "Second?");
+        assert_eq!(
+            (second.command.as_str(), second.allow.as_str()),
+            ("Second?", "Submit")
+        );
         assert!(second.choices[1].selected && !second.choices[0].selected);
+        let buttons = second.question.unwrap();
+        assert!(buttons.can_back && buttons.last);
+        assert_eq!(
+            buttons.typed, "mine",
+            "what was typed comes back with its question"
+        );
+        a.agent = Agent::Pi;
+        let pi = approval_card(Language::English, &a, &seen, 1_000)
+            .question
+            .unwrap();
+        assert!(
+            pi.cancel.is_none() && pi.other.is_none(),
+            "pi takes only its choices"
+        );
+    }
+
+    #[test]
+    fn an_answer_is_the_ticked_choices_in_order_then_what_was_typed() {
+        let question = core_agents::event::Question {
+            header: String::new(),
+            question: "Which?".into(),
+            options: vec!["A".into(), "B".into(), "C".into()],
+            multi: true,
+        };
+        let progress = Progress {
+            at: 0,
+            picked: vec![vec![2, 0]],
+            typed: vec!["mine".into()],
+        };
+        assert_eq!(progress.answer(&question, 0), "A, C, mine");
+        assert_eq!(Progress::default().answer(&question, 0), "", "nothing yet");
+        let typed_only = Progress {
+            typed: vec!["only this".into()],
+            ..Progress::default()
+        };
+        assert_eq!(typed_only.answer(&question, 0), "only this");
+    }
+
+    #[test]
+    fn back_and_next_walk_the_questions_and_the_last_next_sends_them_all() {
+        let question = |multi| core_agents::event::Question {
+            header: String::new(),
+            question: "Which?".into(),
+            options: vec!["A".into(), "B".into()],
+            multi,
+        };
+        let questions = [question(false), question(true), question(false)];
+        let mut p = Progress::default();
+        assert_eq!(p.step(Step::Next, String::new(), &questions), None);
+        assert_eq!(p.at, 0, "no answer, no next");
+        p.pick(1, &questions);
+        assert_eq!(p.at, 1, "one choice answers and goes on");
+        p.pick(1, &questions);
+        p.pick(0, &questions);
+        assert_eq!(
+            (p.at, p.picked[1].clone()),
+            (1, vec![1, 0]),
+            "several are ticked in place"
+        );
+        assert_eq!(p.step(Step::Back, String::new(), &questions), None);
+        assert_eq!(p.at, 0);
+        assert_eq!(p.step(Step::Next, String::new(), &questions), None);
+        assert_eq!(p.step(Step::Next, "own".into(), &questions), None);
+        assert_eq!(p.at, 2);
+        p.pick(9, &questions);
+        assert_eq!(
+            p.picked[2],
+            Vec::<usize>::new(),
+            "a choice the question lacks changes nothing"
+        );
+        assert_eq!(
+            p.step(Step::Next, "typed".into(), &questions),
+            Some(Reply::Answers {
+                answers: vec!["B".into(), "A, B, own".into(), "typed".into()],
+                indexes: vec![vec![1], vec![0, 1], vec![]],
+            })
+        );
+        // A question left without an answer is shown again instead of sending.
+        let mut gap = Progress {
+            at: 2,
+            picked: vec![vec![0], vec![], vec![1]],
+            typed: vec![String::new(); 3],
+        };
+        assert_eq!(gap.step(Step::Next, String::new(), &questions), None);
+        assert_eq!(gap.at, 1);
     }
 
     #[test]

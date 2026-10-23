@@ -62,21 +62,25 @@ pub fn hook_stdout(reply: &Reply) -> Option<String> {
 }
 
 /// What the hook program prints for a `Question`: the tool goes ahead with the answers filled in, so the agent
-/// does not ask in the terminal. `input` is the tool input the agent sent.
+/// does not ask in the terminal, or, cancelled, it does not run and the agent reads why. `input` is the tool input
+/// the agent sent.
 pub fn question_stdout(reply: &Reply, input: &serde_json::Value) -> Option<String> {
-    let Reply::Answers { answers, .. } = reply else {
-        return None;
+    let decision = match reply {
+        Reply::Answers { answers, .. } => {
+            let mut given = serde_json::Map::new();
+            for (question, answer) in input.get("questions")?.as_array()?.iter().zip(answers) {
+                given.insert(question.get("question")?.as_str()?.to_owned(), json!(answer));
+            }
+            let mut updated = input.clone();
+            updated["answers"] = serde_json::Value::Object(given);
+            json!({ "hookEventName": "PreToolUse", "permissionDecision": "allow", "updatedInput": updated })
+        }
+        Reply::Deny { message } => {
+            json!({ "hookEventName": "PreToolUse", "permissionDecision": "deny", "permissionDecisionReason": message })
+        }
+        Reply::Allow | Reply::Pass => return None,
     };
-    let mut given = serde_json::Map::new();
-    for (question, answer) in input.get("questions")?.as_array()?.iter().zip(answers) {
-        given.insert(question.get("question")?.as_str()?.to_owned(), json!(answer));
-    }
-    let mut updated = input.clone();
-    updated["answers"] = serde_json::Value::Object(given);
-    Some(
-        json!({ "hookSpecificOutput": { "hookEventName": "PreToolUse", "permissionDecision": "allow", "updatedInput": updated } })
-            .to_string(),
-    )
+    Some(json!({ "hookSpecificOutput": decision }).to_string())
 }
 
 #[cfg(test)]
@@ -113,6 +117,12 @@ mod tests {
         assert_eq!(hook["updatedInput"]["answers"]["Which?"], "A");
         assert_eq!(hook["updatedInput"]["questions"], input["questions"]);
         assert!(question_stdout(&Reply::Pass, &input).is_none());
+        let cancel = Reply::Deny {
+            message: "cancelled".into(),
+        };
+        let out: Value = serde_json::from_str(&question_stdout(&cancel, &input).unwrap()).unwrap();
+        assert_eq!(out["hookSpecificOutput"]["permissionDecision"], "deny");
+        assert_eq!(out["hookSpecificOutput"]["permissionDecisionReason"], "cancelled");
     }
 
     #[test]

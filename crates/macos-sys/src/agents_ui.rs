@@ -10,7 +10,7 @@ use crate::{
     widgets::{Fit, PageRoot, draw_text, text_attributes},
 };
 use objc2::{DefinedClass, MainThreadMarker, MainThreadOnly, define_class, msg_send, rc::Retained};
-use objc2_app_kit::{NSFont, NSStringDrawing, NSView};
+use objc2_app_kit::{NSFocusRingType, NSFont, NSStringDrawing, NSTextField, NSView};
 use objc2_foundation::{NSObjectProtocol, NSPoint, NSRect, NSSize, NSString};
 use std::{
     cell::{Cell, RefCell},
@@ -31,6 +31,12 @@ const COMMAND_LINES: usize = 3;
 const COMMAND_LINE_HEIGHT: f64 = 16.0;
 const CARD_PAD: f64 = 16.0;
 const CHOICE_GAP: f64 = 6.0;
+const ACTIONS_GAP: f64 = 6.0;
+/// Where a choice's circle starts in its button, and its size: `TouchButton`'s for a label lined up at the left.
+const LEADING_PAD: f64 = 12.0;
+const GLYPH: f64 = 15.0;
+/// The round button that leaves a question to the terminal.
+const TERMINAL_SIZE: f64 = BUTTON_HEIGHT;
 
 /// A command or edit that waits for an answer.
 #[derive(Debug, Clone, PartialEq)]
@@ -41,18 +47,47 @@ pub struct ApprovalCardData {
     pub command: String,
     /// The folder and how long ago it asked.
     pub detail: String,
+    /// "Allow" on a command; on a question "Next", or "Submit" on the last one.
     pub allow: String,
+    /// "Deny" on a command; on a question, leaving it to the terminal.
     pub deny: String,
     /// The choices of a question, one button each; empty for a command.
     pub choices: Vec<ChoiceData>,
-    /// Whether the allow button is there: a command has it, a question only when it takes several choices.
-    pub confirm: bool,
+    /// The rest of a question's buttons; `None` on a command.
+    pub question: Option<QuestionData>,
 }
 
 #[derive(Debug, Clone, PartialEq)]
 pub struct ChoiceData {
     pub label: String,
     pub selected: bool,
+}
+
+#[derive(Debug, Clone, PartialEq)]
+pub struct QuestionData {
+    /// "Back", when the request has more than one question.
+    pub back: Option<String>,
+    /// Off on the first question.
+    pub can_back: bool,
+    /// "Cancel", for an agent that can be told the user declined; `None` leaves it out.
+    pub cancel: Option<String>,
+    /// The placeholder of the field for an answer of one's own; `None` for an agent that takes only its choices.
+    pub other: Option<String>,
+    /// What was typed in that field before, put back when the question comes on the card again.
+    pub typed: String,
+    /// It takes one choice, so picking one replaces what was typed.
+    pub single: bool,
+    /// The last question: next sends the answers.
+    pub last: bool,
+}
+
+/// A button of a question other than its choices.
+#[derive(Debug, Clone, Copy, PartialEq, Eq)]
+pub enum Step {
+    Back,
+    /// Next, which sends the answers on the last question.
+    Next,
+    Cancel,
 }
 
 #[derive(Debug, Clone, PartialEq)]
@@ -111,6 +146,8 @@ pub struct AgentsCallbacks {
     pub on_decide: Box<dyn Fn(u64, bool)>,
     /// The choice with this number was pressed on the question with this id.
     pub on_pick: Box<dyn Fn(u64, usize)>,
+    /// Back, next or cancel was pressed on the question with this id, with what is typed in its field.
+    pub on_step: Box<dyn Fn(u64, Step, String)>,
     /// The usage limits are to be read again.
     pub on_refresh: Box<dyn Fn()>,
     /// The row of a session with an open request was pressed: that request, by id, is to go on the card.
@@ -132,11 +169,13 @@ pub fn card_change(old: Option<&ApprovalCardData>, new: Option<&ApprovalCardData
     match (old, new) {
         (None, None) => CardChange::Keep,
         (Some(old), Some(new)) if old == new => CardChange::Keep,
+        // The heading counts the questions, so another question of the same request is rebuilt too.
         (Some(old), Some(new))
             if old.id == new.id
+                && old.heading == new.heading
                 && old.allow == new.allow
                 && old.deny == new.deny
-                && old.confirm == new.confirm
+                && old.question == new.question
                 && old.choices.len() == new.choices.len()
                 && old.choices.iter().zip(&new.choices).all(|(a, b)| a.label == b.label) =>
         {
@@ -243,20 +282,60 @@ define_class!(
                 ),
                 &attrs(11.0, Weight::Regular, style::TEXT_SECONDARY, Fit::Tail),
             );
+            // The field for an answer of one's own sits on a shape like the choices', its pencil where their
+            // circles are.
+            if let Some(row) = other_row(data, bounds.size) {
+                style::control(row, style::BUTTON_RADIUS, style::Control::Rest);
+                style::draw_symbol(
+                    "pencil",
+                    NSPoint::new(row.origin.x + LEADING_PAD + GLYPH / 2.0, row.origin.y + BUTTON_HEIGHT / 2.0),
+                    GLYPH,
+                    &white(style::TEXT_SECONDARY),
+                );
+            }
         }
     }
 
     unsafe impl NSObjectProtocol for ApprovalCard {}
 );
 
-/// The height a card needs: heading, the command lines, the detail line, a button for each choice, and the
-/// buttons that answer.
+/// The rows above the buttons that answer: a button for each choice, then the field for an answer of one's own.
+fn choice_rows(data: &ApprovalCardData) -> usize {
+    data.choices.len() + usize::from(data.question.as_ref().is_some_and(|q| q.other.is_some()))
+}
+
+/// The room the choices take, with a wider gap under them so they stand apart from the buttons that answer.
+fn choices_height(data: &ApprovalCardData) -> f64 {
+    match choice_rows(data) {
+        0 => 0.0,
+        rows => rows as f64 * (BUTTON_HEIGHT + CHOICE_GAP) + ACTIONS_GAP,
+    }
+}
+
+/// Where the first choice is on a card of this height: the choices stack above the buttons that answer.
+fn choices_top(data: &ApprovalCardData, height: f64) -> f64 {
+    height - CARD_PAD - BUTTON_HEIGHT - choices_height(data)
+}
+
+/// The row of the field for an answer of one's own, under the choices, on a card of this size.
+fn other_row(data: &ApprovalCardData, card: NSSize) -> Option<NSRect> {
+    data.question.as_ref()?.other.as_ref()?;
+    Some(NSRect::new(
+        NSPoint::new(
+            CARD_PAD,
+            choices_top(data, card.height) + data.choices.len() as f64 * (BUTTON_HEIGHT + CHOICE_GAP),
+        ),
+        NSSize::new(card.width - 2.0 * CARD_PAD, BUTTON_HEIGHT),
+    ))
+}
+
+/// The height a card needs: heading, the command lines, the detail line, the choices, and the buttons that answer.
 fn card_height(data: &ApprovalCardData) -> f64 {
     34.0 + COMMAND_LINE_HEIGHT * COMMAND_LINES as f64
         + 8.0
         + 14.0
         + 12.0
-        + data.choices.len() as f64 * (BUTTON_HEIGHT + CHOICE_GAP)
+        + choices_height(data)
         + BUTTON_HEIGHT
         + CARD_PAD
 }
@@ -502,6 +581,39 @@ struct ShownCard {
     data: ApprovalCardData,
     view: Retained<ApprovalCard>,
     choices: Vec<Retained<TouchButton>>,
+    /// The field for an answer of one's own, which a refresh leaves alone so that typing goes on.
+    field: Option<Retained<NSTextField>>,
+}
+
+/// The field for an answer of one's own, in the row under the choices, its text where their labels are.
+fn answer_field(mtm: MainThreadMarker, row: NSRect, placeholder: &str, typed: &str) -> Retained<NSTextField> {
+    let height = 18.0;
+    let x = row.origin.x + LEADING_PAD + GLYPH + 6.0;
+    let field = NSTextField::initWithFrame(
+        mtm.alloc(),
+        NSRect::new(
+            NSPoint::new(x, row.origin.y + (row.size.height - height) / 2.0),
+            NSSize::new(row.size.width - (x - row.origin.x) - LEADING_PAD, height),
+        ),
+    );
+    field.setBezeled(false);
+    field.setDrawsBackground(false);
+    field.setFocusRingType(NSFocusRingType::None);
+    field.setFont(Some(&style::font(13.0, Weight::Semibold)));
+    field.setTextColor(Some(&white(style::TEXT)));
+    field.setPlaceholderString(Some(&NSString::from_str(placeholder)));
+    field.setStringValue(&NSString::from_str(typed));
+    field.setUsesSingleLineMode(true);
+    // A long answer scrolls in its line instead of wrapping out of the row.
+    if let Some(cell) = field.cell() {
+        cell.setScrollable(true);
+    }
+    field
+}
+
+/// What is typed in the field, trimmed; empty without one.
+fn typed_in(field: Option<&NSTextField>) -> String {
+    field.map_or_else(String::new, |f| f.stringValue().to_string().trim().to_owned())
 }
 
 pub struct AgentsView {
@@ -616,9 +728,20 @@ impl AgentsView {
         };
         let buttons_top = card_height - CARD_PAD - BUTTON_HEIGHT;
         let full = inner - 2.0 * CARD_PAD;
-        let half = if approval.confirm { (full - GAP) / 2.0 } else { full };
-        // The choices stack above the buttons that answer, in the order of the question.
-        let choices_top = buttons_top - approval.choices.len() as f64 * (BUTTON_HEIGHT + CHOICE_GAP);
+        let id = approval.id;
+        let field = other_row(approval, NSSize::new(inner, card_height)).map(|row| {
+            let (placeholder, typed) = approval
+                .question
+                .as_ref()
+                .map(|q| (q.other.clone().unwrap_or_default(), q.typed.clone()))
+                .unwrap_or_default();
+            let field = answer_field(mtm, row, &placeholder, &typed);
+            card.addSubview(&field);
+            field
+        });
+        let single = approval.question.as_ref().is_some_and(|q| q.single);
+        // The choices stack above the buttons that answer, in the order of the question, lined up with it.
+        let choices_top = choices_top(approval, card_height);
         let mut choices = Vec::new();
         for (n, choice) in approval.choices.iter().enumerate() {
             let button = TouchButton::new(
@@ -629,50 +752,102 @@ impl AgentsView {
                 ),
                 Look::Rect,
             );
+            button.set_leading(true);
             button.set_symbol(if choice.selected { "checkmark" } else { "circle" });
             button.set_title(&choice.label);
+            // A label too long for the button ends in an ellipsis; the whole of it is in the tooltip.
+            button.setToolTip(Some(&NSString::from_str(&choice.label)));
             button.set_selected(choice.selected);
-            let (shared, id) = (Rc::clone(&self.callbacks), approval.id);
-            button.set_on_click(move || (shared.on_pick)(id, n));
+            let (shared, field) = (Rc::clone(&self.callbacks), field.clone());
+            button.set_on_click(move || {
+                if single && let Some(field) = &field {
+                    field.setStringValue(&NSString::from_str(""));
+                }
+                (shared.on_pick)(id, n);
+            });
             card.addSubview(&button);
             choices.push(button);
         }
-        let deny = TouchButton::new(
-            mtm,
-            NSRect::new(
-                NSPoint::new(CARD_PAD, buttons_top),
-                NSSize::new(half, BUTTON_HEIGHT),
-            ),
-            Look::Rect,
-        );
-        deny.set_title(&approval.deny);
-        deny.set_tone(if approval.choices.is_empty() { Some(Tone::Red) } else { None });
-        let allow = TouchButton::new(
-            mtm,
-            NSRect::new(
-                NSPoint::new(CARD_PAD + half + GAP, buttons_top),
-                NSSize::new(half, BUTTON_HEIGHT),
-            ),
-            Look::Rect,
-        );
-        allow.set_symbol("checkmark");
-        allow.set_title(&approval.allow);
-        allow.set_selected(true);
-        deny.set_symbol(if approval.choices.is_empty() { "xmark" } else { "terminal" });
-        let id = approval.id;
-        let shared = Rc::clone(&self.callbacks);
-        deny.set_on_click(move || (shared.on_decide)(id, false));
-        let shared = Rc::clone(&self.callbacks);
-        allow.set_on_click(move || (shared.on_decide)(id, true));
-        card.addSubview(&deny);
-        if approval.confirm {
-            card.addSubview(&allow);
+        match &approval.question {
+            None => {
+                let half = (full - GAP) / 2.0;
+                let deny = TouchButton::new(
+                    mtm,
+                    NSRect::new(NSPoint::new(CARD_PAD, buttons_top), NSSize::new(half, BUTTON_HEIGHT)),
+                    Look::Rect,
+                );
+                deny.set_symbol("xmark");
+                deny.set_title(&approval.deny);
+                deny.set_tone(Some(Tone::Red));
+                let shared = Rc::clone(&self.callbacks);
+                deny.set_on_click(move || (shared.on_decide)(id, false));
+                card.addSubview(&deny);
+                let allow = TouchButton::new(
+                    mtm,
+                    NSRect::new(
+                        NSPoint::new(CARD_PAD + half + GAP, buttons_top),
+                        NSSize::new(half, BUTTON_HEIGHT),
+                    ),
+                    Look::Rect,
+                );
+                allow.set_symbol("checkmark");
+                allow.set_title(&approval.allow);
+                allow.set_selected(true);
+                let shared = Rc::clone(&self.callbacks);
+                allow.set_on_click(move || (shared.on_decide)(id, true));
+                card.addSubview(&allow);
+            }
+            Some(question) => {
+                // Leaving it to the terminal is a round button at the left; cancel, back and next share the rest.
+                let terminal = TouchButton::new(
+                    mtm,
+                    NSRect::new(
+                        NSPoint::new(CARD_PAD, buttons_top),
+                        NSSize::new(TERMINAL_SIZE, BUTTON_HEIGHT),
+                    ),
+                    Look::Round { filled: false },
+                );
+                terminal.set_symbol("terminal");
+                terminal.set_title(&approval.deny);
+                let shared = Rc::clone(&self.callbacks);
+                terminal.set_on_click(move || (shared.on_decide)(id, false));
+                card.addSubview(&terminal);
+                let next_symbol = if question.last { "paperplane" } else { "chevron.right" };
+                let steps: Vec<(Step, &str, &str, bool)> = [
+                    question.cancel.as_deref().map(|t| (Step::Cancel, t, "xmark", true)),
+                    question.back.as_deref().map(|t| (Step::Back, t, "chevron.left", question.can_back)),
+                    Some((Step::Next, approval.allow.as_str(), next_symbol, true)),
+                ]
+                .into_iter()
+                .flatten()
+                .collect();
+                let left = CARD_PAD + TERMINAL_SIZE + GAP;
+                let width = (full - TERMINAL_SIZE - GAP * steps.len() as f64) / steps.len() as f64;
+                for (n, (step, title, symbol, enabled)) in steps.into_iter().enumerate() {
+                    let button = TouchButton::new(
+                        mtm,
+                        NSRect::new(
+                            NSPoint::new(left + n as f64 * (width + GAP), buttons_top),
+                            NSSize::new(width, BUTTON_HEIGHT),
+                        ),
+                        Look::Rect,
+                    );
+                    button.set_symbol(symbol);
+                    button.set_title(title);
+                    button.set_enabled(enabled);
+                    button.set_selected(step == Step::Next);
+                    let (shared, field) = (Rc::clone(&self.callbacks), field.clone());
+                    button.set_on_click(move || (shared.on_step)(id, step, typed_in(field.as_deref())));
+                    card.addSubview(&button);
+                }
+            }
         }
         self.root.addSubview(&card);
         ShownCard {
             data: approval.clone(),
             view: card,
             choices,
+            field,
         }
     }
 
@@ -858,7 +1033,8 @@ impl AgentsView {
         added
     }
 
-    /// Returns true when the key was consumed: Enter allows the command on the card, the delete key (Option+Delete by default) denies it, and
+    /// Returns true when the key was consumed: Enter allows the command on the card or goes on from the question,
+    /// the delete key (Option+Delete by default) denies the command or leaves the question to the terminal, and
     /// Command+R reads the usage limits again.
     pub fn handle_key(&self, key: Key) -> bool {
         if key == Key::Shortcut('r') {
@@ -868,9 +1044,19 @@ impl AgentsView {
         let Some(id) = self.first.get() else {
             return false;
         };
+        let (asks, typed, editing) = match self.card.borrow().as_ref() {
+            Some(shown) => (
+                shown.data.question.is_some(),
+                typed_in(shown.field.as_deref()),
+                shown.field.as_ref().is_some_and(|f| f.currentEditor().is_some()),
+            ),
+            None => (false, String::new(), false),
+        };
         match key {
+            Key::Enter if asks => (self.callbacks.on_step)(id, Step::Next, typed),
             Key::Enter => (self.callbacks.on_decide)(id, true),
-            Key::Delete => (self.callbacks.on_decide)(id, false),
+            // While an answer is being typed, the delete key edits it.
+            Key::Delete if !editing => (self.callbacks.on_decide)(id, false),
             _ => return false,
         }
         true
@@ -934,7 +1120,7 @@ mod tests {
             heading: "Claude Code - Pick".into(),
             command: "Which?".into(),
             detail: "shop  -  just now".into(),
-            allow: "Done".into(),
+            allow: "Submit".into(),
             deny: "Terminal".into(),
             choices: labels
                 .iter()
@@ -944,7 +1130,15 @@ mod tests {
                     selected: ticked.contains(&n),
                 })
                 .collect(),
-            confirm: true,
+            question: Some(QuestionData {
+                back: None,
+                can_back: false,
+                cancel: Some("Cancel".into()),
+                other: Some("Type your own answer".into()),
+                typed: String::new(),
+                single: true,
+                last: true,
+            }),
         }
     }
 
@@ -971,6 +1165,15 @@ mod tests {
             card_change(Some(&shown), Some(&card(2, &["A", "B"], &[]))),
             CardChange::Rebuild,
             "another request"
+        );
+        let second = ApprovalCardData {
+            heading: "Claude Code - Pick 2/2".into(),
+            ..shown.clone()
+        };
+        assert_eq!(
+            card_change(Some(&shown), Some(&second)),
+            CardChange::Rebuild,
+            "the next question of the request, even with the same choices"
         );
         assert_eq!(card_change(Some(&shown), None), CardChange::Rebuild);
         assert_eq!(card_change(None, Some(&shown)), CardChange::Rebuild);

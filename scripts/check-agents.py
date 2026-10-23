@@ -163,6 +163,23 @@ def ask(session, command):
     return waiting
 
 
+def ask_question(session, questions):
+    """Starts a hook the way Claude Code does before AskUserQuestion and leaves it waiting for the answers."""
+    waiting = subprocess.Popen(
+        [BIN, "--figghost-hook", "claude"], stdin=subprocess.PIPE, stdout=subprocess.PIPE, env=env
+    )
+    payload = event("PreToolUse", session=session, tool_name="AskUserQuestion", tool_input={"questions": questions})
+    waiting.stdin.write(json.dumps(payload).encode())
+    waiting.stdin.close()
+    waiting.started = time.monotonic()
+    return waiting
+
+
+def question(text, header, labels, multi=False):
+    options = [{"label": label, "description": f"about {label}"} for label in labels]
+    return {"question": text, "header": header, "multiSelect": multi, "options": options}
+
+
 def answer_of(waiting):
     out = waiting.stdout.read().decode()
     waiting.wait(timeout=30)
@@ -266,6 +283,43 @@ try:
         check(wait_for_count("denied (delivered)", 1), "the program logged the refusal")
         # With nothing left to answer there are no buttons.
         check(press("Allow") == "not found", "no buttons are left once every request is answered")
+
+        # 5c. A question of two steps: a choice answers the first and goes on, Back returns to it, Next goes on
+        # again, and Submit on the last sends every answer in the tool input; Cancel tells the agent the user
+        # declined, so it does not ask again in its terminal.
+        seen = trace().count(WAITING)
+        two_steps = ask_question(
+            "q4",
+            [
+                question("Which database?", "Database", ["Postgres", "SQLite"]),
+                question("Which caches?", "Cache", ["Redis", "Memcached"], multi=True),
+            ],
+        )
+        check(wait_for_count(WAITING, seen + 1), "a question of two steps reaches the program and waits")
+        check(press_when_shown("Postgres").startswith("pressed"), "a choice answers the first step")
+        for button in ("Back", "Next", "Redis", "Memcached", "Submit"):
+            check(press(button).startswith("pressed"), f"{button} is on the card and pressed")
+        out, took = answer_of(two_steps)
+        hook_output = json.loads(out)["hookSpecificOutput"] if out else {}
+        check(hook_output.get("permissionDecision") == "allow", "Submit lets the tool run")
+        check(
+            hook_output.get("updatedInput", {}).get("answers")
+            == {"Which database?": "Postgres", "Which caches?": "Redis, Memcached"},
+            f"with every answer filled in ({hook_output.get('updatedInput', {}).get('answers')})",
+        )
+        check(took < WAIT_SECONDS * 3, f"and it answered without timing out ({took:.1f} s)")
+        check(wait_for_count("answered (delivered)", 1), "the program logged the answers")
+        seen = trace().count(WAITING)
+        declined = ask_question("q5", [question("Which database?", "Database", ["Postgres", "SQLite"])])
+        check(wait_for_count(WAITING, seen + 1), "another question waits")
+        check(press_when_shown("Cancel").startswith("pressed"), "Cancel is on the card and pressed")
+        out, took = answer_of(declined)
+        hook_output = json.loads(out)["hookSpecificOutput"] if out else {}
+        check(
+            hook_output.get("permissionDecision") == "deny" and hook_output.get("permissionDecisionReason"),
+            "Cancel keeps the tool from running and says why",
+        )
+        check(wait_for_count("cancelled (delivered)", 1), "the program logged the cancel")
     else:
         # No permission to read the window through accessibility: say so, and let the request time out.
         answer_of(first)

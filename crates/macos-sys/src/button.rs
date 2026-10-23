@@ -36,6 +36,8 @@ pub enum Look {
 }
 
 const CHIP_PAD: f64 = 12.0;
+/// The least room between a centred label and the edges of its button.
+const EDGE_PAD: f64 = 8.0;
 const GLYPH_GAP: f64 = 6.0;
 const COUNT_GAP: f64 = 6.0;
 
@@ -49,6 +51,8 @@ pub struct ButtonIvars {
     hovered: Cell<bool>,
     pressed: Cell<bool>,
     tone: Cell<Option<Tone>>,
+    /// The glyph and label start at the left edge instead of the middle.
+    leading: Cell<bool>,
     /// A picture for a tile, drawn instead of the glyph.
     image: RefCell<Option<Retained<NSImage>>>,
     on_click: RefCell<Option<Rc<dyn Fn()>>>,
@@ -147,6 +151,7 @@ impl TouchButton {
             hovered: Cell::new(false),
             pressed: Cell::new(false),
             tone: Cell::new(None),
+            leading: Cell::new(false),
             image: RefCell::new(None),
             on_click: RefCell::new(None),
         };
@@ -232,6 +237,12 @@ impl TouchButton {
     /// Colours the glyph, for a button whose meaning is a state (stop in red, approve in green).
     pub fn set_tone(&self, tone: Option<Tone>) {
         self.ivars().tone.set(tone);
+        self.setNeedsDisplay(true);
+    }
+
+    /// Lines the glyph and label up at the left edge, as the items of a list are.
+    pub fn set_leading(&self, leading: bool) {
+        self.ivars().leading.set(leading);
         self.setNeedsDisplay(true);
     }
 
@@ -497,13 +508,21 @@ impl TouchButton {
         if has_glyph {
             total += glyph;
         }
-        if title_width > 0.0 {
-            total += if has_glyph { GLYPH_GAP } else { 0.0 } + title_width;
-        }
         if detail_width > 0.0 {
             total += COUNT_GAP + detail_width;
         }
-        let mut x = (bounds.size.width - total) / 2.0;
+        // A label too long for the button ends in an ellipsis inside it instead of running over its edges.
+        let pad = if iv.leading.get() { CHIP_PAD } else { EDGE_PAD };
+        let gap = if has_glyph { GLYPH_GAP } else { 0.0 };
+        let title_width = title_width.min((bounds.size.width - 2.0 * pad - total - gap).max(0.0));
+        if title_width > 0.0 {
+            total += gap + title_width;
+        }
+        let mut x = if iv.leading.get() {
+            pad
+        } else {
+            (bounds.size.width - total) / 2.0
+        };
         let mid = bounds.size.height / 2.0;
         if has_glyph {
             style::draw_symbol(
@@ -522,7 +541,7 @@ impl TouchButton {
                     NSPoint::new(x, mid - line / 2.0),
                     NSSize::new(title_width + 2.0, line),
                 ),
-                &text_attributes(&font, &ink, Fit::Clip, false),
+                &text_attributes(&font, &ink, Fit::Tail, false),
             );
             x += title_width;
         }
