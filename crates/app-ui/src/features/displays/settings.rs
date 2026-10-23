@@ -11,6 +11,7 @@ pub fn state(config: &Config) -> Value {
     json!({
         "enabled": config.enabled,
         "keys": config.keys,
+        "profiles": config.profiles,
     })
 }
 
@@ -19,6 +20,7 @@ pub fn set(config: &mut Config, path: &str, value: &Value) -> Option<Result<(), 
     let slot = match path {
         "enabled" => &mut config.enabled,
         "keys" => &mut config.keys,
+        "profiles" => &mut config.profiles,
         _ => return None,
     };
     Some(
@@ -50,7 +52,7 @@ mod tests {
     #[test]
     fn the_switches_take_only_true_or_false() {
         let mut config = Config::default();
-        for path in ["enabled", "keys"] {
+        for path in ["enabled", "keys", "profiles"] {
             for bad in [json!("yes"), json!(1), json!(null)] {
                 assert!(
                     set(&mut config, path, &bad).unwrap().is_err(),
@@ -59,7 +61,7 @@ mod tests {
             }
             assert!(set(&mut config, path, &json!(true)).unwrap().is_ok());
         }
-        assert!(config.enabled && config.keys);
+        assert!(config.enabled && config.keys && config.profiles);
         assert!(set(&mut config, "nonsense", &json!(true)).is_none());
     }
 }

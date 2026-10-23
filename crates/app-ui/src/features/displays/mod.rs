@@ -1,5 +1,6 @@
 //! The Displays tab of the notch: the brightness and contrast of each external display, set in the display itself
-//! over DDC/CI as its own buttons would, and, when the person turns it on, the brightness keys for those displays
+//! over DDC/CI as its own buttons would, the colour profile of every display, chosen among the ones macOS comes with
+//! as System Settings offers them, and, when the person turns it on, the brightness keys for the external displays
 //! with the volume indicator's look. It is off until the person turns it on.
 //!
 //! Every message to a display waits on it for tens of milliseconds, so all of them go through one worker thread,
@@ -14,7 +15,8 @@ use crate::{
     trace,
 };
 use macos_sys::{
-    app,
+    MainThreadMarker, app,
+    color_profiles::{self, ScreenProfiles},
     ddc::{self, Control, Level, Monitor},
     displays_ui::{DisplaysDisplay, DisplaysTexts, DisplaysView, PAGE_SIZE, Screen},
     event_tap::{EventTap, Verdict, mask},
@@ -50,12 +52,24 @@ const RETRY_SECONDS: f64 = 3.0;
 const FINE_STEP_FLAGS: u64 = 0x0002_0000 | 0x0008_0000;
 const CONTROL_FLAG: u64 = 0x0004_0000;
 
-#[derive(Debug, Clone, Default, PartialEq, Eq, Serialize, Deserialize)]
+#[derive(Debug, Clone, PartialEq, Eq, Serialize, Deserialize)]
 #[serde(default)]
 pub struct Config {
     pub enabled: bool,
     /// The brightness keys set the external displays. Needs Accessibility.
     pub keys: bool,
+    /// Each card has a menu of the display's colour profiles, and every display gets a card.
+    pub profiles: bool,
+}
+
+impl Default for Config {
+    fn default() -> Self {
+        Self {
+            enabled: false,
+            keys: false,
+            profiles: true,
+        }
+    }
 }
 
 // -- the worker -----------------------------------------------------------------------------------------------
@@ -267,9 +281,14 @@ thread_local! {
 }
 
 pub struct Feature {
+    mtm: MainThreadMarker,
     view: Rc<DisplaysView>,
     config: RefCell<Config>,
     known: RefCell<Option<Vec<Known>>>,
+    /// The displays the system shows with their colour profiles, read when the tab opens.
+    color: RefCell<Vec<ScreenProfiles>>,
+    /// What each card on the tab stands for, in the order shown.
+    cards: RefCell<Vec<Card>>,
     jobs: RefCell<Option<Sender<Job>>>,
     any: Arc<AtomicBool>,
     tap: RefCell<Option<EventTap>>,
@@ -285,9 +304,10 @@ pub fn attach(env: &AttachEnv) -> Option<Rc<Feature>> {
     let texts = DisplaysTexts {
         brightness: language.displays_brightness().to_owned(),
         contrast: language.displays_contrast().to_owned(),
+        profile: language.displays_profile().to_owned(),
     };
     let feature = Rc::new_cyclic(|me: &Weak<Feature>| {
-        let weak = me.clone();
+        let (weak, chooser) = (me.clone(), me.clone());
         let view = DisplaysView::new(
             env.mtm,
             notch.page_area(PAGE_SIZE.width, PAGE_SIZE.height),
@@ -297,11 +317,19 @@ pub fn attach(env: &AttachEnv) -> Option<Rc<Feature>> {
                     f.moved(index, control, fraction);
                 }
             }),
+            Rc::new(move |index, choice| {
+                if let Some(f) = chooser.upgrade() {
+                    f.chosen(index, choice);
+                }
+            }),
         );
         Feature {
+            mtm: env.mtm,
             view,
             config: RefCell::new(env.config.displays.clone()),
             known: RefCell::default(),
+            color: RefCell::default(),
+            cards: RefCell::default(),
             jobs: RefCell::default(),
             any: Arc::default(),
             tap: RefCell::default(),
@@ -317,6 +345,7 @@ pub fn attach(env: &AttachEnv) -> Option<Rc<Feature>> {
         move || {
             if let Some(f) = shown.upgrade() {
                 f.showing.set(true);
+                f.read_profiles();
                 f.render();
                 if f.config.borrow().enabled {
                     f.send(Job::Look);
@@ -361,8 +390,51 @@ impl Feature {
         if config.enabled && !was.enabled && self.showing.get() {
             self.send(Job::Look);
         }
+        if self.showing.get() {
+            self.read_profiles();
+        }
         self.render();
         Ok(())
+    }
+
+    /// Reads the displays and their colour profiles, while the tab can show them.
+    fn read_profiles(&self) {
+        let config = self.config.borrow();
+        *self.color.borrow_mut() = if config.enabled && config.profiles {
+            color_profiles::screens(self.mtm)
+        } else {
+            Vec::new()
+        };
+    }
+
+    /// A profile was chosen in a card's menu: the display takes it, as in System Settings. The display's own
+    /// profile takes the choice away instead, which puts it back.
+    fn chosen(&self, index: usize, choice: usize) {
+        let card = self.cards.borrow().get(index).copied();
+        let Some(at) = card.and_then(|c| c.color) else {
+            return;
+        };
+        let Some((display, name, path, own)) = self.color.borrow().get(at).and_then(|screen| {
+            let profile = screen.profiles.get(choice)?;
+            Some((
+                screen.display,
+                profile.name.clone(),
+                profile.path.clone(),
+                choice < screen.own,
+            ))
+        }) else {
+            return;
+        };
+        let done = color_profiles::set(display, (!own).then_some(path.as_path()));
+        trace::log(&format!(
+            "displays: profile {name} for display {display} {}",
+            if done { "set" } else { "refused" }
+        ));
+        // ColorSync may take a moment to report the change, so what was chosen is shown until the tab opens again.
+        if done && let Some(screen) = self.color.borrow_mut().get_mut(at) {
+            screen.current = Some(choice);
+        }
+        self.render();
     }
 
     fn wants_keys(&self) -> bool {
@@ -425,8 +497,11 @@ impl Feature {
 
     /// A slider moved: the worker sets the display, and what is known follows without drawing the page again.
     fn moved(&self, index: usize, control: Control, fraction: f64) {
+        let Some(at) = self.cards.borrow().get(index).and_then(|c| c.ddc) else {
+            return;
+        };
         let mut known = self.known.borrow_mut();
-        let Some(display) = known.as_mut().and_then(|k| k.get_mut(index)) else {
+        let Some(display) = known.as_mut().and_then(|k| k.get_mut(at)) else {
             return;
         };
         let slot = match control {
@@ -454,46 +529,130 @@ impl Feature {
     }
 
     fn render(&self) {
-        self.view.show(display(
+        let (shown, cards) = display(
             i18n::current(),
             self.config.borrow().enabled,
             self.known.borrow().as_deref(),
-        ));
+            &self.color.borrow(),
+        );
+        *self.cards.borrow_mut() = cards;
+        self.view.show(shown);
     }
 }
 
-/// The picture of the tab: a card for each display, or why there is none.
-fn display(language: Language, enabled: bool, known: Option<&[Known]>) -> DisplaysDisplay {
-    let note = |title: &str, hint: &str| DisplaysDisplay {
-        screens: Vec::new(),
-        note: Some((title.to_owned(), hint.to_owned())),
+/// What a card stands for: a display the system shows, by its place in the colour list, the display of the same
+/// name that answers over DDC/CI, by its place in what is known, or both.
+#[derive(Debug, Clone, Copy, PartialEq, Eq)]
+struct Card {
+    color: Option<usize>,
+    ddc: Option<usize>,
+}
+
+/// A name without the " (2)" macOS adds when two displays have the same one.
+fn base_name(name: &str) -> &str {
+    match name.rsplit_once(" (") {
+        Some((base, n))
+            if n.strip_suffix(')')
+                .is_some_and(|n| n.parse::<u32>().is_ok()) =>
+        {
+            base
+        }
+        _ => name,
+    }
+}
+
+/// One card for each display the system shows, joined to the first display of the same name that answers over
+/// DDC/CI; one that answers and has no such twin gets a card of its own after them.
+// ponytail: joined by name, as nothing else ties a DDC port to a display; two displays of one model pair in order.
+fn join(screens: &[ScreenProfiles], known: &[Known]) -> Vec<Card> {
+    let mut used = vec![false; known.len()];
+    let mut cards: Vec<Card> = screens
+        .iter()
+        .enumerate()
+        .map(|(n, screen)| {
+            let ddc = known.iter().enumerate().position(|(k, display)| {
+                !used[k] && !display.name.is_empty() && display.name == base_name(&screen.name)
+            });
+            if let Some(k) = ddc {
+                used[k] = true;
+            }
+            Card {
+                color: Some(n),
+                ddc,
+            }
+        })
+        .collect();
+    cards.extend((0..known.len()).filter(|&k| !used[k]).map(|k| Card {
+        color: None,
+        ddc: Some(k),
+    }));
+    cards
+}
+
+/// The picture of the tab, a card for each display or why there is none, and what each card stands for. Without
+/// colour profiles only the displays that answer over DDC/CI have a card.
+fn display(
+    language: Language,
+    enabled: bool,
+    known: Option<&[Known]>,
+    color: &[ScreenProfiles],
+) -> (DisplaysDisplay, Vec<Card>) {
+    let note = |title: &str, hint: &str| {
+        let shown = DisplaysDisplay {
+            screens: Vec::new(),
+            note: Some((title.to_owned(), hint.to_owned())),
+        };
+        (shown, Vec::new())
     };
     if !enabled {
         return note(language.displays_off_title(), language.displays_off_hint());
     }
-    match known {
-        None => note(language.displays_looking(), ""),
-        Some([]) => note(
-            language.displays_none_title(),
-            language.displays_none_hint(),
-        ),
-        Some(known) => DisplaysDisplay {
-            screens: known
-                .iter()
-                .enumerate()
-                .map(|(i, k)| Screen {
-                    name: if k.name.is_empty() {
-                        language.displays_unnamed(i + 1)
-                    } else {
-                        k.name.clone()
-                    },
-                    brightness: k.brightness.map(Level::fraction),
-                    contrast: k.contrast.map(Level::fraction),
-                })
-                .collect(),
+    if color.is_empty() {
+        match known {
+            None => return note(language.displays_looking(), ""),
+            Some([]) => {
+                return note(
+                    language.displays_none_title(),
+                    language.displays_none_hint(),
+                );
+            }
+            Some(_) => {}
+        }
+    }
+    let known = known.unwrap_or_default();
+    let cards = join(color, known);
+    let screens = cards
+        .iter()
+        .enumerate()
+        .map(|(i, card)| {
+            let ddc = card.ddc.and_then(|k| known.get(k));
+            let profiles = card.color.and_then(|n| color.get(n));
+            let name = profiles
+                .map(|p| p.name.clone())
+                .or_else(|| ddc.map(|k| k.name.clone()))
+                .filter(|name| !name.is_empty())
+                .unwrap_or_else(|| language.displays_unnamed(i + 1));
+            Screen {
+                name,
+                brightness: ddc.and_then(|k| k.brightness).map(Level::fraction),
+                contrast: ddc.and_then(|k| k.contrast).map(Level::fraction),
+                profiles: profiles.map_or_else(Vec::new, |p| {
+                    p.profiles
+                        .iter()
+                        .map(|profile| profile.name.clone())
+                        .collect()
+                }),
+                profile: profiles.and_then(|p| p.current),
+            }
+        })
+        .collect();
+    (
+        DisplaysDisplay {
+            screens,
             note: None,
         },
-    }
+        cards,
+    )
 }
 
 #[cfg(test)]
@@ -523,17 +682,92 @@ mod tests {
         let config: Config = serde_json::from_str("{}").unwrap();
         assert_eq!(config, Config::default());
         assert!(!config.enabled && !config.keys);
+        assert!(config.profiles, "the profiles show once the tab is on");
         let partial: Config = serde_json::from_str(r#"{ "enabled": true, "future": 1 }"#).unwrap();
-        assert!(partial.enabled && !partial.keys);
+        assert!(partial.enabled && !partial.keys && partial.profiles);
+    }
+
+    fn screen(name: &str, current: Option<usize>) -> ScreenProfiles {
+        ScreenProfiles {
+            display: 1,
+            name: name.into(),
+            profiles: ["Own", "Display P3", "sRGB IEC61966-2.1"]
+                .map(|n| color_profiles::Profile {
+                    name: n.into(),
+                    path: format!("/p/{n}.icc").into(),
+                })
+                .to_vec(),
+            current,
+            own: 1,
+        }
+    }
+
+    #[test]
+    fn every_display_gets_a_card_with_its_profiles_and_the_sliders_of_its_twin() {
+        let color = [
+            screen("Built-in Retina Display", Some(0)),
+            screen("LG HDR 4K (1)", Some(2)),
+            screen("LG HDR 4K (2)", None),
+        ];
+        let known = [
+            known("LG HDR 4K", true),
+            known("Hidden", false),
+            known("LG HDR 4K", false),
+        ];
+        let (shown, cards) = display(Language::English, true, Some(&known), &color);
+        assert_eq!(
+            cards,
+            [
+                Card {
+                    color: Some(0),
+                    ddc: None
+                },
+                Card {
+                    color: Some(1),
+                    ddc: Some(0)
+                },
+                Card {
+                    color: Some(2),
+                    ddc: Some(2)
+                },
+                Card {
+                    color: None,
+                    ddc: Some(1)
+                },
+            ],
+            "the two of one model pair in order; one no screen names gets a card after them"
+        );
+        let built_in = &shown.screens[0];
+        assert!(built_in.brightness.is_none() && built_in.profiles.len() == 3);
+        assert_eq!(built_in.profile, Some(0));
+        let lg = &shown.screens[1];
+        assert_eq!((lg.name.as_str(), lg.profile), ("LG HDR 4K (1)", Some(2)));
+        assert!(lg.brightness.is_some() && lg.contrast.is_some());
+        assert!(
+            shown.screens[2].contrast.is_none(),
+            "the second LG has its own twin"
+        );
+        assert!(shown.screens[3].profiles.is_empty());
+        // While nothing has answered yet, the cards are there with their profiles.
+        let (waiting, _) = display(Language::English, true, None, &color);
+        assert!(waiting.note.is_none() && waiting.screens.len() == 3);
+    }
+
+    #[test]
+    fn a_number_macos_adds_is_not_part_of_the_name() {
+        assert_eq!(base_name("LG HDR 4K (2)"), "LG HDR 4K");
+        assert_eq!(base_name("Studio (Left)"), "Studio (Left)");
+        assert_eq!(base_name("S24i-30"), "S24i-30");
     }
 
     #[test]
     fn each_display_is_a_card_with_the_settings_it_has() {
         for language in LANGUAGES {
-            let shown = display(
+            let (shown, _) = display(
                 language,
                 true,
                 Some(&[known("S24i-30", true), known("", false)]),
+                &[],
             );
             assert!(shown.note.is_none());
             assert_eq!(shown.screens.len(), 2);
@@ -548,18 +782,19 @@ mod tests {
     #[test]
     fn off_looking_and_none_each_say_something_different() {
         for language in LANGUAGES {
-            let off = display(language, false, Some(&[known("A", true)]))
+            let off = display(language, false, Some(&[known("A", true)]), &[])
+                .0
                 .note
                 .unwrap();
-            let looking = display(language, true, None).note.unwrap();
-            let none = display(language, true, Some(&[])).note.unwrap();
+            let looking = display(language, true, None, &[]).0.note.unwrap();
+            let none = display(language, true, Some(&[]), &[]).0.note.unwrap();
             assert!(!off.0.is_empty() && !off.1.is_empty() && !none.1.is_empty());
             assert_ne!(off.0, looking.0);
             assert_ne!(looking.0, none.0);
         }
         assert_ne!(
-            display(Language::English, false, None).note,
-            display(Language::Vietnamese, false, None).note
+            display(Language::English, false, None, &[]).0.note,
+            display(Language::Vietnamese, false, None, &[]).0.note
         );
     }
 

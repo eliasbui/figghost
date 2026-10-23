@@ -24,6 +24,14 @@ impl Language {
         }
     }
 
+    /// The menu of a display's colour profiles, for VoiceOver.
+    pub fn displays_profile(self) -> &'static str {
+        match self {
+            Language::English => "Color profile",
+            Language::Vietnamese => "Cấu hình màu",
+        }
+    }
+
     /// A display that gives no name of its own.
     pub fn displays_unnamed(self, number: usize) -> String {
         match self {

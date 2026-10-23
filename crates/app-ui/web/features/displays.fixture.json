@@ -1,4 +1,5 @@
 {
   "enabled": true,
-  "keys": false
+  "keys": false,
+  "profiles": true
 }

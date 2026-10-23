@@ -13,6 +13,7 @@ pub mod calendar_ui;
 pub mod camera;
 pub mod capture_overlay;
 pub mod capture_ui;
+pub mod color_profiles;
 pub mod cursor_ui;
 pub mod dayprogress_ui;
 pub mod ddc;
