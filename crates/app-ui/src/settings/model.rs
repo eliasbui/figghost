@@ -1647,6 +1647,7 @@ mod tests {
             "dayprogress",
             "devices",
             "displays",
+            "video",
             "system",
             "snippets",
             "download",

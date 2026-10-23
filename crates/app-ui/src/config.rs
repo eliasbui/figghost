@@ -45,7 +45,7 @@ impl TilingConfig {
 }
 
 /// The tabs of the notch, in their default order.
-pub const NOTCH_PAGES: [&str; 17] = [
+pub const NOTCH_PAGES: [&str; 18] = [
     "clipboard",
     "shelf",
     "media",
@@ -62,6 +62,7 @@ pub const NOTCH_PAGES: [&str; 17] = [
     "system",
     "devices",
     "displays",
+    "video",
     "sound",
 ];
 
@@ -472,6 +473,7 @@ pub struct Config {
     #[serde(deserialize_with = "lenient_section")]
     pub devices: crate::features::devices::Config,
     pub displays: crate::features::displays::Config,
+    pub video: crate::features::video::Config,
     #[serde(deserialize_with = "lenient_section")]
     pub system: crate::features::system::Config,
     #[serde(deserialize_with = "lenient_section")]
@@ -534,6 +536,7 @@ impl Default for Config {
             dayprogress: crate::features::dayprogress::Config::default(),
             devices: crate::features::devices::Config::default(),
             displays: crate::features::displays::Config::default(),
+            video: crate::features::video::Config::default(),
             system: crate::features::system::Config::default(),
             typing: crate::features::typing::Config::default(),
             snippets: crate::features::snippets::Config::default(),
@@ -594,6 +597,7 @@ impl Config {
                 cfg.screentime = cfg.screentime.sanitized();
                 cfg.dayprogress = cfg.dayprogress.sanitized();
                 cfg.devices = cfg.devices.sanitized();
+                cfg.video = cfg.video.sanitized();
                 cfg.system = cfg.system.sanitized();
                 cfg.typing = cfg.typing.sanitized();
                 cfg.snippets = cfg.snippets.sanitized();

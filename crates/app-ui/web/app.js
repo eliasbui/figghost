@@ -1982,7 +1982,7 @@ const CATEGORIES = [
   { id: 'notch', sec: 'notch', icon: 'laptopcomputer', pages: ['notch', 'islands', 'musicwidget'] },
   { id: 'agents', sec: 'notch', icon: 'terminal.fill', pages: ['agents', 'prs'] },
   { id: 'calendar', sec: 'notch', icon: 'calendar', pages: ['calendar', 'pomodoro', 'dayprogress', 'screentime'] },
-  { id: 'tabs', sec: 'notch', icon: 'square.stack.3d.up.fill', pages: ['notes', 'launcher', 'weather'] },
+  { id: 'tabs', sec: 'notch', icon: 'square.stack.3d.up.fill', pages: ['notes', 'launcher', 'weather', 'video'] },
   { id: 'system', sec: 'notch', icon: 'cpu', pages: ['system', 'updates', 'devices', 'displays'] },
   { id: 'scroll', sec: 'mouse', icon: 'computermouse.fill', pages: ['scroll', 'cursor', 'wheel'] },
   { id: 'tiling', sec: 'mouse', icon: 'rectangle.lefthalf.inset.filled', pages: ['tiling', 'pin'] },

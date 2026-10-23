@@ -79,6 +79,7 @@ pub mod translate_ui;
 pub mod typing;
 pub mod ui;
 pub mod usage;
+pub mod video_ui;
 pub mod vision;
 pub mod volume;
 pub mod volumes;

@@ -33,6 +33,7 @@
       { "id": "agents", "title": "Agents", "on": true, "waiting": false },
       { "id": "calendar", "title": "Calendar", "on": true, "waiting": false },
       { "id": "dayprogress", "title": "Day progress", "on": true, "waiting": false },
+      { "id": "video", "title": "Video", "on": true, "waiting": false },
       { "id": "weather", "title": "Weather", "on": true, "waiting": true },
       { "id": "system", "title": "System", "on": true, "waiting": false },
       { "id": "sound", "title": "Sound", "on": false, "waiting": false }

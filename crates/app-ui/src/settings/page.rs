@@ -37,6 +37,7 @@ const FEATURE_SCRIPTS: &[&str] = &[
     include_str!("../../web/features/dayprogress.js"),
     include_str!("../../web/features/devices.js"),
     include_str!("../../web/features/displays.js"),
+    include_str!("../../web/features/video.js"),
     include_str!("../../web/features/system.js"),
     include_str!("../../web/features/typing.js"),
     include_str!("../../web/features/snippets.js"),
@@ -164,6 +165,10 @@ const FEATURE_FIXTURES: &[(&str, &str)] = &[
         include_str!("../../web/features/displays.fixture.json"),
     ),
     (
+        "video",
+        include_str!("../../web/features/video.fixture.json"),
+    ),
+    (
         "system",
         include_str!("../../web/features/system.fixture.json"),
     ),
@@ -227,6 +232,7 @@ const SYMBOLS: &[&str] = &[
     "sun.horizon.fill",
     "headphones",
     "display",
+    "play.rectangle.fill",
     "timer",
     "arrow.triangle.pull",
     "arrow.down.circle",

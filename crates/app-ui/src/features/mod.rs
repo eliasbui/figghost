@@ -49,13 +49,14 @@ pub mod translate;
 pub mod typing;
 pub mod updates;
 pub mod utilities;
+pub mod video;
 pub mod vision;
 pub mod weather;
 pub mod wheel;
 
 /// The tabs of the notch that have a place in the strip only while their feature is on, so that a tab which would only
 /// say "this is off" is not there to be opened. Each follows the `enabled` of its own feature.
-pub(crate) const OPT_IN_TABS: [&str; 11] = [
+pub(crate) const OPT_IN_TABS: [&str; 12] = [
     "notes",
     "launcher",
     "weather",
@@ -67,6 +68,7 @@ pub(crate) const OPT_IN_TABS: [&str; 11] = [
     "system",
     "devices",
     "displays",
+    "video",
 ];
 
 /// Whether this tab is out of the strip for now because its feature is off.
@@ -83,6 +85,7 @@ pub fn tab_waits(id: &str, config: &Config) -> bool {
         "system" => !config.system.enabled,
         "devices" => !config.devices.enabled,
         "displays" => !config.displays.enabled,
+        "video" => !config.video.enabled,
         _ => false,
     }
 }
@@ -286,6 +289,7 @@ pub struct Features {
     pub dayprogress: Option<Rc<dayprogress::Feature>>,
     pub devices: Option<Rc<devices::Feature>>,
     pub displays: Option<Rc<displays::Feature>>,
+    pub video: Option<Rc<video::Feature>>,
     pub system: Option<Rc<system::Feature>>,
     pub typing: Option<Rc<typing::Feature>>,
     pub snippets: Option<Rc<snippets::Feature>>,
@@ -329,6 +333,7 @@ impl Features {
             system: system::attach(env),
             devices: devices::attach(env),
             displays: displays::attach(env),
+            video: video::attach(env),
             snippets: snippets::attach(typing.as_ref()),
             typing,
             download: download::attach(env),
@@ -551,6 +556,10 @@ impl Features {
                 .displays
                 .as_ref()
                 .map_or(Ok(()), |f| f.configure(&config.displays)),
+            "video" => self
+                .video
+                .as_ref()
+                .map_or(Ok(()), |f| f.configure(&config.video)),
             "system" => self
                 .system
                 .as_ref()
@@ -979,6 +988,7 @@ pub fn state(
         "displays".into(),
         displays::settings::state(&config.displays),
     );
+    root.insert("video".into(), video::settings::state(&config.video));
     root.insert(
         "mole".into(),
         mole::settings::state(runtime.get("mole").unwrap_or(&none)),
@@ -1067,6 +1077,9 @@ pub fn set(config: &mut Config, path: &str, value: &Value) -> Option<Result<&'st
         }
         "displays" => displays::settings::set(&mut config.displays, rest, value)
             .map(|r| r.map(|()| "displays")),
+        "video" => {
+            video::settings::set(&mut config.video, rest, value).map(|r| r.map(|()| "video"))
+        }
         "typing" => {
             typing::settings::set(&mut config.typing, rest, value).map(|r| r.map(|()| "typing"))
         }

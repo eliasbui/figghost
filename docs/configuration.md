@@ -77,6 +77,7 @@
       "dayprogress": { "enabled": false, "wake": 7, "bed": 23, "reminders": true },
       "devices": { "enabled": false, "low_at": 20 },
       "displays": { "enabled": false, "keys": false },
+      "video": { "enabled": false, "url": "" },
       "weather": { "enabled": false, "units": "metric", "places": [{ "name": "Hanoi", "region": "", "country": "Vietnam", "latitude": 21.0245, "longitude": 105.84117 }] },
       "system": { "enabled": false, "seconds": 1, "processor": true, "memory": true, "network": true, "details": true },
       "typing": { "enabled": false, "method": "telex", "modern_tone": true, "english_restore": true, "shortcut": "ctrl+space", "apps": ["com.example.game"] },
