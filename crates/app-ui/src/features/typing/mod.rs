@@ -5,6 +5,9 @@
 //! thread, so that the system's own use of the same keys never gets it first), the entry in the menu bar panel and
 //! the notice on the notch. Another Vietnamese input method at work would put every mark twice, so while one runs
 //! every key is left alone and the settings page says why.
+//!
+//! The same keyboard also serves snippets (`features::snippets`), which is why it can run with Vietnamese typing off:
+//! it then starts in English, has no shortcut, and shows no badge or menu entry.
 
 use super::{AttachEnv, islands};
 use crate::{config::parse_hotkey, i18n, menu::symbols, settings::model::Fault};
@@ -160,6 +163,7 @@ impl Config {
             },
             toggle: chord_of(&self.shortcut),
             excluded: self.apps.clone(),
+            snippets: Vec::new(),
         }
     }
 }
@@ -235,6 +239,8 @@ pub struct Feature {
     /// The name of another Vietnamese input method that is running.
     other: RefCell<Option<String>>,
     names: RefCell<HashMap<String, String>>,
+    /// The abbreviations the keyboard replaces; empty while snippets are off.
+    snippets: RefCell<Vec<core_typing::Snippet>>,
     /// The item of the menu bar that shows the language.
     tray: RefCell<Option<TextItem>>,
     me: Weak<Feature>,
@@ -252,6 +258,7 @@ pub fn attach(env: &AttachEnv) -> Option<Rc<Feature>> {
         recording: Cell::new(false),
         other: RefCell::default(),
         names: RefCell::default(),
+        snippets: RefCell::new(env.config.snippets.clone().sanitized().list()),
         tray: RefCell::default(),
         me: me.clone(),
     });
@@ -262,14 +269,23 @@ pub fn attach(env: &AttachEnv) -> Option<Rc<Feature>> {
 
 impl Feature {
     fn apply(&self, config: &Config) {
+        let was_on = self.config.borrow().enabled;
         *self.config.borrow_mut() = config.clone();
-        if !config.enabled {
+        if !self.wanted() {
             self.stop();
             return;
         }
-        *self.other.borrow_mut() = typing::other_input_method();
+        *self.other.borrow_mut() = if config.enabled {
+            typing::other_input_method()
+        } else {
+            None
+        };
         if let Some(keyboard) = &*self.keyboard.borrow() {
-            keyboard.configure(config.keyboard());
+            keyboard.configure(self.settings());
+            // Typing starts in Vietnamese each time it is switched on, and is English while only snippets run.
+            if config.enabled != was_on {
+                keyboard.set_vietnamese(config.enabled);
+            }
             keyboard.set_paused(self.paused());
         } else {
             self.start();
@@ -277,17 +293,46 @@ impl Feature {
         self.refresh_badges();
     }
 
+    /// The keyboard runs while Vietnamese typing or snippets need it.
+    fn wanted(&self) -> bool {
+        self.config.borrow().enabled || !self.snippets.borrow().is_empty()
+    }
+
+    /// What the keyboard side needs: the shortcut that switches the language only while Vietnamese typing is on.
+    fn settings(&self) -> core_typing::Settings {
+        let config = self.config.borrow();
+        let mut settings = config.keyboard();
+        if !config.enabled {
+            settings.toggle = None;
+        }
+        settings.snippets = self.snippets.borrow().clone();
+        settings
+    }
+
+    /// Takes a new list of snippets (empty for none), starting or stopping the keyboard as needed.
+    pub fn set_snippets(&self, snippets: Vec<core_typing::Snippet>) {
+        *self.snippets.borrow_mut() = snippets;
+        let config = self.config.borrow().clone();
+        self.apply(&config);
+    }
+
+    /// The name of another Vietnamese input method that is running, while Vietnamese typing is on.
+    pub fn other(&self) -> Option<String> {
+        self.other.borrow().clone()
+    }
+
     fn paused(&self) -> bool {
         self.recording.get() || self.other.borrow().is_some()
     }
 
     fn start(&self) {
-        if self.keyboard.borrow().is_some() || !self.config.borrow().enabled {
+        if self.keyboard.borrow().is_some() || !self.wanted() {
             return;
         }
-        let settings = self.config.borrow().keyboard();
+        let settings = self.settings();
+        let vietnamese = self.config.borrow().enabled;
         let frontmost = workspace::frontmost_app().map(|a| a.bundle_id);
-        match Keyboard::start(settings, true, frontmost, on_toggle, on_chord_taken) {
+        match Keyboard::start(settings, vietnamese, frontmost, on_toggle, on_chord_taken) {
             Ok(keyboard) => {
                 keyboard.set_paused(self.paused());
                 keyboard.set_capture(self.recording.get());
@@ -326,7 +371,7 @@ impl Feature {
             let config = self.config.borrow();
             (config.notch_badge, config.tray_badge)
         };
-        let running = self.is_running();
+        let running = self.typing_on();
         let vietnamese = self.is_vietnamese();
         let word = if vietnamese { "VI" } else { "EN" };
         if let Some(notch) = self.notch.as_ref().and_then(Weak::upgrade) {
@@ -407,6 +452,11 @@ impl Feature {
         self.keyboard.borrow().is_some()
     }
 
+    /// Vietnamese typing itself is on and its keyboard runs; the keyboard may also run for snippets alone.
+    fn typing_on(&self) -> bool {
+        self.config.borrow().enabled && self.is_running()
+    }
+
     pub fn is_vietnamese(&self) -> bool {
         self.keyboard
             .borrow()
@@ -416,6 +466,9 @@ impl Feature {
 
     /// Switches between Vietnamese and English, as the shortcut does.
     pub fn toggle(&self) {
+        if !self.typing_on() {
+            return;
+        }
         let now = {
             let keyboard = self.keyboard.borrow();
             let Some(keyboard) = keyboard.as_ref() else {
@@ -514,7 +567,7 @@ impl Feature {
             })
             .symbol(symbols::TYPING)
             .checked(move || mark.upgrade().is_some_and(|f| f.is_vietnamese()))
-            .visible_when(move || shown.upgrade().is_some_and(|f| f.is_running())),
+            .visible_when(move || shown.upgrade().is_some_and(|f| f.typing_on())),
         )]
     }
 }

@@ -1,0 +1,28 @@
+/* Snippets. Styles for the page in web/features/snippets.js, using the variables at the top of app.css. */
+.snip-form { display: flex; flex-direction: column; gap: 8px; width: 100%; }
+.snip-form.disabled { opacity: 0.5; pointer-events: none; }
+.snip-label { display: flex; flex-direction: column; gap: 4px; color: var(--text-2); font-size: var(--fs-small); }
+.snip-form input.snip-abbr { font-family: var(--mono); }
+textarea.snip-text {
+  width: 100%; min-height: 96px; max-height: 360px; padding: 8px 12px; border: 0; border-radius: var(--r-field);
+  background: var(--field); color: var(--text); font: var(--fs-body) var(--mono); line-height: 1.45;
+  box-shadow: inset 0 0 0 1px var(--field-edge); resize: vertical;
+}
+textarea.snip-text::placeholder { color: var(--text-3); }
+.snip-error { min-height: 1.3em; color: var(--bad); }
+.snip-actions { display: flex; gap: 8px; }
+.snip-list { display: flex; flex-direction: column; width: 100%; }
+.snip-item { display: flex; align-items: flex-start; gap: 12px; padding: 8px 0; }
+.snip-item + .snip-item { border-top: 1px solid var(--line, rgba(128, 128, 128, 0.18)); }
+.snip-chip {
+  flex: 0 0 auto; min-width: 64px; max-width: 160px; overflow: hidden; text-overflow: ellipsis; white-space: nowrap;
+  padding: 2px 8px; border-radius: var(--r-thumb); text-align: center; background: var(--fill); color: var(--text);
+  font: 12px var(--mono);
+}
+.snip-main { flex: 1 1 auto; min-width: 0; }
+.snip-preview {
+  color: var(--text); font-size: var(--fs-body); overflow: hidden; display: -webkit-box;
+  -webkit-line-clamp: 2; -webkit-box-orient: vertical; word-break: break-word;
+}
+.snip-warn { color: var(--warn); }
+.snip-tools { display: flex; gap: 4px; flex: 0 0 auto; }

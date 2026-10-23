@@ -4,12 +4,19 @@
 //! typed again with its marks. `plan` says how each app wants that typing posted.
 //!
 //! Key codes are the macOS virtual key codes of an ANSI keyboard, which is what the engine reads.
+//!
+//! Snippets (`snippets`) ride on the same stream of keys: an abbreviation typed in any app is taken back and a longer
+//! text put in its place, with Vietnamese typing on or off.
 
 use gonhanh_core::engine::{Action as EngineAction, Engine};
 
 mod plan;
+mod snippets;
 
 pub use plan::{Delays, Delivery, Plan, plan_for};
+pub use snippets::{
+    AbbrError, Expansion, MAX_ABBR, MAX_SNIPPETS, MAX_TEXT, Matcher, Snippet, char_of, check_abbr,
+};
 
 /// The virtual key codes the rules name.
 pub mod key {
@@ -317,6 +324,8 @@ pub struct Settings {
     pub toggle: Option<Chord>,
     /// Bundle identifiers of the apps where typing stays as it is.
     pub excluded: Vec<String>,
+    /// The abbreviations to replace, in any app that is not another device. Empty for none.
+    pub snippets: Vec<Snippet>,
 }
 
 /// What the keyboard reports, of what matters here.
@@ -350,6 +359,14 @@ pub enum Action {
         text: String,
         then: Then,
     },
+    /// The key completed an abbreviation: hold it back, delete `delete` characters before the cursor and put `text`
+    /// there, typed or pasted as `paste` says, the way `plan` says to get to the cursor.
+    Expand {
+        plan: Plan,
+        delete: usize,
+        text: String,
+        paste: bool,
+    },
 }
 
 fn is_discord(app: &str) -> bool {
@@ -359,13 +376,17 @@ fn is_discord(app: &str) -> bool {
 /// One keyboard's worth of typing: the typist, and the choices that decide when it may act.
 pub struct Session {
     typist: Typist,
+    matcher: Matcher,
     settings: Settings,
 }
 
 impl Session {
     pub fn new(settings: Settings) -> Self {
+        let mut matcher = Matcher::default();
+        matcher.set(settings.snippets.clone());
         Self {
             typist: Typist::new(settings.options),
+            matcher,
             settings,
         }
     }
@@ -374,12 +395,16 @@ impl Session {
         if settings.options != self.settings.options {
             self.typist.set_options(settings.options);
         }
+        if settings.snippets != self.settings.snippets {
+            self.matcher.set(settings.snippets.clone());
+        }
         self.settings = settings;
     }
 
     /// The focus moved to another app.
     pub fn forget(&mut self) {
         self.typist.forget();
+        self.matcher.reset();
     }
 
     /// `vietnamese` is false while typing is switched to English.
@@ -388,10 +413,11 @@ impl Session {
             Event::Key(key) => key,
             Event::ControlDown => {
                 self.typist.control_down();
+                self.matcher.reset();
                 return Action::Pass;
             }
             Event::Click => {
-                self.typist.forget();
+                self.forget();
                 return Action::Pass;
             }
         };
@@ -400,7 +426,7 @@ impl Session {
             .toggle
             .is_some_and(|chord| chord.matches(&key))
         {
-            self.typist.forget();
+            self.forget();
             return Action::Toggle;
         }
         let excluded = focus
@@ -410,11 +436,41 @@ impl Session {
         // Discord sends the message on Return, before a restored word could reach it.
         let discord_return = (key.code == key::RETURN || key.code == key::ENTER)
             && focus.app.is_some_and(is_discord);
-        if !vietnamese || excluded || plan.delivery == Delivery::Passthrough || discord_return {
-            self.typist.forget();
+        if plan.delivery == Delivery::Passthrough {
+            self.forget();
             return Action::Pass;
         }
-        match self.typist.key(key) {
+        // An app where typing is left alone still gets its snippets: the keys are then simply what they are.
+        let verdict = if vietnamese && !excluded && !discord_return {
+            self.typist.key(key)
+        } else {
+            self.typist.forget();
+            Verdict::Pass
+        };
+        // macOS hides the keys of a password field from taps while Secure Input is on; a field that says what it is
+        // is left alone too, for an app that does not turn that on.
+        let expansion = if focus.role == Some("AXSecureTextField") {
+            self.matcher.reset();
+            None
+        } else {
+            self.matcher.key(&key, &verdict)
+        };
+        if let Some(Expansion {
+            delete,
+            text,
+            paste,
+        }) = expansion
+        {
+            // What the typist held of the word is not on the screen any more.
+            self.typist.forget();
+            return Action::Expand {
+                plan,
+                delete,
+                text,
+                paste,
+            };
+        }
+        match verdict {
             Verdict::Pass => Action::Pass,
             Verdict::Replace { delete, text, then } => Action::Type {
                 plan,
@@ -738,6 +794,7 @@ mod tests {
                 ..Chord::default()
             }),
             excluded: vec!["com.apple.Terminal".into()],
+            snippets: Vec::new(),
         })
     }
 
@@ -755,6 +812,7 @@ mod tests {
                 Action::Type {
                     delete, text, then, ..
                 } => field.apply(c, Verdict::Replace { delete, text, then }),
+                Action::Expand { .. } => panic!("there are no snippets"),
             }
         }
     }
@@ -769,6 +827,7 @@ mod tests {
                 Action::Type {
                     delete, text, then, ..
                 } => field.apply(c, Verdict::Replace { delete, text, then }),
+                Action::Expand { .. } => panic!("there are no snippets"),
             }
         }
         field.text()
@@ -873,5 +932,150 @@ mod tests {
         session.configure(settings);
         type_into(&mut session, &mut field, NOTES, " a6");
         assert_eq!(field.text(), "việ â");
+    }
+
+    fn with_snippets(pairs: &[(&str, &str)]) -> Session {
+        let mut settings = session().settings.clone();
+        settings.snippets = pairs
+            .iter()
+            .map(|(abbr, text)| Snippet {
+                abbr: (*abbr).into(),
+                text: (*text).into(),
+            })
+            .collect();
+        Session::new(settings)
+    }
+
+    /// Types `keys` through a session into a field, the way the tap does, and returns what the field holds.
+    fn expanded(session: &mut Session, focus: Focus<'_>, vietnamese: bool, keys: &str) -> String {
+        let mut field = Field::default();
+        for c in keys.chars() {
+            match session.handle(Event::Key(press(c)), focus, vietnamese) {
+                Action::Pass => field.take(c),
+                Action::Toggle => panic!("{c:?} is not the shortcut"),
+                Action::Type {
+                    delete, text, then, ..
+                } => field.apply(c, Verdict::Replace { delete, text, then }),
+                Action::Expand { delete, text, .. } => {
+                    for _ in 0..delete {
+                        field.0.pop();
+                    }
+                    field.0.extend(text.chars());
+                }
+            }
+        }
+        field.text()
+    }
+
+    #[test]
+    fn a_snippet_is_expanded_with_vietnamese_typing_on_and_off() {
+        for vietnamese in [true, false] {
+            let mut session = with_snippets(&[(";sig", "Best regards")]);
+            assert_eq!(
+                expanded(&mut session, NOTES, vietnamese, "Hi, ;sig"),
+                "Hi, Best regards",
+                "vietnamese: {vietnamese}"
+            );
+        }
+    }
+
+    #[test]
+    fn telex_leaves_the_characters_before_an_abbreviation_alone() {
+        // `;dd` shows as `;đ`: two characters for three keys. A deletion of three would eat the `a` before it.
+        let mut session = with_snippets(&[(";dd", "Do not disturb")]);
+        assert_eq!(
+            expanded(&mut session, NOTES, true, "a ;dd"),
+            "a Do not disturb"
+        );
+        // No space between: the word before it is not touched either, and typing goes on in Vietnamese after.
+        let mut session = with_snippets(&[(";dd", "Do not disturb")]);
+        assert_eq!(
+            expanded(&mut session, NOTES, true, "ba;dd Vieejt"),
+            "baDo not disturb Việt"
+        );
+    }
+
+    #[test]
+    fn a_snippet_is_expanded_where_typing_is_left_alone_but_not_for_another_device() {
+        let terminal = Focus {
+            app: Some("com.apple.Terminal"),
+            role: Some("AXTextArea"),
+        };
+        let mut session = with_snippets(&[(";sig", "Best regards")]);
+        assert_eq!(
+            expanded(&mut session, terminal, true, ";sig"),
+            "Best regards"
+        );
+        let mirroring = Focus {
+            app: Some("com.apple.ScreenContinuity"),
+            role: None,
+        };
+        assert_eq!(expanded(&mut session, mirroring, true, ";sig"), ";sig");
+    }
+
+    #[test]
+    fn a_password_field_is_never_read_for_abbreviations() {
+        let secure = Focus {
+            app: Some("com.apple.Safari"),
+            role: Some("AXSecureTextField"),
+        };
+        let mut session = with_snippets(&[(";sig", "Best regards")]);
+        assert_eq!(expanded(&mut session, secure, false, ";sig"), ";sig");
+        // Nothing typed there is remembered either: the rest of an abbreviation typed outside does not complete it.
+        expanded(&mut session, NOTES, false, ";si");
+        expanded(&mut session, secure, false, "x");
+        assert_eq!(expanded(&mut session, NOTES, false, "g"), "g");
+    }
+
+    #[test]
+    fn a_click_and_a_new_app_start_the_abbreviation_again() {
+        let mut session = with_snippets(&[(";sig", "Best regards")]);
+        assert_eq!(expanded(&mut session, NOTES, false, ";si"), ";si");
+        assert_eq!(session.handle(Event::Click, NOTES, false), Action::Pass);
+        assert_eq!(expanded(&mut session, NOTES, false, "g"), "g");
+        expanded(&mut session, NOTES, false, ";si");
+        session.forget();
+        assert_eq!(expanded(&mut session, NOTES, false, "g"), "g");
+        expanded(&mut session, NOTES, false, ";si");
+        session.handle(Event::ControlDown, NOTES, false);
+        assert_eq!(expanded(&mut session, NOTES, false, "g"), "g");
+    }
+
+    #[test]
+    fn new_snippets_take_effect_and_unchanged_ones_keep_the_buffer() {
+        let mut session = with_snippets(&[(";a", "A")]);
+        expanded(&mut session, NOTES, false, ";x");
+        let mut settings = session.settings.clone();
+        settings.excluded.clear();
+        session.configure(settings.clone());
+        assert_eq!(expanded(&mut session, NOTES, false, "y"), "y");
+        settings.snippets.push(Snippet {
+            abbr: ";b".into(),
+            text: "B".into(),
+        });
+        session.configure(settings);
+        assert_eq!(expanded(&mut session, NOTES, false, ";b"), "B");
+        assert_eq!(expanded(&mut session, NOTES, false, ";a"), "A");
+    }
+
+    #[test]
+    fn the_plan_of_the_app_comes_with_the_expansion() {
+        let mut session = with_snippets(&[(";a", "A\nB")]);
+        let focus = Focus {
+            app: Some("com.microsoft.VSCode"),
+            role: Some("AXTextArea"),
+        };
+        session.handle(Event::Key(press(';')), focus, false);
+        let Action::Expand {
+            plan,
+            delete,
+            text,
+            paste,
+        } = session.handle(Event::Key(press('a')), focus, false)
+        else {
+            panic!("the second key completes the abbreviation");
+        };
+        assert_eq!(plan, plan_for(focus.app, focus.role));
+        assert_eq!((delete, text.as_str(), paste), (1, "A\nB", true));
     }
 }

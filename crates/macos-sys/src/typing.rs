@@ -6,10 +6,14 @@
 //! How the text is posted depends on the app and on the element that has the focus (see `core_typing::plan`). Asking
 //! another app what has its focus is a message that a busy app answers late, and a tap that waits is switched off by
 //! the system, so a thread of its own asks and the tap reads the last answer.
+//!
+//! The same tap puts snippets in: when the keys complete an abbreviation, the key is held back, the abbreviation is
+//! deleted the way the app wants deletions posted, and the text is typed or pasted (see `Poster::expand`).
 
 use crate::{
     ax::Element,
     event_tap::{self, EventTap, EventView, TapError, Verdict, field},
+    pasteboard::{Pasteboard, Snapshot},
     synth::SELF_TAG,
     workspace,
 };
@@ -19,7 +23,7 @@ use std::{
     ffi::c_void,
     sync::{
         Arc, Mutex, PoisonError,
-        atomic::{AtomicBool, Ordering},
+        atomic::{AtomicBool, AtomicU64, Ordering},
         mpsc,
     },
     thread,
@@ -41,6 +45,7 @@ const FLAG_SHIFT: u64 = 0x0002_0000;
 const FLAG_CONTROL: u64 = 0x0004_0000;
 const FLAG_OPTION: u64 = 0x0008_0000;
 const FLAG_COMMAND: u64 = 0x0010_0000;
+const KEY_V: u16 = 9;
 
 const SESSION_EVENT_TAP: u32 = 1;
 /// `kCGEventSourceStatePrivate`: the posted keys carry only the modifiers set on them, never those the person holds.
@@ -49,6 +54,10 @@ const SOURCE_STATE_PRIVATE: i32 = -1;
 const MAX_CHUNK: usize = 20;
 /// A narrow no-break space, typed and deleted again to dismiss the suggestion of an address bar.
 const DISMISS: &str = "\u{202F}";
+
+/// How long a pasted snippet stays on the pasteboard before the person's own clipboard is put back. The app reads
+/// the pasteboard when it handles the paste, which a busy one does late.
+const RESTORE_AFTER: Duration = Duration::from_millis(500);
 
 /// How old the answer about the focus may be before the next key asks again.
 const FOCUS_FRESH: Duration = Duration::from_millis(250);
@@ -177,6 +186,63 @@ fn replace_in_field(delete: usize, text: &str) -> bool {
     true
 }
 
+/// The person's clipboard, kept while a snippet is on the pasteboard in its place.
+struct Held {
+    saved: Snapshot,
+    /// The change count the pasteboard had once the snippet was written; any other count means someone copied since.
+    count: isize,
+    ticket: u64,
+}
+
+static HELD: Mutex<Option<Held>> = Mutex::new(None);
+static TICKETS: AtomicU64 = AtomicU64::new(0);
+
+/// Puts a snippet on the pasteboard to be pasted, keeping what the person had there. The snippet is marked as passing
+/// so the clipboard history does not record it; the clipboard is put back by `unstage`. Returns the ticket to give
+/// it, or `None`, with nothing touched, when the clipboard cannot be kept in full (a promised file that fails to
+/// arrive): losing it is worse than not expanding.
+fn stage(board: &Pasteboard, text: &str) -> Option<u64> {
+    let mut held = HELD.lock().unwrap_or_else(PoisonError::into_inner);
+    // A snippet still waiting to be taken off is what the pasteboard holds now; the person's clipboard is what was
+    // saved before it.
+    let saved = match held.take() {
+        Some(earlier) => earlier.saved,
+        None => board.snapshot()?,
+    };
+    let count = board.write_transient(text);
+    let ticket = TICKETS.fetch_add(1, Ordering::Relaxed) + 1;
+    *held = Some(Held {
+        saved,
+        count,
+        ticket,
+    });
+    Some(ticket)
+}
+
+/// Puts the person's clipboard back, unless a later snippet has taken over or someone copied something since: that is
+/// newer, and is left alone.
+fn unstage(board: &Pasteboard, ticket: u64) {
+    let mut held = HELD.lock().unwrap_or_else(PoisonError::into_inner);
+    if held.as_ref().is_none_or(|h| h.ticket != ticket) {
+        return;
+    }
+    if let Some(h) = held.take()
+        && board.change_count() == h.count
+    {
+        board.restore(&h.saved);
+    }
+}
+
+/// `unstage` once the app has had time to read the paste, off the tap's thread so that no key waits for it.
+fn unstage_later(ticket: u64) {
+    let _ = thread::Builder::new()
+        .name("fig-snippet-restore".into())
+        .spawn(move || {
+            thread::sleep(RESTORE_AFTER);
+            objc2::rc::autoreleasepool(|_| unstage(&Pasteboard::general(), ticket));
+        });
+}
+
 /// Posts key events that carry only what is set on them, each stamped as this app's own.
 struct Poster(*mut c_void);
 
@@ -232,7 +298,45 @@ impl Poster {
     }
 
     /// Deletes `delete` characters before the cursor and types `text` the way `plan` says.
-    fn replace(&self, plan: &Plan, mut delete: usize, text: &str) {
+    fn replace(&self, plan: &Plan, delete: usize, text: &str) {
+        self.put(plan, delete, text, false);
+    }
+
+    /// The same for a snippet. A text of one short line is typed like any replacement. Any other is pasted, because
+    /// typing a line break means pressing Return, which sends a message in a chat app, and a long text typed key by
+    /// key holds the keyboard for seconds. A paste borrows the pasteboard: the person's clipboard is saved first, the
+    /// text goes on it marked as passing (no clipboard history keeps it), Command+V is posted, and the clipboard is
+    /// put back half a second later unless something was copied meanwhile. `false`, with nothing done, when the
+    /// clipboard cannot be saved in full; the abbreviation then stays as it was typed.
+    fn expand(&self, plan: &Plan, delete: usize, text: &str, paste: bool) -> bool {
+        let ticket = if paste {
+            match stage(&Pasteboard::general(), text) {
+                Some(ticket) => Some(ticket),
+                None => return false,
+            }
+        } else {
+            None
+        };
+        let pasted = self.put(plan, delete, text, ticket.is_some());
+        match ticket {
+            Some(ticket) if pasted => unstage_later(ticket),
+            Some(ticket) => unstage(&Pasteboard::general(), ticket),
+            None => {}
+        }
+        true
+    }
+
+    /// Puts the text in, by typing it or by pasting it with Command+V. Returns whether it was left to a paste.
+    fn insert(&self, text: &str, size: usize, gap: u32, paste: bool) -> bool {
+        if paste {
+            self.key(KEY_V, FLAG_COMMAND);
+        } else {
+            self.text(text, size, gap);
+        }
+        paste
+    }
+
+    fn put(&self, plan: &Plan, mut delete: usize, text: &str, paste: bool) -> bool {
         let d = plan.delays;
         let size = if plan.delivery == Delivery::CharByChar {
             1
@@ -240,7 +344,7 @@ impl Poster {
             MAX_CHUNK
         };
         match plan.delivery {
-            Delivery::Passthrough => return,
+            Delivery::Passthrough => return false,
             Delivery::Selection if !text.is_empty() => {
                 for _ in 0..delete {
                     self.key(key::LEFT, FLAG_SHIFT);
@@ -249,9 +353,9 @@ impl Poster {
                 if delete > 0 {
                     pause(d.after_delete);
                 }
-                self.text(text, size, d.text);
+                let pasted = self.insert(text, size, d.text, paste);
                 pause(d.settle);
-                return;
+                return pasted;
             }
             Delivery::EmptyCharPrefix => {
                 self.text(DISMISS, size, 0);
@@ -260,7 +364,7 @@ impl Poster {
             }
             Delivery::AxDirect if replace_in_field(delete, text) => {
                 pause(d.settle);
-                return;
+                return false;
             }
             Delivery::ClearSuggestion | Delivery::AxDirect => {
                 self.key(key::FORWARD_DELETE, 0);
@@ -275,8 +379,9 @@ impl Poster {
         if delete > 0 {
             pause(d.after_delete);
         }
-        self.text(text, size, d.text);
+        let pasted = self.insert(text, size, d.text, paste);
         pause(d.settle);
+        pasted
     }
 }
 
@@ -571,6 +676,18 @@ impl Tap {
                     _ => Verdict::Drop,
                 }
             }
+            Action::Expand {
+                plan,
+                delete,
+                text,
+                paste,
+            } => {
+                if self.poster.expand(&plan, delete, &text, paste) {
+                    Verdict::Drop
+                } else {
+                    Verdict::Pass
+                }
+            }
         }
     }
 
@@ -683,10 +800,49 @@ mod tests {
     }
 
     #[test]
+    fn a_pasted_snippet_gives_the_clipboard_back_unless_something_was_copied() {
+        // A private pasteboard: the person's own is never touched by a test.
+        let board = Pasteboard::named(&format!("figghost-snippets-test-{}", std::process::id()));
+        board.write(crate::pasteboard::Write::Text("mine"));
+        let first = stage(&board, "first").unwrap();
+        assert_eq!(board.string().as_deref(), Some("first"));
+        assert!(
+            board
+                .types()
+                .iter()
+                .any(|t| t == "org.nspasteboard.TransientType"),
+            "marked as passing, so no history keeps it"
+        );
+        // A second snippet before the first is taken off: what the person had is still what comes back.
+        let second = stage(&board, "second").unwrap();
+        unstage(&board, first);
+        assert_eq!(
+            board.string().as_deref(),
+            Some("second"),
+            "the first restore is stale: the second snippet is still being pasted"
+        );
+        unstage(&board, second);
+        assert_eq!(board.string().as_deref(), Some("mine"));
+        // Something copied while the snippet waited is newer than the clipboard that was saved.
+        let third = stage(&board, "third").unwrap();
+        board.write(crate::pasteboard::Write::Text("copied meanwhile"));
+        unstage(&board, third);
+        assert_eq!(board.string().as_deref(), Some("copied meanwhile"));
+        board.release();
+    }
+
+    #[test]
     fn the_keyboard_can_be_started_and_dropped() {
         // Without Accessibility access macOS refuses the tap and there is nothing to drop. English, so that a
         // person typing meanwhile is not changed.
         if let Ok(keyboard) = Keyboard::start(Settings::default(), false, None, |_| {}, |_, _| {}) {
+            keyboard.configure(Settings {
+                snippets: vec![core_typing::Snippet {
+                    abbr: ";a".into(),
+                    text: "A".into(),
+                }],
+                ..Settings::default()
+            });
             keyboard.configure(Settings::default());
             keyboard.set_capture(false);
             keyboard.app_changed(Some("com.apple.TextEdit".into()));
