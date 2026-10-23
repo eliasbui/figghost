@@ -47,6 +47,7 @@ pub mod stack;
 pub mod system;
 pub mod translate;
 pub mod typing;
+pub mod updates;
 pub mod utilities;
 pub mod vision;
 pub mod weather;
@@ -54,11 +55,12 @@ pub mod wheel;
 
 /// The tabs of the notch that have a place in the strip only while their feature is on, so that a tab which would only
 /// say "this is off" is not there to be opened. Each follows the `enabled` of its own feature.
-pub(crate) const OPT_IN_TABS: [&str; 10] = [
+pub(crate) const OPT_IN_TABS: [&str; 11] = [
     "notes",
     "launcher",
     "weather",
     "prs",
+    "updates",
     "pomodoro",
     "screentime",
     "dayprogress",
@@ -74,6 +76,7 @@ pub fn tab_waits(id: &str, config: &Config) -> bool {
         "launcher" => !config.launcher.enabled,
         "weather" => !config.weather.enabled,
         "prs" => !config.prs.enabled,
+        "updates" => !config.updates.enabled,
         "pomodoro" => !config.pomodoro.enabled,
         "screentime" => !config.screentime.enabled,
         "dayprogress" => !config.dayprogress.enabled,
@@ -150,6 +153,20 @@ pub(crate) fn run_bounded_with(
     envs: &[(&str, &str)],
     seconds: u64,
 ) -> Result<String, Ran> {
+    match run_bounded_output(program, args, envs, seconds)? {
+        (true, text) => Ok(text),
+        (false, _) => Err(Ran::Failed),
+    }
+}
+
+/// The same, giving back what it printed whether or not it said it failed, with whether it succeeded: some tools,
+/// such as `npm outdated`, report what they found with a failing status.
+pub(crate) fn run_bounded_output(
+    program: &str,
+    args: &[&str],
+    envs: &[(&str, &str)],
+    seconds: u64,
+) -> Result<(bool, String), Ran> {
     let mut child = Command::new(program)
         .args(args)
         .envs(envs.iter().copied())
@@ -199,10 +216,13 @@ pub(crate) fn run_bounded_with(
                     }
                 };
                 let printed = text.lock().unwrap_or_else(PoisonError::into_inner).clone();
-                return if status.success() && !too_much {
-                    Ok(String::from_utf8_lossy(&printed).into_owned())
-                } else {
+                return if too_much {
                     Err(Ran::Failed)
+                } else {
+                    Ok((
+                        status.success(),
+                        String::from_utf8_lossy(&printed).into_owned(),
+                    ))
                 };
             }
             Ok(None) if Instant::now() < deadline => {
@@ -261,6 +281,7 @@ pub struct Features {
     pub weather: Option<Rc<weather::Feature>>,
     pub pomodoro: Option<Rc<pomodoro::Feature>>,
     pub prs: Option<Rc<prs::Feature>>,
+    pub updates: Option<Rc<updates::Feature>>,
     pub screentime: Option<Rc<screentime::Feature>>,
     pub dayprogress: Option<Rc<dayprogress::Feature>>,
     pub devices: Option<Rc<devices::Feature>>,
@@ -302,6 +323,7 @@ impl Features {
             weather: weather::attach(env),
             pomodoro: pomodoro::attach(env),
             prs: prs::attach(env),
+            updates: updates::attach(env),
             screentime: screentime::attach(env),
             dayprogress: dayprogress::attach(env),
             system: system::attach(env),
@@ -388,6 +410,9 @@ impl Features {
         }
         if let Some(f) = &self.prs {
             out.insert("prs", f.runtime());
+        }
+        if let Some(f) = &self.updates {
+            out.insert("updates", f.runtime());
         }
         if let Some(f) = &self.screentime {
             out.insert("screentime", f.runtime());
@@ -506,6 +531,10 @@ impl Features {
                 .prs
                 .as_ref()
                 .map_or(Ok(()), |f| f.configure(&config.prs)),
+            "updates" => self
+                .updates
+                .as_ref()
+                .map_or(Ok(()), |f| f.configure(&config.updates)),
             "screentime" => self
                 .screentime
                 .as_ref()
@@ -741,6 +770,11 @@ impl Features {
         {
             return Some(result);
         }
+        if let Some(f) = &self.updates
+            && let Some(result) = f.action(name)
+        {
+            return Some(result);
+        }
         if let Some(f) = &self.screentime
             && let Some(result) = f.action(name)
         {
@@ -921,6 +955,10 @@ pub fn state(
         prs::settings::state(&config.prs, runtime.get("prs").unwrap_or(&none)),
     );
     root.insert(
+        "updates".into(),
+        updates::settings::state(&config.updates, runtime.get("updates").unwrap_or(&none)),
+    );
+    root.insert(
         "pomodoro".into(),
         pomodoro::settings::state(&config.pomodoro, runtime.get("pomodoro").unwrap_or(&none)),
     );
@@ -1013,6 +1051,8 @@ pub fn set(config: &mut Config, path: &str, value: &Value) -> Option<Result<&'st
             weather::settings::set(&mut config.weather, rest, value).map(|r| r.map(|()| "weather"))
         }
         "prs" => prs::settings::set(&mut config.prs, rest, value).map(|r| r.map(|()| "prs")),
+        "updates" => updates::settings::set(&mut config.updates, rest, value)
+            .map(|r| r.map(|()| "updates")),
         "pomodoro" => pomodoro::settings::set(&mut config.pomodoro, rest, value)
             .map(|r| r.map(|()| "pomodoro")),
         "screentime" => screentime::settings::set(&mut config.screentime, rest, value)

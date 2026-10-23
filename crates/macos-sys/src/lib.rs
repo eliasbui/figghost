@@ -52,6 +52,7 @@ pub mod pomodoro_ui;
 pub mod power;
 pub mod process;
 pub mod prs_ui;
+pub mod updates_ui;
 pub mod qos;
 pub mod record_ui;
 pub mod recorder;

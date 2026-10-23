@@ -31,6 +31,7 @@ const FEATURE_SCRIPTS: &[&str] = &[
     include_str!("../../web/features/launcher.js"),
     include_str!("../../web/features/weather.js"),
     include_str!("../../web/features/prs.js"),
+    include_str!("../../web/features/updates.js"),
     include_str!("../../web/features/pomodoro.js"),
     include_str!("../../web/features/screentime.js"),
     include_str!("../../web/features/dayprogress.js"),
@@ -139,6 +140,10 @@ const FEATURE_FIXTURES: &[(&str, &str)] = &[
     ),
     ("prs", include_str!("../../web/features/prs.fixture.json")),
     (
+        "updates",
+        include_str!("../../web/features/updates.fixture.json"),
+    ),
+    (
         "pomodoro",
         include_str!("../../web/features/pomodoro.fixture.json"),
     ),
@@ -224,6 +229,7 @@ const SYMBOLS: &[&str] = &[
     "display",
     "timer",
     "arrow.triangle.pull",
+    "arrow.down.circle",
     "text.cursor",
     "pencil",
     "arrow.down.circle.fill",
