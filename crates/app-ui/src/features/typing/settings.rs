@@ -23,6 +23,8 @@ pub fn state(config: &Config, runtime: &Value) -> Value {
         "english_restore": config.english_restore,
         "notch_badge": config.notch_badge,
         "tray_badge": config.tray_badge,
+        "flag": config.flag,
+        "waving_flag": config.waving_flag,
         "shortcut": config.shortcut,
         "apps": apps,
         "max_apps": MAX_APPS,
@@ -52,6 +54,8 @@ pub fn set(config: &mut Config, path: &str, value: &Value) -> Option<Result<(), 
         "english_restore" => flag(&mut config.english_restore),
         "notch_badge" => flag(&mut config.notch_badge),
         "tray_badge" => flag(&mut config.tray_badge),
+        "flag" => flag(&mut config.flag),
+        "waving_flag" => flag(&mut config.waving_flag),
         "method" => value
             .as_str()
             .and_then(Method::parse)
@@ -161,6 +165,8 @@ mod tests {
             "english_restore",
             "notch_badge",
             "tray_badge",
+            "flag",
+            "waving_flag",
         ] {
             assert!(
                 set(&mut config, path, &json!(false)).unwrap().is_ok(),
@@ -177,6 +183,7 @@ mod tests {
         }
         assert!(!config.enabled && !config.modern_tone && !config.english_restore);
         assert!(!config.notch_badge && !config.tray_badge);
+        assert!(!config.flag && !config.waving_flag);
         assert!(set(&mut config, "method", &json!("vni")).unwrap().is_ok());
         assert_eq!(config.method, Method::Vni);
         for bad in [json!("VNI"), json!("qwerty"), json!(1), json!(null)] {

@@ -28,6 +28,7 @@ use std::{
     cell::{Cell, RefCell},
     collections::HashMap,
     rc::{Rc, Weak},
+    time::Instant,
 };
 
 pub mod settings;
@@ -46,6 +47,13 @@ const BADGE_SLOT: &str = "typing_language";
 const BADGE_PRIORITY: u8 = 1;
 const PRIORITY: u8 = 21;
 const SHOW_SECONDS: f64 = 1.5;
+/// The flag of Vietnam waving, for the notice of switching to Vietnamese (docs/typing/build.py): a row of square
+/// frames that loops.
+const WAVING: &[u8] = include_bytes!("../../../assets/typing/vietnam.png");
+const WAVING_COUNT: usize = 8;
+const WAVING_FPS: f64 = 8.0;
+/// The language as a flag (docs/typing/build.py): Vietnam, then the United States for English.
+const FLAGS: &[u8] = include_bytes!("../../../assets/typing/flags.png");
 
 #[derive(Debug, Clone, Copy, PartialEq, Eq, Default, Serialize, Deserialize)]
 #[serde(rename_all = "lowercase")]
@@ -96,6 +104,10 @@ pub struct Config {
     pub notch_badge: bool,
     /// An item of its own in the menu bar with the language, that switches it when clicked.
     pub tray_badge: bool,
+    /// The language as a flag rather than VI or EN, on the notch and in the menu bar.
+    pub flag: bool,
+    /// The notice of switching to Vietnamese shows the flag of Vietnam waving.
+    pub waving_flag: bool,
 }
 
 impl Default for Config {
@@ -109,6 +121,8 @@ impl Default for Config {
             apps: Vec::new(),
             notch_badge: true,
             tray_badge: true,
+            flag: false,
+            waving_flag: true,
         }
     }
 }
@@ -226,6 +240,14 @@ fn on_toggle(vietnamese: bool) {
     });
 }
 
+fn word(vietnamese: bool) -> &'static str {
+    if vietnamese { "VI" } else { "EN" }
+}
+
+fn flag_frame(vietnamese: bool) -> usize {
+    if vietnamese { 0 } else { 1 }
+}
+
 /// The running feature. Created by `attach`, kept alive by the app context.
 pub struct Feature {
     mtm: MainThreadMarker,
@@ -243,6 +265,8 @@ pub struct Feature {
     snippets: RefCell<Vec<core_typing::Snippet>>,
     /// The item of the menu bar that shows the language.
     tray: RefCell<Option<TextItem>>,
+    /// Counts the notices, so that the frames of the waving flag stop when a newer notice replaces it.
+    notices: Cell<u64>,
     me: Weak<Feature>,
 }
 
@@ -260,6 +284,7 @@ pub fn attach(env: &AttachEnv) -> Option<Rc<Feature>> {
         names: RefCell::default(),
         snippets: RefCell::new(env.config.snippets.clone().sanitized().list()),
         tray: RefCell::default(),
+        notices: Cell::new(0),
         me: me.clone(),
     });
     LIVE.with(|live| *live.borrow_mut() = Rc::downgrade(&feature));
@@ -367,13 +392,12 @@ impl Feature {
 
     /// Puts the language on the notch and in the menu bar, or takes it off, as the settings and the keyboard say.
     fn refresh_badges(&self) {
-        let (notch_badge, tray_badge) = {
+        let (notch_badge, tray_badge, flag) = {
             let config = self.config.borrow();
-            (config.notch_badge, config.tray_badge)
+            (config.notch_badge, config.tray_badge, config.flag)
         };
         let running = self.typing_on();
         let vietnamese = self.is_vietnamese();
-        let word = if vietnamese { "VI" } else { "EN" };
         if let Some(notch) = self.notch.as_ref().and_then(Weak::upgrade) {
             let activity = (running && notch_badge).then(|| {
                 let tone = if vietnamese { Tone::Green } else { Tone::Gray };
@@ -383,10 +407,7 @@ impl Feature {
                         tone,
                         pulse: false,
                     },
-                    right: Ear::Text {
-                        text: word.into(),
-                        tone,
-                    },
+                    right: self.language_ear(vietnamese),
                     detail: None,
                     page: None,
                     priority: BADGE_PRIORITY,
@@ -398,17 +419,34 @@ impl Feature {
             self.tray.borrow_mut().take();
             return;
         }
-        if let Some(item) = &*self.tray.borrow() {
-            item.set_text(word);
-            return;
-        }
-        let me = self.me.clone();
-        let item = TextItem::new(self.mtm, i18n::current().typing_menu(), word, move || {
-            if let Some(feature) = me.upgrade() {
-                feature.toggle();
-            }
+        let mut tray = self.tray.borrow_mut();
+        let item = tray.get_or_insert_with(|| {
+            let me = self.me.clone();
+            TextItem::new(self.mtm, i18n::current().typing_menu(), "", move || {
+                if let Some(feature) = me.upgrade() {
+                    feature.toggle();
+                }
+            })
         });
-        *self.tray.borrow_mut() = Some(item);
+        if flag {
+            item.set_sprite(FLAGS, flag_frame(vietnamese));
+        } else {
+            item.set_text(word(vietnamese));
+        }
+    }
+
+    /// The language on the right of the notch: VI or EN, or its flag when the settings ask for it.
+    fn language_ear(&self, vietnamese: bool) -> Ear {
+        if self.config.borrow().flag {
+            return Ear::Sprite {
+                sheet: FLAGS,
+                frame: flag_frame(vietnamese),
+            };
+        }
+        Ear::Text {
+            text: word(vietnamese).into(),
+            tone: if vietnamese { Tone::Green } else { Tone::Gray },
+        }
     }
 
     fn watch_front(&self) {
@@ -481,37 +519,66 @@ impl Feature {
         self.announce(now);
     }
 
-    /// Says on the notch which language typing is in now.
+    /// Says on the notch which language typing is in now; Vietnamese comes with the flag waving, when it is wanted.
     fn announce(&self, vietnamese: bool) {
         self.refresh_badges();
         let Some(notch) = self.notch.as_ref().and_then(Weak::upgrade) else {
             return;
         };
+        let serial = self.notices.get() + 1;
+        self.notices.set(serial);
+        islands::show_for(&notch, SLOT, self.notice(vietnamese, 0), Some(SHOW_SECONDS));
+        if !(vietnamese && self.config.borrow().waving_flag) {
+            return;
+        }
+        // One timer for each frame, each checking that its notice is still the one shown: a repeating timer would
+        // have to be dropped from inside its own call. The last frame is up before the notice is taken down.
+        let started = Instant::now();
+        let frames = (SHOW_SECONDS * WAVING_FPS) as usize;
+        for frame in 1..frames {
+            let (me, notch) = (self.me.clone(), Rc::downgrade(&notch));
+            app::after(frame as f64 / WAVING_FPS, move || {
+                let (Some(feature), Some(notch)) = (me.upgrade(), notch.upgrade()) else {
+                    return;
+                };
+                if feature.notices.get() == serial
+                    && started.elapsed().as_secs_f64() < SHOW_SECONDS - 0.5 / WAVING_FPS
+                {
+                    notch.set_activity(SLOT, Some(feature.notice(true, frame)));
+                }
+            });
+        }
+    }
+
+    /// The notice of a change of language, with frame `frame` of the waving flag when it is wanted.
+    fn notice(&self, vietnamese: bool, frame: usize) -> Activity {
         let language = i18n::current();
         let tone = if vietnamese { Tone::Green } else { Tone::Gray };
-        let method = self.config.borrow().method.label();
-        islands::show_for(
-            &notch,
-            SLOT,
-            Activity {
-                left: Ear::Symbol {
+        let (method, waving) = {
+            let config = self.config.borrow();
+            (config.method.label(), config.waving_flag)
+        };
+        Activity {
+            left: if vietnamese && waving {
+                Ear::Sprite {
+                    sheet: WAVING,
+                    frame: frame % WAVING_COUNT,
+                }
+            } else {
+                Ear::Symbol {
                     name: "keyboard",
                     tone,
                     pulse: false,
-                },
-                right: Ear::Text {
-                    text: if vietnamese { "VI" } else { "EN" }.into(),
-                    tone,
-                },
-                detail: Some(Detail {
-                    title: language.typing_now(vietnamese).to_owned(),
-                    subtitle: language.typing_now_detail(vietnamese, method),
-                }),
-                page: None,
-                priority: PRIORITY,
+                }
             },
-            Some(SHOW_SECONDS),
-        );
+            right: self.language_ear(vietnamese),
+            detail: Some(Detail {
+                title: language.typing_now(vietnamese).to_owned(),
+                subtitle: language.typing_now_detail(vietnamese, method),
+            }),
+            page: None,
+            priority: PRIORITY,
+        }
     }
 
     fn name_of(&self, id: &str) -> String {
@@ -585,8 +652,22 @@ mod tests {
         assert_eq!(config.shortcut, DEFAULT_SHORTCUT);
         assert!(config.apps.is_empty());
         assert!(config.notch_badge && config.tray_badge);
+        assert!(!config.flag && config.waving_flag);
         let loaded: Config = serde_json::from_str("{}").unwrap();
         assert_eq!(loaded, config, "a file from before this feature");
+    }
+
+    #[test]
+    fn the_flags_are_rows_of_the_frames_the_code_shows() {
+        // The size from the PNG header: width, then height, each four bytes after the signature and IHDR's head.
+        let frames = |png: &[u8]| {
+            let at = |i: usize| u32::from_be_bytes(png[i..i + 4].try_into().unwrap());
+            assert_eq!(at(16) % at(20), 0, "square frames");
+            (at(16) / at(20)) as usize
+        };
+        assert_eq!(frames(WAVING), WAVING_COUNT);
+        assert_eq!(frames(FLAGS), 2, "Vietnamese, then English");
+        assert!(flag_frame(true) < 2 && flag_frame(false) < 2);
     }
 
     #[test]

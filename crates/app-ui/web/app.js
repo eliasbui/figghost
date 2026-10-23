@@ -85,7 +85,8 @@ const I18N = {
     'side.search': 'Search settings', 'side.clear': 'Clear search', 'side.none': 'No settings found',
     'guide.label': 'The ghost', 'guide.q1': 'Boo.', 'guide.q2': 'I live in your notch.', 'guide.q3': 'Nothing extraneous here.', 'guide.q4': 'Ask me again later.',
     'metric.features': 'Features on', 'metric.tabs': 'Notch tabs', 'metric.clips': 'Copied items', 'metric.access': 'Accessibility',
-    'cat.general': 'General', 'cat.scroll': 'Mouse & Cursor', 'cat.notch': 'Notch & Island', 'cat.tabs': 'Notch tabs', 'cat.clipboard': 'Clipboard & Tools', 'cat.tiling': 'Window & Keys',
+    'cat.general': 'General', 'cat.keys': 'Shortcuts', 'cat.scroll': 'Mouse & Cursor', 'cat.notch': 'Notch & Island', 'cat.agents': 'AI Agents & PRs', 'cat.calendar': 'Schedule & Focus', 'cat.tabs': 'Notch Widgets', 'cat.system': 'System & Devices', 'cat.clipboard': 'Clipboard & Typing', 'cat.smart': 'Smart & Translate', 'cat.capture': 'Capture & Media', 'cat.tiling': 'Windows & Pin',
+    'nav.sec.overview': 'Overview', 'nav.sec.notch': 'Notch & Island', 'nav.sec.mouse': 'Mouse & Windows', 'nav.sec.tools': 'Clipboard & Tools',
     'nav.general': 'General', 'nav.keys': 'Shortcuts', 'nav.scroll': 'Scrolling', 'nav.clipboard': 'Clipboard', 'nav.notch': 'Notch', 'nav.agents': 'AI agents', 'nav.tiling': 'Window snapping', 'nav.about': 'About',
     'page.general': 'General', 'page.general.sub': 'Startup, language and permissions.',
     'page.keys': 'Shortcuts', 'page.keys.sub': 'The keys Figghost listens to, in one place. Click a shortcut, then press the new keys.',
@@ -209,7 +210,8 @@ const I18N = {
     'side.search': 'Tìm chức năng', 'side.clear': 'Xóa tìm kiếm', 'side.none': 'Không có mục nào',
     'guide.label': 'Con ma', 'guide.q1': 'Hú.', 'guide.q2': 'Tôi sống trong notch của bạn.', 'guide.q3': 'Ở đây không có gì thừa.', 'guide.q4': 'Lát nữa hỏi lại nhé.',
     'metric.features': 'Đang bật', 'metric.tabs': 'Tab của notch', 'metric.clips': 'Mục đã chép', 'metric.access': 'Trợ năng',
-    'cat.general': 'Cài đặt chung', 'cat.scroll': 'Chuột & Thao tác', 'cat.notch': 'Notch & Tiện ích', 'cat.tabs': 'Tab của notch', 'cat.clipboard': 'Bảng tạm & Công cụ', 'cat.tiling': 'Cửa sổ & Phím tắt',
+    'cat.general': 'Cài đặt chung', 'cat.keys': 'Phím tắt', 'cat.scroll': 'Chuột & Con trỏ', 'cat.notch': 'Notch & Đảo động', 'cat.agents': 'Tác tử AI & PR', 'cat.calendar': 'Lịch & Tập trung', 'cat.tabs': 'Tiện ích Notch', 'cat.system': 'Hệ thống & Thiết bị', 'cat.clipboard': 'Bảng tạm & Gõ chữ', 'cat.smart': 'Chọn nhanh & Dịch', 'cat.capture': 'Chụp & Tải media', 'cat.tiling': 'Cửa sổ & Ghim',
+    'nav.sec.overview': 'Tổng quan', 'nav.sec.notch': 'Notch & Đảo động', 'nav.sec.mouse': 'Chuột & Cửa sổ', 'nav.sec.tools': 'Bảng tạm & Công cụ',
     'nav.general': 'Chung', 'nav.keys': 'Phím tắt', 'nav.scroll': 'Cuộn chuột', 'nav.clipboard': 'Clipboard', 'nav.notch': 'Notch', 'nav.agents': 'Tác tử AI', 'nav.tiling': 'Chia cửa sổ', 'nav.about': 'Giới thiệu',
     'page.general': 'Chung', 'page.general.sub': 'Khởi động, ngôn ngữ và quyền truy cập.',
     'page.keys': 'Phím tắt', 'page.keys.sub': 'Mọi phím Figghost dùng, gom về một chỗ. Nhấn vào một phím tắt rồi bấm tổ hợp phím mới.',
@@ -1975,12 +1977,18 @@ function pageAbout() {
 }
 
 const CATEGORIES = [
-  { id: 'general', icon: 'gearshape.fill', pages: ['general', 'mole', 'about'] },
-  { id: 'scroll', icon: 'computermouse.fill', pages: ['scroll', 'cursor', 'wheel'] },
-  { id: 'notch', icon: 'laptopcomputer', pages: ['notch', 'islands', 'musicwidget'] },
-  { id: 'tabs', icon: 'square.stack.3d.up.fill', pages: ['calendar', 'dayprogress', 'agents', 'notes', 'launcher', 'weather', 'prs', 'updates', 'pomodoro', 'screentime', 'system', 'devices', 'displays'] },
-  { id: 'clipboard', icon: 'list.clipboard.fill', pages: ['clipboard', 'smart', 'translate', 'typing', 'snippets', 'capture', 'vision', 'download', 'utilities'] },
-  { id: 'tiling', icon: 'rectangle.lefthalf.inset.filled', pages: ['tiling', 'pin', 'keys'] },
+  { id: 'general', sec: 'overview', icon: 'gearshape.fill', pages: ['general', 'mole', 'about'] },
+  { id: 'keys', sec: 'overview', icon: 'keyboard', pages: ['keys'] },
+  { id: 'notch', sec: 'notch', icon: 'laptopcomputer', pages: ['notch', 'islands', 'musicwidget'] },
+  { id: 'agents', sec: 'notch', icon: 'terminal.fill', pages: ['agents', 'prs'] },
+  { id: 'calendar', sec: 'notch', icon: 'calendar', pages: ['calendar', 'pomodoro', 'dayprogress', 'screentime'] },
+  { id: 'tabs', sec: 'notch', icon: 'square.stack.3d.up.fill', pages: ['notes', 'launcher', 'weather'] },
+  { id: 'system', sec: 'notch', icon: 'cpu', pages: ['system', 'updates', 'devices', 'displays'] },
+  { id: 'scroll', sec: 'mouse', icon: 'computermouse.fill', pages: ['scroll', 'cursor', 'wheel'] },
+  { id: 'tiling', sec: 'mouse', icon: 'rectangle.lefthalf.inset.filled', pages: ['tiling', 'pin'] },
+  { id: 'clipboard', sec: 'tools', icon: 'list.clipboard.fill', pages: ['clipboard', 'typing', 'snippets'] },
+  { id: 'smart', sec: 'tools', icon: 'sparkles', pages: ['smart', 'translate', 'utilities'] },
+  { id: 'capture', sec: 'tools', icon: 'camera.viewfinder', pages: ['capture', 'vision', 'download'] },
 ];
 
 function categoryOf(pageId) {
@@ -2025,13 +2033,13 @@ let pageSyncs = [];
 
 function accessPill() {
   const mark = ghost('mini');
-  const label = h('span');
-  const el = h('button', { class: 'status-pill', onclick: () => (S.env.accessibility ? go('general') : send({ t: 'action', name: 'open_accessibility' })) }, mark, label);
+  const label = h('span', { class: 'nav-label' });
+  const dot = h('span', { class: 'dot' });
+  const el = h('button', { class: 'status-pill', onclick: () => (S.env.accessibility ? go('general') : send({ t: 'action', name: 'open_accessibility' })) }, mark, label, dot);
   reg(() => {
     label.textContent = S.env.accessibility ? t('chip.access.ok') : t('chip.access.no');
     mark.classList.toggle('asleep', !S.env.accessibility);
-    // Granted is the normal state and says nothing; only the missing access is worth the room in the bar.
-    el.style.display = S.env.accessibility ? 'none' : '';
+    dot.classList.toggle('good', !!S.env.accessibility);
   });
   return el;
 }
@@ -2167,28 +2175,36 @@ function openCategory(cat) {
 }
 
 function renderNavItems() {
-  return CATEGORIES.map((cat) =>
-    h('button', {
+  const out = [];
+  let lastSec = null;
+  for (const cat of CATEGORIES) {
+    if (cat.sec && cat.sec !== lastSec) {
+      lastSec = cat.sec;
+      out.push(h('div', { class: 'nav-sec', text: t('nav.sec.' + cat.sec) }));
+    }
+    out.push(h('button', {
       class: 'nav-item',
       'data-page': cat.id,
       'data-cat': cat.id,
       title: t('cat.' + cat.id),
       'aria-label': t('cat.' + cat.id),
-      // A press of the pointer is handled by the dock's lens; this is the keyboard's Space and Return.
+      // A press of the pointer is handled by the sidebar's lens; this is the keyboard's Space and Return.
       onclick: (e) => { if (e.detail === 0) openCategory(cat); },
     },
-    h('span', { class: 'nav-icon' }, icon(cat.icon)))
-  );
+    h('span', { class: 'nav-icon' }, icon(cat.icon)),
+    h('span', { class: 'nav-label', text: t('cat.' + cat.id) })));
+  }
+  return out;
 }
 
-/** Puts the lens of the dock under the icon of the open group: gliding there when a person chose it, at once
+/** Puts the lens of the sidebar under the item of the open group: gliding there when a person chose it, at once
  *  otherwise, so a window that opens does not show it sliding in from the edge. */
 function placeLens(glide = true) {
   const nav = $('#nav');
   const item = nav && nav.querySelector('.nav-item[aria-current="page"]');
   if (!item) return;
   nav.classList.toggle('still', !glide);
-  nav.style.setProperty('--x', item.offsetLeft + item.offsetWidth / 2 + 'px');
+  nav.style.setProperty('--y', item.offsetTop + item.offsetHeight / 2 + 'px');
   nav.style.setProperty('--s', '1');
   if (!glide) {
     void nav.offsetWidth;
@@ -2196,31 +2212,31 @@ function placeLens(glide = true) {
   }
 }
 
-/** The dock's lens follows a press: it swells where the pointer goes down, slides with a drag (stretched by its
- *  speed, like a drop of water), lights the icon under it, and on release opens that icon's group. */
+/** The sidebar's lens follows a press: it swells where the pointer goes down, slides with a drag (stretched by its
+ *  speed, like a drop of water), lights the item under it, and on release opens that item's group. */
 function dockLens(nav) {
   const items = () => [...nav.querySelectorAll('.nav-item')];
-  const centre = (item) => item.offsetLeft + item.offsetWidth / 2;
-  const nearest = (x) => items().reduce((best, item) => (Math.abs(centre(item) - x) < Math.abs(centre(best) - x) ? item : best));
+  const centre = (item) => item.offsetTop + item.offsetHeight / 2;
+  const nearest = (y) => items().reduce((best, item) => (Math.abs(centre(item) - y) < Math.abs(centre(best) - y) ? item : best));
   let press = null;
   let settle = 0;
   const follow = (e) => {
     const all = items();
-    const x = Math.min(Math.max(e.clientX - nav.getBoundingClientRect().left, centre(all[0])), centre(all[all.length - 1]));
+    const y = Math.min(Math.max(e.clientY - nav.getBoundingClientRect().top + nav.scrollTop, centre(all[0])), centre(all[all.length - 1]));
     const now = e.timeStamp;
-    const speed = press.t ? Math.abs(x - press.x) / Math.max(now - press.t, 1) : 0;
-    press.x = x;
+    const speed = press.t ? Math.abs(y - press.y) / Math.max(now - press.t, 1) : 0;
+    press.y = y;
     press.t = now;
-    nav.style.setProperty('--x', x + 'px');
-    nav.style.setProperty('--s', String(1 + Math.min(speed * 0.18, 0.4)));
+    nav.style.setProperty('--y', y + 'px');
+    nav.style.setProperty('--s', String(1 + Math.min(speed * 0.12, 0.25)));
     clearTimeout(settle);
     settle = setTimeout(() => nav.style.setProperty('--s', '1'), 90);
-    const lit = nearest(x);
+    const lit = nearest(y);
     for (const item of all) item.classList.toggle('lit', item === lit);
   };
   const end = (open) => {
     if (!press) return;
-    const target = nearest(press.x);
+    const target = nearest(press.y);
     press = null;
     clearTimeout(settle);
     nav.classList.remove('pressing', 'dragging');
@@ -2232,13 +2248,13 @@ function dockLens(nav) {
     if (e.button !== 0) return;
     e.preventDefault();
     try { nav.setPointerCapture(e.pointerId); } catch (_) { /* a synthetic pointer has nothing to capture */ }
-    press = { x: 0, t: 0, x0: e.clientX };
+    press = { y: 0, t: 0, y0: e.clientY };
     nav.classList.add('pressing');
     follow(e);
   });
   nav.addEventListener('pointermove', (e) => {
     if (!press) return;
-    if (Math.abs(e.clientX - press.x0) > 3) nav.classList.add('dragging');
+    if (Math.abs(e.clientY - press.y0) > 3) nav.classList.add('dragging');
     follow(e);
   });
   nav.addEventListener('pointerup', () => end(true));
@@ -2307,17 +2323,22 @@ function buildShell() {
   document.documentElement.lang = lang;
   $('#root').replaceChildren(
     h('div', { id: 'app' },
+      h('div', { class: 'dragzone', 'data-drag': '' }),
+      h('aside', { id: 'sidebar' },
+        navSearch(),
+        dockLens(h('nav', { id: 'nav', 'aria-label': 'Figghost' }, ...renderNavItems())),
+        h('div', { class: 'side-foot' }, accessPill())),
       h('main', { id: 'main' },
-        h('div', { class: 'dragzone', 'data-drag': '' }),
-        h('div', { class: 'topbar' }, navSearch(), accessPill()),
         h('header', { class: 'page-head' },
-          h('div', { id: 'subtabs', class: 'page-subtabs' }),
-          h('p', { class: 'page-sub', id: 'subtitle' })),
+          h('div', { class: 'page-head-main' },
+            h('div', { class: 'page-head-text' },
+              h('h1', { class: 'page-title', id: 'title' }),
+              h('p', { class: 'page-sub', id: 'subtitle' })),
+            h('div', { id: 'subtabs', class: 'page-subtabs' }))),
         h('div', { id: 'scroller' }),
         h('div', { class: 'guide' },
           h('p', { class: 'bubble' }, h('span', { class: 'bubble-text', id: 'guide-text' })),
-          h('button', { class: 'guide-ghost', 'aria-label': t('guide.label'), onclick: poke }, ghost()))),
-      dockLens(h('nav', { id: 'nav', 'aria-label': 'Figghost' }, ...renderNavItems()))),
+          h('button', { class: 'guide-ghost', 'aria-label': t('guide.label'), onclick: poke }, ghost())))),
     h('div', { id: 'toast', 'aria-live': 'polite' }),
     h('div', { id: 'modal' }),
     h('div', { class: 'defs', 'aria-hidden': 'true', html: WOBBLE_SVG }));
@@ -2332,6 +2353,8 @@ function go(id) {
   cat.lastPage = current;
   dropSyncs(pageSyncs);
   graphs.clear();
+  const title = $('#title');
+  if (title) title.textContent = t('page.' + page.id);
   const sub = $('#subtitle');
   if (sub) sub.textContent = t('page.' + page.id + '.sub');
   renderSubtabs(cat, current);
@@ -2459,20 +2482,20 @@ window.__selftest = function () {
       field.blur();
     }
 
-    // A press on the dock dragged from the first icon to the fifth opens the fifth group, and the lens settles under it.
+    // A press on the sidebar dragged from the first item to the fifth opens the fifth group, and the lens settles under it.
     {
       go('general');
       const nav = $('#nav');
       const items = [...nav.querySelectorAll('.nav-item')];
-      const at = (item) => nav.getBoundingClientRect().left + item.offsetLeft + item.offsetWidth / 2;
-      const pointer = (type, item) => nav.dispatchEvent(new PointerEvent(type, { pointerId: 9, button: 0, clientX: at(item), bubbles: true, cancelable: true }));
+      const at = (item) => nav.getBoundingClientRect().top + item.offsetTop - nav.scrollTop + item.offsetHeight / 2;
+      const pointer = (type, item) => nav.dispatchEvent(new PointerEvent(type, { pointerId: 9, button: 0, clientY: at(item), bubbles: true, cancelable: true }));
       pointer('pointerdown', items[0]);
       expect(nav.classList.contains('pressing') && items[0].classList.contains('lit'), 'a press swells the lens and lights the icon under it');
       pointer('pointermove', items[4]);
       expect(nav.classList.contains('dragging') && items[4].classList.contains('lit') && !items[0].classList.contains('lit'), 'a drag moves the light along');
       pointer('pointerup', items[4]);
       expect(categoryOf(current).id === CATEGORIES[4].id && !nav.classList.contains('pressing'), 'letting go opens the group under the lens: ' + current);
-      expect(nav.style.getPropertyValue('--x') === items[4].offsetLeft + items[4].offsetWidth / 2 + 'px', 'the lens rests under the open group');
+      expect(nav.style.getPropertyValue('--y') === items[4].offsetTop + items[4].offsetHeight / 2 + 'px', 'the lens rests under the open group');
       go('general');
     }
 

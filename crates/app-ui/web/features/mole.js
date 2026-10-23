@@ -51,6 +51,28 @@
     'mole.apps.remove': 'Uninstall selected',
     'mole.apps.body': 'The chosen apps and their leftover files go to the Trash.',
     'mole.apps.extra': '{n} leftovers',
+    'mole.sec.docker': 'Docker',
+    'mole.docker.title': 'Docker resources',
+    'mole.docker.desc': 'What Docker keeps: containers with their logs, images, volumes, networks and the build cache.',
+    'mole.docker.missing': 'Docker is not installed.', 'mole.docker.down': 'Docker is not running. Start Docker Desktop and refresh.',
+    'mole.docker.disk': 'Docker Desktop takes {size} on this Mac.',
+    'mole.docker.reclaim': '{size} can be reclaimed',
+    'mole.docker.t.Images': 'Images', 'mole.docker.t.Containers': 'Containers', 'mole.docker.t.Local Volumes': 'Volumes', 'mole.docker.t.Build Cache': 'Build cache', 'mole.docker.t.logs': 'Logs',
+    'mole.docker.clear_logs': 'Clear all logs', 'mole.docker.clear_logs.body': 'The logs of every container are emptied for good. The containers keep running.',
+    'mole.docker.unused': 'Remove unused', 'mole.docker.unused.body': 'Stopped containers, unused networks, dangling images and dangling build cache are removed. Volumes are kept.',
+    'mole.docker.cache': 'Clear build cache', 'mole.docker.cache.body': 'All build cache that nothing uses is removed. The next build takes longer.',
+    'mole.docker.done': 'Docker: {n} done.', 'mole.docker.done.partial': 'Docker: {n} done, {failed} failed.',
+    'mole.docker.logs': 'logs {size}', 'mole.docker.used': 'used by {n}', 'mole.docker.unused.tag': 'not used', 'mole.docker.anonymous': 'anonymous',
+    'mole.docker.start': 'Start', 'mole.docker.stop': 'Stop', 'mole.docker.restart': 'Restart', 'mole.docker.clean': 'Clear logs', 'mole.docker.remove': 'Remove',
+    'mole.docker.rm.body': 'The chosen containers are removed, running ones are stopped first. Their volumes are kept.',
+    'mole.docker.logs.body': 'The logs of the chosen containers are emptied for good.',
+    'mole.docker.rmi.body': 'The chosen images are removed. An image a container uses cannot be removed.',
+    'mole.docker.volume_rm.body': 'The chosen volumes and the data in them are deleted for good. A volume in use cannot be removed.',
+    'mole.docker.network_rm.body': 'The chosen networks are removed. A network in use cannot be removed.',
+    'mole.sec.docker_containers': 'Docker containers', 'mole.docker_containers.title': 'Containers', 'mole.docker_containers.desc': 'Start, stop, restart, clear the logs of or remove the chosen containers.', 'mole.docker_containers.empty': 'No containers.',
+    'mole.sec.docker_images': 'Docker images', 'mole.docker_images.title': 'Images', 'mole.docker_images.desc': 'The size is what removing an image frees: the layers no other image shares.', 'mole.docker_images.empty': 'No images.',
+    'mole.sec.docker_volumes': 'Docker volumes', 'mole.docker_volumes.title': 'Volumes', 'mole.docker_volumes.desc': 'Volumes hold data; removing one deletes it.', 'mole.docker_volumes.empty': 'No volumes.',
+    'mole.sec.docker_networks': 'Docker networks', 'mole.docker_networks.title': 'Networks', 'mole.docker_networks.desc': 'Networks made by you or by Compose. The built-in ones are not listed.', 'mole.docker_networks.empty': 'No networks.',
     'mole.sec.analyze': 'Disk usage',
     'mole.analyze.title': 'What takes the space',
     'mole.analyze.desc': 'The biggest entries first. Open a folder to look inside it; what is chosen goes to the Trash.',
@@ -117,6 +139,28 @@
     'mole.apps.remove': 'Gỡ mục đã chọn',
     'mole.apps.body': 'Các ứng dụng đã chọn và tệp còn sót được chuyển vào Thùng rác.',
     'mole.apps.extra': '{n} tệp còn sót',
+    'mole.sec.docker': 'Docker',
+    'mole.docker.title': 'Tài nguyên Docker',
+    'mole.docker.desc': 'Những gì Docker giữ: container cùng log, image, volume, network và build cache.',
+    'mole.docker.missing': 'Chưa cài Docker.', 'mole.docker.down': 'Docker chưa chạy. Mở Docker Desktop rồi làm mới.',
+    'mole.docker.disk': 'Docker Desktop đang chiếm {size} trên máy Mac.',
+    'mole.docker.reclaim': 'Có thể thu hồi {size}',
+    'mole.docker.t.Images': 'Image', 'mole.docker.t.Containers': 'Container', 'mole.docker.t.Local Volumes': 'Volume', 'mole.docker.t.Build Cache': 'Build cache', 'mole.docker.t.logs': 'Log',
+    'mole.docker.clear_logs': 'Xóa toàn bộ log', 'mole.docker.clear_logs.body': 'Log của mọi container bị xóa hẳn. Container vẫn tiếp tục chạy.',
+    'mole.docker.unused': 'Dọn phần không dùng', 'mole.docker.unused.body': 'Xóa container đã dừng, network không dùng, image treo và build cache treo. Volume được giữ lại.',
+    'mole.docker.cache': 'Xóa build cache', 'mole.docker.cache.body': 'Xóa toàn bộ build cache không dùng. Lần build sau sẽ lâu hơn.',
+    'mole.docker.done': 'Docker: xong {n} mục.', 'mole.docker.done.partial': 'Docker: xong {n} mục, {failed} mục không làm được.',
+    'mole.docker.logs': 'log {size}', 'mole.docker.used': '{n} container dùng', 'mole.docker.unused.tag': 'không dùng', 'mole.docker.anonymous': 'ẩn danh',
+    'mole.docker.start': 'Chạy', 'mole.docker.stop': 'Dừng', 'mole.docker.restart': 'Khởi động lại', 'mole.docker.clean': 'Xóa log', 'mole.docker.remove': 'Xóa',
+    'mole.docker.rm.body': 'Các container đã chọn bị xóa, container đang chạy sẽ bị dừng trước. Volume của chúng được giữ lại.',
+    'mole.docker.logs.body': 'Log của các container đã chọn bị xóa hẳn.',
+    'mole.docker.rmi.body': 'Các image đã chọn bị xóa. Image đang có container dùng thì không xóa được.',
+    'mole.docker.volume_rm.body': 'Các volume đã chọn và dữ liệu trong đó bị xóa hẳn. Volume đang dùng thì không xóa được.',
+    'mole.docker.network_rm.body': 'Các network đã chọn bị xóa. Network đang dùng thì không xóa được.',
+    'mole.sec.docker_containers': 'Docker container', 'mole.docker_containers.title': 'Container', 'mole.docker_containers.desc': 'Chạy, dừng, khởi động lại, xóa log hoặc xóa các container đã chọn.', 'mole.docker_containers.empty': 'Không có container nào.',
+    'mole.sec.docker_images': 'Docker image', 'mole.docker_images.title': 'Image', 'mole.docker_images.desc': 'Dung lượng là phần được giải phóng khi xóa: các lớp không image nào khác dùng chung.', 'mole.docker_images.empty': 'Không có image nào.',
+    'mole.sec.docker_volumes': 'Docker volume', 'mole.docker_volumes.title': 'Volume', 'mole.docker_volumes.desc': 'Volume chứa dữ liệu; xóa volume là xóa dữ liệu trong đó.', 'mole.docker_volumes.empty': 'Không có volume nào.',
+    'mole.sec.docker_networks': 'Docker network', 'mole.docker_networks.title': 'Network', 'mole.docker_networks.desc': 'Network do bạn hoặc Compose tạo. Network có sẵn không được liệt kê.', 'mole.docker_networks.empty': 'Không có network nào.',
     'mole.sec.analyze': 'Dung lượng ổ đĩa',
     'mole.analyze.title': 'Cái gì chiếm chỗ',
     'mole.analyze.desc': 'Mục lớn nhất xếp trước. Mở một thư mục để xem bên trong; mục đã chọn được chuyển vào Thùng rác.',
@@ -320,18 +364,27 @@
    * A list whose rows are chosen with a checkbox and removed together. `detail` is the second line of a row,
    * `lead` an element before its name, `open` makes a folder row open; `head` goes above the toolbar.
    */
-  function pickList({ kind, read, detail, lead, open, head, filter, tint }) {
+  function pickList({ kind, read, detail, lead, open, head, filter, tint, scan, actions }) {
+    const key = scan || kind;
+    const working = () => busy(actions ? 'docker_act' : 'remove');
     const chosen = new Set();
     const items = () => read() || [];
     const all = h('input', { type: 'checkbox', 'aria-label': t('mole.pick.all') });
     const count = h('span', { class: 'mole-count' });
     const search = filter ? h('input', { type: 'search', class: 'text-field mole-search', placeholder: t('mole.search'), 'aria-label': t('mole.search'), spellcheck: 'false', autocomplete: 'off' }) : null;
-    const remove = button(t('mole.' + kind + '.remove'), () => {
+    const remove = actions ? null : button(t('mole.' + kind + '.remove'), () => {
       const picked = items().filter((i) => chosen.has(i.path));
       confirmDialog({ title: t('mole.confirm', { n: picked.length, size: size(sum(picked)) }), body: t('mole.' + kind + '.body'), confirm: t('mole.' + kind + '.remove') },
         () => act('mole_remove:' + kind + '\n' + picked.map((i) => i.path).join('\n')));
     }, { icon: 'trash', small: true, danger: true });
-    const refresh = button('', () => act('mole_scan:' + kind), { icon: 'refresh', small: true, aria: t('mole.refresh') });
+    // Docker's lists do things to their rows besides removing them, each its own button.
+    const verbs = (actions || []).map(({ verb, label, danger }) => button(t('mole.docker.' + label), () => {
+      const picked = items().filter((i) => chosen.has(i.path));
+      const go = () => act('mole_docker:' + verb + '\n' + picked.map((i) => i.path).join('\n'));
+      if (!danger) { go(); return; }
+      confirmDialog({ title: t('mole.confirm', { n: picked.length, size: size(sum(picked)) }), body: t('mole.docker.' + verb + '.body'), confirm: t('mole.docker.' + label) }, go);
+    }, { small: true, danger }));
+    const refresh = button('', () => act('mole_scan:' + key), { icon: 'refresh', small: true, aria: t('mole.refresh') });
     refresh.title = t('mole.refresh');
     const box = h('div', { class: 'mole-list', 'data-kind': kind });
     const visible = () => {
@@ -347,16 +400,17 @@
       all.checked = shown.length > 0 && n === shown.length;
       all.indeterminate = n > 0 && n < shown.length;
       all.disabled = !shown.length;
-      count.textContent = busy(kind) || !read() ? t('mole.scanning')
+      count.textContent = busy(key) || !read() ? t('mole.scanning')
         : picked.length ? t('mole.picked', { n: picked.length, size: size(sum(picked)) })
         : t('mole.total', { n: list.length, size: size(sum(list)) });
-      remove.disabled = !picked.length || busy('remove');
-      refresh.disabled = busy(kind);
+      if (remove) remove.disabled = !picked.length || working();
+      for (const b of verbs) b.disabled = !picked.length || working();
+      refresh.disabled = busy(key);
     };
     const draw = () => {
       if (!read()) { box.replaceChildren(scanning()); return; }
       const shown = visible();
-      if (!shown.length) { box.replaceChildren(busy(kind) ? scanning() : h('div', { class: 'empty', text: t('mole.' + kind + '.empty') })); return; }
+      if (!shown.length) { box.replaceChildren(busy(key) ? scanning() : h('div', { class: 'empty', text: t('mole.' + kind + '.empty') })); return; }
       const top = Math.max(1, ...shown.map((i) => i.size));
       box.replaceChildren(...shown.map((i, k) => {
         const pick = h('input', { type: 'checkbox', 'aria-label': i.name });
@@ -382,12 +436,12 @@
     if (search) search.addEventListener('input', () => { draw(); paint(); });
     let last = null;
     reg(() => {
-      const stamp = JSON.stringify([read(), busy(kind), lang]);
+      const stamp = JSON.stringify([read(), busy(key), lang]);
       if (stamp !== last) { last = stamp; draw(); }
       paint();
     });
     return [sectionTitle(t('mole.sec.' + kind)), card(row(t('mole.' + kind + '.title'), t('mole.' + kind + '.desc'), null), head,
-      h('div', { class: 'mole-toolbar' }, h('label', { class: 'mole-all' }, all, count), search, remove, refresh), box)];
+      h('div', { class: 'mole-toolbar' }, h('label', { class: 'mole-all' }, all, count), search, ...verbs, remove, refresh), box)];
   }
 
   const age = (i) => (i.age == null ? '' : i.age ? t('mole.age', { n: i.age }) : t('mole.age.today'));
@@ -482,6 +536,67 @@
     return wrap;
   }
 
+  const DOCKER_PARTS = ['Images', 'Containers', 'Local Volumes', 'Build Cache', 'logs'];
+  const dockerCls = (k) => 'd-' + k.split(' ').pop().toLowerCase();
+
+  /** What Docker takes, with the clean-ups that work on all of it at once. */
+  function dockerCard() {
+    const d = () => mole().docker;
+    const note = h('div', { class: 'mole-docker-note' });
+    const bar = h('div', { class: 'mole-stack big' });
+    const legend = h('div', { class: 'mole-legend' });
+    const total = h('b');
+    const reclaim = h('span', { class: 'mole-tile-sub' });
+    const working = () => busy('docker_act') || busy('docker');
+    const ask = (label, onYes) => confirmDialog({ title: t('mole.docker.' + label), body: t('mole.docker.' + label + '.body'), confirm: t('mole.docker.' + label) }, onYes);
+    const logs = button(t('mole.docker.clear_logs'), () => ask('clear_logs', () => act('mole_docker:logs\n' + d().containers.map((c) => c.path).join('\n'))), { small: true });
+    const unused = button(t('mole.docker.unused'), () => ask('unused', () => act('mole_docker_prune:unused')), { icon: 'trash', small: true, danger: true });
+    const cache = button(t('mole.docker.cache'), () => ask('cache', () => act('mole_docker_prune:cache')), { icon: 'trash', small: true, danger: true });
+    const refresh = button('', () => act('mole_scan:docker'), { icon: 'refresh', small: true, aria: t('mole.refresh') });
+    const body = h('div', { class: 'mole-free' }, h('div', { class: 'mole-tile-head' }, reclaim, total), bar, legend);
+    const tools = h('div', { class: 'mole-toolbar' }, h('span', { class: 'mole-all' }), logs, unused, cache, refresh);
+    reg(() => {
+      const v = d();
+      const ok = !!(v && v.ok);
+      body.hidden = !ok;
+      for (const b of [logs, unused, cache]) { b.hidden = !ok; b.disabled = working(); }
+      refresh.disabled = busy('docker');
+      logs.disabled = working() || !ok || !v.containers.length;
+      note.textContent = !v || busy('docker') ? t('mole.scanning') : v.missing ? t('mole.docker.missing') : v.down ? t('mole.docker.down')
+        : v.disk ? t('mole.docker.disk', { size: size(v.disk) }) : '';
+      if (!ok) return;
+      const parts = DOCKER_PARTS.map((k) => {
+        const row = k === 'logs' ? { size: v.logs, reclaimable: v.logs } : (v.totals || []).find((x) => x.type === k) || { size: 0, reclaimable: 0 };
+        return [k, row];
+      });
+      const whole = parts.reduce((a, [, r]) => a + r.size, 0);
+      total.textContent = size(whole);
+      reclaim.textContent = t('mole.docker.reclaim', { size: size(parts.reduce((a, [, r]) => a + r.reclaimable, 0)) });
+      bar.replaceChildren(...parts.map(([k, r]) => { const seg = h('span', { class: dockerCls(k) }); seg.style.width = (whole ? (r.size / whole) * 100 : 0) + '%'; return seg; }));
+      legend.replaceChildren(...parts.map(([k, r]) => h('span', { class: dockerCls(k) }, h('i'), t('mole.docker.t.' + k) + ' ' + size(r.size))));
+    });
+    return [sectionTitle(t('mole.sec.docker')), card(row(t('mole.docker.title'), t('mole.docker.desc'), null), h('div', { class: 'mole-free' }, note), body, tools)];
+  }
+
+  function dockerLists() {
+    const list = (k) => () => (mole().docker && mole().docker.ok ? mole().docker[k] : null);
+    const used = (i) => (i.used ? t('mole.docker.used', { n: i.used }) : t('mole.docker.unused.tag'));
+    const wrap = h('div', { class: 'mole-docker' },
+      ...pickList({ kind: 'docker_containers', scan: 'docker', read: list('containers'), filter: true,
+        lead: (i) => h('span', { class: 'mole-dot ' + i.state, title: i.state }),
+        detail: (i) => [i.note, i.status, i.logs ? t('mole.docker.logs', { size: size(i.logs) }) : ''].filter(Boolean).join(' / '),
+        actions: [{ verb: 'start', label: 'start' }, { verb: 'stop', label: 'stop' }, { verb: 'restart', label: 'restart' },
+          { verb: 'logs', label: 'clean', danger: true }, { verb: 'rm', label: 'remove', danger: true }] }),
+      ...pickList({ kind: 'docker_images', scan: 'docker', read: list('images'), filter: true,
+        detail: (i) => [i.note, used(i)].join(' / '), actions: [{ verb: 'rmi', label: 'remove', danger: true }] }),
+      ...pickList({ kind: 'docker_volumes', scan: 'docker', read: list('volumes'), filter: true,
+        detail: (i) => [i.anonymous ? t('mole.docker.anonymous') : '', used(i)].filter(Boolean).join(' / '), actions: [{ verb: 'volume_rm', label: 'remove', danger: true }] }),
+      ...pickList({ kind: 'docker_networks', scan: 'docker', read: list('networks'),
+        detail: (i) => i.note, actions: [{ verb: 'network_rm', label: 'remove', danger: true }] }));
+    reg(() => { wrap.hidden = !(mole().docker && mole().docker.ok); });
+    return wrap;
+  }
+
   function analyzeHead() {
     const where = h('nav', { class: 'mole-path', 'aria-label': t('mole.sec.analyze') });
     const up = button(t('mole.analyze.up'), () => act('mole_analyze:' + (mole().analyze.path.replace(/\/[^/]+\/?$/, '') || '/')), { icon: 'chevron.up', small: true });
@@ -518,7 +633,8 @@
         const r = mole().result;
         if (!r || r.seq === seen) return;
         seen = r.seq;
-        toast(t(r.failed ? 'mole.result.partial' : 'mole.result', { n: r.removed, size: size(r.freed), failed: r.failed }));
+        if (r.docker) toast(t(r.failed ? 'mole.docker.done.partial' : 'mole.docker.done', { n: r.removed, failed: r.failed }));
+        else toast(t(r.failed ? 'mole.result.partial' : 'mole.result', { n: r.removed, size: size(r.freed), failed: r.failed }));
       });
       act('mole_open');
       return [
@@ -528,6 +644,8 @@
         ...pickList({ kind: 'installers', read: () => mole().installers, detail: (i) => tilde(i.path) }),
         ...pickList({ kind: 'apps', read: () => mole().apps, filter: true, lead: (i) => iconImg(i.note),
           detail: (i) => (i.extra ? i.note + ' / ' + t('mole.apps.extra', { n: i.extra }) : i.note) }),
+        ...dockerCard(),
+        dockerLists(),
         ...pickList({ kind: 'analyze', read: () => mole().analyze && mole().analyze.entries, head: analyzeHead(), detail: () => '',
           open: (i) => act('mole_analyze:' + i.path), tint: (k) => (k < MAX_SLICES - 1 ? PALETTE[k % PALETTE.length] : 'var(--text-2)') }),
       ];
@@ -621,6 +739,38 @@
       expect(btn(clean, t('mole.clean.remove')).disabled, 'mole: no second removal while one runs');
       S.mole.clean = []; S.mole.busy = []; runSyncs();
       expect(clean.textContent.includes(t('mole.clean.empty')), 'mole: an empty list says so');
+      S.mole.docker = { missing: true }; runSyncs();
+      expect(document.body.textContent.includes(t('mole.docker.missing')) && document.querySelector('.mole-docker').hidden, 'mole: without Docker the page says so and lists nothing');
+      const cid = 'a'.repeat(64);
+      S.mole.docker = { ok: true, logs: 2048, disk: 5e9, totals: [{ type: 'Images', size: 3e9, reclaimable: 1e9, count: 2 }, { type: 'Build Cache', size: 2e9, reclaimable: 2e9, count: 9 }],
+        containers: [{ path: cid, name: 'web', note: 'nginx', status: 'Up 2 minutes', state: 'running', logs: 2048, size: 4096, dir: false }],
+        images: [{ path: 'sha256:1', name: 'nginx:latest', note: '2 days ago', used: 1, size: 100, dir: false }],
+        volumes: [{ path: 'data', name: 'data', anonymous: false, used: 0, size: 10, note: '', dir: false }], networks: [] };
+      runSyncs();
+      const dsec = document.querySelector('.mole-list[data-kind=docker_containers]').closest('.card');
+      expect(!document.querySelector('.mole-docker').hidden && dsec.querySelector('.mole-dot.running') && dsec.textContent.includes(t('mole.docker.logs', { size: size(2048) })),
+        'mole: a running container is listed with its logs');
+      expect(section('docker').textContent.includes(t('mole.docker.t.Build Cache') + ' ' + size(2e9)), 'mole: the parts of Docker are added up');
+      dsec.querySelector('.mole-all input').click();
+      sent.length = 0;
+      btn(dsec, t('mole.docker.stop')).click();
+      expect(sent.some((m) => m.name === 'mole_docker:stop\n' + cid), 'mole: stopping needs no question: ' + JSON.stringify(sent));
+      sent.length = 0;
+      btn(dsec, t('mole.docker.remove')).click();
+      expect(!sent.length, 'mole: removing a container asks first');
+      document.querySelector('#modal .btn.primary').click();
+      expect(sent.some((m) => m.name === 'mole_docker:rm\n' + cid), 'mole: the chosen container is removed: ' + JSON.stringify(sent));
+      sent.length = 0;
+      btn(section('docker'), t('mole.docker.clear_logs')).click();
+      document.querySelector('#modal .btn.primary').click();
+      expect(sent.some((m) => m.name === 'mole_docker:logs\n' + cid), 'mole: clear all logs takes every container: ' + JSON.stringify(sent));
+      sent.length = 0;
+      btn(section('docker'), t('mole.docker.cache')).click();
+      document.querySelector('#modal .btn.primary').click();
+      expect(sent.some((m) => m.name === 'mole_docker_prune:cache'), 'mole: the build cache is cleared after asking');
+      S.mole.busy = ['docker_act']; runSyncs();
+      expect(btn(dsec, t('mole.docker.stop')).disabled, 'mole: no second Docker action while one runs');
+      S.mole.busy = []; S.mole.docker = null;
       S.mole.status = null; S.mole.clean = null; S.mole.purge = null; S.mole.apps = null; S.mole.analyze = null; runSyncs();
     },
   });

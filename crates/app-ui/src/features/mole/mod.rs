@@ -3,6 +3,7 @@
 //! projects, installer files, apps with their leftovers and what takes the disk. The page scans as it opens, and
 //! what is chosen in a list is removed together.
 
+mod docker;
 mod scan;
 mod strings;
 
@@ -42,6 +43,8 @@ struct Inner {
     folder: Option<PathBuf>,
     /// Every folder the disk view has read, so that going back to one is at once.
     seen: BTreeMap<PathBuf, Vec<Found>>,
+    /// What Docker keeps, as the page shows it; null until read.
+    docker: Value,
     /// What the last removal did; `seq` tells the page it is new.
     result: Value,
     seq: u64,
@@ -98,6 +101,7 @@ impl Feature {
             "installers": list(Kind::Installers),
             "apps": list(Kind::Apps),
             "analyze": analyze,
+            "docker": inner.docker,
             "result": inner.result,
         })
     }
@@ -129,8 +133,12 @@ impl Feature {
                 for kind in missing {
                     self.scan(kind);
                 }
+                if all || lock(&self.inner).docker.is_null() {
+                    self.docker_scan();
+                }
             }
             "mole_status" => self.status(),
+            "mole_scan" if arg == "docker" => self.docker_scan(),
             "mole_scan" => match Kind::parse(arg) {
                 Some(kind) => self.scan(kind),
                 None => return Some(Err(Fault::new("invalid_value", "unknown list"))),
@@ -143,6 +151,26 @@ impl Feature {
                 self.analyze(path.to_path_buf(), false);
             }
             "mole_remove" => return Some(self.remove(arg)),
+            "mole_docker" => return Some(self.docker_act(arg)),
+            "mole_docker_prune" => {
+                if !matches!(arg, "unused" | "cache") {
+                    return Some(Err(Fault::new("invalid_value", "unknown prune")));
+                }
+                let (home, which) = (self.home.clone(), arg.to_owned());
+                self.spawn(
+                    "docker_act",
+                    move || {
+                        let tool = docker::Tool::locate(&home);
+                        let ok = tool.as_ref().is_some_and(|t| docker::prune(t, &which));
+                        (
+                            (usize::from(ok), usize::from(!ok)),
+                            docker::scan(tool.as_ref(), &home),
+                            which,
+                        )
+                    },
+                    Self::store_docker,
+                );
+            }
             _ => return None,
         }
         Some(Ok(()))
@@ -216,6 +244,65 @@ impl Feature {
             inner.seen.insert(folder, list.clone());
             inner.lists.insert(Kind::Analyze, list);
         });
+    }
+
+    fn docker_scan(&self) {
+        let home = self.home.clone();
+        self.spawn(
+            "docker",
+            move || docker::scan(docker::Tool::locate(&home).as_ref(), &home),
+            |inner, v| inner.docker = v,
+        );
+    }
+
+    /// `arg` is a verb of `docker::VERBS` and then ids, one per line; only ids of the list that verb works on, as
+    /// the last reading listed them, are passed to Docker.
+    fn docker_act(&self, arg: &str) -> Result<(), Fault> {
+        let mut lines = arg.lines();
+        let verb = lines.next().unwrap_or_default();
+        let list = docker::VERBS
+            .iter()
+            .find(|(v, _)| *v == verb)
+            .map(|(_, list)| *list)
+            .ok_or_else(|| Fault::new("invalid_value", "unknown docker action"))?;
+        let wanted: BTreeSet<&str> = lines.collect();
+        let ids: Vec<String> = {
+            let inner = lock(&self.inner);
+            inner.docker[list]
+                .as_array()
+                .into_iter()
+                .flatten()
+                .filter_map(|row| row["path"].as_str())
+                .filter(|id| wanted.contains(id))
+                .map(str::to_owned)
+                .collect()
+        };
+        if ids.is_empty() {
+            return Err(Fault::new("invalid_value", "nothing to do"));
+        }
+        let (home, verb) = (self.home.clone(), verb.to_owned());
+        self.spawn(
+            "docker_act",
+            move || {
+                let tool = docker::Tool::locate(&home);
+                let done = tool
+                    .as_ref()
+                    .map_or((0, ids.len()), |t| docker::act(t, &verb, &ids));
+                (done, docker::scan(tool.as_ref(), &home), verb)
+            },
+            Self::store_docker,
+        );
+        Ok(())
+    }
+
+    fn store_docker(
+        inner: &mut Inner,
+        ((done, failed), state, verb): ((usize, usize), Value, String),
+    ) {
+        inner.docker = state;
+        inner.seq += 1;
+        inner.result =
+            json!({ "seq": inner.seq, "docker": verb, "removed": done, "failed": failed });
     }
 
     /// `arg` is the kind of list and then the paths of its rows, one per line.
@@ -297,6 +384,7 @@ pub mod settings {
             "installers": array("installers"),
             "apps": array("apps"),
             "analyze": object("analyze"),
+            "docker": object("docker"),
             "result": object("result"),
         })
     }
@@ -504,6 +592,16 @@ mod tests {
                 .is_err()
         );
         assert!(feature.action("mole_other").is_none());
+        lock(&feature.inner).docker =
+            json!({ "ok": true, "containers": [{ "path": "abc" }], "images": [] });
+        for bad in [
+            "mole_docker:nope\nabc",
+            "mole_docker:rmi\nabc",
+            "mole_docker:rm\n--help",
+            "mole_docker_prune:all",
+        ] {
+            assert!(feature.action(bad).unwrap().is_err(), "{bad}");
+        }
     }
 
     #[test]

@@ -72,6 +72,12 @@ fn items(access: bool, recording: bool) -> Value {
             false,
         ),
         ("Open Mole", "sparkles", None, true),
+        (
+            "Check for Updates...",
+            "arrow.triangle.2.circlepath",
+            None,
+            true,
+        ),
         ("Quit", "xmark.rectangle", None, true),
     ];
     Value::Array(

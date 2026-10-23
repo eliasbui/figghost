@@ -2,7 +2,7 @@
 //! every time the menu opens, so entries can reflect the frontmost app, permissions and login-item state
 //! without any bookkeeping.
 
-use crate::webview::TrayPanel;
+use crate::{mascot::Sheet, webview::TrayPanel};
 use block2::RcBlock;
 use objc2::{
     DefinedClass, MainThreadMarker, MainThreadOnly, define_class, msg_send,
@@ -12,8 +12,8 @@ use objc2::{
 };
 use objc2_app_kit::{
     NSAccessibility, NSBezierPath, NSColor, NSControlStateValueOff, NSControlStateValueOn,
-    NSEventMask, NSImage, NSMenu, NSMenuDelegate, NSMenuItem, NSStatusBar, NSStatusItem,
-    NSVariableStatusItemLength, NSWindingRule,
+    NSEventMask, NSGraphicsContext, NSImage, NSImageInterpolation, NSMenu, NSMenuDelegate,
+    NSMenuItem, NSStatusBar, NSStatusItem, NSVariableStatusItemLength, NSWindingRule,
 };
 use objc2_foundation::{
     NSAffineTransform, NSObject, NSObjectProtocol, NSPoint, NSRect, NSSize, NSString,
@@ -527,8 +527,8 @@ impl StatusMenu {
     }
 }
 
-/// A second item in the menu bar that shows a few letters, such as the language Vietnamese typing is in, and runs
-/// one action when it is clicked. Leaves the menu bar when dropped.
+/// A second item in the menu bar that shows a few letters or a small picture, such as the language Vietnamese
+/// typing is in, and runs one action when it is clicked. Leaves the menu bar when dropped.
 pub struct TextItem {
     mtm: MainThreadMarker,
     item: Retained<NSStatusItem>,
@@ -566,9 +566,40 @@ impl TextItem {
 
     pub fn set_text(&self, text: &str) {
         if let Some(button) = self.item.button(self.mtm) {
+            button.setImage(None);
             button.setTitle(&NSString::from_str(text));
         }
     }
+
+    /// Shows frame `frame` of the pixel art `sheet` (a row of square frames, as `mascot::Sheet` reads) in place of
+    /// the text, until `set_text` brings the text back.
+    pub fn set_sprite(&self, sheet: &'static [u8], frame: usize) {
+        let (Some(button), Some(image)) = (self.item.button(self.mtm), sprite_image(sheet, frame))
+        else {
+            return;
+        };
+        button.setTitle(&NSString::new());
+        button.setImage(Some(&image));
+    }
+}
+
+/// One frame of pixel art as an image of one point to each pixel, drawn with hard edges so that every pixel of the
+/// art stays the same size on a Retina screen.
+fn sprite_image(sheet: &'static [u8], frame: usize) -> Option<Retained<NSImage>> {
+    let art = Sheet::from_png(sheet)?;
+    let side = art.cell();
+    let draw = RcBlock::new(move |rect: NSRect| {
+        if let Some(context) = NSGraphicsContext::currentContext() {
+            context.setImageInterpolation(NSImageInterpolation::None);
+        }
+        art.draw(frame, rect);
+        Bool::YES
+    });
+    Some(NSImage::imageWithSize_flipped_drawingHandler(
+        NSSize::new(side, side),
+        false,
+        &draw,
+    ))
 }
 
 impl Drop for TextItem {

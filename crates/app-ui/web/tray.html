@@ -69,6 +69,7 @@ function render(items) {
   if (quit) used.add(quit.id);
   const login = take((i) => i.symbol === 'power' && i.checked !== null)[0];
   const config = take(is('folder'))[0];
+  const updates = take(is('arrow.triangle.2.circlepath'))[0];
   const clip = take(is('doc.on.clipboard', 'trash'));
   const toggles = take((i) => i.checked !== null);
   // A tool that is in the menu twice, as Stop recording is, is one tile.
@@ -105,7 +106,7 @@ function render(items) {
     })), cap));
   }
   out.push(group(clip.map((i) => row(i, i.symbol === 'trash'))));
-  out.push(group(login && row(login), config && row(config), quit && row(quit)));
+  out.push(group(login && row(login), config && row(config), updates && row(updates), quit && row(quit)));
 
   const root = $('#root');
   root.replaceChildren(...out.filter(Boolean));

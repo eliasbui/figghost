@@ -63,7 +63,7 @@ pub mod symbols {
         CLEAR_HISTORY = "trash",
         LOGIN = "power",
         OPEN_CONFIG = "folder",
-        CHECK_UPDATES = "arrow.down.circle",
+        CHECK_UPDATES = "arrow.triangle.2.circlepath",
         QUIT = "xmark.rectangle",
         CAPTURE = "camera.viewfinder",
         CAPTURE_AREA = "rectangle.dashed",

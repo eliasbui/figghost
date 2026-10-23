@@ -154,3 +154,24 @@
 .mole-top.memory .mole-bar > span { background: linear-gradient(90deg, var(--mole-mem), var(--mole-mem-2)); }
 /* A part with nothing to say is hidden, which the display of these classes would otherwise override. */
 .mole-free[hidden], .mole-tile[hidden], .mole-gauge[hidden], .mole-spark[hidden], .mole-chart[hidden] { display: none; }
+
+/* Docker: one colour for each kind of thing it keeps, and a dot for the state of a container. */
+.mole-docker[hidden] { display: none; }
+.mole-docker-note { color: var(--text-2); overflow: hidden; text-overflow: ellipsis; white-space: nowrap; }
+.mole-stack .d-images, .mole-legend .d-images i { background: var(--mole-net-2); }
+.mole-stack .d-containers, .mole-legend .d-containers i { background: var(--mole-mem); }
+.mole-stack .d-volumes, .mole-legend .d-volumes i { background: var(--mole-cpu); }
+.mole-stack .d-cache, .mole-legend .d-cache i { background: var(--mole-disk); }
+.mole-stack .d-logs, .mole-legend .d-logs i { background: var(--mole-net); }
+.mole-dot { flex: none; width: 9px; height: 9px; border-radius: 50%; background: var(--text-2); }
+.mole-dot.running { background: var(--good); box-shadow: 0 0 5px var(--good); }
+.mole-dot.paused, .mole-dot.restarting { background: var(--warn); }
+.mole-dot.dead { background: var(--bad); }
+.mole-list[data-kind=docker_containers] .mole-bar > span { background: linear-gradient(90deg, var(--mole-mem), var(--mole-mem-2)); }
+.mole-list[data-kind=docker_images] .mole-bar > span { background: linear-gradient(90deg, var(--mole-net-2), var(--mole-gpu)); }
+.mole-list[data-kind=docker_volumes] .mole-bar > span { background: linear-gradient(90deg, var(--mole-cpu), var(--mole-cpu-2)); }
+.mole-toolbar .btn[hidden] { display: none; }
+.mole-toolbar { flex-wrap: wrap; }
+.mole-all { min-width: 140px; }
+.mole-docker-note { white-space: normal; }
+.mole-free:has(> .mole-docker-note:empty) { display: none; }

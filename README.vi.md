@@ -99,7 +99,7 @@ Notch luôn có Clipboard, Khay tệp, Media (kèm lời bài hát), Tập trung
 | Clipboard | Clipboard | Lịch sử văn bản, liên kết, mã, ảnh và tệp với tìm kiếm tức thì, ghim, Copy Stack, bảng, dữ liệu nhạy cảm bị giữ ngoài, và máy chủ MCP cho trợ lý AI (tắt mặc định) |
 | Chọn thông minh | Smart Select | Hiểu chữ đang chọn: đơn vị, tiền tệ, giờ ở các múi khác, bản dịch (tắt mặc định) |
 | Dịch | Translate | Chọn chữ ở bất kỳ đâu và một cửa sổ kính cạnh con trỏ dịch nó (tắt mặc định) |
-| Gõ tiếng Việt | Vietnamese typing | Telex hoặc VNI ở mọi ứng dụng, VI hoặc EN trên notch và ở thanh menu, phím tắt để chuyển, các ứng dụng giữ nguyên (tắt mặc định) |
+| Gõ tiếng Việt | Vietnamese typing | Telex hoặc VNI ở mọi ứng dụng, VI hoặc EN hay lá cờ trên notch và ở thanh menu, cờ tung bay khi chuyển sang tiếng Việt, phím tắt để chuyển, các ứng dụng giữ nguyên (tắt mặc định) |
 | Gõ tắt | Snippets | Gõ một viết tắt ở mọi ứng dụng và nó thành đoạn văn bạn đã lưu, khi gõ tiếng Việt bật hay tắt; danh sách có xem trước, trình sửa và báo lỗi rõ ràng (tắt mặc định) |
 | Chụp màn hình | Capture | Chụp màn hình, chụp cuộn, quay màn hình ra MP4 hoặc GIF, trình chỉnh sửa và nhận dạng chữ tiếng Việt, tiếng Anh (tắt mặc định) |
 | Chọn màu | Colour picker | Kính lúp trên màn hình đóng băng, chép màu dạng HEX, RGB, HSL hoặc HSB (tắt mặc định) |
@@ -295,7 +295,7 @@ Sự kiện và lời nhắc hôm nay trên notch, và báo trước cuộc họ
 
 ### Gõ tiếng Việt (như Gõ Nhanh)
 
-Telex hoặc VNI ở mọi ứng dụng mà không cần bộ gõ nào khác, qua bộ máy của [Gõ Nhanh](https://github.com/khaphanspace/gonhanh.org) (tắt mặc định). Dấu được đặt theo quy tắc mới (`hoà`, `khoẻ`) hoặc cách cũ, từ tiếng Anh trở lại khi hết từ (`text`, `with`), một phím tắt (mặc định Control+Space, do chính ứng dụng ghi để cách hệ thống dùng cùng phím không lấy mất được) hoặc bảng thanh menu chuyển sang tiếng Anh và ngược lại kèm một chữ trên notch, VI hoặc EN nằm sẵn trên notch đóng và trong một mục riêng nhỏ ở thanh menu (bấm vào để chuyển; mỗi nơi tắt được), và các ứng dụng bạn liệt kê được để yên. Thanh địa chỉ, ô tìm kiếm, Spotlight (ghi qua Trợ năng, dự phòng bằng phím), trình soạn dựng trên web view, terminal và ứng dụng Adobe, mỗi thứ nhận cách gõ mà Gõ Nhanh đã chốt cho nó. Khi một bộ gõ tiếng Việt khác đang chạy, Figghost để yên mọi phím.
+Telex hoặc VNI ở mọi ứng dụng mà không cần bộ gõ nào khác, qua bộ máy của [Gõ Nhanh](https://github.com/khaphanspace/gonhanh.org) (tắt mặc định). Dấu được đặt theo quy tắc mới (`hoà`, `khoẻ`) hoặc cách cũ, từ tiếng Anh trở lại khi hết từ (`text`, `with`), một phím tắt (mặc định Control+Space, do chính ứng dụng ghi để cách hệ thống dùng cùng phím không lấy mất được) hoặc bảng thanh menu chuyển sang tiếng Anh và ngược lại kèm một chữ trên notch, VI hoặc EN nằm sẵn trên notch đóng và trong một mục riêng nhỏ ở thanh menu (bấm vào để chuyển; mỗi nơi tắt được), bằng chữ hoặc bằng cờ Việt Nam hay cờ Mỹ, mỗi lần chuyển sang tiếng Việt lá cờ đỏ sao vàng tung bay trên notch (tắt được), và các ứng dụng bạn liệt kê được để yên. Thanh địa chỉ, ô tìm kiếm, Spotlight (ghi qua Trợ năng, dự phòng bằng phím), trình soạn dựng trên web view, terminal và ứng dụng Adobe, mỗi thứ nhận cách gõ mà Gõ Nhanh đã chốt cho nó. Khi một bộ gõ tiếng Việt khác đang chạy, Figghost để yên mọi phím.
 
 ### Gõ tắt (như TextExpander)
 

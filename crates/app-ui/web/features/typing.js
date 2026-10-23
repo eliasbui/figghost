@@ -10,6 +10,8 @@
     'typing.now.vi': 'Vietnamese', 'typing.now.en': 'English', 'typing.now.switch': 'Switch',
     'typing.notch.title': 'Language on the notch', 'typing.notch.desc': 'VI or EN stays on the closed notch while typing runs, under anything else that is live.',
     'typing.tray.title': 'Language in the menu bar', 'typing.tray.desc': 'A small VI or EN beside the ghost. Click it to switch.',
+    'typing.flag.title': 'Flag instead of VI or EN', 'typing.flag.desc': 'The flag of Vietnam or of the United States stands for the language on the notch and in the menu bar.',
+    'typing.waving.title': 'Waving flag for Vietnamese', 'typing.waving.desc': 'The red flag with the gold star waves on the notch each time typing switches to Vietnamese.',
     'typing.other.title': '{name} is running',
     'typing.other.desc': 'Two input methods would put every mark twice, so Figghost leaves the keys alone while {name} runs. Quit one of the two.',
     'sec.typing.how': 'How you type',
@@ -33,6 +35,8 @@
     'typing.now.vi': 'Tiếng Việt', 'typing.now.en': 'Tiếng Anh', 'typing.now.switch': 'Chuyển',
     'typing.notch.title': 'Hiện ngôn ngữ trên notch', 'typing.notch.desc': 'VI hoặc EN nằm sẵn trên notch khi đóng, miễn là đang gõ và chưa có việc nào khác đang diễn ra.',
     'typing.tray.title': 'Hiện ngôn ngữ ở thanh menu', 'typing.tray.desc': 'Chữ VI hoặc EN nhỏ cạnh con ma. Bấm vào để chuyển.',
+    'typing.flag.title': 'Hiện cờ thay cho VI, EN', 'typing.flag.desc': 'Cờ Việt Nam hoặc cờ Mỹ thay cho chữ VI hoặc EN trên notch và ở thanh menu.',
+    'typing.waving.title': 'Cờ tung bay khi chuyển sang tiếng Việt', 'typing.waving.desc': 'Lá cờ đỏ sao vàng tung bay trên notch mỗi lần chuyển sang gõ tiếng Việt.',
     'typing.other.title': '{name} đang chạy',
     'typing.other.desc': 'Hai bộ gõ cùng chạy sẽ bỏ dấu hai lần, nên Figghost để nguyên các phím khi {name} đang chạy. Hãy thoát một trong hai.',
     'sec.typing.how': 'Cách gõ',
@@ -81,6 +85,8 @@
         row(t('typing.shortcut'), t('typing.shortcut.desc'), hotkeyButton('typing', { allowClear: true, label: t('typing.shortcut') }), when),
         toggleRow('typing.notch_badge', t('typing.notch.title'), t('typing.notch.desc'), when),
         toggleRow('typing.tray_badge', t('typing.tray.title'), t('typing.tray.desc'), when),
+        toggleRow('typing.flag', t('typing.flag.title'), t('typing.flag.desc'), when),
+        toggleRow('typing.waving_flag', t('typing.waving.title'), t('typing.waving.desc'), when),
         row(t('typing.access.title'), t('typing.access.desc'), [
           pill(() => (S.typing.accessibility ? t('access.granted') : t('access.missing')), () => S.typing.accessibility),
           button(t('typing.access.open'), () => send({ t: 'action', name: 'open_accessibility' }), { small: true }),
@@ -118,9 +124,13 @@
     const badge = (title) => [...page.querySelectorAll('.switch')].find((b) => b.getAttribute('aria-label') === title);
     badge(t('typing.notch.title')).click();
     badge(t('typing.tray.title')).click();
-    expect(sent.some((m) => m.path === 'typing.notch_badge') && sent.some((m) => m.path === 'typing.tray_badge'), 'typing: the notch and menu bar switches send their settings: ' + JSON.stringify(sent));
+    badge(t('typing.flag.title')).click();
+    badge(t('typing.waving.title')).click();
+    expect(['notch_badge', 'tray_badge', 'flag', 'waving_flag'].every((k) => sent.some((m) => m.path === 'typing.' + k)), 'typing: the notch, menu bar and flag switches send their settings: ' + JSON.stringify(sent));
     badge(t('typing.notch.title')).click();
     badge(t('typing.tray.title')).click();
+    badge(t('typing.flag.title')).click();
+    badge(t('typing.waving.title')).click();
     sent.length = 0;
     const vni = [...page.querySelectorAll('.seg button')].find((b) => b.textContent === 'VNI');
     vni.click();
