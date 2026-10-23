@@ -161,7 +161,7 @@ pub const NAMED_IDS: [&str; 18] = [
 const IMAGE_TARGETS: [&str; 8] = [
     "to_png", "to_jpeg", "to_heic", "to_tiff", "to_avif", "to_gif", "to_bmp", "to_pdf",
 ];
-const VIDEO_TARGETS: [&str; 3] = ["to_mp4", "to_mov", "to_m4a"];
+const VIDEO_TARGETS: [&str; 4] = ["to_mp4", "to_mov", "to_gif", "to_m4a"];
 const AUDIO_TARGETS: [&str; 6] = ["to_m4a", "to_wav", "to_aiff", "to_flac", "to_caf", "to_aac"];
 const DOCUMENT_TARGETS: [&str; 7] = [
     "to_docx", "to_doc", "to_rtf", "to_odt", "to_html", "to_txt", "to_pdf",
@@ -582,6 +582,15 @@ fn job(id: &str, source: &Path, taken: &mut Vec<PathBuf>) -> Option<Job> {
                 out,
             )
         }
+        ("to_gif", Class::Video) => {
+            let out = output(&stem, "gif");
+            Job::native(
+                Native::VideoToGif {
+                    source: source.to_owned(),
+                },
+                out,
+            )
+        }
         ("to_m4a", Class::Video) => {
             let out = output(&stem, "m4a");
             avconvert("PresetAppleM4A", source, out)
@@ -767,11 +776,11 @@ mod tests {
     fn video_audio_pdf_and_documents_each_get_their_own_formats() {
         assert_eq!(
             ids_of(Kind::Formats, &["/x/a.mov"]),
-            ["to_mp4", "to_m4a", "zip", "tar", "tgz"]
+            ["to_mp4", "to_gif", "to_m4a", "zip", "tar", "tgz"]
         );
         assert_eq!(
             ids_of(Kind::Formats, &["/x/a.mp4"]),
-            ["to_mov", "to_m4a", "zip", "tar", "tgz"]
+            ["to_mov", "to_gif", "to_m4a", "zip", "tar", "tgz"]
         );
         assert_eq!(
             ids_of(Kind::Formats, &["/x/a.wav"]),
@@ -1207,9 +1216,12 @@ mod tests {
         };
         assert_eq!(
             formats(&[&sound]),
-            ["to_mp4", "to_m4a", "zip", "tar", "tgz"]
+            ["to_mp4", "to_gif", "to_m4a", "zip", "tar", "tgz"]
         );
-        assert_eq!(formats(&[&silent]), ["to_mp4", "zip", "tar", "tgz"]);
+        assert_eq!(
+            formats(&[&silent]),
+            ["to_mp4", "to_gif", "zip", "tar", "tgz"]
+        );
         // A batch gets what every file supports.
         assert!(!formats(&[&sound, &silent]).contains(&"to_m4a"));
         assert!(plan("to_m4a", std::slice::from_ref(&silent.to_path_buf())).is_none());

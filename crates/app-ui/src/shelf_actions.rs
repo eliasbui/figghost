@@ -148,6 +148,8 @@ pub enum Native {
     },
     /// A text document printed as a PDF.
     DocumentToPdf { source: PathBuf },
+    /// A video as an animated GIF, at the size and rate of a GIF recording.
+    VideoToGif { source: PathBuf },
 }
 
 /// A job that makes one new file or folder: a command, or work done here.
@@ -442,6 +444,10 @@ fn run_native(work: &Native, output: &Path) -> Result<(), String> {
             format,
         } => ops::pdf_to_images(source, output, stem, *format).map(|_| ()),
         Native::DocumentToPdf { source } => document_to_pdf(source, output),
+        Native::VideoToGif { source } => {
+            use macos_sys::gif::{GIF_FPS, GIF_MAX_WIDTH, write_gif};
+            write_gif(source, output, GIF_MAX_WIDTH, GIF_FPS)
+        }
     }
 }
 

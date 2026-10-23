@@ -63,7 +63,7 @@ The settings window keeps every feature under six icons in a dock at its foot, a
 | --- | --- | --- |
 | Scrolling | Cuộn chuột | Smooth wheel scrolling with a curve you can see, a reverse direction for external mice only, modifier keys for sideways, faster and zoom, and rules for each app |
 | Cursor | Con trỏ | A rainbow arrow, a pixel character or any picture or GIF as the pointer (off by default) |
-| Drag wheel | Vòng kéo thả | A wheel around the pointer while you drag a file: resize, compress, split or merge PDFs, annotate, copy its text, cut out the subject, strip metadata |
+| Drag wheel | Vòng kéo thả | A wheel around the pointer while you drag a file: resize, compress, split or merge PDFs, annotate, copy its text, cut out the subject, strip metadata, turn a video into a GIF |
 
 ### Notch & Tiện ích (Notch & Island)
 
@@ -153,7 +153,7 @@ Select text anywhere and press the shortcut. A small window next to the pointer 
 
 ### Drag wheel
 
-Start dragging a file and tap a modifier key: a wheel opens around the pointer with the things that can be done to it (resize, compress, split or merge PDFs, annotate, copy its text, cut out the subject, strip metadata). Drop on a slot to run it.
+Start dragging a file and tap a modifier key: a wheel opens around the pointer with the things that can be done to it (resize, compress, split or merge PDFs, annotate, copy its text, cut out the subject, strip metadata, turn a video into a GIF). Drop on a slot to run it.
 
 ![The drag wheel with nine slots, one lit under the pointer](docs/images/drag-wheel.gif)
 
