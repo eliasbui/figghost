@@ -29,7 +29,7 @@ use std::{
     time::Instant,
 };
 
-mod logic;
+pub(crate) mod logic;
 pub mod settings;
 mod text;
 

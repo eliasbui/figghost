@@ -6,6 +6,10 @@ use std::{
     fs,
     os::unix::fs::MetadataExt,
     path::{Path, PathBuf},
+    sync::{
+        Mutex,
+        atomic::{AtomicUsize, Ordering},
+    },
     time::SystemTime,
 };
 
@@ -97,11 +101,16 @@ pub struct Found {
 
 impl Found {
     fn new(path: PathBuf, note: &str) -> Found {
+        let size = size_of(&path);
+        Found::sized(path, note, size)
+    }
+
+    fn sized(path: PathBuf, note: &str, size: u64) -> Found {
         let meta = fs::symlink_metadata(&path).ok();
         Found {
             name: file_name(&path),
             note: note.to_owned(),
-            size: size_of(&path),
+            size,
             dir: meta.as_ref().is_some_and(fs::Metadata::is_dir),
             age_days: meta.and_then(|m| days_since(m.modified().ok()?)),
             path,
@@ -137,11 +146,18 @@ fn children(dir: &Path) -> Vec<PathBuf> {
 }
 
 /// The room a file or folder takes on disk, without following links.
-// ponytail: one thread walks everything; split by top folder if a big home folder scans too slowly.
 pub fn size_of(path: &Path) -> u64 {
+    size_until(path, &|| false)
+}
+
+/// The same, but given up (with what was counted so far) as soon as `stop` says so.
+fn size_until(path: &Path, stop: &dyn Fn() -> bool) -> u64 {
     let mut total = 0;
     let mut stack = vec![path.to_path_buf()];
     while let Some(p) = stack.pop() {
+        if stop() {
+            break;
+        }
         let Ok(meta) = fs::symlink_metadata(&p) else {
             continue;
         };
@@ -166,7 +182,7 @@ pub fn list(kind: Kind, home: &Path, own_id: Option<&str>) -> Vec<Found> {
         Kind::Purge => purge(home),
         Kind::Installers => installers(home),
         Kind::Apps => apps(home, own_id),
-        Kind::Analyze => analyze(home),
+        Kind::Analyze => analyze(home, &|| false),
     }
 }
 
@@ -353,14 +369,31 @@ fn leftovers(library: &Path, id: &str, name: &str) -> Vec<PathBuf> {
         .collect()
 }
 
-/// What is inside one folder, each entry with everything under it.
-pub fn analyze(dir: &Path) -> Vec<Found> {
-    biggest(
-        children(dir)
-            .into_iter()
-            .map(|p| Found::new(p, ""))
-            .collect(),
-    )
+/// What is inside one folder, each entry with everything under it, the entries walked side by side. A walk that
+/// `stop`s gives back what it has, which the caller throws away.
+// shortcut: one entry is walked by one thread, so a single huge folder (Library) is the long pole; split it below
+// its first level if that is ever too slow.
+pub fn analyze(dir: &Path, stop: &(dyn Fn() -> bool + Sync)) -> Vec<Found> {
+    let paths = children(dir);
+    let next = AtomicUsize::new(0);
+    let found = Mutex::new(Vec::with_capacity(paths.len()));
+    let workers = std::thread::available_parallelism()
+        .map_or(4, |n| n.get())
+        .min(paths.len());
+    std::thread::scope(|s| {
+        for _ in 0..workers {
+            s.spawn(|| {
+                while let Some(p) = paths.get(next.fetch_add(1, Ordering::Relaxed)) {
+                    if stop() {
+                        break;
+                    }
+                    let item = Found::sized(p.clone(), "", size_until(p, stop));
+                    found.lock().unwrap_or_else(|e| e.into_inner()).push(item);
+                }
+            });
+        }
+    });
+    biggest(found.into_inner().unwrap_or_else(|e| e.into_inner()))
 }
 
 /// Removes one row: caches are emptied and build folders deleted, since their tools make them again; installers,
@@ -460,6 +493,20 @@ mod tests {
         remove(Kind::Clean, &list[0]).unwrap();
         assert!(cache.is_dir() && children(&cache).is_empty());
         fs::remove_dir_all(&home).unwrap();
+    }
+
+    #[test]
+    fn the_disk_view_sizes_every_entry_and_a_stopped_walk_is_cut_short() {
+        let dir = scratch("analyze");
+        fs::create_dir_all(dir.join("big/deep")).unwrap();
+        fs::write(dir.join("big/deep/blob"), vec![1; 1 << 20]).unwrap();
+        fs::write(dir.join("small"), vec![1; 10]).unwrap();
+        let list = analyze(&dir, &|| false);
+        assert_eq!(list.len(), 2);
+        assert_eq!(list[0].name, "big");
+        assert!(list[0].size >= 1 << 20 && list[0].dir);
+        assert!(analyze(&dir, &|| true).is_empty());
+        fs::remove_dir_all(&dir).unwrap();
     }
 
     #[test]

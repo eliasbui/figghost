@@ -6,11 +6,13 @@
 mod scan;
 mod strings;
 
-use super::AttachEnv;
+use super::{AttachEnv, system::logic};
 use crate::settings::model::Fault;
 use macos_sys::{
+    sensors,
     status_item::{Entry, Item},
-    sysinfo, workspace,
+    sysinfo::{self, Pressure, Thermal},
+    workspace,
 };
 use scan::{Found, Kind};
 use serde_json::{Value, json};
@@ -18,9 +20,15 @@ use std::{
     collections::{BTreeMap, BTreeSet},
     path::{Path, PathBuf},
     rc::Rc,
-    sync::{Arc, Mutex, MutexGuard},
-    time::Duration,
+    sync::{
+        Arc, Mutex, MutexGuard,
+        atomic::{AtomicU64, Ordering},
+    },
+    time::{Duration, Instant, SystemTime, UNIX_EPOCH},
 };
+
+/// How many of the busiest processes are shown, by processor and by memory.
+const TOP: usize = 6;
 
 /// The time between the two readings of the processor that its use is worked out from.
 const CPU_SAMPLE: Duration = Duration::from_millis(400);
@@ -30,8 +38,10 @@ struct Inner {
     busy: BTreeSet<&'static str>,
     status: Value,
     lists: BTreeMap<Kind, Vec<Found>>,
-    /// The folder the disk view shows.
+    /// The folder the disk view shows, or is reading when "analyze" is busy.
     folder: Option<PathBuf>,
+    /// Every folder the disk view has read, so that going back to one is at once.
+    seen: BTreeMap<PathBuf, Vec<Found>>,
     /// What the last removal did; `seq` tells the page it is new.
     result: Value,
     seq: u64,
@@ -41,6 +51,8 @@ pub struct Feature {
     home: PathBuf,
     own_id: Option<String>,
     inner: Arc<Mutex<Inner>>,
+    /// Raised for every folder the disk view is asked for; a walk of an older one stops.
+    walk: Arc<AtomicU64>,
 }
 
 fn lock(inner: &Mutex<Inner>) -> MutexGuard<'_, Inner> {
@@ -52,6 +64,7 @@ pub fn attach(_env: &AttachEnv) -> Option<Rc<Feature>> {
         home: PathBuf::from(std::env::var_os("HOME")?),
         own_id: workspace::own_bundle_id(),
         inner: Arc::default(),
+        walk: Arc::default(),
     }))
 }
 
@@ -64,12 +77,17 @@ impl Feature {
                 .get(&kind)
                 .map_or(Value::Null, |l| l.iter().map(Found::json).collect())
         };
-        let analyze = inner.lists.get(&Kind::Analyze).map_or(Value::Null, |l| {
-            json!({
-                "path": inner.folder,
-                "total": l.iter().map(|f| f.size).sum::<u64>(),
-                "entries": list(Kind::Analyze),
-            })
+        // While a folder is read its path is already shown, and nothing of the folder before.
+        let reading = inner.busy.contains("analyze");
+        let analyze = inner.folder.as_ref().map_or(Value::Null, |path| {
+            match inner.lists.get(&Kind::Analyze) {
+                Some(l) if !reading => json!({
+                    "path": path,
+                    "total": l.iter().map(|f| f.size).sum::<u64>(),
+                    "entries": list(Kind::Analyze),
+                }),
+                _ => json!({ "path": path, "total": null, "entries": null }),
+            }
         });
         json!({
             "home": self.home,
@@ -109,12 +127,12 @@ impl Feature {
                         .collect()
                 };
                 for kind in missing {
-                    self.scan(kind, None);
+                    self.scan(kind);
                 }
             }
             "mole_status" => self.status(),
             "mole_scan" => match Kind::parse(arg) {
-                Some(kind) => self.scan(kind, None),
+                Some(kind) => self.scan(kind),
                 None => return Some(Err(Fault::new("invalid_value", "unknown list"))),
             },
             "mole_analyze" => {
@@ -122,7 +140,7 @@ impl Feature {
                 if !path.is_absolute() || !path.is_dir() {
                     return Some(Err(Fault::new("invalid_value", "not a folder")));
                 }
-                self.scan(Kind::Analyze, Some(path.to_path_buf()));
+                self.analyze(path.to_path_buf(), false);
             }
             "mole_remove" => return Some(self.remove(arg)),
             _ => return None,
@@ -153,30 +171,51 @@ impl Feature {
         self.spawn("status", health, |inner, v| inner.status = v);
     }
 
-    /// Lists one kind again; the disk view keeps its folder unless given another.
-    fn scan(&self, kind: Kind, folder: Option<PathBuf>) {
+    /// Lists one kind again; the disk view reads its folder again.
+    fn scan(&self, kind: Kind) {
+        if kind == Kind::Analyze {
+            let folder = lock(&self.inner).folder.clone();
+            self.analyze(folder.unwrap_or_else(|| self.home.clone()), true);
+            return;
+        }
         let home = self.home.clone();
         let own_id = self.own_id.clone();
-        let folder = folder
-            .or_else(|| lock(&self.inner).folder.clone())
-            .unwrap_or_else(|| home.clone());
         self.spawn(
             kind.label(),
-            move || {
-                let list = if kind == Kind::Analyze {
-                    scan::analyze(&folder)
-                } else {
-                    scan::list(kind, &home, own_id.as_deref())
-                };
-                (list, folder)
-            },
-            move |inner, (list, folder)| {
-                if kind == Kind::Analyze {
-                    inner.folder = Some(folder);
-                }
+            move || scan::list(kind, &home, own_id.as_deref()),
+            move |inner, list| {
                 inner.lists.insert(kind, list);
             },
         );
+    }
+
+    /// Shows a folder in the disk view: one read before comes back at once unless `fresh`, and a new one is
+    /// walked while any older walk is stopped, so a click is never lost behind a slow scan of the home folder.
+    fn analyze(&self, folder: PathBuf, fresh: bool) {
+        let mut inner = lock(&self.inner);
+        // Raised under the lock, so a walk that checks under the lock knows for sure whether it is the newest.
+        let walk = self.walk.fetch_add(1, Ordering::SeqCst) + 1;
+        inner.folder = Some(folder.clone());
+        if !fresh && let Some(list) = inner.seen.get(&folder).cloned() {
+            inner.busy.remove("analyze");
+            inner.lists.insert(Kind::Analyze, list);
+            return;
+        }
+        inner.busy.insert("analyze");
+        drop(inner);
+        let shared = Arc::clone(&self.inner);
+        let newest = Arc::clone(&self.walk);
+        std::thread::spawn(move || {
+            let stale = || newest.load(Ordering::SeqCst) != walk;
+            let list = scan::analyze(&folder, &stale);
+            let mut inner = lock(&shared);
+            if stale() {
+                return;
+            }
+            inner.busy.remove("analyze");
+            inner.seen.insert(folder, list.clone());
+            inner.lists.insert(Kind::Analyze, list);
+        });
     }
 
     /// `arg` is the kind of list and then the paths of its rows, one per line.
@@ -216,6 +255,8 @@ impl Feature {
                 if let Some(list) = inner.lists.get_mut(&kind) {
                     list.retain(|f| !paths.contains(&f.path));
                 }
+                // What is left of every folder read before is now smaller.
+                inner.seen.clear();
                 inner.seq += 1;
                 inner.result = json!({
                     "seq": inner.seq, "kind": kind.label(), "removed": gone.len(), "failed": failed,
@@ -294,13 +335,54 @@ fn score(cpu: f64, memory: f64, disk: f64, swap: f64) -> u32 {
     score as u32
 }
 
-/// The numbers the page shows; it takes a moment to read the processor twice.
+/// The busiest processes between two readings taken `seconds` apart, by processor (in percent of one core, as
+/// Activity Monitor counts it) and by memory. A process that is in only one reading has no processor figure.
+fn busiest(
+    before: &[sysinfo::Process],
+    after: &[sysinfo::Process],
+    seconds: f64,
+) -> (Vec<Value>, Vec<Value>) {
+    let then: BTreeMap<i32, u64> = before.iter().map(|p| (p.pid, p.cpu_ns)).collect();
+    let mut rows: Vec<(f64, &sysinfo::Process)> = after
+        .iter()
+        .map(|p| {
+            let used = then.get(&p.pid).map_or(0, |t| p.cpu_ns.saturating_sub(*t));
+            (used as f64 / 1e9 / seconds.max(1e-3) * 100.0, p)
+        })
+        .collect();
+    let row = |(cpu, p): &(f64, &sysinfo::Process)| json!({ "pid": p.pid, "name": p.name, "cpu": cpu, "memory": p.memory });
+    rows.sort_by(|a, b| b.0.total_cmp(&a.0));
+    let by_cpu = rows
+        .iter()
+        .take(TOP)
+        .filter(|r| r.0 > 0.0)
+        .map(row)
+        .collect();
+    rows.sort_by_key(|r| std::cmp::Reverse(r.1.memory));
+    let by_memory = rows.iter().take(TOP).map(row).collect();
+    (by_cpu, by_memory)
+}
+
+/// The numbers the page shows; it takes a moment to read the processor and the network twice.
 fn health() -> Value {
-    let first = sysinfo::cpu_ticks();
+    let (first, net, procs) = (
+        sysinfo::cpu_ticks(),
+        sysinfo::interfaces(),
+        sysinfo::processes(),
+    );
+    let start = Instant::now();
     std::thread::sleep(CPU_SAMPLE);
-    let cpu = match (first, sysinfo::cpu_ticks()) {
-        (Some(a), Some(b)) => cpu_percent(&a, &b),
-        _ => 0.0,
+    let (second, net_after, procs_after) = (
+        sysinfo::cpu_ticks(),
+        sysinfo::interfaces(),
+        sysinfo::processes(),
+    );
+    let seconds = start.elapsed().as_secs_f64();
+    let (down, up) = logic::rates(&net, &net_after, seconds);
+    let (by_cpu, by_memory) = busiest(&procs, &procs_after, seconds);
+    let (cpu, cores) = match (first, second) {
+        (Some(a), Some(b)) => (cpu_percent(&a, &b), logic::core_loads(&a, &b)),
+        _ => (0.0, Vec::new()),
     };
     let percent = |used: u64, total: u64| {
         if total == 0 {
@@ -309,7 +391,8 @@ fn health() -> Value {
             used as f64 * 100.0 / total as f64
         }
     };
-    let (mem_used, mem_total) = sysinfo::memory().map_or((0, 0), |m| (m.used(), m.total));
+    let mem = sysinfo::memory();
+    let (mem_used, mem_total) = mem.map_or((0, 0), |m| (m.used(), m.total));
     let (swap_total, swap_used) = sysinfo::swap().unwrap_or((0, 0));
     let (free, disk_total) = sysinfo::disk().unwrap_or((0, 0));
     let disk_used = disk_total.saturating_sub(free);
@@ -320,6 +403,29 @@ fn health() -> Value {
         "memory": memory, "memory_used": mem_used, "memory_total": mem_total,
         "swap_used": swap_used, "swap_total": swap_total,
         "disk": disk, "disk_used": disk_used, "disk_total": disk_total,
+        "at": SystemTime::now().duration_since(UNIX_EPOCH).map_or(0, |d| d.as_millis() as u64),
+        "cores": cores.iter().map(|l| l * 100.0).collect::<Vec<_>>(),
+        // The slow cores come first in the list, then the fast ones.
+        "kinds": sysinfo::core_kinds().map(|(slow, fast)| [slow, fast]),
+        "memory_app": mem.map(|m| m.app), "memory_wired": mem.map(|m| m.wired),
+        "memory_compressed": mem.map(|m| m.compressed),
+        "pressure": match sysinfo::memory_pressure() {
+            Pressure::Normal => "normal",
+            Pressure::Warning => "warning",
+            Pressure::Critical => "critical",
+        },
+        "net_down": down, "net_up": up,
+        "gpu": sysinfo::gpu_percent(),
+        "celsius": sensors::processor_celsius(),
+        "thermal": match sysinfo::thermal() {
+            Thermal::Nominal => "nominal",
+            Thermal::Fair => "fair",
+            Thermal::Serious => "serious",
+            Thermal::Critical => "critical",
+        },
+        "fans": sensors::fans().iter().map(|f| json!({ "rpm": f.rpm, "max": f.max })).collect::<Vec<_>>(),
+        "top_cpu": by_cpu, "top_memory": by_memory,
+        "battery": sysinfo::battery_wear().map(|w| json!({ "health": w.health, "cycles": w.cycles })),
     })
 }
 
@@ -346,11 +452,38 @@ mod tests {
     }
 
     #[test]
+    fn the_busiest_processes_are_counted_over_the_time_between_readings() {
+        let p = |pid, cpu_ns, memory| sysinfo::Process {
+            pid,
+            name: format!("p{pid}"),
+            cpu_ns,
+            memory,
+        };
+        let before = [p(1, 0, 10), p(2, 1_000_000_000, 500)];
+        let after = [
+            p(1, 500_000_000, 10),
+            p(2, 1_000_000_000, 500),
+            p(3, 9_000_000_000, 1),
+        ];
+        let (cpu, memory) = busiest(&before, &after, 1.0);
+        assert_eq!(
+            cpu.len(),
+            1,
+            "idle and new processes have no processor figure: {cpu:?}"
+        );
+        assert_eq!(cpu[0]["pid"], 1);
+        assert!((cpu[0]["cpu"].as_f64().unwrap() - 50.0).abs() < 1e-9);
+        assert_eq!(memory[0]["pid"], 2);
+        assert_eq!(memory.len(), 3);
+    }
+
+    #[test]
     fn only_listed_rows_can_be_removed() {
         let feature = Feature {
             home: PathBuf::from("/nonexistent-home"),
             own_id: None,
             inner: Arc::default(),
+            walk: Arc::default(),
         };
         assert!(
             feature
@@ -371,6 +504,52 @@ mod tests {
                 .is_err()
         );
         assert!(feature.action("mole_other").is_none());
+    }
+
+    #[test]
+    fn the_newest_folder_asked_for_wins_and_one_read_before_comes_back_at_once() {
+        let root = std::env::temp_dir().join(format!("figghost-mole-walk-{}", std::process::id()));
+        let _ = std::fs::remove_dir_all(&root);
+        for (dir, file) in [("a", "in-a"), ("b", "in-b")] {
+            std::fs::create_dir_all(root.join(dir)).unwrap();
+            std::fs::write(root.join(dir).join(file), "x").unwrap();
+        }
+        let feature = Feature {
+            home: root.clone(),
+            own_id: None,
+            inner: Arc::default(),
+            walk: Arc::default(),
+        };
+        let names = |f: &Feature| {
+            let inner = lock(&f.inner);
+            inner.lists[&Kind::Analyze]
+                .iter()
+                .map(|x| x.name.clone())
+                .collect::<Vec<_>>()
+        };
+        let settle = |f: &Feature| {
+            for _ in 0..500 {
+                if !lock(&f.inner).busy.contains("analyze") {
+                    return;
+                }
+                std::thread::sleep(Duration::from_millis(10));
+            }
+            panic!("the walk never ended");
+        };
+        feature.analyze(root.join("a"), false);
+        feature.analyze(root.join("b"), false);
+        settle(&feature);
+        assert_eq!(lock(&feature.inner).folder, Some(root.join("b")));
+        assert_eq!(names(&feature), ["in-b"]);
+        feature.analyze(root.join("a"), false);
+        settle(&feature);
+        feature.analyze(root.join("b"), false);
+        assert!(
+            !lock(&feature.inner).busy.contains("analyze"),
+            "a folder read before is not read again"
+        );
+        assert_eq!(names(&feature), ["in-b"]);
+        std::fs::remove_dir_all(&root).unwrap();
     }
 
     #[test]

@@ -14,6 +14,16 @@
     'mole.health.can_free': '{size} can be cleaned',
     'mole.cpu': 'CPU', 'mole.memory': 'Memory', 'mole.disk': 'Disk',
     'mole.swap': 'Swap {used} of {total}',
+    'mole.live': 'Live', 'mole.gpu': 'Graphics', 'mole.network': 'Network', 'mole.sensors': 'Heat and power',
+    'mole.cores': '{slow} efficiency and {fast} performance cores', 'mole.cores.n': '{n} cores',
+    'mole.mem.app': 'Apps', 'mole.mem.wired': 'Wired', 'mole.mem.compressed': 'Compressed',
+    'mole.pressure.normal': 'Pressure normal', 'mole.pressure.warning': 'Pressure high', 'mole.pressure.critical': 'Pressure critical',
+    'mole.down': 'Down', 'mole.up': 'Up',
+    'mole.disk.free': '{size} free',
+    'mole.thermal.nominal': 'Cool', 'mole.thermal.fair': 'Warm', 'mole.thermal.serious': 'Hot', 'mole.thermal.critical': 'Too hot',
+    'mole.fan': 'Fan {n}', 'mole.battery': 'Battery health', 'mole.battery.cycles': '{n} cycles',
+    'mole.free.title': 'What can be cleaned',
+    'mole.top.cpu': 'Busiest on the processor', 'mole.top.memory': 'Holding the most memory', 'mole.top.none': 'Nothing busy.',
     'mole.sec.clean': 'Caches and logs',
     'mole.clean.title': 'Free up disk space',
     'mole.clean.desc': 'App and browser caches, logs, developer caches and the Trash. They are emptied, not moved to the Trash; apps make them again when needed.',
@@ -70,6 +80,16 @@
     'mole.health.can_free': 'Có thể dọn {size}',
     'mole.cpu': 'CPU', 'mole.memory': 'Bộ nhớ', 'mole.disk': 'Ổ đĩa',
     'mole.swap': 'Swap {used} trên {total}',
+    'mole.live': 'Trực tiếp', 'mole.gpu': 'Đồ họa', 'mole.network': 'Mạng', 'mole.sensors': 'Nhiệt và nguồn',
+    'mole.cores': '{slow} lõi tiết kiệm và {fast} lõi hiệu năng', 'mole.cores.n': '{n} lõi',
+    'mole.mem.app': 'Ứng dụng', 'mole.mem.wired': 'Hệ thống ghim', 'mole.mem.compressed': 'Bị nén',
+    'mole.pressure.normal': 'Áp lực bình thường', 'mole.pressure.warning': 'Áp lực cao', 'mole.pressure.critical': 'Áp lực nguy hiểm',
+    'mole.down': 'Tải xuống', 'mole.up': 'Tải lên',
+    'mole.disk.free': 'Còn trống {size}',
+    'mole.thermal.nominal': 'Mát', 'mole.thermal.fair': 'Ấm', 'mole.thermal.serious': 'Nóng', 'mole.thermal.critical': 'Quá nóng',
+    'mole.fan': 'Quạt {n}', 'mole.battery': 'Độ chai pin', 'mole.battery.cycles': '{n} lần sạc',
+    'mole.free.title': 'Có thể dọn',
+    'mole.top.cpu': 'Ngốn CPU nhất', 'mole.top.memory': 'Ngốn bộ nhớ nhất', 'mole.top.none': 'Không có gì đang chạy nặng.',
     'mole.sec.clean': 'Bộ nhớ đệm và nhật ký',
     'mole.clean.title': 'Giải phóng dung lượng',
     'mole.clean.desc': 'Bộ nhớ đệm của ứng dụng và trình duyệt, nhật ký, bộ nhớ đệm cho lập trình và Thùng rác. Chúng bị xóa hẳn, không vào Thùng rác; ứng dụng sẽ tự tạo lại khi cần.',
@@ -128,50 +148,179 @@
   const tilde = (p) => (mole().home && p.startsWith(mole().home) ? '~' + p.slice(mole().home.length) : p);
   const scanning = () => h('div', { class: 'empty', role: 'status', text: t('mole.scanning') });
 
-  function meter(key, value, detail) {
-    const fill = h('span');
-    const bar = h('div', { class: 'mole-bar', role: 'progressbar', 'aria-valuemin': '0', 'aria-valuemax': '100', 'aria-label': t('mole.' + key) }, fill);
-    const num = h('b');
-    const extra = h('span');
-    reg(() => {
-      const v = clamp(+value() || 0, 0, 100);
-      fill.style.width = v + '%';
-      bar.classList.toggle('hot', v >= 90);
-      bar.setAttribute('aria-valuenow', String(Math.round(v)));
-      num.textContent = Math.round(v) + '%';
-      extra.textContent = detail() || '';
-    });
-    return h('div', {}, h('div', { class: 'mole-meter-label' }, h('span', { text: t('mole.' + key) }), num), bar, h('div', { class: 'mole-meter-label' }, extra));
+  // The last readings of the live figures, kept across visits of the page.
+  const HISTORY = 60;
+  const hist = { at: null, cpu: [], memory: [], gpu: [], down: [], up: [] };
+  function remember(st) {
+    if (st.at == null || st.at === hist.at) return;
+    hist.at = st.at;
+    const add = (k, v) => { hist[k].push(+v || 0); if (hist[k].length > HISTORY) hist[k].shift(); };
+    add('cpu', st.cpu); add('memory', st.memory); add('gpu', st.gpu); add('down', st.net_down); add('up', st.net_up);
+  }
+  const rate = (n) => size(n) + '/s';
+
+  /** A filled line of readings, oldest on the left, against `top` (or the largest of them). */
+  function spark(values, top) {
+    const max = Math.max(top || 0, ...values, 1e-9);
+    const step = 120 / Math.max(1, HISTORY - 1);
+    const x0 = 120 - (values.length - 1) * step;
+    const pts = values.map((v, i) => (x0 + i * step).toFixed(1) + ',' + (36 - (v / max) * 33).toFixed(1));
+    if (pts.length < 2) return '';
+    return '<path class="area" d="M' + x0.toFixed(1) + ',36L' + pts.join('L') + 'L120,36Z"/><path class="line" d="M' + pts.join('L') + '"/>';
+  }
+  const sparkEl = (cls) => h('div', { class: 'mole-spark ' + cls, 'aria-hidden': 'true' });
+
+  /** A ring filled to `v` out of 100, its figure in the middle. */
+  function gauge(cls, label) {
+    const el = h('div', { class: 'mole-gauge ' + cls, role: 'meter', 'aria-valuemin': '0', 'aria-valuemax': '100', 'aria-label': label },
+      h('b'), h('span', { text: label }));
+    el.set = (v, text) => {
+      const n = clamp(+v || 0, 0, 100);
+      el.style.setProperty('--v', n);
+      el.setAttribute('aria-valuenow', String(Math.round(n)));
+      el.querySelector('b').textContent = text != null ? text : Math.round(n) + '%';
+    };
+    return el;
+  }
+
+  function tile(cls, title, ...kids) {
+    const value = h('b', { class: 'mole-tile-value' });
+    const sub = h('span', { class: 'mole-tile-sub' });
+    const el = h('div', { class: 'mole-tile ' + cls }, h('div', { class: 'mole-tile-head' }, h('span', { text: title }), value), sub, ...kids);
+    return Object.assign(el, { value, sub });
   }
 
   function healthCard() {
     const st = () => mole().status || {};
-    const score = h('span', { class: 'mole-score' });
+    const word = (s) => (s >= 85 ? 'good' : s >= 60 ? 'fair' : 'poor');
+    const score = h('div', { class: 'mole-score-ring', role: 'meter', 'aria-valuemin': '0', 'aria-valuemax': '100', 'aria-label': t('mole.health.title') },
+      h('b'), h('span', { text: t('mole.health.title') }));
+    const status = h('div', { class: 'mole-hero-word' });
+    const free = h('div', { class: 'mole-hero-free' });
     const refresh = button(t('mole.refresh.all'), () => act('mole_refresh'), { icon: 'refresh', small: true });
-    const head = row(t('mole.health.title'), ' ', h('div', { class: 'mole-actions' }, score, refresh));
-    const desc = head.querySelector('.row-desc');
+    const live = h('span', { class: 'mole-live', text: t('mole.live') });
+    const rings = { cpu: gauge('cpu', t('mole.cpu')), memory: gauge('mem', t('mole.memory')), disk: gauge('disk', t('mole.disk')), gpu: gauge('gpu', t('mole.gpu')) };
+    const hero = h('div', { class: 'mole-hero' }, score,
+      h('div', { class: 'mole-hero-text' }, status, free, h('div', { class: 'mole-actions' }, live, refresh)),
+      h('div', { class: 'mole-gauges' }, ...Object.values(rings)));
+
+    const cpu = tile('cpu', t('mole.cpu'), sparkEl('cpu'), h('div', { class: 'mole-cores' }));
+    const mem = tile('mem', t('mole.memory'), sparkEl('mem'), h('div', { class: 'mole-stack' }), h('div', { class: 'mole-legend' }));
+    const net = tile('net', t('mole.network'), sparkEl('down'), sparkEl('up'), h('div', { class: 'mole-legend' }));
+    const disk = tile('disk', t('mole.disk'), h('div', { class: 'mole-stack' }));
+    const heat = tile('heat', t('mole.sensors'), h('div', { class: 'mole-facts' }));
+    const tops = ['cpu', 'memory'].map((k) => h('div', { class: 'mole-top ' + k }, h('div', { class: 'mole-tile-head' }, h('span', { text: t('mole.top.' + k) })), h('div', { class: 'mole-top-rows' })));
+    const tiles = h('div', { class: 'mole-tiles' }, cpu, mem, net, disk, heat, h('div', { class: 'mole-tops' }, ...tops));
+
+    const kinds = ['clean', 'purge', 'installers'];
+    const freeBar = h('div', { class: 'mole-stack big' });
+    const freeLegend = h('div', { class: 'mole-legend' });
+    const freeBox = h('div', { class: 'mole-free' }, h('div', { class: 'mole-tile-head' }, h('span', { text: t('mole.free.title') }), h('b')), freeBar, freeLegend);
+
+    const stack = (el, parts, whole) => el.replaceChildren(...parts.map(([cls, n]) => {
+      const seg = h('span', { class: cls });
+      seg.style.width = (whole > 0 ? (n / whole) * 100 : 0) + '%';
+      return seg;
+    }));
+    const legend = (el, parts) => el.replaceChildren(...parts.map(([cls, text]) => h('span', { class: cls }, h('i'), text)));
+    const put = (el, html) => { el.hidden = !html.includes('<path'); if (el.innerHTML !== html) el.innerHTML = html; };
+    const svg = (body) => '<svg viewBox="0 0 120 36" preserveAspectRatio="none">' + body + '</svg>';
+
+    // While the page is open the health is read again each time a new reading has come in.
+    let asked = st().at;
+    let askedAt = Date.now();
     reg(() => {
-      const s = st().score;
-      score.textContent = s != null ? String(s) : '';
-      score.className = 'mole-score ' + (s >= 85 ? 'good' : s >= 60 ? 'fair' : 'poor');
-      refresh.disabled = busy('status');
-      const lists = ['clean', 'purge', 'installers'].map((k) => mole()[k] || []);
-      const free = lists.reduce((n, l) => n + sum(l), 0);
-      const word = s == null ? t('mole.health.reading') : t('mole.health.' + (s >= 85 ? 'good' : s >= 60 ? 'fair' : 'poor'));
-      desc.textContent = free ? word + ' / ' + t('mole.health.can_free', { size: size(free) }) : word;
+      const s = st();
+      if (busy('status') || document.visibilityState !== 'visible') return;
+      if (s.at !== asked || Date.now() - askedAt > 5000) { asked = s.at; askedAt = Date.now(); act('mole_status'); }
     });
-    const meters = h('div', { class: 'mole-meters' },
-      meter('cpu', () => st().cpu, () => ''),
-      meter('memory', () => st().memory, () => (st().swap_total ? t('mole.swap', { used: size(st().swap_used), total: size(st().swap_total) }) : '')),
-      meter('disk', () => st().disk, () => (st().disk_total ? size(st().disk_used) + ' / ' + size(st().disk_total) : '')));
-    return [sectionTitle(t('mole.sec.health')), card(head, meters)];
+
+    reg(() => {
+      const s = st();
+      remember(s);
+      const n = s.score;
+      score.className = 'mole-score-ring ' + (n == null ? '' : word(n));
+      score.style.setProperty('--v', n || 0);
+      score.querySelector('b').textContent = n != null ? String(n) : '--';
+      status.textContent = n == null ? t('mole.health.reading') : t('mole.health.' + word(n));
+      const lists = kinds.map((k) => mole()[k] || []);
+      const can = lists.reduce((a, l) => a + sum(l), 0);
+      free.textContent = can ? t('mole.health.can_free', { size: size(can) }) : '';
+      refresh.disabled = busy('status');
+      live.classList.toggle('on', hist.cpu.length > 1);
+      rings.cpu.set(s.cpu); rings.memory.set(s.memory); rings.disk.set(s.disk);
+      rings.gpu.hidden = s.gpu == null; rings.gpu.set(s.gpu);
+
+      cpu.value.textContent = Math.round(s.cpu || 0) + '%';
+      const cores = s.cores || [];
+      const slow = s.kinds ? s.kinds[0] : 0;
+      cpu.sub.textContent = s.kinds ? t('mole.cores', { slow: s.kinds[0], fast: s.kinds[1] }) : cores.length ? t('mole.cores.n', { n: cores.length }) : '';
+      put(cpu.querySelector('.mole-spark'), svg(spark(hist.cpu, 100)));
+      const coreBox = cpu.querySelector('.mole-cores');
+      if (coreBox.children.length !== cores.length) coreBox.replaceChildren(...cores.map((_, i) => h('span', { class: i < slow ? 'e' : 'p' }, h('i'))));
+      cores.forEach((v, i) => { coreBox.children[i].firstChild.style.height = clamp(v, 2, 100) + '%'; });
+
+      mem.value.textContent = s.memory_total ? size(s.memory_used) + ' / ' + size(s.memory_total) : '';
+      mem.sub.textContent = s.pressure ? t('mole.pressure.' + s.pressure) + (s.swap_used ? ' / ' + t('mole.swap', { used: size(s.swap_used), total: size(s.swap_total) }) : '') : '';
+      mem.sub.dataset.tone = s.pressure || '';
+      put(mem.querySelector('.mole-spark'), svg(spark(hist.memory, 100)));
+      const parts = [['app', s.memory_app], ['wired', s.memory_wired], ['compressed', s.memory_compressed]];
+      stack(mem.querySelector('.mole-stack'), parts.map(([k, v]) => [k, v || 0]), s.memory_total);
+      legend(mem.querySelector('.mole-legend'), parts.map(([k, v]) => [k, t('mole.mem.' + k) + ' ' + size(v || 0)]));
+
+      net.value.textContent = rate(s.net_down || 0);
+      net.sub.textContent = t('mole.up') + ' ' + rate(s.net_up || 0);
+      const top = Math.max(1024, ...hist.down, ...hist.up);
+      const [down, up] = net.querySelectorAll('.mole-spark');
+      put(down, svg(spark(hist.down, top)));
+      put(up, svg(spark(hist.up, top)));
+      legend(net.querySelector('.mole-legend'), [['down', t('mole.down') + ' ' + rate(s.net_down || 0)], ['up', t('mole.up') + ' ' + rate(s.net_up || 0)]]);
+
+      disk.value.textContent = Math.round(s.disk || 0) + '%';
+      disk.sub.textContent = s.disk_total ? size(s.disk_used) + ' / ' + size(s.disk_total) + ' / ' + t('mole.disk.free', { size: size(s.disk_total - s.disk_used) }) : '';
+      const sizes = kinds.map((k) => sum(mole()[k] || []));
+      const other = Math.max(0, (s.disk_used || 0) - sizes.reduce((a, b) => a + b, 0));
+      stack(disk.querySelector('.mole-stack'), [['used', other], ...kinds.map((k, i) => [k, sizes[i]])], s.disk_total);
+
+      heat.value.textContent = s.celsius != null ? Math.round(s.celsius) + '\u00b0C' : (s.thermal ? t('mole.thermal.' + s.thermal) : '');
+      heat.sub.textContent = s.celsius != null && s.thermal ? t('mole.thermal.' + s.thermal) : '';
+      heat.sub.dataset.tone = s.thermal || '';
+      const facts = [];
+      (s.fans || []).forEach((f, i) => facts.push([t('mole.fan', { n: i + 1 }), Math.round(f.rpm) + ' rpm', f.max ? f.rpm / f.max : 0]));
+      if (s.battery) facts.push([t('mole.battery'), s.battery.health + '% / ' + t('mole.battery.cycles', { n: s.battery.cycles }), s.battery.health / 100]);
+      heat.querySelector('.mole-facts').replaceChildren(...facts.map(([k, v, share]) => {
+        const fill = h('span');
+        fill.style.width = clamp(share * 100, 0, 100) + '%';
+        return h('div', { class: 'mole-fact' }, h('div', { class: 'mole-meter-label' }, h('span', { text: k }), h('b', { text: v })), h('div', { class: 'mole-bar' }, fill));
+      }));
+      heat.hidden = s.celsius == null && !facts.length && !s.thermal;
+
+      tops.forEach((box, n) => {
+        const list = (n ? s.top_memory : s.top_cpu) || [];
+        const top = Math.max(1e-9, ...list.map((p) => (n ? p.memory : p.cpu)));
+        box.querySelector('.mole-top-rows').replaceChildren(...(list.length ? list.map((p) => {
+          const v = n ? p.memory : p.cpu;
+          const fill = h('span');
+          fill.style.width = clamp((v / top) * 100, 2, 100) + '%';
+          return h('div', { class: 'mole-fact', title: p.name + ' (' + p.pid + ')' },
+            h('div', { class: 'mole-meter-label' }, h('span', { class: 'mole-top-name', text: p.name }), h('b', { text: n ? size(v) : v.toFixed(1) + '%' })),
+            h('div', { class: 'mole-bar' }, fill));
+        }) : [h('div', { class: 'mole-tile-sub', text: t('mole.top.none') })]));
+      });
+
+      freeBox.querySelector('b').textContent = size(can);
+      freeBox.hidden = !can;
+      stack(freeBar, kinds.map((k, i) => [k, sizes[i]]), can);
+      legend(freeLegend, kinds.map((k, i) => [k, t('mole.sec.' + k) + ' ' + size(sizes[i])]));
+    });
+    return [sectionTitle(t('mole.sec.health')), card(hero, tiles, freeBox)];
   }
 
   /**
    * A list whose rows are chosen with a checkbox and removed together. `detail` is the second line of a row,
    * `lead` an element before its name, `open` makes a folder row open; `head` goes above the toolbar.
    */
-  function pickList({ kind, read, detail, lead, open, head, filter }) {
+  function pickList({ kind, read, detail, lead, open, head, filter, tint }) {
     const chosen = new Set();
     const items = () => read() || [];
     const all = h('input', { type: 'checkbox', 'aria-label': t('mole.pick.all') });
@@ -184,7 +333,7 @@
     }, { icon: 'trash', small: true, danger: true });
     const refresh = button('', () => act('mole_scan:' + kind), { icon: 'refresh', small: true, aria: t('mole.refresh') });
     refresh.title = t('mole.refresh');
-    const box = h('div', { class: 'mole-list' });
+    const box = h('div', { class: 'mole-list', 'data-kind': kind });
     const visible = () => {
       const q = search ? search.value.trim().toLowerCase() : '';
       return items().filter((i) => !q || (i.name + ' ' + i.note).toLowerCase().includes(q));
@@ -209,17 +358,21 @@
       const shown = visible();
       if (!shown.length) { box.replaceChildren(busy(kind) ? scanning() : h('div', { class: 'empty', text: t('mole.' + kind + '.empty') })); return; }
       const top = Math.max(1, ...shown.map((i) => i.size));
-      box.replaceChildren(...shown.map((i) => {
+      box.replaceChildren(...shown.map((i, k) => {
         const pick = h('input', { type: 'checkbox', 'aria-label': i.name });
         pick.checked = chosen.has(i.path);
         pick.addEventListener('change', () => { if (pick.checked) chosen.add(i.path); else chosen.delete(i.path); paint(); });
         const fill = h('span');
         fill.style.width = Math.max(1, (i.size / top) * 100) + '%';
+        if (tint) fill.style.background = tint(k);
         const go = open && i.dir ? button('', (e) => { e.preventDefault(); open(i); }, { icon: 'folder', small: true, aria: t('mole.analyze.open', { name: i.name }) }) : null;
-        return h('label', { class: 'mole-item', title: tilde(i.path), 'data-path': i.path }, pick, lead ? lead(i) : null,
+        const el = h('label', { class: 'mole-item' + (go ? ' opens' : ''), title: tilde(i.path), 'data-path': i.path }, pick, lead ? lead(i) : null,
           h('span', { class: 'mole-item-text' }, h('span', { class: 'mole-item-name', text: i.name }), h('span', { class: 'mole-item-note', text: detail(i) }),
             h('span', { class: 'mole-bar' }, fill)),
           h('span', { class: 'mole-item-size', text: size(i.size) }), go);
+        // A folder opens wherever its row is clicked; only the checkbox chooses it.
+        if (go) el.addEventListener('click', (e) => { if (e.target !== pick && !go.contains(e.target)) { e.preventDefault(); open(i); } });
+        return el;
       }));
     };
     all.addEventListener('change', () => {
@@ -258,6 +411,7 @@
     return out.map((x) => ({ ...x, share: x.size / whole }));
   }
 
+  const PALETTE = ['#5e5ce6', '#0a84ff', '#64d2ff', '#30d158', '#a3d93b', '#ffd60a', '#ff9f0a', '#ff6b35', '#ff375f', '#bf5af2', '#ac8e68'];
   const R_OUT = 90;
   const R_IN = 58;
   const point = (r, turn) => (100 + r * Math.sin(turn * 2 * Math.PI)).toFixed(2) + ' ' + (100 - r * Math.cos(turn * 2 * Math.PI)).toFixed(2);
@@ -283,14 +437,16 @@
       const a = mole().analyze;
       name.textContent = x ? x.name : tilde(a.path).split('/').pop() || '/';
       num.textContent = x ? size(x.size) + ' / ' + Math.round(x.share * 100) + '%' : size(a.total);
+      wrap.querySelectorAll('.mole-legend-item').forEach((el) => el.classList.toggle('lit', el.dataset.k === k));
       wrap.querySelectorAll('.mole-item.lit').forEach((r) => r.classList.remove('lit'));
       const row = x && x.entry && rowOf(x.entry.path);
       if (row) row.classList.add('lit');
     };
-    wrap.addEventListener('mouseover', (e) => { const el = e.target.closest('.mole-slice'); if (el) light(el.dataset.k); });
-    wrap.addEventListener('mouseout', (e) => { if (e.target.closest('.mole-slice')) light(null); });
+    const keyed = (e) => e.target.closest('.mole-slice, .mole-slice-key');
+    wrap.addEventListener('mouseover', (e) => { const el = keyed(e); if (el) light(el.dataset.k); });
+    wrap.addEventListener('mouseout', (e) => { if (keyed(e)) light(null); });
     wrap.addEventListener('click', (e) => {
-      const el = e.target.closest('.mole-slice');
+      const el = keyed(e);
       const x = el && cut[el.dataset.k];
       if (!x || !x.entry) return;
       if (x.entry.dir) { act('mole_analyze:' + x.entry.path); return; }
@@ -301,7 +457,7 @@
     });
     reg(() => {
       const a = mole().analyze;
-      cut = a && !busy('analyze') ? slices(a) : [];
+      cut = a && a.entries && !busy('analyze') ? slices(a) : [];
       const stamp = JSON.stringify([cut.map((x) => [x.name, x.size]), a && a.path, a && a.total, lang]);
       if (stamp === last) return;
       last = stamp;
@@ -311,26 +467,40 @@
       const paths = cut.map((x, k) => {
         const d = arc(at, at + x.share);
         at += x.share;
-        const fill = x.entry ? 'hsl(' + Math.round((k * 360) / MAX_SLICES + 215) % 360 + ' 62% 56%)' : 'var(--text-2)';
+        const fill = x.entry ? PALETTE[k % PALETTE.length] : 'var(--text-2)';
         return '<path class="mole-slice' + (x.entry && !x.entry.dir ? ' file' : '') + '" data-k="' + k + '" d="' + d + '" style="fill:' + fill + '"></path>';
       }).join('');
       const top = cut.filter((x) => x.entry).slice(0, 3).map((x) => x.name + ' ' + size(x.size)).join(', ');
       wrap.innerHTML = '<svg viewBox="0 0 200 200" role="img" aria-label="'
         + esc(t('mole.analyze.chart', { path: tilde(a.path), total: size(a.total), top })) + '">' + paths
         + '<foreignObject x="46" y="70" width="108" height="60"><div xmlns="http://www.w3.org/1999/xhtml" class="mole-chart-mid" aria-hidden="true">'
-        + '<span class="mole-chart-name"></span><span class="mole-chart-size"></span></div></foreignObject></svg>';
+        + '<span class="mole-chart-name"></span><span class="mole-chart-size"></span></div></foreignObject></svg>'
+        + '<div class="mole-chart-legend" aria-hidden="true">' + cut.map((x, k) => '<span class="mole-legend-item mole-slice-key" data-k="' + k + '"><i style="background:'
+          + (x.entry ? PALETTE[k % PALETTE.length] : 'var(--text-2)') + '"></i>' + esc(x.name) + '<em>' + size(x.size) + '</em></span>').join('') + '</div>';
       light(null);
     });
     return wrap;
   }
 
   function analyzeHead() {
-    const where = h('span', { class: 'mole-path' });
+    const where = h('nav', { class: 'mole-path', 'aria-label': t('mole.sec.analyze') });
     const up = button(t('mole.analyze.up'), () => act('mole_analyze:' + (mole().analyze.path.replace(/\/[^/]+\/?$/, '') || '/')), { icon: 'chevron.up', small: true });
     const home = button(t('mole.analyze.home'), () => act('mole_analyze:' + mole().home), { small: true });
     reg(() => {
       const a = mole().analyze;
-      where.textContent = a ? tilde(a.path) + ' (' + size(a.total) + ')' : '';
+      const stamp = a ? a.path + '|' + a.total + '|' + busy('analyze') + '|' + lang : '';
+      if (where.dataset.stamp !== stamp) {
+        where.dataset.stamp = stamp;
+        // Each folder of the path is a step back up to it, the home folder counted as one.
+        const home = mole().home;
+        const inHome = a && home && (a.path === home || a.path.startsWith(home + '/'));
+        const rest = a ? (inHome ? a.path.slice(home.length) : a.path).split('/').filter(Boolean) : [];
+        const steps = a ? [[inHome ? home : '/', inHome ? '~' : '/'], ...rest.map((n, k) => [(inHome ? home : '') + '/' + rest.slice(0, k + 1).join('/'), n])] : [];
+        where.replaceChildren(...steps.map(([path, name], k) => k === steps.length - 1
+          ? h('b', { text: name })
+          : h('button', { class: 'mole-crumb', type: 'button', text: name, onclick: () => act('mole_analyze:' + path) })),
+          a ? h('span', { class: 'mole-path-size', text: a.total != null ? size(a.total) : t('mole.scanning') }) : null);
+      }
       up.disabled = !a || a.path === '/' || busy('analyze');
       home.disabled = !a || a.path === mole().home || busy('analyze');
     });
@@ -359,12 +529,13 @@
         ...pickList({ kind: 'apps', read: () => mole().apps, filter: true, lead: (i) => iconImg(i.note),
           detail: (i) => (i.extra ? i.note + ' / ' + t('mole.apps.extra', { n: i.extra }) : i.note) }),
         ...pickList({ kind: 'analyze', read: () => mole().analyze && mole().analyze.entries, head: analyzeHead(), detail: () => '',
-          open: (i) => act('mole_analyze:' + i.path) }),
+          open: (i) => act('mole_analyze:' + i.path), tint: (k) => (k < MAX_SLICES - 1 ? PALETTE[k % PALETTE.length] : 'var(--text-2)') }),
       ];
     },
     selftest({ expect, go, sent, S }) {
       const home = S.mole.home;
-      S.mole.status = { score: 91, cpu: 13.6, memory: 81.2, memory_used: 1, memory_total: 2, swap_used: 3858169856, swap_total: 5368709120, disk: 48.2, disk_used: 238313164359, disk_total: 494384795648 };
+      S.mole.status = { score: 91, cpu: 13.6, memory: 81.2, memory_used: 1, memory_total: 2, swap_used: 3858169856, swap_total: 5368709120, disk: 48.2, disk_used: 238313164359, disk_total: 494384795648,
+        cores: [10, 20, 90, 40], kinds: [2, 2], top_cpu: [{ pid: 7, name: 'Xcode', cpu: 182.4, memory: 9 }], top_memory: [], memory_app: 1, memory_wired: 0, memory_compressed: 0, pressure: 'warning', net_down: 2048, net_up: 0, gpu: null, celsius: null, thermal: 'nominal', fans: [], battery: null };
       S.mole.clean = [
         { path: home + '/Library/Caches/org.a', name: 'org.a', note: 'cache', size: 3000000, dir: true, age: 1, extra: 0 },
         { path: home + '/Library/Logs/b', name: 'b', note: 'log', size: 2000000, dir: true, age: 1, extra: 0 },
@@ -408,6 +579,21 @@
       sent.length = 0;
       section('analyze').querySelector('.mole-item .btn').click();
       expect(sent.some((m) => m.name === 'mole_analyze:' + home + '/Library'), 'mole: a folder opens: ' + JSON.stringify(sent));
+      expect(document.querySelectorAll('.mole-cores .e').length === 2 && document.querySelectorAll('.mole-cores .p').length === 2, 'mole: the cores are drawn by kind');
+      expect(document.querySelector('.mole-top.cpu').textContent.includes('Xcode182.4%') && document.querySelector('.mole-top.memory').textContent.includes(t('mole.top.none')),
+        'mole: the busiest processes are listed, and an empty list says so');
+      expect(getComputedStyle(document.querySelector('.mole-gauge.gpu')).display === 'none', 'mole: a Mac that says nothing of its graphics has no ring for it');
+      sent.length = 0;
+      section('analyze').querySelector('.mole-item.opens .mole-item-name').click();
+      expect(sent.some((m) => m.name === 'mole_analyze:' + home + '/Library'), 'mole: a folder row opens where it is clicked: ' + JSON.stringify(sent));
+      expect(!section('analyze').querySelector('.mole-item input:checked'), 'mole: opening a folder does not choose it');
+      S.mole.analyze = { path: home + '/Library/Caches', total: null, entries: null }; runSyncs();
+      const crumbs = [...section('analyze').querySelectorAll('.mole-crumb')];
+      expect(crumbs.length === 2 && section('analyze').textContent.includes(t('mole.scanning')), 'mole: a folder being read shows its path and that it is scanning');
+      sent.length = 0;
+      crumbs[1].click();
+      expect(sent.some((m) => m.name === 'mole_analyze:' + home + '/Library'), 'mole: a step of the path goes back up to it: ' + JSON.stringify(sent));
+      S.mole.analyze = { path: home, total: 300, entries: [{ path: home + '/Library', name: 'Library', note: '', size: 200, dir: true, age: 0, extra: 0 }] }; runSyncs();
       const ring = () => section('analyze').querySelectorAll('.mole-slice');
       expect(ring().length === 2, 'mole: one entry and what is left make two slices');
       expect(section('analyze').querySelector('svg[role=img]').getAttribute('aria-label').includes('Library'), 'mole: the ring is described for a reader');

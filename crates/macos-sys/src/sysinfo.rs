@@ -40,6 +40,7 @@ unsafe extern "C" {
 
 unsafe extern "C" {
     fn mach_host_self() -> libc::mach_port_t;
+    fn mach_timebase_info(info: *mut Timebase) -> i32;
     /// The port of this task, which `mach_task_self()` is a macro for. The `libc` crate marks its own declarations
     /// of both as deprecated in favour of a crate this one has no other use for.
     static mach_task_self_: libc::mach_port_t;
@@ -188,6 +189,81 @@ pub fn memory_pressure() -> Pressure {
 pub fn swap() -> Option<(u64, u64)> {
     let usage: libc::xsw_usage = sysctl("vm.swapusage")?;
     Some((usage.xsu_total, usage.xsu_used))
+}
+
+// -- processes ------------------------------------------------------------------------------------------------
+
+/// How many nanoseconds a tick of the machine's clock is, as a fraction.
+#[repr(C)]
+struct Timebase {
+    numer: u32,
+    denom: u32,
+}
+
+/// One running process: the processor time it has used so far, in nanoseconds, and the memory it holds, in bytes.
+#[derive(Debug, Clone, PartialEq, Eq)]
+pub struct Process {
+    pub pid: i32,
+    pub name: String,
+    pub cpu_ns: u64,
+    pub memory: u64,
+}
+
+/// The processes this user may read; those of the system and of other users are left out, since the kernel does
+/// not tell their figures to an app that is not root. Their processor time only means something as the difference
+/// of two readings.
+pub fn processes() -> Vec<Process> {
+    let mut base = Timebase { numer: 0, denom: 0 };
+    // SAFETY: `base` is a valid out value.
+    if unsafe { mach_timebase_info(&mut base) } != 0 || base.denom == 0 {
+        return Vec::new();
+    }
+    // SAFETY: a null buffer asks only for the number of processes.
+    let count = unsafe { libc::proc_listallpids(ptr::null_mut(), 0) };
+    if count <= 0 {
+        return Vec::new();
+    }
+    // Room for some that start between the two calls.
+    let mut pids = vec![0i32; count as usize + 64];
+    // SAFETY: the buffer holds `pids.len()` integers and its size in bytes is what is passed.
+    let n = unsafe {
+        libc::proc_listallpids(
+            pids.as_mut_ptr().cast(),
+            (pids.len() * size_of::<i32>()) as i32,
+        )
+    };
+    pids.truncate(n.max(0) as usize);
+    let mut out = Vec::with_capacity(pids.len());
+    for pid in pids.into_iter().filter(|&p| p > 0) {
+        // SAFETY: a plain C struct that the call fills.
+        let mut info: libc::proc_taskinfo = unsafe { zeroed() };
+        let size = size_of::<libc::proc_taskinfo>() as i32;
+        // SAFETY: `info` has room for `size` bytes, which is the most the call writes.
+        let got = unsafe {
+            libc::proc_pidinfo(pid, libc::PROC_PIDTASKINFO, 0, (&raw mut info).cast(), size)
+        };
+        if got != size {
+            continue;
+        }
+        // The file name of the program, since the short name the kernel keeps is cut at 32 bytes.
+        let mut path = [0u8; libc::PROC_PIDPATHINFO_MAXSIZE as usize];
+        // SAFETY: the buffer is as long as is passed, and the call writes the path into it.
+        let len = unsafe { libc::proc_pidpath(pid, path.as_mut_ptr().cast(), path.len() as u32) };
+        if len <= 0 {
+            continue;
+        }
+        let path = String::from_utf8_lossy(&path[..len as usize]);
+        let name = path.rsplit('/').next().unwrap_or(&path).to_owned();
+        // The times are in ticks of the machine's clock, which on Apple silicon are not nanoseconds.
+        let ticks = u128::from(info.pti_total_user + info.pti_total_system);
+        out.push(Process {
+            pid,
+            name,
+            cpu_ns: (ticks * u128::from(base.numer) / u128::from(base.denom)) as u64,
+            memory: info.pti_resident_size,
+        });
+    }
+    out
 }
 
 // -- network --------------------------------------------------------------------------------------------------
@@ -401,6 +477,17 @@ pub fn thermal() -> Thermal {
 #[cfg(test)]
 mod tests {
     use super::*;
+
+    #[test]
+    fn this_process_is_listed_with_its_memory() {
+        let me = std::process::id() as i32;
+        let list = processes();
+        let own = list
+            .iter()
+            .find(|p| p.pid == me)
+            .expect("this process can read itself");
+        assert!(own.memory > 0 && !own.name.is_empty());
+    }
 
     #[test]
     fn the_processor_has_cores_that_each_have_four_counters() {
