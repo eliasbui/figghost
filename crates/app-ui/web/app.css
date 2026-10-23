@@ -1236,7 +1236,7 @@ html.reduce-motion *::after {
 [data-cat="stack"] .nav-icon { background: linear-gradient(135deg, #f59e0b, #b45309); }
 [data-cat="mascot"] .nav-icon { background: linear-gradient(135deg, #eab308, #ca8a04); }
 [data-cat="wheel"] .nav-icon { background: linear-gradient(135deg, #6366f1, #4338ca); }
-[data-cat="mole"] .nav-icon { background: linear-gradient(135deg, #71717a, #3f3f46); }
+[data-cat="mole"] .nav-icon { background: linear-gradient(135deg, #30d158, #1f9e43); }
 [data-cat="about"] .nav-icon { background: linear-gradient(135deg, #0a84ff, #0060df); }
 
 /* Sidebar search pill */

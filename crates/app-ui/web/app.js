@@ -85,7 +85,7 @@ const I18N = {
     'side.search': 'Search settings', 'side.clear': 'Clear search', 'side.none': 'No settings found',
     'guide.label': 'The ghost', 'guide.q1': 'Boo.', 'guide.q2': 'I live in your notch.', 'guide.q3': 'Nothing extraneous here.', 'guide.q4': 'Ask me again later.',
     'metric.features': 'Features on', 'metric.tabs': 'Notch tabs', 'metric.clips': 'Copied items', 'metric.access': 'Accessibility',
-    'cat.general': 'General', 'cat.keys': 'Shortcuts', 'cat.scroll': 'Mouse & Cursor', 'cat.notch': 'Notch & Island', 'cat.agents': 'AI Agents & PRs', 'cat.calendar': 'Schedule & Focus', 'cat.tabs': 'Notch Widgets', 'cat.system': 'System & Devices', 'cat.clipboard': 'Clipboard & Typing', 'cat.smart': 'Smart & Translate', 'cat.capture': 'Capture & Media', 'cat.tiling': 'Windows & Pin',
+    'cat.general': 'General', 'cat.mole': 'Clean up this Mac', 'cat.keys': 'Shortcuts', 'cat.scroll': 'Mouse & Cursor', 'cat.notch': 'Notch & Island', 'cat.agents': 'AI Agents & PRs', 'cat.calendar': 'Schedule & Focus', 'cat.tabs': 'Notch Widgets', 'cat.system': 'System & Devices', 'cat.clipboard': 'Clipboard & Typing', 'cat.smart': 'Smart & Translate', 'cat.capture': 'Capture & Media', 'cat.tiling': 'Windows & Pin',
     'nav.sec.overview': 'Overview', 'nav.sec.notch': 'Notch & Island', 'nav.sec.mouse': 'Mouse & Windows', 'nav.sec.tools': 'Clipboard & Tools',
     'nav.general': 'General', 'nav.keys': 'Shortcuts', 'nav.scroll': 'Scrolling', 'nav.clipboard': 'Clipboard', 'nav.notch': 'Notch', 'nav.agents': 'AI agents', 'nav.tiling': 'Window snapping', 'nav.about': 'About',
     'page.general': 'General', 'page.general.sub': 'Startup, language and permissions.',
@@ -210,7 +210,7 @@ const I18N = {
     'side.search': 'Tìm chức năng', 'side.clear': 'Xóa tìm kiếm', 'side.none': 'Không có mục nào',
     'guide.label': 'Con ma', 'guide.q1': 'Hú.', 'guide.q2': 'Tôi sống trong notch của bạn.', 'guide.q3': 'Ở đây không có gì thừa.', 'guide.q4': 'Lát nữa hỏi lại nhé.',
     'metric.features': 'Đang bật', 'metric.tabs': 'Tab của notch', 'metric.clips': 'Mục đã chép', 'metric.access': 'Trợ năng',
-    'cat.general': 'Cài đặt chung', 'cat.keys': 'Phím tắt', 'cat.scroll': 'Chuột & Con trỏ', 'cat.notch': 'Notch & Đảo động', 'cat.agents': 'Tác tử AI & PR', 'cat.calendar': 'Lịch & Tập trung', 'cat.tabs': 'Tiện ích Notch', 'cat.system': 'Hệ thống & Thiết bị', 'cat.clipboard': 'Bảng tạm & Gõ chữ', 'cat.smart': 'Chọn nhanh & Dịch', 'cat.capture': 'Chụp & Tải media', 'cat.tiling': 'Cửa sổ & Ghim',
+    'cat.general': 'Cài đặt chung', 'cat.mole': 'Dọn dẹp máy Mac', 'cat.keys': 'Phím tắt', 'cat.scroll': 'Chuột & Con trỏ', 'cat.notch': 'Notch & Đảo động', 'cat.agents': 'Tác tử AI & PR', 'cat.calendar': 'Lịch & Tập trung', 'cat.tabs': 'Tiện ích Notch', 'cat.system': 'Hệ thống & Thiết bị', 'cat.clipboard': 'Bảng tạm & Gõ chữ', 'cat.smart': 'Chọn nhanh & Dịch', 'cat.capture': 'Chụp & Tải media', 'cat.tiling': 'Cửa sổ & Ghim',
     'nav.sec.overview': 'Tổng quan', 'nav.sec.notch': 'Notch & Đảo động', 'nav.sec.mouse': 'Chuột & Cửa sổ', 'nav.sec.tools': 'Bảng tạm & Công cụ',
     'nav.general': 'Chung', 'nav.keys': 'Phím tắt', 'nav.scroll': 'Cuộn chuột', 'nav.clipboard': 'Clipboard', 'nav.notch': 'Notch', 'nav.agents': 'Tác tử AI', 'nav.tiling': 'Chia cửa sổ', 'nav.about': 'Giới thiệu',
     'page.general': 'Chung', 'page.general.sub': 'Khởi động, ngôn ngữ và quyền truy cập.',
@@ -1977,7 +1977,8 @@ function pageAbout() {
 }
 
 const CATEGORIES = [
-  { id: 'general', sec: 'overview', icon: 'gearshape.fill', pages: ['general', 'mole', 'about'] },
+  { id: 'general', sec: 'overview', icon: 'gearshape.fill', pages: ['general', 'about'] },
+  { id: 'mole', sec: 'overview', icon: 'sparkles', pages: ['mole'] },
   { id: 'keys', sec: 'overview', icon: 'keyboard', pages: ['keys'] },
   { id: 'notch', sec: 'notch', icon: 'laptopcomputer', pages: ['notch', 'islands', 'musicwidget'] },
   { id: 'agents', sec: 'notch', icon: 'terminal.fill', pages: ['agents', 'prs'] },
