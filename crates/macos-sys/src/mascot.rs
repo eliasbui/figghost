@@ -925,6 +925,7 @@ impl Stage {
 
     /// One frame of the story, for the moment the screen is drawing. Called by the driver only.
     fn tick(&self, now: f64) {
+        crate::sysinfo::count_frame();
         let run = self.run.borrow();
         let Some(play) = run.as_ref() else {
             return;

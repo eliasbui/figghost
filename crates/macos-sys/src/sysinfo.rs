@@ -90,6 +90,102 @@ pub fn cpu_ticks() -> Option<Vec<[u32; 4]>> {
     Some(ticks)
 }
 
+// -- this app ---------------------------------------------------------------------------------------------------
+
+/// What this process has used since it started. The times and byte counts only grow, so a rate is the difference of
+/// two readings.
+#[derive(Debug, Clone, Copy, PartialEq, Eq, Default)]
+pub struct OwnUsage {
+    /// Processor time of every thread, in nanoseconds.
+    pub cpu_ns: u64,
+    /// Time the GPU spent on this process's work, in nanoseconds.
+    pub gpu_ns: u64,
+    /// The memory Activity Monitor shows for the app, in bytes.
+    pub memory: u64,
+    pub disk_read: u64,
+    pub disk_written: u64,
+}
+
+/// `task_power_info_v2` of `<mach/task_info.h>`, packed to four bytes as the header has it.
+#[repr(C, packed(4))]
+struct TaskPowerInfoV2 {
+    cpu_energy: [u64; 6],
+    gpu_utilisation: u64,
+    gpu_reserved: [u64; 3],
+    ptime: u64,
+    pset_switches: u64,
+}
+const TASK_POWER_INFO_V2: libc::task_flavor_t = 26;
+
+pub fn own_usage() -> Option<OwnUsage> {
+    // SAFETY: a plain C struct that the call fills.
+    let mut info: libc::rusage_info_v4 = unsafe { zeroed() };
+    // SAFETY: `info` is a `rusage_info_v4`, which is what the flavour asks for.
+    let status = unsafe {
+        libc::proc_pid_rusage(libc::getpid(), libc::RUSAGE_INFO_V4, (&raw mut info).cast())
+    };
+    if status != 0 {
+        return None;
+    }
+    // SAFETY: a plain C struct that the call fills.
+    let mut power: TaskPowerInfoV2 = unsafe { zeroed() };
+    let mut count = (size_of::<TaskPowerInfoV2>() / size_of::<libc::natural_t>()) as u32;
+    // SAFETY: `power` has room for `count` integers, which is what the call may write.
+    let gpu_ns = match unsafe {
+        libc::task_info(
+            mach_task_self_,
+            TASK_POWER_INFO_V2,
+            (&raw mut power).cast(),
+            &mut count,
+        )
+    } {
+        0 => power.gpu_utilisation,
+        _ => 0,
+    };
+    // SAFETY: a plain C struct that the call fills.
+    let mut times: libc::rusage = unsafe { zeroed() };
+    // SAFETY: `times` outlives the call.
+    unsafe { libc::getrusage(libc::RUSAGE_SELF, &mut times) };
+    let ns = |t: libc::timeval| t.tv_sec as u64 * 1_000_000_000 + t.tv_usec as u64 * 1000;
+    Some(OwnUsage {
+        cpu_ns: ns(times.ru_utime) + ns(times.ru_stime),
+        gpu_ns,
+        memory: info.ri_phys_footprint,
+        disk_read: info.ri_diskio_bytesread,
+        disk_written: info.ri_diskio_byteswritten,
+    })
+}
+
+/// The processes this one started that are still running, such as the tools the features ask.
+pub fn own_children() -> Vec<i32> {
+    let mut pids = [0i32; 256];
+    // SAFETY: the buffer holds `pids.len()` process ids and its size in bytes is passed with it.
+    let n = unsafe {
+        libc::proc_listchildpids(
+            libc::getpid(),
+            pids.as_mut_ptr().cast(),
+            (pids.len() * size_of::<i32>()) as i32,
+        )
+    };
+    pids.iter()
+        .take(n.max(0) as usize)
+        .copied()
+        .filter(|p| *p > 0)
+        .collect()
+}
+
+static FRAMES: std::sync::atomic::AtomicU64 = std::sync::atomic::AtomicU64::new(0);
+
+/// Called by every animation of the app once a frame, so that the frames drawn per second can be told.
+pub fn count_frame() {
+    FRAMES.fetch_add(1, std::sync::atomic::Ordering::Relaxed);
+}
+
+/// The frames counted since the app started.
+pub fn frames() -> u64 {
+    FRAMES.load(std::sync::atomic::Ordering::Relaxed)
+}
+
 fn sysctl<T>(name: &str) -> Option<T> {
     let name = CString::new(name).ok()?;
     // SAFETY: every `T` used here is a plain integer or C struct that the kernel fills completely.
@@ -477,6 +573,21 @@ pub fn thermal() -> Thermal {
 #[cfg(test)]
 mod tests {
     use super::*;
+
+    #[test]
+    fn this_process_reads_its_own_use() {
+        let a = own_usage().expect("a reading");
+        let mut x = 0u64;
+        for i in 0..20_000_000u64 {
+            x = x.wrapping_add(i * i);
+        }
+        assert!(x > 0);
+        let b = own_usage().unwrap();
+        assert!(b.cpu_ns > a.cpu_ns, "the loop took processor time");
+        assert!(b.memory > 1 << 20, "a process uses more than a megabyte");
+        count_frame();
+        assert!(frames() >= 1);
+    }
 
     #[test]
     fn this_process_is_listed_with_its_memory() {

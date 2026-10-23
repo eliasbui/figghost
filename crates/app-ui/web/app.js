@@ -182,6 +182,8 @@ const I18N = {
     'layout.grid_7': 'Cell 7 · bottom left', 'layout.grid_8': 'Cell 8 · bottom middle', 'layout.grid_9': 'Cell 9 · bottom right',
 
     'about.line': 'A light native toolbox for the menu bar and the notch of your Mac.',
+    'about.usage.title': 'What Figghost is using', 'about.usage.desc': 'Read every two seconds while this window is open. The network counts the tools Figghost runs, such as curl and gh, since the app opens no connection of its own. Frames are those its animations draw: none while nothing moves.', 'about.usage.wait': 'Reading...',
+    'about.usage.cpu': 'CPU', 'about.usage.gpu': 'GPU', 'about.usage.memory': 'Memory', 'about.usage.net': 'Network', 'about.usage.disk': 'Disk', 'about.usage.fps': 'Frames', 'about.usage.fps.n': '{n} fps', 'about.usage.disk.n': 'read {r}/s, write {w}/s',
     'about.version': 'Version', 'about.privacy': 'Privacy', 'about.privacy.val': 'Everything stays on this Mac. The only thing Figghost asks the network by itself is whether a new version exists, once a day.', 'about.quit': 'Quit Figghost',
     'about.quit.desc': 'Stops scrolling, clipboard and notch features until you open the app again.',
     'about.update': 'Check for updates', 'about.update.desc': 'Looks for a new version every day. Press Check now to look at once; a new version is downloaded and installed for you.', 'about.update.check': 'Check now',
@@ -303,6 +305,8 @@ const I18N = {
     'layout.grid_7': 'Ô 7 · dưới trái', 'layout.grid_8': 'Ô 8 · dưới giữa', 'layout.grid_9': 'Ô 9 · dưới phải',
 
     'about.line': 'Hộp công cụ gọn nhẹ, bản địa, cho thanh menu và notch của máy Mac.',
+    'about.usage.title': 'Figghost đang dùng', 'about.usage.desc': 'Đọc mỗi hai giây khi cửa sổ này mở. Mạng tính cả các công cụ Figghost chạy như curl và gh, vì bản thân app không tự mở kết nối nào. Khung hình là của các hiệu ứng app đang vẽ: bằng 0 khi không có gì chuyển động.', 'about.usage.wait': 'Đang đọc...',
+    'about.usage.cpu': 'CPU', 'about.usage.gpu': 'GPU', 'about.usage.memory': 'Bộ nhớ', 'about.usage.net': 'Mạng', 'about.usage.disk': 'Ổ đĩa', 'about.usage.fps': 'Khung hình', 'about.usage.fps.n': '{n} fps', 'about.usage.disk.n': 'đọc {r}/s, ghi {w}/s',
     'about.version': 'Phiên bản', 'about.privacy': 'Riêng tư', 'about.privacy.val': 'Mọi thứ nằm trên máy Mac này. Thứ duy nhất Figghost tự hỏi qua mạng là đã có bản mới hay chưa, mỗi ngày một lần.', 'about.quit': 'Thoát Figghost',
     'about.quit.desc': 'Dừng cuộn mượt, clipboard và notch cho đến khi bạn mở lại ứng dụng.',
     'about.update': 'Kiểm tra bản mới', 'about.update.desc': 'Mỗi ngày tự hỏi GitHub xem có bản mới chưa. Bấm Kiểm tra để hỏi ngay; bản mới sẽ được tải và cài sẵn cho bạn.', 'about.update.check': 'Kiểm tra',
@@ -1902,6 +1906,34 @@ function mapRow(cat) {
   return row(h('span', { class: 'map-title' }, tile, t('cat.' + cat.id)), cat.pages.map((id) => t('nav.' + id)).join(' · '), null);
 }
 
+/** What Figghost itself uses, as numbers that follow the state. */
+function usageCard() {
+  const bytes = (n) => {
+    if (!(n > 0)) return '0 B';
+    const units = ['B', 'KB', 'MB', 'GB'];
+    const i = Math.min(units.length - 1, Math.floor(Math.log(n) / Math.log(1024)));
+    return (n / 1024 ** i).toFixed(i > 1 ? 1 : 0) + ' ' + units[i];
+  };
+  const percent = (v) => (v < 10 ? v.toFixed(1) : Math.round(v)) + '%';
+  const shown = {
+    cpu: (u) => percent(u.cpu),
+    gpu: (u) => percent(u.gpu),
+    memory: (u) => bytes(u.memory),
+    net: (u) => bytes(u.net) + '/s',
+    disk: (u) => t('about.usage.disk.n', { r: bytes(u.disk_read), w: bytes(u.disk_write) }),
+    fps: (u) => t('about.usage.fps.n', { n: Math.round(u.fps) }),
+  };
+  const rows = Object.entries(shown).map(([key, format]) => {
+    const value = h('span', { class: 'row-title usage-value' });
+    reg(() => {
+      const u = S.app.usage;
+      value.textContent = u && u[key === 'disk' ? 'disk_read' : key] != null ? format(u) : t('about.usage.wait');
+    });
+    return row(t('about.usage.' + key), null, value);
+  });
+  return [sectionTitle(t('about.usage.title')), card(row(t('about.usage.title'), t('about.usage.desc'), null), ...rows)];
+}
+
 function pageAbout() {
   const text = h('pre', { class: 'license', hidden: true, text: MIT_LICENSE.join('\n') });
   const toggle = h('button', { class: 'btn small', 'aria-expanded': 'false', text: t('about.license.show'), onclick: () => {
@@ -1921,6 +1953,7 @@ function pageAbout() {
       row(t('update.news.title'), t('update.news.desc'), h('div', { class: 'row-actions' }, button(t('update.news.show'), () => send({ t: 'action', name: 'show_whats_new' }), { small: true }), switchEl('update.whats_new', t('update.news.title')))),
       row(t('about.privacy'), t('about.privacy.val'), null),
       row(t('data.title'), S.app.config_dir, button(t('data.open'), () => send({ t: 'action', name: 'open_config' }), { icon: 'folder', small: true }))),
+    ...usageCard(),
     sectionTitle(t('about.sec.what')),
     card(row(t('about.what.title'), t('about.what.body'), null), row(t('about.native.title'), t('about.native.body'), null)),
     sectionTitle(t('about.sec.map')),
@@ -2625,6 +2658,14 @@ window.__selftest = function () {
 
     // The update row follows what the app reports: a button to look, then the version it found and what became of it.
     go('about');
+    {
+      const values = [...document.querySelectorAll('.usage-value')].map((v) => v.textContent);
+      expect(values.length === 6 && values.includes('59.0 MB') && values.includes('3.4%'), 'about: what the app uses is shown: ' + values.join(' | '));
+      const was = S.app.usage;
+      S.app.usage = null; runSyncs();
+      expect([...document.querySelectorAll('.usage-value')].every((v) => v.textContent === t('about.usage.wait')), 'about: before a reading it says so');
+      S.app.usage = was; runSyncs();
+    }
     // The About page says what the app is, where it comes from and under what licence it is used.
     expect(['about.sec.what', 'about.sec.history', 'about.sec.license'].every((key) => $('#scroller').textContent.includes(t(key))), 'About has its sections');
     expect($('#scroller').textContent.includes(t('about.license.title')) && $('#scroller').textContent.includes('Doanh Thai Bui'), 'and names the licence and its holder');
