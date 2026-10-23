@@ -525,6 +525,8 @@ impl SettingsFeature {
             "agents_remove_codex" => self.agent_hooks(Agent::Codex, false),
             "agents_install_pi" => self.agent_hooks(Agent::Pi, true),
             "agents_remove_pi" => self.agent_hooks(Agent::Pi, false),
+            "agents_install_agy" => self.agent_hooks(Agent::Agy, true),
+            "agents_remove_agy" => self.agent_hooks(Agent::Agy, false),
             "agents_usage_on" => self.agent_usage(true),
             "agents_usage_off" => self.agent_usage(false),
             name if name.starts_with("accounts_") => {

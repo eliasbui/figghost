@@ -14,16 +14,19 @@ pub enum Agent {
     Codex,
     /// Reported by the extension Figghost installs into pi, not by hooks: pi has no hook file and no usage limits.
     Pi,
+    /// Antigravity's command line tool, `agy`, through the hooks of `~/.gemini/config/hooks.json`.
+    Agy,
 }
 
 impl Agent {
-    pub const ALL: [Agent; 3] = [Agent::Claude, Agent::Codex, Agent::Pi];
+    pub const ALL: [Agent; 4] = [Agent::Claude, Agent::Codex, Agent::Pi, Agent::Agy];
 
     pub fn id(self) -> &'static str {
         match self {
             Agent::Claude => "claude",
             Agent::Codex => "codex",
             Agent::Pi => "pi",
+            Agent::Agy => "agy",
         }
     }
 
@@ -36,6 +39,7 @@ impl Agent {
             Agent::Claude => "Claude Code",
             Agent::Codex => "Codex",
             Agent::Pi => "Pi",
+            Agent::Agy => "Antigravity",
         }
     }
 }
@@ -131,7 +135,10 @@ fn parse_questions(input: Option<&Value>) -> Vec<Question> {
                 header: clip(text("header"), 30),
                 question: clip(text("question"), MESSAGE_CHARS),
                 options,
-                multi: q.get("multiSelect").and_then(Value::as_bool).unwrap_or(false),
+                multi: q
+                    .get("multiSelect")
+                    .and_then(Value::as_bool)
+                    .unwrap_or(false),
             })
         })
         .collect()
@@ -178,6 +185,35 @@ fn summarize_input(input: Option<&Value>) -> Option<String> {
         }
     }
     Some(clip(&input.to_string(), DETAIL_CHARS))
+}
+
+/// What `agy` writes to a hook, which does not name its event and spells its keys in camelCase, in the shape the
+/// other agents use: `event` is the name its hook command was given. `None` for an event that is not followed.
+pub fn agy_payload(event: &str, raw: &Value) -> Option<Value> {
+    let name = match event {
+        "SessionStart" => "SessionStart",
+        // Before each call of the model: the agent is at work.
+        "PreInvocation" => "UserPromptSubmit",
+        "PostToolUse" => "PostToolUse",
+        "Stop" => match raw.get("terminationReason").and_then(Value::as_str) {
+            Some("ERROR" | "MAX_TOKEN_BUDGET_EXCEEDED") => "StopFailure",
+            Some("USER_CANCELED") => "Interrupt",
+            _ => "Stop",
+        },
+        _ => return None,
+    };
+    let cwd = raw
+        .get("workspacePaths")
+        .and_then(Value::as_array)
+        .and_then(|paths| paths.first())
+        .cloned()
+        .unwrap_or(Value::Null);
+    Some(serde_json::json!({
+        "hook_event_name": name,
+        "session_id": raw.get("conversationId").cloned().unwrap_or(Value::Null),
+        "cwd": cwd,
+        "tool_name": raw.pointer("/toolCall/name").cloned().unwrap_or(Value::Null),
+    }))
 }
 
 /// Turns the JSON an agent writes to a hook's standard input into an event. `None` for anything that is not
@@ -272,9 +308,15 @@ mod tests {
         assert!(event.questions[0].multi);
         let prompt = json!({ "hook_event_name": "PermissionRequest", "session_id": "s", "cwd": "/w",
             "tool_name": "AskUserQuestion", "tool_input": input });
-        assert_eq!(parse_event(Agent::Claude, &prompt, 0).unwrap().kind, EventKind::Other);
+        assert_eq!(
+            parse_event(Agent::Claude, &prompt, 0).unwrap().kind,
+            EventKind::Other
+        );
         let empty = json!({ "hook_event_name": "PreToolUse", "tool_name": "AskUserQuestion", "tool_input": {} });
-        assert_eq!(parse_event(Agent::Claude, &empty, 0).unwrap().kind, EventKind::Other);
+        assert_eq!(
+            parse_event(Agent::Claude, &empty, 0).unwrap().kind,
+            EventKind::Other
+        );
     }
 
     #[test]
@@ -351,6 +393,47 @@ mod tests {
         assert_eq!(clip("  abc  ", 10), "abc");
         assert_eq!(clip("đường dẫn", 4), "đườn...");
         assert_eq!(clip("abcd", 4), "abcd");
+    }
+
+    #[test]
+    fn agy_events_take_the_shape_of_the_others() {
+        let raw = json!({ "conversationId": "c1", "workspacePaths": ["/w", "/x"],
+            "toolCall": { "name": "run_command", "args": { "CommandLine": "npm test" } }, "stepIdx": 3 });
+        let event = parse_event(Agent::Agy, &agy_payload("PostToolUse", &raw).unwrap(), 5).unwrap();
+        assert_eq!(event.kind, EventKind::ToolDone);
+        assert_eq!(
+            (event.session_id.as_str(), event.cwd.as_str()),
+            ("c1", "/w")
+        );
+        assert_eq!(
+            event.detail, None,
+            "a command is never carried out of the hook"
+        );
+        let working = agy_payload("PreInvocation", &json!({ "conversationId": "c1" })).unwrap();
+        assert_eq!(
+            parse_event(Agent::Agy, &working, 0).unwrap().kind,
+            EventKind::PromptSubmit
+        );
+        for (reason, kind) in [
+            ("NO_TOOL_CALL", EventKind::Stop),
+            ("ERROR", EventKind::StopFailure),
+            ("USER_CANCELED", EventKind::Interrupt),
+        ] {
+            let stop = agy_payload(
+                "Stop",
+                &json!({ "conversationId": "c1", "terminationReason": reason }),
+            )
+            .unwrap();
+            assert_eq!(
+                parse_event(Agent::Agy, &stop, 0).unwrap().kind,
+                kind,
+                "{reason}"
+            );
+        }
+        assert!(
+            agy_payload("PreToolUse", &raw).is_none(),
+            "tool calls are not gated"
+        );
     }
 
     #[test]

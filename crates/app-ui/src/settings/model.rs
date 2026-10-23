@@ -289,6 +289,7 @@ pub fn state(config: &Config, env: &Env) -> Value {
             "claude": agent_entry(&env.agents.claude),
             "codex": agent_entry(&env.agents.codex),
             "pi": agent_entry(&env.agents.pi),
+            "agy": agent_entry(&env.agents.agy),
             "usage_tap": env.agents.usage_tap,
             "usage_known": env.agents.usage_known,
             "spend": env.agents.spend.iter().map(|s| json!({

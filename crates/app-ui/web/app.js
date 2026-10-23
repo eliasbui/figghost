@@ -104,6 +104,7 @@ const I18N = {
     'sec.agents.follow': 'Following', 'agents.enable.title': 'Follow coding agents', 'agents.enable.desc': 'Listen for what Claude Code and Codex report and show it on the Agents tab of the notch.',
     'sec.agents.connect': 'Connect', 'agents.claude.title': 'Claude Code', 'agents.claude.desc': 'Adds hooks to ~/.claude/settings.json. Your other hooks stay as they are.',
     'agents.codex.title': 'Codex', 'agents.codex.desc': 'Adds hooks to ~/.codex/hooks.json. Codex asks you to review new hooks the first time it runs.',
+    'agents.agy.title': 'Antigravity', 'agents.agy.desc': 'Adds a hook named figghost to ~/.gemini/config/hooks.json, next to your own. The agy command line tool then shows its sessions on the notch, working, finished or failed. It asks for permissions in its own terminal as before.',
     'agents.pi.title': 'Pi', 'agents.pi.desc': 'Adds an extension to ~/.pi/agent/extensions/figghost.ts. Pi loads it the next time it starts; its questions can then be answered on the notch as well as in its terminal.',
     'agents.install': 'Install', 'agents.remove': 'Remove', 'agents.repair': 'Repair',
     'agents.status.on': 'Connected', 'agents.status.off': 'Not connected', 'agents.status.partial': 'Incomplete ({n} of {m})', 'agents.status.missing': 'Not found', 'agents.status.error': 'Cannot read its file',
@@ -227,6 +228,7 @@ const I18N = {
     'sec.agents.follow': 'Theo dõi', 'agents.enable.title': 'Theo dõi các tác tử lập trình', 'agents.enable.desc': 'Lắng nghe những gì Claude Code và Codex báo về và hiện trên tab Tác tử của notch.',
     'sec.agents.connect': 'Kết nối', 'agents.claude.title': 'Claude Code', 'agents.claude.desc': 'Thêm hook vào ~/.claude/settings.json. Các hook khác của bạn được giữ nguyên.',
     'agents.codex.title': 'Codex', 'agents.codex.desc': 'Thêm hook vào ~/.codex/hooks.json. Codex sẽ hỏi bạn xem lại hook mới ở lần chạy đầu tiên.',
+    'agents.agy.title': 'Antigravity', 'agents.agy.desc': 'Thêm một hook tên figghost vào ~/.gemini/config/hooks.json, bên cạnh hook của bạn. Công cụ dòng lệnh agy khi đó hiện các phiên của nó trên notch: đang chạy, đã xong hay bị lỗi. Nó vẫn hỏi quyền trong terminal của nó như trước.',
     'agents.pi.title': 'Pi', 'agents.pi.desc': 'Thêm một extension vào ~/.pi/agent/extensions/figghost.ts. Pi nạp nó ở lần khởi động tiếp theo; sau đó câu hỏi của Pi trả lời được trên notch cũng như trong terminal của nó.',
     'agents.install': 'Cài', 'agents.remove': 'Gỡ', 'agents.repair': 'Sửa',
     'agents.status.on': 'Đã kết nối', 'agents.status.off': 'Chưa kết nối', 'agents.status.partial': 'Chưa đủ ({n}/{m})', 'agents.status.missing': 'Không tìm thấy', 'agents.status.error': 'Không đọc được tệp của nó',
@@ -1720,7 +1722,7 @@ function pageAgents() {
   const body = [
     card(toggleRow('agents.enabled', t('agents.enable.title'), t('agents.enable.desc'))),
     sectionTitle(t('sec.agents.connect')),
-    card(agentLine('claude'), agentLine('codex'), agentLine('pi')),
+    card(agentLine('claude'), agentLine('codex'), agentLine('pi'), agentLine('agy')),
     sectionTitle(t('sec.agents.answer')),
     card(
       row(t('agents.wait.title'), t('agents.wait.desc'), waitSelect(), { when: () => S.agents.enabled }),
@@ -2590,6 +2592,10 @@ window.__selftest = function () {
     piLine.querySelector('button').click();
     expect(sent.some((m) => m.t === 'action' && m.name === 'agents_remove_pi'), 'an installed extension offers to remove: ' + JSON.stringify(sent));
     S.agents.pi.installed = 0; runSyncs();
+    const agyLine = [...document.querySelectorAll('.card .row')].find((r) => r.querySelector('.row-title').textContent === t('agents.agy.title'));
+    sent.length = 0;
+    agyLine.querySelector('button').click();
+    expect(sent.some((m) => m.t === 'action' && m.name === 'agents_install_agy'), 'Antigravity offers its hook: ' + JSON.stringify(sent));
     const wait = $('select.pick');
     wait.value = '60';
     wait.dispatchEvent(new Event('change'));

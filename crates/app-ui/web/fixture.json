@@ -45,6 +45,7 @@
     "claude": { "found": true, "installed": 8, "wanted": 8, "error": null },
     "codex": { "found": true, "installed": 0, "wanted": 7, "error": null },
     "pi": { "found": true, "installed": 0, "wanted": 1, "error": null },
+    "agy": { "found": true, "installed": 0, "wanted": 4, "error": null },
     "usage_tap": false, "usage_known": false,
     "spend": [
       { "agent": "claude", "today": 1240000, "week": 9800000, "today_cost": 3.45, "week_cost": 21.3 },

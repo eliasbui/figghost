@@ -54,6 +54,7 @@ fn main() {
         std::process::exit(agents::run_hook_cli(
             &home,
             args.get(at + 1).map(String::as_str),
+            args.get(at + 2).map(String::as_str),
         ));
     }
     if args.iter().any(|a| a == "--figghost-statusline") {

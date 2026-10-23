@@ -2,7 +2,7 @@
 """Pixel sprites of the coding agents, which the closed notch shows while they work, ask, finish or fail
 (crates/app-ui/src/agents.rs).
 
-  build.py cut <sheet.png> <codex|pi>   cut a generated 4 x 3 sheet on magenta into ART/<name>.png
+  build.py cut <sheet.png> <codex|pi|agy>   cut a generated 4 x 3 sheet on magenta into ART/<name>.png
   build.py claude                       draw ART/claude.png from the glyphs Claude Code draws Clawd with
   build.py check                        self-test
 
@@ -27,9 +27,10 @@ def rgb(hex_colour):
 
 
 # The colours of the mascots, what the generated sheets need beyond them (tears, a laptop, soil), and those
-# of each logo: the bands of the Codex mark and the blocks of pi.dev/logo.svg.
+# of each logo: the bands of the Codex mark, the blocks of pi.dev/logo.svg and the four colours of Antigravity's arch.
 BASE = mascots.PALETTE + ["#88E4F8", "#808080", "#6E3A1C"]
-BRAND = {"codex": ["#B1A7FF", "#7A9DFF", "#3941FF"], "pi": ["#F09082", "#4D9ABF", "#F1BE58"]}
+BRAND = {"codex": ["#B1A7FF", "#7A9DFF", "#3941FF"], "pi": ["#F09082", "#4D9ABF", "#F1BE58"],
+         "agy": ["#4285F4", "#EA4335", "#FBBC05", "#34A853"]}
 
 
 def write_rgba(path, rows):

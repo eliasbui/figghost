@@ -68,10 +68,23 @@ const CODEX: &[Subscription] = &[
     quick("SessionEnd", None),
 ];
 
+/// What `agy` reports: only the course of a session. Its PreToolUse runs before every tool, and an answer there
+/// would stand in for agy's own permissions, so it is not followed.
+const AGY: &[Subscription] = &[
+    quick("SessionStart", None),
+    quick("PreInvocation", None),
+    quick("PostToolUse", Some("*")),
+    quick("Stop", None),
+];
+
+/// The named hook of ours in agy's `hooks.json`, which holds named hooks instead of one list per event.
+pub const AGY_HOOK_NAME: &str = "figghost";
+
 pub fn subscriptions(agent: Agent) -> &'static [Subscription] {
     match agent {
         Agent::Claude => CLAUDE,
         Agent::Codex => CODEX,
+        Agent::Agy => AGY,
         // pi is told about by its extension, below.
         Agent::Pi => &[],
     }
@@ -174,6 +187,9 @@ fn find_ours(list: &mut [Value]) -> Option<&mut Value> {
 /// Adds our hook to every event we follow, or brings an existing entry of ours up to date. The document is
 /// only meaningful when this returns `Ok`: on an error the caller must not write it.
 pub fn install_hooks(doc: &mut Value, agent: Agent, exe: &str) -> Result<Report, InstallError> {
+    if agent == Agent::Agy {
+        return install_agy(doc, exe);
+    }
     let hooks = hooks_object(doc)?;
     let command = command_line(exe, agent);
     let mut report = Report::default();
@@ -202,8 +218,62 @@ pub fn install_hooks(doc: &mut Value, agent: Agent, exe: &str) -> Result<Report,
     Ok(report)
 }
 
+/// agy's entries, each event's command naming the event, since agy does not say which one it runs a hook for.
+fn agy_spec(exe: &str) -> Value {
+    let mut spec = serde_json::Map::new();
+    for sub in AGY {
+        let hook = json!({
+            "type": "command",
+            "command": format!("{} {}", command_line(exe, Agent::Agy), sub.event),
+            "timeout": sub.timeout,
+        });
+        let entry = match sub.matcher {
+            Some(matcher) => json!({ "matcher": matcher, "hooks": [hook] }),
+            None => hook,
+        };
+        spec.insert(sub.event.to_owned(), json!([entry]));
+    }
+    Value::Object(spec)
+}
+
+fn agy_ours(doc: &Value) -> Option<&serde_json::Map<String, Value>> {
+    doc.get(AGY_HOOK_NAME)
+        .filter(|ours| ours.to_string().contains(HOOK_MARKER))?
+        .as_object()
+}
+
+fn install_agy(doc: &mut Value, exe: &str) -> Result<Report, InstallError> {
+    if doc.is_null() {
+        *doc = json!({});
+    }
+    let root = doc
+        .as_object_mut()
+        .ok_or_else(|| InstallError::Shape("the file is not a JSON object".into()))?;
+    let spec = agy_spec(exe);
+    let mut report = Report::default();
+    match root.get(AGY_HOOK_NAME) {
+        Some(old) if *old == spec => report.unchanged = AGY.len(),
+        Some(old) if !old.to_string().contains(HOOK_MARKER) => {
+            return Err(InstallError::Shape(format!(
+                "\"{AGY_HOOK_NAME}\" in hooks.json is not Figghost's and was left alone"
+            )));
+        }
+        Some(_) => report.updated = AGY.len(),
+        None => report.added = AGY.len(),
+    }
+    root.insert(AGY_HOOK_NAME.to_owned(), spec);
+    Ok(report)
+}
+
 /// Removes every hook of ours and whatever it leaves empty; returns how many hooks went.
 pub fn remove_hooks(doc: &mut Value) -> usize {
+    if let Some(ours) = agy_ours(doc) {
+        let count = ours.len();
+        if let Some(root) = doc.as_object_mut() {
+            root.shift_remove(AGY_HOOK_NAME);
+        }
+        return count;
+    }
     let Some(hooks) = doc.get_mut("hooks").and_then(Value::as_object_mut) else {
         return 0;
     };
@@ -249,6 +319,21 @@ pub fn remove_hooks(doc: &mut Value) -> usize {
 
 pub fn status(doc: &Value, agent: Agent) -> Status {
     let wanted = subscriptions(agent);
+    if agent == Agent::Agy {
+        let installed = agy_ours(doc).map_or(0, |ours| {
+            wanted
+                .iter()
+                .filter(|sub| {
+                    ours.get(sub.event)
+                        .is_some_and(|e| e.to_string().contains(HOOK_MARKER))
+                })
+                .count()
+        });
+        return Status {
+            installed,
+            wanted: wanted.len(),
+        };
+    }
     let installed = wanted
         .iter()
         .filter(|sub| {
@@ -367,13 +452,19 @@ pub struct Targets {
     pub pi_dir: PathBuf,
     /// pi loads every file of its extensions folder; this one is ours.
     pub pi_extension: PathBuf,
+    pub agy_dir: PathBuf,
+    /// The hooks every Antigravity tool reads, the command line one included.
+    pub agy_hooks: PathBuf,
 }
 
 pub fn targets(user_home: &Path) -> Targets {
     let claude_dir = user_home.join(".claude");
     let codex_dir = user_home.join(".codex");
     let pi_dir = user_home.join(".pi/agent");
+    let agy_dir = user_home.join(".gemini/antigravity-cli");
     Targets {
+        agy_hooks: user_home.join(".gemini/config/hooks.json"),
+        agy_dir,
         claude_settings: claude_dir.join("settings.json"),
         codex_hooks: codex_dir.join("hooks.json"),
         pi_extension: pi_dir.join("extensions/figghost.ts"),
@@ -894,6 +985,52 @@ mod tests {
     }
 
     #[cfg(unix)]
+    #[test]
+    fn agy_gets_a_named_hook_of_its_own_beside_the_others() {
+        let mut doc = json!({ "lint": { "PostToolUse": [ { "matcher": "run_command", "hooks": [ { "command": "./lint.sh" } ] } ] } });
+        let report = install_hooks(&mut doc, Agent::Agy, EXE).unwrap();
+        assert_eq!(report.added, AGY.len());
+        assert_eq!(
+            doc["lint"]["PostToolUse"][0]["hooks"][0]["command"], "./lint.sh",
+            "the user's hook stays"
+        );
+        let session = doc[AGY_HOOK_NAME]["SessionStart"][0]["command"]
+            .as_str()
+            .unwrap();
+        assert!(
+            session.contains(HOOK_MARKER) && session.ends_with(" agy SessionStart"),
+            "{session}"
+        );
+        assert_eq!(doc[AGY_HOOK_NAME]["PostToolUse"][0]["matcher"], "*");
+        assert!(doc[AGY_HOOK_NAME].get("PreToolUse").is_none());
+        assert_eq!(
+            status(&doc, Agent::Agy),
+            Status {
+                installed: AGY.len(),
+                wanted: AGY.len()
+            }
+        );
+        assert_eq!(
+            install_hooks(&mut doc, Agent::Agy, EXE).unwrap().unchanged,
+            AGY.len()
+        );
+        assert_eq!(
+            install_hooks(&mut doc, Agent::Agy, "/elsewhere/Figghost")
+                .unwrap()
+                .updated,
+            AGY.len()
+        );
+        assert_eq!(remove_hooks(&mut doc), AGY.len());
+        assert!(doc.get(AGY_HOOK_NAME).is_none() && doc.get("lint").is_some());
+        assert_eq!(status(&doc, Agent::Agy).installed, 0);
+        let mut taken = json!({ AGY_HOOK_NAME: { "Stop": [ { "command": "mine" } ] } });
+        assert!(
+            install_hooks(&mut taken, Agent::Agy, EXE).is_err(),
+            "a hook of that name that is not ours stays"
+        );
+        assert_eq!(remove_hooks(&mut taken), 0);
+    }
+
     #[test]
     fn the_command_runs_in_a_shell_even_when_the_path_has_spaces_and_quotes() {
         use std::os::unix::fs::PermissionsExt;

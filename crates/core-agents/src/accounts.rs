@@ -484,7 +484,10 @@ pub fn switch(
         Agent::Claude => switch_claude(places, account, secrets, now_ms),
         Agent::Codex => switch_codex(places, account, now_ms),
         // Orca keeps no pi accounts, so none is ever listed.
-        Agent::Pi => Err("pi has no accounts to switch".into()),
+        Agent::Pi | Agent::Agy => Err(format!(
+            "{} has no accounts to switch",
+            account.agent.name()
+        )),
     }
 }
 
@@ -602,7 +605,9 @@ pub fn restore(places: &Places, agent: Agent, secrets: &dyn Secrets) -> Result<(
             }
             .map_err(|e| format!("~/.codex/auth.json: {e}"))?;
         }
-        Agent::Pi => return Err("pi has no accounts to restore".into()),
+        Agent::Pi | Agent::Agy => {
+            return Err(format!("{} has no accounts to restore", agent.name()));
+        }
     }
     let _ = fs::remove_file(&path);
     Ok(())
@@ -611,9 +616,9 @@ pub fn restore(places: &Places, agent: Agent, secrets: &dyn Secrets) -> Result<(
 #[cfg(test)]
 mod tests {
     use super::*;
-    use std::{cell::RefCell, collections::HashMap};
     #[cfg(unix)]
     use std::os::unix::fs::PermissionsExt;
+    use std::{cell::RefCell, collections::HashMap};
 
     #[derive(Default)]
     struct FakeKeychain(RefCell<HashMap<String, Vec<u8>>>);

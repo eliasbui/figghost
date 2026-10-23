@@ -22,8 +22,7 @@ use macos_sys::{
     MainThreadMarker,
     agents_ui::{
         AgentsCallbacks, AgentsDisplay, AgentsView, ApprovalCardData, ChoiceData, SessionData,
-        TokensData,
-        UsageData,
+        TokensData, UsageData,
     },
     app,
     notch::{Activity, Ear, Notch},
@@ -87,6 +86,7 @@ fn short_name(agent: Agent) -> &'static str {
         Agent::Claude => "Claude",
         Agent::Codex => "Codex",
         Agent::Pi => "Pi",
+        Agent::Agy => "Antigravity",
     }
 }
 
@@ -97,6 +97,7 @@ fn sprites(agent: Agent) -> &'static [u8] {
         Agent::Claude => include_bytes!("../assets/agents/claude.png"),
         Agent::Codex => include_bytes!("../assets/agents/codex.png"),
         Agent::Pi => include_bytes!("../assets/agents/pi.png"),
+        Agent::Agy => include_bytes!("../assets/agents/agy.png"),
     }
 }
 
@@ -379,6 +380,7 @@ pub struct Status {
     pub codex: AgentStatus,
     /// pi's extension: one file, so `wanted` is 1.
     pub pi: AgentStatus,
+    pub agy: AgentStatus,
     /// Our status line program is what Claude Code runs, so its usage limits reach the notch.
     pub usage_tap: bool,
     /// Limits from Claude Code have been received at least once.
@@ -420,6 +422,7 @@ impl Files {
             Agent::Claude => targets.claude_settings,
             Agent::Codex => targets.codex_hooks,
             Agent::Pi => targets.pi_extension,
+            Agent::Agy => targets.agy_hooks,
         }
     }
 
@@ -429,6 +432,7 @@ impl Files {
             Agent::Claude => targets.claude_dir,
             Agent::Codex => targets.codex_dir,
             Agent::Pi => targets.pi_dir,
+            Agent::Agy => targets.agy_dir,
         }
     }
 
@@ -452,6 +456,7 @@ impl Files {
         Status {
             claude: one(Agent::Claude),
             codex: one(Agent::Codex),
+            agy: one(Agent::Agy),
             pi: AgentStatus {
                 found: self.agent_dir(Agent::Pi).is_dir(),
                 installed: usize::from(install::pi_installed(&self.hooks_file(Agent::Pi))),
@@ -471,7 +476,8 @@ impl Files {
     pub fn install(&self, agent: Agent, exe: &str) -> Result<Report, String> {
         let path = self.hooks_file(agent);
         if agent == Agent::Pi {
-            let changed = install::install_pi(&path, &socket_path(&self.home)).map_err(|e| e.to_string())?;
+            let changed =
+                install::install_pi(&path, &socket_path(&self.home)).map_err(|e| e.to_string())?;
             return Ok(Report {
                 added: usize::from(changed),
                 updated: 0,
@@ -684,6 +690,7 @@ impl AgentsFeature {
             (Agent::Claude, &status.claude),
             (Agent::Codex, &status.codex),
             (Agent::Pi, &status.pi),
+            (Agent::Agy, &status.agy),
         ] {
             if agent_status.installed > 0
                 && let Err(e) = self.install(agent)
@@ -971,7 +978,11 @@ impl AgentsFeature {
             let Some(approval) = tracker.approval(id) else {
                 return;
             };
-            let step = self.progress.borrow().get(&id).map_or(0, |p| p.answers.len());
+            let step = self
+                .progress
+                .borrow()
+                .get(&id)
+                .map_or(0, |p| p.answers.len());
             let Some(question) = approval.questions.get(step) else {
                 return;
             };
@@ -1013,7 +1024,10 @@ impl AgentsFeature {
             let mut ticked = progress.ticked.clone();
             ticked.sort_unstable();
             ticked.retain(|&n| n < question.options.len());
-            let labels = ticked.iter().map(|&n| question.options[n].clone()).collect();
+            let labels = ticked
+                .iter()
+                .map(|&n| question.options[n].clone())
+                .collect();
             (labels, ticked)
         };
         if !labels.is_empty() {
@@ -1218,7 +1232,12 @@ impl AgentsFeature {
             self.chosen.set(shown.map(|a| a.id));
             (
                 shown.map(|a| {
-                    let progress = self.progress.borrow().get(&a.id).cloned().unwrap_or_default();
+                    let progress = self
+                        .progress
+                        .borrow()
+                        .get(&a.id)
+                        .cloned()
+                        .unwrap_or_default();
                     approval_card(language, a, &progress, now)
                 }),
                 match waiting.len() {
@@ -1241,7 +1260,10 @@ impl AgentsFeature {
         // The pointer on the card means somebody is answering it: the agent waits as long as it stays there. A
         // notch that opened by itself on a question nobody looks at still lets the wait run out.
         if let Some(card) = &approval
-            && self.notch.upgrade().is_some_and(|notch| notch.pointer_inside())
+            && self
+                .notch
+                .upgrade()
+                .is_some_and(|notch| notch.pointer_inside())
         {
             self.hold(card.id);
         }
@@ -1383,11 +1405,21 @@ fn write_private(path: &Path, bytes: &[u8]) -> io::Result<()> {
     file.write_all(bytes)
 }
 
-/// `Figghost --figghost-hook claude|codex`: what an agent runs for each event. Returns the exit status.
-pub fn run_hook_cli(home: &Path, agent: Option<&str>) -> i32 {
+/// `Figghost --figghost-hook claude|codex`, or `agy <event>`: what an agent runs for each event. Returns the exit
+/// status.
+pub fn run_hook_cli(home: &Path, agent: Option<&str>, event: Option<&str>) -> i32 {
     let Some(agent) = agent.and_then(Agent::from_id) else {
         return 0;
     };
+    if agent == Agent::Agy {
+        return core_agents::cli::run_agy_hook(
+            event.unwrap_or_default(),
+            io::stdin().lock(),
+            &mut io::stdout().lock(),
+            &socket_path(home),
+            now_ms(),
+        );
+    }
     core_agents::cli::run_hook(
         agent,
         io::stdin().lock(),
@@ -1433,12 +1465,22 @@ mod tests {
 
     #[test]
     fn a_card_names_the_agent_the_tool_the_command_and_where() {
-        let card = approval_card(Language::English, &approval(), &Progress::default(), 1_000 + 120_000);
+        let card = approval_card(
+            Language::English,
+            &approval(),
+            &Progress::default(),
+            1_000 + 120_000,
+        );
         assert_eq!(card.heading, "Claude Code wants to use Bash");
         assert_eq!(card.command, "rm -rf build");
         assert_eq!(card.detail, "shop  -  2 minutes ago");
         assert_eq!((card.allow.as_str(), card.deny.as_str()), ("Allow", "Deny"));
-        let vi = approval_card(Language::Vietnamese, &approval(), &Progress::default(), 1_000);
+        let vi = approval_card(
+            Language::Vietnamese,
+            &approval(),
+            &Progress::default(),
+            1_000,
+        );
         assert_eq!(vi.heading, "Claude Code muốn dùng Bash");
         assert_eq!(vi.allow, "Cho phép");
     }
@@ -1513,11 +1555,16 @@ mod tests {
             _ => panic!(),
         };
         let (first, second) = (ask(&mut tracker, "a"), ask(&mut tracker, "b"));
-        let shown = |tracker: &Tracker, chosen| card_approval(tracker.approvals(), chosen).map(|a| a.id);
+        let shown =
+            |tracker: &Tracker, chosen| card_approval(tracker.approvals(), chosen).map(|a| a.id);
         assert_eq!(shown(&tracker, None), Some(first));
         assert_eq!(shown(&tracker, Some(second)), Some(second));
         tracker.end_approval(second);
-        assert_eq!(shown(&tracker, Some(second)), Some(first), "back to the first once it closes");
+        assert_eq!(
+            shown(&tracker, Some(second)),
+            Some(first),
+            "back to the first once it closes"
+        );
         tracker.end_approval(first);
         assert_eq!(shown(&tracker, Some(first)), None);
     }
@@ -1533,9 +1580,16 @@ mod tests {
         assert!(sandbox.files.status().pi.found);
         assert_eq!(sandbox.files.install(Agent::Pi, EXE).unwrap().added, 1);
         assert_eq!(sandbox.files.status().pi.installed, 1);
-        let file = sandbox.files.user_home.join(".pi/agent/extensions/figghost.ts");
+        let file = sandbox
+            .files
+            .user_home
+            .join(".pi/agent/extensions/figghost.ts");
         let socket = socket_path(&sandbox.files.home);
-        assert!(fs::read_to_string(&file).unwrap().contains(&*socket.to_string_lossy()));
+        assert!(
+            fs::read_to_string(&file)
+                .unwrap()
+                .contains(&*socket.to_string_lossy())
+        );
         assert_eq!(sandbox.files.remove(Agent::Pi).unwrap(), 1);
         assert!(!file.exists());
         assert_eq!(sandbox.files.status().pi.installed, 0);

@@ -69,7 +69,10 @@ pub fn run_hook(
     {
         return 0;
     }
-    let asks = matches!(event.kind, EventKind::PermissionRequest | EventKind::Question);
+    let asks = matches!(
+        event.kind,
+        EventKind::PermissionRequest | EventKind::Question
+    );
     let question = event.kind == EventKind::Question;
     let wait = if asks { HARD_WAIT } else { ACK_WAIT };
     if stream.set_read_timeout(Some(wait)).is_err() {
@@ -91,6 +94,33 @@ pub fn run_hook(
     {
         let _ = writeln!(stdout, "{output}");
     }
+    0
+}
+
+/// `agy`'s hook: its input is put in the shape of the other agents' first, and it always gets an empty JSON object
+/// back, which is the answer agy expects of the events followed. Always returns 0.
+pub fn run_agy_hook(
+    event: &str,
+    stdin: impl Read,
+    stdout: &mut impl Write,
+    socket: &Path,
+    now_ms: i64,
+) -> i32 {
+    let mut raw = Vec::new();
+    if stdin.take(MAX_STDIN).read_to_end(&mut raw).is_ok()
+        && let Ok(value) = serde_json::from_slice::<Value>(&raw)
+        && let Some(payload) = crate::event::agy_payload(event, &value)
+    {
+        run_hook(
+            Agent::Agy,
+            payload.to_string().as_bytes(),
+            &mut std::io::sink(),
+            socket,
+            now_ms,
+            |_| None,
+        );
+    }
+    let _ = writeln!(stdout, "{{}}");
     0
 }
 
@@ -194,7 +224,14 @@ mod tests {
             _ => None,
         };
         assert_eq!(
-            run_hook(Agent::Claude, &request_json()[..], &mut out, &socket, 1, bridge),
+            run_hook(
+                Agent::Claude,
+                &request_json()[..],
+                &mut out,
+                &socket,
+                1,
+                bridge
+            ),
             0
         );
         assert!(out.is_empty(), "the agent asks for itself");
@@ -244,7 +281,14 @@ mod tests {
         let server = Server::start(&socket, 5, handler).unwrap();
         let mut out = Vec::new();
         assert_eq!(
-            run_hook(Agent::Claude, &request_json()[..], &mut out, &socket, 1, no_env),
+            run_hook(
+                Agent::Claude,
+                &request_json()[..],
+                &mut out,
+                &socket,
+                1,
+                no_env
+            ),
             0
         );
         let printed: Value = serde_json::from_slice(&out).unwrap();
@@ -270,7 +314,14 @@ mod tests {
         });
         let server = Server::start(&socket, 5, handler).unwrap();
         let mut out = Vec::new();
-        run_hook(Agent::Codex, &request_json()[..], &mut out, &socket, 1, no_env);
+        run_hook(
+            Agent::Codex,
+            &request_json()[..],
+            &mut out,
+            &socket,
+            1,
+            no_env,
+        );
         let printed: Value = serde_json::from_slice(&out).unwrap();
         assert_eq!(
             printed["hookSpecificOutput"]["decision"]["behavior"],
@@ -311,7 +362,10 @@ mod tests {
         let server = Server::start(&socket, 5, handler).unwrap();
         for junk in [&b"not json"[..], b"{}", b"[1,2]", b""] {
             let mut out = Vec::new();
-            assert_eq!(run_hook(Agent::Claude, junk, &mut out, &socket, 1, no_env), 0);
+            assert_eq!(
+                run_hook(Agent::Claude, junk, &mut out, &socket, 1, no_env),
+                0
+            );
             assert!(out.is_empty());
         }
         assert!(seen.lock().unwrap().is_empty());
@@ -352,7 +406,14 @@ mod tests {
         })
         .to_string();
         let mut out = Vec::new();
-        run_hook(Agent::Claude, payload.as_bytes(), &mut out, &socket, 1, no_env);
+        run_hook(
+            Agent::Claude,
+            payload.as_bytes(),
+            &mut out,
+            &socket,
+            1,
+            no_env,
+        );
         assert!(
             !out.is_empty(),
             "the request still got through and was answered"

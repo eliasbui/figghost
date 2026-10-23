@@ -127,6 +127,7 @@ impl Agents {
             Agent::Claude => targets.claude_settings,
             Agent::Codex => targets.codex_hooks,
             Agent::Pi => targets.pi_extension,
+            Agent::Agy => targets.agy_hooks,
         }
     }
 
