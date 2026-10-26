@@ -81,6 +81,18 @@ impl MediaFeature {
             },
         );
 
+        notch.set_on_rest_step({
+            let watcher = Rc::downgrade(&watcher);
+            let (previous, next) = (press(SystemKey::Previous), press(SystemKey::Next));
+            move |delta| {
+                let playing = watcher.upgrade().is_some_and(|w| w.sample().is_some());
+                if playing {
+                    if delta < 0 { previous() } else { next() }
+                }
+                playing
+            }
+        });
+
         let observer: Rc<RefCell<Option<Observer>>> = Rc::default();
         let listener: Rc<RefCell<Option<Refreshed>>> = Rc::default();
         let visible = Rc::new(Cell::new(false));
