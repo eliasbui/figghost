@@ -1746,15 +1746,22 @@ impl Inner {
             NSSize::new(size.width, (size.height - ear_height).max(0.0)),
         ));
         let top = size.height - ear_height;
+        // On a pill with something live the ears are at the two ends and the date and time take the middle.
+        let (bar_x, bar_width) = match self.shape.get() {
+            Shape::Compact { ear, .. } if !geometry.hardware => {
+                (ear, (size.width - 2.0 * ear).max(0.0))
+            }
+            _ => (0.0, size.width),
+        };
         self.rest_bar.setFrame(NSRect::new(
-            NSPoint::new(0.0, top),
-            NSSize::new(size.width, ear_height),
+            NSPoint::new(bar_x, top),
+            NSSize::new(bar_width, ear_height),
         ));
         let button = NSSize::new(ear_height, ear_height);
         self.rest_prev
             .setFrame(NSRect::new(NSPoint::new(REST_INSET, 0.0), button));
         self.rest_next.setFrame(NSRect::new(
-            NSPoint::new(size.width - REST_INSET - ear_height, 0.0),
+            NSPoint::new(bar_width - REST_INSET - ear_height, 0.0),
             button,
         ));
         // The ears stay against the outer edges, so they ride out with the shape as it widens.
@@ -2159,7 +2166,8 @@ impl Inner {
         };
         let idle = clock_on && match self.shape.get() {
             Shape::Rest => !hardware,
-            Shape::Compact { .. } => hardware && self.current_activity().is_none(),
+            // A pill keeps the date and time in the middle while something is live; a hardware notch has the camera there.
+            Shape::Compact { .. } => !hardware || self.current_activity().is_none(),
             Shape::Open => false,
         };
         let wanted = idle && self.flight.get().is_none() && self.shows();
