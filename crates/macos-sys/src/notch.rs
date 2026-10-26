@@ -8,7 +8,9 @@
 //! frame instead. Only the fades are Core Animation's.
 
 use crate::{
-    app, labels,
+    app,
+    button::{Look, TouchButton},
+    labels,
     mascot::Sheet,
     panel::{FigPanel, Key},
     pasteboard::file_paths,
@@ -42,9 +44,8 @@ use objc2_app_kit::{
 use objc2_core_foundation::CGPoint;
 use objc2_core_graphics::CGColor;
 use objc2_foundation::{
-    NSArray, NSData, NSDate, NSDateFormatter, NSDictionary, NSNotification, NSNotificationCenter,
-    NSNumber, NSObject, NSObjectProtocol, NSPoint, NSRect, NSRunLoop, NSRunLoopCommonModes, NSSize,
-    NSString,
+    NSArray, NSData, NSDate, NSDateFormatter, NSDictionary, NSNotification, NSNotificationCenter, NSNumber, NSObject,
+    NSObjectProtocol, NSPoint, NSRect, NSRunLoop, NSRunLoopCommonModes, NSSize, NSString,
 };
 use objc2_quartz_core::{
     CABasicAnimation, CACornerMask, CACurrentMediaTime, CADisplayLink, CAGradientLayer, CALayer,
@@ -73,6 +74,7 @@ const SWITCHER_INSET: f64 = 16.0;
 const BAND_GAP: f64 = 8.0;
 /// Width of the resting shape on a screen without a hardware notch.
 pub const PILL_WIDTH: f64 = 200.0;
+const HOT_ZONE_HEIGHT: f64 = 4.0;
 const TRIGGER_MIN_HEIGHT: f64 = 8.0;
 const TRIGGER_SIDE_SLACK: f64 = 10.0;
 /// The bottom corners of the resting shape, close to the hardware notch's own.
@@ -218,6 +220,10 @@ pub struct Style {
     /// Off takes the notch off the screen while the app in front is full screen on the notch's screen, and puts it
     /// back when that app leaves full screen or another one comes to the front.
     pub show_in_fullscreen: bool,
+    /// The date and the time in the resting notch: across the pill, or in the two ears of a hardware notch.
+    pub rest_clock: bool,
+    /// The previous and next buttons at the two ends of the resting date and time.
+    pub rest_steps: bool,
 }
 
 impl Default for Style {
@@ -239,6 +245,8 @@ impl Default for Style {
             rest_width: 0.0,
             rest_height: 0.0,
             show_in_fullscreen: true,
+            rest_clock: true,
+            rest_steps: false,
         }
     }
 }
@@ -278,7 +286,7 @@ impl NotchGeometry {
         if std::env::var_os("FIGGHOST_NOTCH_OFFSCREEN").is_some() {
             return Some(Self {
                 screen: NSRect::new(NSPoint::new(-30_000.0, 0.0), NSSize::new(1_920.0, 1_080.0)),
-                notch: NSSize::new(PILL_WIDTH, 32.0),
+                notch: NSSize::new(PILL_WIDTH, 24.0),
                 hardware: false,
             });
         }
@@ -355,10 +363,12 @@ impl NotchGeometry {
         self.frame(size.width, size.height)
     }
 
-    /// The size of the resting shape: always the cutout or the pill, because the date and the time
-    /// are drawn in it; the "hidden" setting no longer shrinks it to a thin strip.
-    pub fn rest_size(&self, _rest: Rest) -> NSSize {
-        self.notch
+    /// The size of the resting shape.
+    pub fn rest_size(&self, rest: Rest) -> NSSize {
+        match (self.hardware, rest) {
+            (true, _) | (false, Rest::Notch) => self.notch,
+            (false, Rest::Hidden) => NSSize::new(PILL_WIDTH, HOT_ZONE_HEIGHT),
+        }
     }
 
     /// Where the pointer must be to open a shape of this size. Taller than the shape when it is a thin strip, and
@@ -497,6 +507,7 @@ pub struct Activity {
 type Signal = Rc<dyn Fn()>;
 type DragSignal = Rc<dyn Fn(bool)>;
 type Resize = Rc<dyn Fn(NSSize)>;
+type RestStep = Rc<dyn Fn(i32) -> bool>;
 
 pub struct RootIvars {
     /// Called when the pointer enters or leaves the window.
@@ -761,9 +772,9 @@ define_class!(
     }
 );
 
-/// The text of the resting notch.
+/// How much room the date and time of the resting pill need beside its two buttons.
 const REST_TEXT_SIZE: f64 = 11.0;
-const REST_PAD: f64 = 8.0;
+const REST_INSET: f64 = 3.0;
 const REST_CLOCK_SECONDS: f64 = 2.0;
 /// From the most to the least that the date and time can say; the first that fits the room is shown.
 const REST_PATTERNS: [&str; 5] = [
@@ -775,7 +786,7 @@ const REST_PATTERNS: [&str; 5] = [
 ];
 /// The same for the right ear beside a hardware notch, which holds the date only; the left ear holds the time.
 const REST_DATE_PATTERNS: [&str; 4] = ["EEE dd/MM/yyyy", "EEE dd/MM", "dd/MM/yyyy", "dd/MM"];
-/// How far the resting notch widens on each side of a hardware cutout to hold the time and the date.
+/// How far the resting notch widens on each side of a hardware cutout to hold the time, the date and the buttons.
 const REST_EAR: f64 = 116.0;
 
 /// The date and time as wide as `width` allows.
@@ -796,12 +807,14 @@ fn rest_text(patterns: &[&str], width: f64) -> String {
 }
 
 pub struct RestIvars {
-    /// Across the pill, or in the left ear when `gap` is not 0.
+    /// Between the buttons, or in the left ear when `gap` is not 0.
     text: RefCell<String>,
     /// The date in the right ear.
     right: RefCell<String>,
     /// The width of the hardware cutout the texts keep clear of; 0 on a pill.
     gap: Cell<f64>,
+    /// Whether the step buttons take the two ends.
+    steps: Cell<bool>,
 }
 
 define_class!(
@@ -826,6 +839,7 @@ impl RestBar {
             text: RefCell::new(String::new()),
             right: RefCell::new(String::new()),
             gap: Cell::new(0.0),
+            steps: Cell::new(false),
         });
         // SAFETY: designated initializer with valid arguments on the main thread.
         let this: Retained<Self> = unsafe { msg_send![super(this), initWithFrame: NSRect::ZERO] };
@@ -835,21 +849,41 @@ impl RestBar {
     }
 
     /// The width one text may use: what is left between a button and the middle (the cutout, or the other button).
+    /// What the text keeps clear of at each end: the button, or a small margin.
+    fn edge(&self) -> f64 {
+        if self.ivars().steps.get() {
+            self.bounds().size.height + REST_INSET + 4.0
+        } else {
+            REST_INSET + 5.0
+        }
+    }
+
     fn room(&self) -> f64 {
         let (bounds, gap) = (self.bounds(), self.ivars().gap.get());
+        let side = self.edge();
         if gap > 0.0 {
-            ((bounds.size.width - gap) / 2.0 - 2.0 * REST_PAD).max(0.0)
+            ((bounds.size.width - gap) / 2.0 - side - 4.0).max(0.0)
         } else {
-            (bounds.size.width - 2.0 * REST_PAD).max(0.0)
+            (bounds.size.width - 2.0 * side).max(0.0)
         }
     }
 
     fn paint(&self) {
         let bounds = self.bounds();
         let side = bounds.size.height;
+        let glyph = white(0.85);
+        for (x, name) in [
+            (REST_INSET + side / 2.0, "chevron.left"),
+            (bounds.size.width - REST_INSET - side / 2.0, "chevron.right"),
+        ]
+        .into_iter()
+        .filter(|_| self.ivars().steps.get())
+        {
+            style::draw_symbol(name, NSPoint::new(x, side / 2.0), side * 0.42, &glyph);
+        }
         let font = style::digits(REST_TEXT_SIZE, Weight::Semibold);
         let line = font.ascender() - font.descender();
-        let pad = REST_PAD;
+        let pad = self.edge();
         let y = (side - line) / 2.0 - 0.5;
         let attrs = text_attributes(&font, &white(1.0), Fit::Tail, true);
         let gap = self.ivars().gap.get();
@@ -1351,10 +1385,14 @@ struct Inner {
     serial: Cell<u64>,
     /// The ears' bars are redrawn by this while they are on screen; nothing runs otherwise.
     bars: RefCell<Option<app::Timer>>,
-    /// The date and the time of the resting notch on a screen without a hardware notch.
+    /// The date, the time and the two step buttons of the resting pill on a screen without a hardware notch.
     rest_bar: Retained<RestBar>,
+    rest_prev: Retained<TouchButton>,
+    rest_next: Retained<TouchButton>,
     /// Keeps the time current while the pill is on screen at rest.
     rest_clock: RefCell<Option<app::Timer>>,
+    /// Asked first when a step button is pressed with -1 or 1; true when it dealt with the press (music).
+    on_rest_step: RefCell<Option<RestStep>>,
     /// Bumped by every movement; a movement that finishes late does nothing when another has started since.
     generation: Cell<u64>,
     /// The shape as it is on screen now.
@@ -1712,6 +1750,13 @@ impl Inner {
             NSPoint::new(0.0, top),
             NSSize::new(size.width, ear_height),
         ));
+        let button = NSSize::new(ear_height, ear_height);
+        self.rest_prev
+            .setFrame(NSRect::new(NSPoint::new(REST_INSET, 0.0), button));
+        self.rest_next.setFrame(NSRect::new(
+            NSPoint::new(size.width - REST_INSET - ear_height, 0.0),
+            button,
+        ));
         // The ears stay against the outer edges, so they ride out with the shape as it widens.
         self.left.setFrame(NSRect::new(
             NSPoint::new(0.0, top),
@@ -1738,6 +1783,8 @@ impl Inner {
         let style = self.style.borrow().clone();
         let largest = union_size(self.window_size(Shape::Open), self.window_size(previous));
         self.set_window(union_size(largest, self.window_size(target)));
+        let hidden_rest =
+            target == Shape::Rest && !self.geometry.get().hardware && style.rest == Rest::Hidden;
         let alphas = Alphas {
             // The closed shape is black, like a notch; the material shows only when it opens.
             ink: if open { 0.0 } else { 1.0 },
@@ -1753,7 +1800,8 @@ impl Inner {
             },
             content: if open { 1.0 } else { 0.0 },
             // Fully transparent pixels would let the pointer through; this keeps the invisible strip catchable.
-            surface: 1.0,
+            // Fully transparent pixels would let the pointer through; this keeps the invisible strip catchable.
+            surface: if hidden_rest { 0.01 } else { 1.0 },
         };
         // The open notch casts the window's own shadow, redrawn on every frame of a movement so it follows the shape.
         if open && style.shadow {
@@ -2101,19 +2149,27 @@ impl Inner {
         self.sync_rest_bar();
     }
 
-    /// The resting notch shows the date and the time, across the pill on a pill and in the two ears
+    /// The resting notch shows the date, the time and the step buttons, between them on a pill and in the two ears
     /// of a hardware notch, whose middle is the camera; not while something is live or a movement is under way.
     fn sync_rest_bar(&self) {
         let hardware = self.geometry.get().hardware;
-        let idle = match self.shape.get() {
+        let (clock_on, steps_on) = {
+            let style = self.style.borrow();
+            (style.rest_clock, style.rest_steps)
+        };
+        let idle = clock_on && match self.shape.get() {
             Shape::Rest => !hardware,
             Shape::Compact { .. } => hardware && self.current_activity().is_none(),
             Shape::Open => false,
         };
         let wanted = idle && self.flight.get().is_none() && self.shows();
         self.rest_bar.setHidden(!wanted);
+        self.rest_bar.ivars().steps.set(steps_on);
+        self.rest_prev.setHidden(!steps_on);
+        self.rest_next.setHidden(!steps_on);
         if wanted {
             self.refresh_rest_text();
+            self.rest_bar.setNeedsDisplay(true);
         }
         let mut clock = self.rest_clock.borrow_mut();
         match (wanted, clock.is_some()) {
@@ -2142,10 +2198,7 @@ impl Inner {
         iv.gap.set(gap);
         let room = self.rest_bar.room();
         let (text, right) = if gap > 0.0 {
-            (
-                rest_text(&["HH:mm"], room),
-                rest_text(&REST_DATE_PATTERNS, room),
-            )
+            (rest_text(&["HH:mm"], room), rest_text(&REST_DATE_PATTERNS, room))
         } else {
             (rest_text(&REST_PATTERNS, room), String::new())
         };
@@ -2154,6 +2207,37 @@ impl Inner {
             *iv.right.borrow_mut() = right;
             self.rest_bar.setNeedsDisplay(true);
         }
+    }
+
+    /// A press of a step button: the music's, when something plays, else the neighbouring tab.
+    fn rest_step(&self, delta: i32) {
+        let handler = self.on_rest_step.borrow().clone();
+        if handler.is_some_and(|handled| handled(delta)) {
+            return;
+        }
+        let order = self.order.borrow().clone();
+        if order.is_empty() {
+            return;
+        }
+        let at = order
+            .iter()
+            .position(|&page| page == self.active.get())
+            .unwrap_or(0) as i32;
+        let next = order[(at + delta).rem_euclid(order.len() as i32) as usize];
+        self.expand(false, Some(next));
+    }
+
+    /// Whether the pointer is on one of the step buttons, where hovering must not open the notch.
+    fn pointer_on_rest_buttons(&self) -> bool {
+        if self.rest_bar.isHidden() || self.rest_prev.isHidden() {
+            return false;
+        }
+        let at = self
+            .rest_bar
+            .convertPoint_fromView(self.panel.mouseLocationOutsideOfEventStream(), None);
+        [&self.rest_prev, &self.rest_next]
+            .iter()
+            .any(|button| contains(button.frame(), at))
     }
 
     /// The activity on show: the highest priority, the newest among equals.
@@ -2188,7 +2272,7 @@ impl Inner {
                 }
             }
             // The middle of a hardware notch is the camera, so the time and the date go in the ears beside it.
-            None if self.geometry.get().hardware => Shape::Compact {
+            None if self.geometry.get().hardware && self.style.borrow().rest_clock => Shape::Compact {
                 ear: REST_EAR,
                 drop: 0.0,
             },
@@ -2905,6 +2989,7 @@ fn pointer_moved(inner: &Rc<Inner>, p: NSPoint) {
                 && !inner.is_open()
                 && !inner.suppressed.get()
                 && !inner.snoozed.get()
+                && !inner.pointer_on_rest_buttons()
             {
                 if style.haptics {
                     tap();
@@ -3027,6 +3112,13 @@ impl Notch {
         detail.setAlphaValue(0.0);
         surface.addSubview(&detail);
         let rest_bar = RestBar::new(mtm);
+        let step_button = |name: &str| {
+            let button = TouchButton::new(mtm, NSRect::ZERO, Look::Overlay);
+            button.set_symbol(name);
+            rest_bar.addSubview(&button);
+            button
+        };
+        let (rest_prev, rest_next) = (step_button("chevron.left"), step_button("chevron.right"));
         surface.addSubview(&rest_bar);
         // Fixed-size content: the shape grows around it instead of stretching it (see `layout_inside`).
         let content = NSView::initWithFrame(mtm.alloc(), NSRect::new(NSPoint::ZERO, EXPANDED_SIZE));
@@ -3099,7 +3191,10 @@ impl Notch {
             serial: Cell::new(0),
             bars: RefCell::new(None),
             rest_bar,
+            rest_prev,
+            rest_next,
             rest_clock: RefCell::new(None),
+            on_rest_step: RefCell::new(None),
             generation: Cell::new(0),
             pose: Cell::new(Pose {
                 size: rest,
@@ -3224,6 +3319,14 @@ impl Notch {
                 pointer_moved(&on_drag, NSEvent::mouseLocation());
             }
         }));
+        for (button, delta) in [(&inner.rest_prev, -1), (&inner.rest_next, 1)] {
+            let weak = Rc::downgrade(&inner);
+            button.set_on_click(move || {
+                if let Some(inner) = weak.upgrade() {
+                    inner.rest_step(delta);
+                }
+            });
+        }
         let on_click = Rc::clone(&inner);
         *root.ivars().on_click.borrow_mut() = Some(Rc::new(move || on_click.expand(true, None)));
 
@@ -3628,6 +3731,12 @@ impl Notch {
         }
     }
 
+    /// `handled` is asked first when a step button of the resting pill is pressed, with -1 (previous) or 1 (next);
+    /// without an answer of true the press opens the notch on the previous or next tab.
+    pub fn set_on_rest_step(&self, handled: impl Fn(i32) -> bool + 'static) {
+        *self.inner.on_rest_step.borrow_mut() = Some(Rc::new(handled));
+    }
+
     /// Whether the user can see this page's tab.
     pub fn page_shown(&self, index: usize) -> bool {
         self.inner.page_visible(index)
@@ -3747,7 +3856,10 @@ mod tests {
         let hardware = geometry(true).collapsed_frame();
         assert_eq!((hardware.size.width, hardware.size.height), (200.0, 32.0));
         let plain = geometry(false).collapsed_frame();
-        assert_eq!((plain.size.width, plain.size.height), (PILL_WIDTH, 32.0));
+        assert_eq!(
+            (plain.size.width, plain.size.height),
+            (PILL_WIDTH, HOT_ZONE_HEIGHT)
+        );
         // Both stay glued to the top edge so the pointer reaches them by moving up.
         for f in [hardware, plain] {
             assert_eq!(f.origin.y + f.size.height, 982.0);
@@ -3758,7 +3870,7 @@ mod tests {
     fn a_screen_without_a_notch_can_show_one_or_nothing() {
         let plain = geometry(false);
         assert_eq!(plain.rest_size(Rest::Notch).height, 32.0);
-        assert_eq!(plain.rest_size(Rest::Hidden).height, 32.0);
+        assert_eq!(plain.rest_size(Rest::Hidden).height, HOT_ZONE_HEIGHT);
         // The hardware cutout is always the cutout, whatever the setting says.
         assert_eq!(geometry(true).rest_size(Rest::Hidden).height, 32.0);
     }
@@ -3793,7 +3905,7 @@ mod tests {
         assert!(contains(trigger, NSPoint::new(centre, top - 1.0)));
         assert!(!contains(
             trigger,
-            NSPoint::new(centre, top - trigger.size.height - 1.0)
+            NSPoint::new(centre, top - TRIGGER_MIN_HEIGHT - 1.0)
         ));
         assert!(!contains(trigger, NSPoint::new(centre + 200.0, top)));
     }

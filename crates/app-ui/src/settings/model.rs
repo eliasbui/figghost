@@ -372,6 +372,8 @@ fn notch_state(config: &Config, env: &Env) -> Value {
         "rest": n.rest,
         "hide_in_capture": n.hide_in_capture,
         "show_in_fullscreen": n.show_in_fullscreen,
+        "rest_clock": n.rest_clock,
+        "rest_steps": n.rest_steps,
         "haptics": n.haptics,
         "display": n.display,
         "open_page": n.open_page,
@@ -704,6 +706,8 @@ fn set(config: &mut Config, path: &str, value: &Value) -> Outcome {
         | "notch.open_on_hover"
         | "notch.hide_in_capture"
         | "notch.show_in_fullscreen"
+        | "notch.rest_clock"
+        | "notch.rest_steps"
         | "notch.haptics"
         | "notch.live_media"
         | "notch.live_agents" => {
@@ -714,6 +718,8 @@ fn set(config: &mut Config, path: &str, value: &Value) -> Outcome {
                 "notch.open_on_hover" => n.open_on_hover = on,
                 "notch.hide_in_capture" => n.hide_in_capture = on,
                 "notch.show_in_fullscreen" => n.show_in_fullscreen = on,
+                "notch.rest_clock" => n.rest_clock = on,
+                "notch.rest_steps" => n.rest_steps = on,
                 "notch.haptics" => n.haptics = on,
                 "notch.live_media" => n.live_media = on,
                 _ => n.live_agents = on,

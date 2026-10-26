@@ -119,3 +119,4 @@ pub fn reminders_request(done: impl FnOnce(bool) + 'static) {
 pub fn open_pane(pane: &str) {
     workspace::open_url(pane);
 }
+

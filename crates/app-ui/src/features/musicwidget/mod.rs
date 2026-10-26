@@ -129,7 +129,11 @@ fn default_size(style: &str) -> (f64, f64) {
 
 /// The radius of the corners; a bar is a capsule.
 fn radius(style: &str, height: f64) -> f64 {
-    if style == "bar" { height / 2.0 } else { 26.0 }
+    if style == "bar" {
+        height / 2.0
+    } else {
+        26.0
+    }
 }
 
 fn glass(material: &str) -> Glass {
@@ -170,14 +174,13 @@ fn load_place(home: &Path) -> Option<Place> {
     let v: Value = serde_json::from_str(&text).ok()?;
     let n = |k: &str| v.get(k).and_then(Value::as_f64).filter(|x| x.is_finite());
     let (w, h) = (n("w")?, n("h")?);
-    (w >= WIDTH_RANGE.0 && w <= WIDTH_RANGE.1 && h >= HEIGHT_RANGE.0 && h <= HEIGHT_RANGE.1).then(
-        || Place {
+    (w >= WIDTH_RANGE.0 && w <= WIDTH_RANGE.1 && h >= HEIGHT_RANGE.0 && h <= HEIGHT_RANGE.1)
+        .then(|| Place {
             x: n("x").unwrap_or(0.0),
             y: n("y").unwrap_or(0.0),
             w,
             h,
-        },
-    )
+        })
 }
 
 fn art_url(bytes: &[u8]) -> String {
@@ -242,8 +245,8 @@ impl Feature {
             }
             return Ok(());
         }
-        let resized =
-            old.style != config.style || (old.width, old.height) != (config.width, config.height);
+        let resized = old.style != config.style
+            || (old.width, old.height) != (config.width, config.height);
         self.start(resized);
         Ok(())
     }
@@ -256,17 +259,10 @@ impl Feature {
             let (dw, dh) = default_size(&config.style);
             (
                 if config.width > 0.0 { config.width } else { dw },
-                if config.height > 0.0 {
-                    config.height
-                } else {
-                    dh
-                },
+                if config.height > 0.0 { config.height } else { dh },
             )
         };
-        let mut place = self
-            .place
-            .get()
-            .filter(|p| WidgetPanel::on_a_screen(self.mtm, *p));
+        let mut place = self.place.get().filter(|p| WidgetPanel::on_a_screen(self.mtm, *p));
         if place.is_none() {
             let work = WidgetPanel::work_area(self.mtm);
             place = Some(Place {
@@ -492,3 +488,4 @@ mod tests {
         assert_eq!(*slot.borrow(), Some("ready".into()));
     }
 }
+

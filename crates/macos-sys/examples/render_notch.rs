@@ -13,13 +13,13 @@ use macos_sys::{
         AgentsCallbacks, AgentsDisplay, AgentsView, ApprovalCardData, ChoiceData, QuestionData,
         SessionData, TokensData, UsageData,
     },
-    app,
     button::TouchButton,
+    panel::FigPanel,
+    app,
     focus_ui::{FocusCallbacks, FocusDisplay, FocusView},
     media_ui::{MediaCallbacks, MediaView},
     notch::{Notch, NotchGeometry},
     now_playing::{Sample, Track},
-    panel::FigPanel,
     shelf_ui::{ShelfCallbacks, ShelfView},
     style::Tone,
     ui::{AppCallbacks, Row},
@@ -34,8 +34,7 @@ fn find_button(view: &NSView, name: &str) -> Option<Retained<TouchButton>> {
     for sub in view.subviews().iter() {
         if let Ok(button) = sub.clone().downcast::<TouchButton>() {
             // SAFETY: accessibilityLabel takes no arguments and returns an optional string.
-            let label: Option<Retained<NSString>> =
-                unsafe { msg_send![&*button, accessibilityLabel] };
+            let label: Option<Retained<NSString>> = unsafe { msg_send![&*button, accessibilityLabel] };
             if label.is_some_and(|l| l.to_string() == name) {
                 return Some(button);
             }
@@ -250,11 +249,7 @@ fn main() {
         );
         // The same page in a panel outside every screen, where clicks are delivered by its window.
         let pressed: Rc<RefCell<Vec<String>>> = Rc::default();
-        let (picks, steps, chosen) = (
-            Rc::clone(&pressed),
-            Rc::clone(&pressed),
-            Rc::clone(&pressed),
-        );
+        let (picks, steps, chosen) = (Rc::clone(&pressed), Rc::clone(&pressed), Rc::clone(&pressed));
         let clicked = AgentsView::new(
             mtm,
             notch.page_frame(),
@@ -457,8 +452,7 @@ fn main() {
             );
             pressed.borrow_mut().clear();
             clicked.show(mtm, &display(None, "", sessions.clone(), usage.clone()));
-            let row = find_button(&clicked.root, "Claude Code shop")
-                .expect("the waiting session is a button");
+            let row = find_button(&clicked.root, "Claude Code shop").expect("the waiting session is a button");
             // SAFETY: an accessibility press takes no arguments.
             let _: bool = unsafe { msg_send![&*row, accessibilityPerformPress] };
             assert_eq!(pressed.borrow().as_slice(), ["session 1"]);
@@ -483,9 +477,7 @@ fn main() {
                 ["session 1", "Next 7 MariaDB", "Cancel 7 MariaDB"],
                 "next and cancel carry what was typed"
             );
-            println!(
-                "ok: a click across a redraw lands, a waiting session's row is pressable, next sends what was typed"
-            );
+            println!("ok: a click across a redraw lands, a waiting session's row is pressable, next sends what was typed");
             view.show(mtm, &display(None, "", sessions.clone(), usage.clone()));
             save("agents_overview", 4);
             let mut busy = display(None, "", sessions.clone(), usage.clone());

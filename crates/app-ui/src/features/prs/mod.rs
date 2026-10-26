@@ -493,7 +493,8 @@ fn fetch(host: Host) -> Result<Vec<Request>, Problem> {
             let id = gitlab_user_id(&me).ok_or(Problem::Unreadable)?;
             let mut all = Vec::new();
             for who in ["reviewer_id", "author_id"] {
-                let query = format!("merge_requests?state=opened&scope=all&{who}={id}&per_page=20");
+                let query =
+                    format!("merge_requests?state=opened&scope=all&{who}={id}&per_page=20");
                 let text = run(&tool, &["api", &query], COMMAND_SECONDS)?;
                 all.extend(parse_gitlab(&text).map_err(|_| Problem::Unreadable)?);
             }

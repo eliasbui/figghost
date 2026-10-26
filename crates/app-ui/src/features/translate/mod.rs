@@ -19,10 +19,10 @@ use core_smart::{net, translate};
 use macos_sys::{
     MainThreadMarker, app,
     hotkey::Hotkey,
-    notch::Material,
     pasteboard::{Pasteboard, Write},
     permissions,
     status_item::{Entry, Item},
+    notch::Material,
     translate_ui::TranslatePopup,
 };
 use serde::{Deserialize, Serialize};

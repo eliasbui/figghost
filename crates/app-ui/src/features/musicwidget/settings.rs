@@ -106,11 +106,7 @@ mod tests {
         assert!(set(&mut config, "style", &json!("vinyl")).unwrap().is_ok());
         assert_eq!(config.style, "vinyl");
         assert!(set(&mut config, "style", &json!("plaid")).unwrap().is_err());
-        assert!(
-            set(&mut config, "material", &json!("clear"))
-                .unwrap()
-                .is_ok()
-        );
+        assert!(set(&mut config, "material", &json!("clear")).unwrap().is_ok());
         assert!(set(&mut config, "layer", &json!("always")).unwrap().is_ok());
         assert!(set(&mut config, "layer", &json!("lock")).unwrap().is_err());
         assert!(set(&mut config, "opacity", &json!(0.6)).unwrap().is_ok());
@@ -135,9 +131,6 @@ mod tests {
             &Config::default(),
             &json!({ "width": 410.0, "height": 150.0 }),
         );
-        assert_eq!(
-            (state["width"].as_f64(), state["height"].as_f64()),
-            (Some(410.0), Some(150.0))
-        );
+        assert_eq!((state["width"].as_f64(), state["height"].as_f64()), (Some(410.0), Some(150.0)));
     }
 }

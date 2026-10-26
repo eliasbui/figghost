@@ -4,9 +4,11 @@
 //! A screen has no room for an app on the lock screen, so this is the nearest thing: a panel on every Space,
 //! also over full-screen apps when asked to.
 
-use crate::{panel::FigPanel, webview::WebHost};
+use crate::{
+    panel::FigPanel,
+    webview::WebHost,
+};
 use block2::RcBlock;
-use core_foundation::{array::CFArray, base::TCFType, number::CFNumber};
 use objc2::{
     MainThreadMarker,
     rc::{Retained, Weak},
@@ -19,6 +21,7 @@ use objc2_app_kit::{
 use objc2_foundation::{
     NSNotification, NSNotificationCenter, NSObjectProtocol, NSPoint, NSRect, NSSize,
 };
+use core_foundation::{array::CFArray, base::TCFType, number::CFNumber};
 use std::{
     cell::{Cell, RefCell},
     ffi::c_void,
@@ -181,8 +184,7 @@ impl WidgetPanel {
             },
             |_| {},
         );
-        let glass =
-            NSGlassEffectView::initWithFrame(mtm.alloc(), NSRect::new(NSPoint::ZERO, frame.size));
+        let glass = NSGlassEffectView::initWithFrame(mtm.alloc(), NSRect::new(NSPoint::ZERO, frame.size));
         glass.setStyle(NSGlassEffectViewStyle::Regular);
         glass.setContentView(Some(&host.view));
         panel.setContentView(Some(&glass));
@@ -241,9 +243,7 @@ impl WidgetPanel {
         });
         let (r, g, b, a) = glass.tint;
         self.glass
-            .setTintColor(Some(&NSColor::colorWithSRGBRed_green_blue_alpha(
-                r, g, b, a,
-            )));
+            .setTintColor(Some(&NSColor::colorWithSRGBRed_green_blue_alpha(r, g, b, a)));
         self.glass.setCornerRadius(radius);
         *self.radius.borrow_mut() = radius;
     }
@@ -270,12 +270,7 @@ impl WidgetPanel {
             if on && self.lock_space.get().is_none() {
                 let space = (sky.create)(sky.connection, 1, 0);
                 (sky.set_level)(sky.connection, space, i32::MAX);
-                (sky.add)(
-                    sky.connection,
-                    space,
-                    windows.as_concrete_TypeRef().cast(),
-                    7,
-                );
+                (sky.add)(sky.connection, space, windows.as_concrete_TypeRef().cast(), 7);
                 let spaces = CFArray::from_CFTypes(&[CFNumber::from(space as i32)]);
                 (sky.show)(sky.connection, spaces.as_concrete_TypeRef().cast());
                 self.lock_space.set(Some(space));
@@ -309,15 +304,8 @@ impl WidgetPanel {
 
     /// The area of the main screen that windows may use.
     pub fn work_area(mtm: MainThreadMarker) -> Place {
-        NSScreen::mainScreen(mtm).map_or(
-            Place {
-                x: 0.0,
-                y: 0.0,
-                w: 1440.0,
-                h: 900.0,
-            },
-            |s| s.visibleFrame().into(),
-        )
+        NSScreen::mainScreen(mtm)
+            .map_or(Place { x: 0.0, y: 0.0, w: 1440.0, h: 900.0 }, |s| s.visibleFrame().into())
     }
 
     /// Whether most of a panel of this place is on some screen, so a place kept from a screen that is gone is

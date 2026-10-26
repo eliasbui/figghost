@@ -95,6 +95,10 @@ pub struct NotchConfig {
     pub hide_in_capture: bool,
     /// The notch while the app in front is full screen on its screen; off takes it off the screen until then.
     pub show_in_fullscreen: bool,
+    /// The date and the time in the closed notch, which keeps the pill on screen whatever `rest` says.
+    pub rest_clock: bool,
+    /// The previous and next buttons beside them: they skip a track while music plays, else change the tab.
+    pub rest_steps: bool,
     pub haptics: bool,
     /// Which screen: `auto` (the built-in one with a notch, else the main one), `main` or `pointer`.
     pub display: String,
@@ -136,6 +140,8 @@ impl Default for NotchConfig {
             rest: "notch".into(),
             hide_in_capture: false,
             show_in_fullscreen: true,
+            rest_clock: true,
+            rest_steps: false,
             haptics: true,
             display: "auto".into(),
             open_page: "activity".into(),
@@ -231,6 +237,8 @@ impl From<serde_json::Value> for NotchConfig {
             rest: word(&v["rest"], &["notch", "hidden"], &d.rest),
             hide_in_capture: flag("hide_in_capture", d.hide_in_capture),
             show_in_fullscreen: flag("show_in_fullscreen", d.show_in_fullscreen),
+            rest_clock: flag("rest_clock", d.rest_clock),
+            rest_steps: flag("rest_steps", d.rest_steps),
             haptics: flag("haptics", d.haptics),
             display: screen_choice(&v["display"], &d.display),
             open_page,
@@ -295,7 +303,8 @@ impl NotchConfig {
             },
             open_on_hover: self.open_on_hover,
             hover_delay: f64::from(self.hover_delay_ms.min(1000)) / 1000.0,
-            rest: if self.rest == "hidden" {
+            // The date and the time need the pill on screen, so a hidden strip is only for when they are off.
+            rest: if self.rest == "hidden" && !self.rest_clock {
                 Rest::Hidden
             } else {
                 Rest::Notch
@@ -321,6 +330,8 @@ impl NotchConfig {
             },
             pages: self.pages.clone(),
             show_in_fullscreen: self.show_in_fullscreen,
+            rest_clock: self.rest_clock,
+            rest_steps: self.rest_steps,
         }
     }
 
