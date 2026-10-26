@@ -17,8 +17,8 @@ use objc2_foundation::{NSArray, NSNotification, NSNotificationCenter, NSString};
 use std::ffi::{CString, c_void};
 use std::path::PathBuf;
 use std::ptr::{NonNull, null};
-use std::sync::{Mutex, Once};
 use std::sync::atomic::{AtomicBool, Ordering};
+use std::sync::{Mutex, Once};
 
 type Ref = *mut c_void;
 

@@ -8,9 +8,7 @@
 //! frame instead. Only the fades are Core Animation's.
 
 use crate::{
-    app,
-    button::{Look, TouchButton},
-    labels,
+    app, labels,
     mascot::Sheet,
     panel::{FigPanel, Key},
     pasteboard::file_paths,
@@ -44,8 +42,9 @@ use objc2_app_kit::{
 use objc2_core_foundation::CGPoint;
 use objc2_core_graphics::CGColor;
 use objc2_foundation::{
-    NSArray, NSData, NSDate, NSDateFormatter, NSDictionary, NSNotification, NSNotificationCenter, NSNumber, NSObject,
-    NSObjectProtocol, NSPoint, NSRect, NSRunLoop, NSRunLoopCommonModes, NSSize, NSString,
+    NSArray, NSData, NSDate, NSDateFormatter, NSDictionary, NSNotification, NSNotificationCenter,
+    NSNumber, NSObject, NSObjectProtocol, NSPoint, NSRect, NSRunLoop, NSRunLoopCommonModes, NSSize,
+    NSString,
 };
 use objc2_quartz_core::{
     CABasicAnimation, CACornerMask, CACurrentMediaTime, CADisplayLink, CAGradientLayer, CALayer,
@@ -356,7 +355,7 @@ impl NotchGeometry {
         self.frame(size.width, size.height)
     }
 
-    /// The size of the resting shape: always the cutout or the pill, because the date, the time and the step buttons
+    /// The size of the resting shape: always the cutout or the pill, because the date and the time
     /// are drawn in it; the "hidden" setting no longer shrinks it to a thin strip.
     pub fn rest_size(&self, _rest: Rest) -> NSSize {
         self.notch
@@ -498,7 +497,6 @@ pub struct Activity {
 type Signal = Rc<dyn Fn()>;
 type DragSignal = Rc<dyn Fn(bool)>;
 type Resize = Rc<dyn Fn(NSSize)>;
-type RestStep = Rc<dyn Fn(i32) -> bool>;
 
 pub struct RootIvars {
     /// Called when the pointer enters or leaves the window.
@@ -763,9 +761,9 @@ define_class!(
     }
 );
 
-/// How much room the date and time of the resting pill need beside its two buttons.
+/// The text of the resting notch.
 const REST_TEXT_SIZE: f64 = 11.0;
-const REST_INSET: f64 = 3.0;
+const REST_PAD: f64 = 8.0;
 const REST_CLOCK_SECONDS: f64 = 2.0;
 /// From the most to the least that the date and time can say; the first that fits the room is shown.
 const REST_PATTERNS: [&str; 5] = [
@@ -777,7 +775,7 @@ const REST_PATTERNS: [&str; 5] = [
 ];
 /// The same for the right ear beside a hardware notch, which holds the date only; the left ear holds the time.
 const REST_DATE_PATTERNS: [&str; 4] = ["EEE dd/MM/yyyy", "EEE dd/MM", "dd/MM/yyyy", "dd/MM"];
-/// How far the resting notch widens on each side of a hardware cutout to hold the time, the date and the buttons.
+/// How far the resting notch widens on each side of a hardware cutout to hold the time and the date.
 const REST_EAR: f64 = 116.0;
 
 /// The date and time as wide as `width` allows.
@@ -798,7 +796,7 @@ fn rest_text(patterns: &[&str], width: f64) -> String {
 }
 
 pub struct RestIvars {
-    /// Between the buttons, or in the left ear when `gap` is not 0.
+    /// Across the pill, or in the left ear when `gap` is not 0.
     text: RefCell<String>,
     /// The date in the right ear.
     right: RefCell<String>,
@@ -839,27 +837,19 @@ impl RestBar {
     /// The width one text may use: what is left between a button and the middle (the cutout, or the other button).
     fn room(&self) -> f64 {
         let (bounds, gap) = (self.bounds(), self.ivars().gap.get());
-        let side = bounds.size.height + REST_INSET + 4.0;
         if gap > 0.0 {
-            ((bounds.size.width - gap) / 2.0 - side - 4.0).max(0.0)
+            ((bounds.size.width - gap) / 2.0 - 2.0 * REST_PAD).max(0.0)
         } else {
-            (bounds.size.width - 2.0 * side).max(0.0)
+            (bounds.size.width - 2.0 * REST_PAD).max(0.0)
         }
     }
 
     fn paint(&self) {
         let bounds = self.bounds();
         let side = bounds.size.height;
-        let glyph = white(0.85);
-        for (x, name) in [
-            (REST_INSET + side / 2.0, "chevron.left"),
-            (bounds.size.width - REST_INSET - side / 2.0, "chevron.right"),
-        ] {
-            style::draw_symbol(name, NSPoint::new(x, side / 2.0), side * 0.42, &glyph);
-        }
         let font = style::digits(REST_TEXT_SIZE, Weight::Semibold);
         let line = font.ascender() - font.descender();
-        let pad = side + REST_INSET + 4.0;
+        let pad = REST_PAD;
         let y = (side - line) / 2.0 - 0.5;
         let attrs = text_attributes(&font, &white(1.0), Fit::Tail, true);
         let gap = self.ivars().gap.get();
@@ -1361,14 +1351,10 @@ struct Inner {
     serial: Cell<u64>,
     /// The ears' bars are redrawn by this while they are on screen; nothing runs otherwise.
     bars: RefCell<Option<app::Timer>>,
-    /// The date, the time and the two step buttons of the resting pill on a screen without a hardware notch.
+    /// The date and the time of the resting notch on a screen without a hardware notch.
     rest_bar: Retained<RestBar>,
-    rest_prev: Retained<TouchButton>,
-    rest_next: Retained<TouchButton>,
     /// Keeps the time current while the pill is on screen at rest.
     rest_clock: RefCell<Option<app::Timer>>,
-    /// Asked first when a step button is pressed with -1 or 1; true when it dealt with the press (music).
-    on_rest_step: RefCell<Option<RestStep>>,
     /// Bumped by every movement; a movement that finishes late does nothing when another has started since.
     generation: Cell<u64>,
     /// The shape as it is on screen now.
@@ -1725,13 +1711,6 @@ impl Inner {
         self.rest_bar.setFrame(NSRect::new(
             NSPoint::new(0.0, top),
             NSSize::new(size.width, ear_height),
-        ));
-        let button = NSSize::new(ear_height, ear_height);
-        self.rest_prev
-            .setFrame(NSRect::new(NSPoint::new(REST_INSET, 0.0), button));
-        self.rest_next.setFrame(NSRect::new(
-            NSPoint::new(size.width - REST_INSET - ear_height, 0.0),
-            button,
         ));
         // The ears stay against the outer edges, so they ride out with the shape as it widens.
         self.left.setFrame(NSRect::new(
@@ -2122,7 +2101,7 @@ impl Inner {
         self.sync_rest_bar();
     }
 
-    /// The resting notch shows the date, the time and the step buttons, between them on a pill and in the two ears
+    /// The resting notch shows the date and the time, across the pill on a pill and in the two ears
     /// of a hardware notch, whose middle is the camera; not while something is live or a movement is under way.
     fn sync_rest_bar(&self) {
         let hardware = self.geometry.get().hardware;
@@ -2163,7 +2142,10 @@ impl Inner {
         iv.gap.set(gap);
         let room = self.rest_bar.room();
         let (text, right) = if gap > 0.0 {
-            (rest_text(&["HH:mm"], room), rest_text(&REST_DATE_PATTERNS, room))
+            (
+                rest_text(&["HH:mm"], room),
+                rest_text(&REST_DATE_PATTERNS, room),
+            )
         } else {
             (rest_text(&REST_PATTERNS, room), String::new())
         };
@@ -2172,37 +2154,6 @@ impl Inner {
             *iv.right.borrow_mut() = right;
             self.rest_bar.setNeedsDisplay(true);
         }
-    }
-
-    /// A press of a step button: the music's, when something plays, else the neighbouring tab.
-    fn rest_step(&self, delta: i32) {
-        let handler = self.on_rest_step.borrow().clone();
-        if handler.is_some_and(|handled| handled(delta)) {
-            return;
-        }
-        let order = self.order.borrow().clone();
-        if order.is_empty() {
-            return;
-        }
-        let at = order
-            .iter()
-            .position(|&page| page == self.active.get())
-            .unwrap_or(0) as i32;
-        let next = order[(at + delta).rem_euclid(order.len() as i32) as usize];
-        self.expand(false, Some(next));
-    }
-
-    /// Whether the pointer is on one of the step buttons, where hovering must not open the notch.
-    fn pointer_on_rest_buttons(&self) -> bool {
-        if self.rest_bar.isHidden() {
-            return false;
-        }
-        let at = self
-            .rest_bar
-            .convertPoint_fromView(self.panel.mouseLocationOutsideOfEventStream(), None);
-        [&self.rest_prev, &self.rest_next]
-            .iter()
-            .any(|button| contains(button.frame(), at))
     }
 
     /// The activity on show: the highest priority, the newest among equals.
@@ -2954,7 +2905,6 @@ fn pointer_moved(inner: &Rc<Inner>, p: NSPoint) {
                 && !inner.is_open()
                 && !inner.suppressed.get()
                 && !inner.snoozed.get()
-                && !inner.pointer_on_rest_buttons()
             {
                 if style.haptics {
                     tap();
@@ -3077,13 +3027,6 @@ impl Notch {
         detail.setAlphaValue(0.0);
         surface.addSubview(&detail);
         let rest_bar = RestBar::new(mtm);
-        let step_button = |name: &str| {
-            let button = TouchButton::new(mtm, NSRect::ZERO, Look::Overlay);
-            button.set_symbol(name);
-            rest_bar.addSubview(&button);
-            button
-        };
-        let (rest_prev, rest_next) = (step_button("chevron.left"), step_button("chevron.right"));
         surface.addSubview(&rest_bar);
         // Fixed-size content: the shape grows around it instead of stretching it (see `layout_inside`).
         let content = NSView::initWithFrame(mtm.alloc(), NSRect::new(NSPoint::ZERO, EXPANDED_SIZE));
@@ -3156,10 +3099,7 @@ impl Notch {
             serial: Cell::new(0),
             bars: RefCell::new(None),
             rest_bar,
-            rest_prev,
-            rest_next,
             rest_clock: RefCell::new(None),
-            on_rest_step: RefCell::new(None),
             generation: Cell::new(0),
             pose: Cell::new(Pose {
                 size: rest,
@@ -3284,14 +3224,6 @@ impl Notch {
                 pointer_moved(&on_drag, NSEvent::mouseLocation());
             }
         }));
-        for (button, delta) in [(&inner.rest_prev, -1), (&inner.rest_next, 1)] {
-            let weak = Rc::downgrade(&inner);
-            button.set_on_click(move || {
-                if let Some(inner) = weak.upgrade() {
-                    inner.rest_step(delta);
-                }
-            });
-        }
         let on_click = Rc::clone(&inner);
         *root.ivars().on_click.borrow_mut() = Some(Rc::new(move || on_click.expand(true, None)));
 
@@ -3696,12 +3628,6 @@ impl Notch {
         }
     }
 
-    /// `handled` is asked first when a step button of the resting pill is pressed, with -1 (previous) or 1 (next);
-    /// without an answer of true the press opens the notch on the previous or next tab.
-    pub fn set_on_rest_step(&self, handled: impl Fn(i32) -> bool + 'static) {
-        *self.inner.on_rest_step.borrow_mut() = Some(Rc::new(handled));
-    }
-
     /// Whether the user can see this page's tab.
     pub fn page_shown(&self, index: usize) -> bool {
         self.inner.page_visible(index)
@@ -3821,10 +3747,7 @@ mod tests {
         let hardware = geometry(true).collapsed_frame();
         assert_eq!((hardware.size.width, hardware.size.height), (200.0, 32.0));
         let plain = geometry(false).collapsed_frame();
-        assert_eq!(
-            (plain.size.width, plain.size.height),
-            (PILL_WIDTH, 32.0)
-        );
+        assert_eq!((plain.size.width, plain.size.height), (PILL_WIDTH, 32.0));
         // Both stay glued to the top edge so the pointer reaches them by moving up.
         for f in [hardware, plain] {
             assert_eq!(f.origin.y + f.size.height, 982.0);

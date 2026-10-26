@@ -1061,8 +1061,9 @@ pub fn set(config: &mut Config, path: &str, value: &Value) -> Option<Result<&'st
             weather::settings::set(&mut config.weather, rest, value).map(|r| r.map(|()| "weather"))
         }
         "prs" => prs::settings::set(&mut config.prs, rest, value).map(|r| r.map(|()| "prs")),
-        "updates" => updates::settings::set(&mut config.updates, rest, value)
-            .map(|r| r.map(|()| "updates")),
+        "updates" => {
+            updates::settings::set(&mut config.updates, rest, value).map(|r| r.map(|()| "updates"))
+        }
         "pomodoro" => pomodoro::settings::set(&mut config.pomodoro, rest, value)
             .map(|r| r.map(|()| "pomodoro")),
         "screentime" => screentime::settings::set(&mut config.screentime, rest, value)

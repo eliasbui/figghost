@@ -2,8 +2,8 @@
 
 use crate::{
     agents::AgentsFeature, clipboard::Clipboard, config::Config, features::Features,
-    permissions_popup::PermissionsPopup, shelf::ShelfFeature, tiling::Tiling, update::UpdateFeature,
-    volume_hud::VolumeHud,
+    permissions_popup::PermissionsPopup, shelf::ShelfFeature, tiling::Tiling,
+    update::UpdateFeature, volume_hud::VolumeHud,
 };
 use core_mouse::Control;
 use macos_sys::MainThreadMarker;

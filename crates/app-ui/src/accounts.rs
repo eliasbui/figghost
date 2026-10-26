@@ -286,7 +286,10 @@ fn limits_of(home: &Path, user: &str) -> Result<Limits, Unavailable> {
     let headers = [
         ("Authorization", bearer.as_str()),
         ("anthropic-beta", accounts::USAGE_BETA),
-        ("User-Agent", concat!("Figghost/", env!("CARGO_PKG_VERSION"))),
+        (
+            "User-Agent",
+            concat!("Figghost/", env!("CARGO_PKG_VERSION")),
+        ),
     ];
     let body = net::get_with_headers(accounts::USAGE_URL, &[], &headers, FETCH_SECONDS)
         .map_err(|_| Unavailable::Failed)?;

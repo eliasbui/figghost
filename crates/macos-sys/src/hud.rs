@@ -417,8 +417,7 @@ fn draw_speaker_scaled(at: NSPoint, scale: f64, level: f64, muted: bool, sun: bo
 
 fn draw_number(level: f64, size: f64, area: NSRect) {
     // SAFETY: extern static weight constant.
-    let font =
-        NSFont::monospacedDigitSystemFontOfSize_weight(size, unsafe { NSFontWeightMedium });
+    let font = NSFont::monospacedDigitSystemFontOfSize_weight(size, unsafe { NSFontWeightMedium });
     let attrs = text_attributes(&font, &NSColor::whiteColor(), Fit::Clip, true);
     draw_text(&format!("{:.0}", level * 100.0), area, &attrs);
 }
@@ -789,7 +788,12 @@ impl Hud {
 
 /// Where the panel goes: the styles that hang sit under the cutout at the top edge of the screen, and the ones
 /// that float go to the place the user chose, or to the one their style has by itself.
-fn frame_for(geometry: &NotchGeometry, style: HudStyle, position: HudPosition, size: NSSize) -> NSRect {
+fn frame_for(
+    geometry: &NotchGeometry,
+    style: HudStyle,
+    position: HudPosition,
+    size: NSSize,
+) -> NSRect {
     if style.hangs() {
         return geometry.frame(size.width, size.height);
     }
@@ -909,13 +913,28 @@ mod tests {
         assert!(!HudStyle::Glass.paints_shape() && !HudStyle::Corner.paints_shape());
         // The new ones float: the island is centred under the menu bar, the side slider is on the right edge at
         // mid height, and the tile is centred above the bottom.
-        let island = frame_for(&geometry, HudStyle::Island, HudPosition::Auto, HudStyle::Island.size(0.0));
+        let island = frame_for(
+            &geometry,
+            HudStyle::Island,
+            HudPosition::Auto,
+            HudStyle::Island.size(0.0),
+        );
         assert_eq!(island.origin.x + island.size.width / 2.0, 720.0);
         assert!(island.origin.y + island.size.height <= 900.0 - 24.0);
-        let side = frame_for(&geometry, HudStyle::Side, HudPosition::Auto, HudStyle::Side.size(0.0));
+        let side = frame_for(
+            &geometry,
+            HudStyle::Side,
+            HudPosition::Auto,
+            HudStyle::Side.size(0.0),
+        );
         assert_eq!(side.origin.x + side.size.width, 1440.0 - SIDE_MARGIN);
         assert_eq!(side.origin.y + side.size.height / 2.0, 450.0);
-        let tile = frame_for(&geometry, HudStyle::Tile, HudPosition::Auto, HudStyle::Tile.size(0.0));
+        let tile = frame_for(
+            &geometry,
+            HudStyle::Tile,
+            HudPosition::Auto,
+            HudStyle::Tile.size(0.0),
+        );
         assert_eq!(tile.origin.x + tile.size.width / 2.0, 720.0);
         assert!(!HudStyle::Island.hangs() && !HudStyle::Side.hangs() && !HudStyle::Tile.hangs());
         for word in ["island", "side", "tile", "ring", "equalizer", "wide"] {
@@ -934,9 +953,15 @@ mod tests {
         let ring = HudStyle::Ring.size(0.0);
         let at = |word: &str| frame_for(&geometry, HudStyle::Ring, HudPosition::named(word), ring);
         // By itself the dial is in the middle of the screen.
-        assert_eq!(frame_for(&geometry, HudStyle::Ring, HudPosition::Auto, ring), at("center"));
+        assert_eq!(
+            frame_for(&geometry, HudStyle::Ring, HudPosition::Auto, ring),
+            at("center")
+        );
         let left = at("bottom-left");
-        assert_eq!((left.origin.x, left.origin.y), (CORNER_MARGIN, BOTTOM_FLOOR));
+        assert_eq!(
+            (left.origin.x, left.origin.y),
+            (CORNER_MARGIN, BOTTOM_FLOOR)
+        );
         let right = at("top-right");
         assert_eq!(right.origin.x + ring.width, 1440.0 - CORNER_MARGIN);
         assert!(right.origin.y + ring.height <= 900.0 - 24.0);

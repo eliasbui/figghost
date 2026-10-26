@@ -125,7 +125,10 @@ mod tests {
             .unwrap();
         assert!(config.camera && !config.microphone);
         let s = state(&config, &Value::Null);
-        assert_eq!((&s["camera"], &s["microphone"]), (&json!(true), &json!(false)));
+        assert_eq!(
+            (&s["camera"], &s["microphone"]),
+            (&json!(true), &json!(false))
+        );
     }
 
     #[test]

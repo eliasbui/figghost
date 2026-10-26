@@ -177,7 +177,11 @@ pub fn card_change(old: Option<&ApprovalCardData>, new: Option<&ApprovalCardData
                 && old.deny == new.deny
                 && old.question == new.question
                 && old.choices.len() == new.choices.len()
-                && old.choices.iter().zip(&new.choices).all(|(a, b)| a.label == b.label) =>
+                && old
+                    .choices
+                    .iter()
+                    .zip(&new.choices)
+                    .all(|(a, b)| a.label == b.label) =>
         {
             CardChange::Refresh
         }
@@ -323,7 +327,8 @@ fn other_row(data: &ApprovalCardData, card: NSSize) -> Option<NSRect> {
     Some(NSRect::new(
         NSPoint::new(
             CARD_PAD,
-            choices_top(data, card.height) + data.choices.len() as f64 * (BUTTON_HEIGHT + CHOICE_GAP),
+            choices_top(data, card.height)
+                + data.choices.len() as f64 * (BUTTON_HEIGHT + CHOICE_GAP),
         ),
         NSSize::new(card.width - 2.0 * CARD_PAD, BUTTON_HEIGHT),
     ))
@@ -586,7 +591,12 @@ struct ShownCard {
 }
 
 /// The field for an answer of one's own, in the row under the choices, its text where their labels are.
-fn answer_field(mtm: MainThreadMarker, row: NSRect, placeholder: &str, typed: &str) -> Retained<NSTextField> {
+fn answer_field(
+    mtm: MainThreadMarker,
+    row: NSRect,
+    placeholder: &str,
+    typed: &str,
+) -> Retained<NSTextField> {
     let height = 18.0;
     let x = row.origin.x + LEADING_PAD + GLYPH + 6.0;
     let field = NSTextField::initWithFrame(
@@ -613,7 +623,9 @@ fn answer_field(mtm: MainThreadMarker, row: NSRect, placeholder: &str, typed: &s
 
 /// What is typed in the field, trimmed; empty without one.
 fn typed_in(field: Option<&NSTextField>) -> String {
-    field.map_or_else(String::new, |f| f.stringValue().to_string().trim().to_owned())
+    field.map_or_else(String::new, |f| {
+        f.stringValue().to_string().trim().to_owned()
+    })
 }
 
 pub struct AgentsView {
@@ -683,9 +695,15 @@ impl AgentsView {
         match card_change(old_card.as_ref(), display.approval.as_ref()) {
             CardChange::Keep => {}
             CardChange::Refresh => {
-                if let (Some(shown), Some(data)) = (self.card.borrow_mut().as_mut(), &display.approval) {
+                if let (Some(shown), Some(data)) =
+                    (self.card.borrow_mut().as_mut(), &display.approval)
+                {
                     for (button, choice) in shown.choices.iter().zip(&data.choices) {
-                        button.set_symbol(if choice.selected { "checkmark" } else { "circle" });
+                        button.set_symbol(if choice.selected {
+                            "checkmark"
+                        } else {
+                            "circle"
+                        });
                         button.set_selected(choice.selected);
                     }
                     *shown.view.ivars().data.borrow_mut() = Some(data.clone());
@@ -747,13 +765,20 @@ impl AgentsView {
             let button = TouchButton::new(
                 mtm,
                 NSRect::new(
-                    NSPoint::new(CARD_PAD, choices_top + n as f64 * (BUTTON_HEIGHT + CHOICE_GAP)),
+                    NSPoint::new(
+                        CARD_PAD,
+                        choices_top + n as f64 * (BUTTON_HEIGHT + CHOICE_GAP),
+                    ),
                     NSSize::new(full, BUTTON_HEIGHT),
                 ),
                 Look::Rect,
             );
             button.set_leading(true);
-            button.set_symbol(if choice.selected { "checkmark" } else { "circle" });
+            button.set_symbol(if choice.selected {
+                "checkmark"
+            } else {
+                "circle"
+            });
             button.set_title(&choice.label);
             // A label too long for the button ends in an ellipsis; the whole of it is in the tooltip.
             button.setToolTip(Some(&NSString::from_str(&choice.label)));
@@ -773,7 +798,10 @@ impl AgentsView {
                 let half = (full - GAP) / 2.0;
                 let deny = TouchButton::new(
                     mtm,
-                    NSRect::new(NSPoint::new(CARD_PAD, buttons_top), NSSize::new(half, BUTTON_HEIGHT)),
+                    NSRect::new(
+                        NSPoint::new(CARD_PAD, buttons_top),
+                        NSSize::new(half, BUTTON_HEIGHT),
+                    ),
                     Look::Rect,
                 );
                 deny.set_symbol("xmark");
@@ -812,10 +840,20 @@ impl AgentsView {
                 let shared = Rc::clone(&self.callbacks);
                 terminal.set_on_click(move || (shared.on_decide)(id, false));
                 card.addSubview(&terminal);
-                let next_symbol = if question.last { "paperplane" } else { "chevron.right" };
+                let next_symbol = if question.last {
+                    "paperplane"
+                } else {
+                    "chevron.right"
+                };
                 let steps: Vec<(Step, &str, &str, bool)> = [
-                    question.cancel.as_deref().map(|t| (Step::Cancel, t, "xmark", true)),
-                    question.back.as_deref().map(|t| (Step::Back, t, "chevron.left", question.can_back)),
+                    question
+                        .cancel
+                        .as_deref()
+                        .map(|t| (Step::Cancel, t, "xmark", true)),
+                    question
+                        .back
+                        .as_deref()
+                        .map(|t| (Step::Back, t, "chevron.left", question.can_back)),
                     Some((Step::Next, approval.allow.as_str(), next_symbol, true)),
                 ]
                 .into_iter()
@@ -837,7 +875,9 @@ impl AgentsView {
                     button.set_enabled(enabled);
                     button.set_selected(step == Step::Next);
                     let (shared, field) = (Rc::clone(&self.callbacks), field.clone());
-                    button.set_on_click(move || (shared.on_step)(id, step, typed_in(field.as_deref())));
+                    button.set_on_click(move || {
+                        (shared.on_step)(id, step, typed_in(field.as_deref()))
+                    });
                     card.addSubview(&button);
                 }
             }
@@ -852,7 +892,11 @@ impl AgentsView {
     }
 
     /// The views under the card: what waits behind it, the sessions, the usage limits and the tokens.
-    fn make_below_card(&self, mtm: MainThreadMarker, display: &AgentsDisplay) -> Vec<Retained<NSView>> {
+    fn make_below_card(
+        &self,
+        mtm: MainThreadMarker,
+        display: &AgentsDisplay,
+    ) -> Vec<Retained<NSView>> {
         let mut added: Vec<Retained<NSView>> = Vec::new();
         let (width, top) = (self.frame.size.width, self.frame.size.height);
         let inner = width - 2.0 * MARGIN;
@@ -942,7 +986,9 @@ impl AgentsView {
         }
         if choosing {
             usage_shown &= cursor + usage_section <= bottom;
-            tokens_shown &= cursor + f64::from(u8::from(usage_shown)) * usage_section + tokens_section <= bottom;
+            tokens_shown &=
+                cursor + f64::from(u8::from(usage_shown)) * usage_section + tokens_section
+                    <= bottom;
         }
         if usage_shown {
             let heading = self.heading(mtm, &display.usage_heading, cursor);
@@ -1048,7 +1094,10 @@ impl AgentsView {
             Some(shown) => (
                 shown.data.question.is_some(),
                 typed_in(shown.field.as_deref()),
-                shown.field.as_ref().is_some_and(|f| f.currentEditor().is_some()),
+                shown
+                    .field
+                    .as_ref()
+                    .is_some_and(|f| f.currentEditor().is_some()),
             ),
             None => (false, String::new(), false),
         };
@@ -1145,7 +1194,10 @@ mod tests {
     #[test]
     fn the_card_under_a_click_is_kept_while_only_its_text_or_ticks_change() {
         let shown = card(1, &["A", "B"], &[]);
-        assert_eq!(card_change(Some(&shown), Some(&shown.clone())), CardChange::Keep);
+        assert_eq!(
+            card_change(Some(&shown), Some(&shown.clone())),
+            CardChange::Keep
+        );
         assert_eq!(card_change(None, None), CardChange::Keep);
         let older = ApprovalCardData {
             detail: "shop  -  1 minute ago".into(),
