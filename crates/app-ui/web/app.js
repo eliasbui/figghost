@@ -93,10 +93,11 @@ function throttleBy(key, ms, fn) {
 const I18N = {
   en: {
     'side.search': 'Search settings', 'side.clear': 'Clear search', 'side.none': 'No settings found',
-    'guide.label': 'The ghost', 'guide.q1': 'Boo.', 'guide.q2': 'I live in your notch.', 'guide.q3': 'Nothing extraneous here.', 'guide.q4': 'Ask me again later.',
-    'metric.features': 'Features on', 'metric.tabs': 'Notch tabs', 'metric.clips': 'Copied items', 'metric.access': 'Accessibility',
+    'nav.back': 'Back', 'nav.forward': 'Forward',
+    'hero.on': 'On', 'hero.off': 'Off', 'feat.title': 'Features', 'feat.count': '{n} of {m} on', 'feat.total': '{n} of {m} features on',
     'cat.general': 'General', 'cat.mole': 'Clean up this Mac', 'cat.keys': 'Shortcuts', 'cat.scroll': 'Mouse & Cursor', 'cat.notch': 'Notch & Island', 'cat.agents': 'AI Agents & PRs', 'cat.calendar': 'Schedule & Focus', 'cat.tabs': 'Notch Widgets', 'cat.system': 'System & Devices', 'cat.clipboard': 'Clipboard & Typing', 'cat.smart': 'Smart & Translate', 'cat.capture': 'Capture & Media', 'cat.tiling': 'Windows & Pin',
-    'nav.sec.overview': 'Overview', 'nav.sec.notch': 'Notch & Island', 'nav.sec.mouse': 'Mouse & Windows', 'nav.sec.tools': 'Clipboard & Tools',
+    'nav.sec.overview': 'Overview', 'nav.sec.notch': 'Notch & Island', 'nav.sec.tabs': 'Notch tabs', 'nav.sec.mouse': 'Mouse & Windows', 'nav.sec.tools': 'Clipboard & Tools',
+    'cat.about': 'About',
     'nav.general': 'General', 'nav.keys': 'Shortcuts', 'nav.scroll': 'Scrolling', 'nav.clipboard': 'Clipboard', 'nav.notch': 'Notch', 'nav.agents': 'AI agents', 'nav.tiling': 'Window snapping', 'nav.about': 'About',
     'page.general': 'General', 'page.general.sub': 'Startup, language and permissions.',
     'page.keys': 'Shortcuts', 'page.keys.sub': 'The keys Figghost listens to, in one place. Click a shortcut, then press the new keys.',
@@ -218,10 +219,11 @@ const I18N = {
   },
   vi: {
     'side.search': 'Tìm chức năng', 'side.clear': 'Xóa tìm kiếm', 'side.none': 'Không có mục nào',
-    'guide.label': 'Con ma', 'guide.q1': 'Hú.', 'guide.q2': 'Tôi sống trong notch của bạn.', 'guide.q3': 'Ở đây không có gì thừa.', 'guide.q4': 'Lát nữa hỏi lại nhé.',
-    'metric.features': 'Đang bật', 'metric.tabs': 'Tab của notch', 'metric.clips': 'Mục đã chép', 'metric.access': 'Trợ năng',
+    'nav.back': 'Quay lại', 'nav.forward': 'Tiếp',
+    'hero.on': 'Đang bật', 'hero.off': 'Đang tắt', 'feat.title': 'Tính năng', 'feat.count': '{n} trên {m} đang bật', 'feat.total': '{n} trên {m} tính năng đang bật',
     'cat.general': 'Cài đặt chung', 'cat.mole': 'Dọn dẹp máy Mac', 'cat.keys': 'Phím tắt', 'cat.scroll': 'Chuột & Con trỏ', 'cat.notch': 'Notch & Đảo động', 'cat.agents': 'Tác tử AI & PR', 'cat.calendar': 'Lịch & Tập trung', 'cat.tabs': 'Tiện ích Notch', 'cat.system': 'Hệ thống & Thiết bị', 'cat.clipboard': 'Bảng tạm & Gõ chữ', 'cat.smart': 'Chọn nhanh & Dịch', 'cat.capture': 'Chụp & Tải media', 'cat.tiling': 'Cửa sổ & Ghim',
-    'nav.sec.overview': 'Tổng quan', 'nav.sec.notch': 'Notch & Đảo động', 'nav.sec.mouse': 'Chuột & Cửa sổ', 'nav.sec.tools': 'Bảng tạm & Công cụ',
+    'nav.sec.overview': 'Tổng quan', 'nav.sec.notch': 'Notch & Đảo động', 'nav.sec.tabs': 'Tab của notch', 'nav.sec.mouse': 'Chuột & Cửa sổ', 'nav.sec.tools': 'Bảng tạm & Công cụ',
+    'cat.about': 'Giới thiệu',
     'nav.general': 'Chung', 'nav.keys': 'Phím tắt', 'nav.scroll': 'Cuộn chuột', 'nav.clipboard': 'Clipboard', 'nav.notch': 'Notch', 'nav.agents': 'Tác tử AI', 'nav.tiling': 'Chia cửa sổ', 'nav.about': 'Giới thiệu',
     'page.general': 'Chung', 'page.general.sub': 'Khởi động, ngôn ngữ và quyền truy cập.',
     'page.keys': 'Phím tắt', 'page.keys.sub': 'Mọi phím Figghost dùng, gom về một chỗ. Nhấn vào một phím tắt rồi bấm tổ hợp phím mới.',
@@ -669,7 +671,7 @@ function confirmDialog({ title, body, confirm }, onYes) {
 // ---------------------------------------------------------------- components
 
 function switchEl(path, label) {
-  const el = h('button', { class: 'switch', role: 'switch', 'aria-checked': 'false', 'aria-label': label || '', onclick: () => change(path, !get(path)) });
+  const el = h('button', { class: 'switch', role: 'switch', 'aria-checked': 'false', 'aria-label': label || '', 'data-path': path, onclick: () => change(path, !get(path)) });
   reg(() => el.setAttribute('aria-checked', String(!!get(path))));
   return el;
 }
@@ -835,35 +837,142 @@ function pill(textFn, goodFn) {
   return el;
 }
 
-/** The figures under the hero of the General page. Every one is read from the state the page already has. */
-function metricsStrip() {
-  const features = () => {
-    const flags = ['mouse.smooth', 'notch.enabled', 'agents.enabled', 'tiling.enabled'].map((path) => !!get(path));
-    for (const p of PLUGINS) if (p.build && S[p.id] && typeof S[p.id].enabled === 'boolean') flags.push(S[p.id].enabled);
-    return [flags.filter(Boolean).length, flags.length];
+// -- page icons -----------------------------------------------------
+
+// The icon of each page, drawn like the system's glass icons on a 24 grid: g is a translucent layer (even-odd, so a
+// circle inside it cuts a hole), s a solid one, w white strokes and k strokes in the page's deep colour over s.
+const GLYPHS = (() => {
+  const f = (n) => +n.toFixed(2);
+  const R = (x, y, w, hh, r) => {
+    r = Math.min(r, w / 2, hh / 2);
+    return `M${f(x + r)} ${f(y)}h${f(w - 2 * r)}a${r} ${r} 0 0 1 ${r} ${r}v${f(hh - 2 * r)}a${r} ${r} 0 0 1 ${-r} ${r}` +
+      `h${f(2 * r - w)}a${r} ${r} 0 0 1 ${-r} ${-r}v${f(2 * r - hh)}a${r} ${r} 0 0 1 ${r} ${-r}z`;
   };
-  const tabs = () => {
-    const pages = (S.notch && S.notch.pages) || [];
-    return [pages.filter((x) => x.on && !x.waiting).length, pages.length];
+  const C = (cx, cy, r) => `M${f(cx - r)} ${cy}a${r} ${r} 0 1 0 ${f(2 * r)} 0a${r} ${r} 0 1 0 ${f(-2 * r)} 0z`;
+  const star = (cx, cy, r) => `M${cx} ${f(cy - r)}Q${cx} ${cy} ${f(cx + r)} ${cy}Q${cx} ${cy} ${cx} ${f(cy + r)}` +
+    `Q${cx} ${cy} ${f(cx - r)} ${cy}Q${cx} ${cy} ${cx} ${f(cy - r)}z`;
+  const gear = (cx, cy, ro, ri, n) => {
+    let d = '';
+    for (let k = 0; k < n * 4; k++) {
+      const a = (k / (n * 4)) * Math.PI * 2 - Math.PI / 2;
+      const r = k % 4 === 1 || k % 4 === 2 ? ro : ri;
+      d += (k ? 'L' : 'M') + f(cx + r * Math.cos(a)) + ' ' + f(cy + r * Math.sin(a));
+    }
+    return d + 'z';
   };
-  const tile = (glyph, labelKey, fill) => {
-    const value = h('div', { class: 'metric-val' });
-    const el = h('section', { class: 'card metric' },
-      h('div', { class: 'metric-top' }, icon(glyph), h('span', { class: 'metric-label', text: t(labelKey) })),
-      value);
-    reg(() => fill(value, el));
-    return el;
+  return {
+    general: { g: gear(12, 12, 10.2, 7.8, 8) + C(12, 12, 3.6), s: C(12, 12, 1.8) },
+    keys: { g: R(1.5, 5.5, 21, 13, 3.8), s: R(4.6, 8.6, 2.6, 2.6, 0.8) + R(8.6, 8.6, 2.6, 2.6, 0.8) + R(12.6, 8.6, 2.6, 2.6, 0.8) + R(16.6, 8.6, 2.6, 2.6, 0.8) + R(7, 13.2, 10, 2.4, 1.2) },
+    mole: { g: C(12, 12, 10), s: star(11, 13, 6.2) + star(17.6, 6.2, 2.6) },
+    about: { g: C(12, 12, 10), s: C(12, 7.2, 1.6) + R(10.7, 10.2, 2.6, 7.8, 1.3) },
+    notch: { g: R(1.5, 4, 21, 16, 4), s: 'M7.5 4h9v1.4a2.4 2.4 0 0 1-2.4 2.4h-4.2A2.4 2.4 0 0 1 7.5 5.4z' + R(5, 16.2, 14, 1.8, 0.9) },
+    islands: { g: R(2, 8, 20, 8, 4), s: C(17.8, 12, 2) + R(5.8, 11, 7.5, 2, 1) },
+    musicwidget: { g: R(2.5, 2.5, 19, 19, 5.5), s: C(9.5, 16, 2.6) + R(11, 6.5, 1.8, 9.5, 0.9) + 'M11 6.5l5.5-1.6v3.1L11 9.6z' },
+    agents: { g: R(1.5, 3.5, 21, 17, 4.5), w: 'M6.5 9.5l3.5 3-3.5 3', s: R(12, 14, 5.5, 2, 1) },
+    prs: { s: C(6.5, 5.5, 2.7) + C(6.5, 18.5, 2.7) + C(17.5, 18.5, 2.7), w: 'M6.5 8.2v7.6M17.5 15.8V10a3 3 0 0 0-3-3h-2.5M13.8 4.8L11.6 7l2.2 2.2' },
+    calendar: {
+      g: R(2.5, 4, 19, 17.5, 4.5),
+      s: 'M2.5 10.2V8.5a4.5 4.5 0 0 1 4.5-4.5h10a4.5 4.5 0 0 1 4.5 4.5v1.7z' + R(6.6, 2, 2.2, 4.6, 1.1) + R(15.2, 2, 2.2, 4.6, 1.1) +
+        C(8, 14, 1.3) + C(12, 14, 1.3) + C(16, 14, 1.3) + C(8, 17.6, 1.3) + C(12, 17.6, 1.3),
+    },
+    pomodoro: { g: C(12, 13.5, 8.5), s: 'M12 13.5V7.5a6 6 0 0 1 5.2 3z' + R(10.5, 2, 3, 3, 1.2) },
+    dayprogress: { g: R(2, 17.6, 20, 3.4, 1.7), s: 'M5.5 16a6.5 6.5 0 0 1 13 0z', w: 'M12 3.5v2.5M4.6 7.6l1.7 1.7M19.4 7.6l-1.7 1.7' },
+    screentime: {
+      g: 'M6 2.5h12v2.5c0 3-2.6 4.8-4.4 7 1.8 2.2 4.4 4 4.4 7v2.5H6V19c0-3 2.6-4.8 4.4-7C8.6 9.8 6 8 6 5z',
+      s: 'M8.6 19.2c0-1.9 1.9-3.3 3.4-4.3 1.5 1 3.4 2.4 3.4 4.3zM9.2 6.4h5.6c-.6 1.1-1.6 2-2.8 2.9-1.2-.9-2.2-1.8-2.8-2.9z',
+    },
+    notes: { g: R(3.5, 2.5, 17, 19, 4.5), s: R(7, 7.5, 10, 2, 1) + R(7, 11, 10, 2, 1) + R(7, 14.5, 6, 2, 1) },
+    launcher: { g: R(2.5, 2.5, 8.6, 8.6, 2.8) + R(12.9, 2.5, 8.6, 8.6, 2.8) + R(2.5, 12.9, 8.6, 8.6, 2.8), s: R(12.9, 12.9, 8.6, 8.6, 2.8) },
+    weather: { g: C(15, 8.5, 5), s: 'M7.5 20.5a4.5 4.5 0 0 1-.9-8.9a6 6 0 0 1 11.3 1.6a3.7 3.7 0 0 1-.4 7.3z' },
+    video: { g: R(1.5, 4.5, 21, 15, 4.5), s: 'M9.8 8.6l6 3.4-6 3.4z' },
+    system: { g: R(4.5, 4.5, 15, 15, 3.8), s: R(8.5, 8.5, 7, 7, 1.8), w: 'M9 2v2.5M15 2v2.5M9 19.5V22M15 19.5V22M2 9h2.5M2 15h2.5M19.5 9H22M19.5 15H22' },
+    updates: { g: C(12, 12, 10), s: 'M10.6 5.5h2.8v6.3h3L12 16.6l-4.4-4.8h3z' },
+    devices: { s: R(2.5, 12.5, 5, 8, 2.2) + R(16.5, 12.5, 5, 8, 2.2), w: 'M4.5 13v-1a7.5 7.5 0 0 1 15 0v1' },
+    displays: { g: R(1.5, 3.5, 21, 14, 3.8), s: R(8, 19.5, 8, 2, 1) + C(12, 10.5, 2.4), w: 'M12 17.5v2M12 5.4v.8M12 14.8v.8M7.2 10.5h.8M16 10.5h.8' },
+    scroll: { g: R(5.5, 2, 13, 20, 6.5), s: R(10.8, 5.5, 2.4, 5, 1.2) },
+    cursor: { g: C(15.5, 8.5, 6), s: 'M5.5 3.2v15.6l4.1-3.8 2.7 5.8 2.6-1.2-2.7-5.7 5.6-.2z' },
+    wheel: { g: C(12, 12, 10) + C(12, 12, 4.2), s: 'M12 2a10 10 0 0 1 9.5 6.9l-5.5 1.8A4.2 4.2 0 0 0 12 7.8z' },
+    tiling: { g: R(1.5, 3.5, 21, 17, 4.5), s: R(3.8, 5.8, 7.6, 12.4, 2.4) },
+    pin: { g: R(1.5, 9, 21, 12.5, 4), s: 'M9 2.5h6l-.8 5 2.8 2.8V12H7v-1.7l2.8-2.8z', w: 'M12 12v6' },
+    clipboard: { g: R(3.5, 3.5, 17, 19, 4.5), s: R(8, 1.8, 8, 4.4, 1.6) + R(7, 11, 10, 2, 1) + R(7, 14.8, 7, 2, 1) },
+    typing: { g: R(1.5, 5, 21, 15.5, 4.5), w: 'M8 18l4-9.5 4 9.5M9.4 14.6h5.2M10.3 5.9a1.7 1.7 0 0 0 3.4 0' },
+    snippets: {
+      g: R(1.5, 5, 21, 14, 4.5), s: C(12, 12, 1.2),
+      w: 'M9 8.5c-1.4 0-2 .6-2 1.8v.5c0 .7-.4 1.2-1.2 1.2.8 0 1.2.5 1.2 1.2v.5c0 1.2.6 1.8 2 1.8M15 8.5c1.4 0 2 .6 2 1.8v.5c0 .7.4 1.2 1.2 1.2-.8 0-1.2.5-1.2 1.2v.5c0 1.2-.6 1.8-2 1.8',
+    },
+    smart: { g: R(2, 11, 20, 8, 3.5), s: star(9, 9.5, 6.5) + star(18, 5, 3) },
+    translate: {
+      g: 'M4.5 2.5h9a3 3 0 0 1 3 3v5a3 3 0 0 1-3 3H8.5l-3.5 2.8V13.5h-.5a3 3 0 0 1-3-3v-5a3 3 0 0 1 3-3z',
+      s: 'M11 9.5h8.5a3 3 0 0 1 3 3v5a3 3 0 0 1-3 3H19v2.8l-3.5-2.8H11a3 3 0 0 1-3-3v-5a3 3 0 0 1 3-3z',
+      w: 'M4.8 6h5.4M7.5 4.6V6M5.5 10c1.4-.8 2.4-2 2.8-4', k: 'M12.6 18.6l2.6-6.4 2.6 6.4M13.6 16.4h3.2',
+    },
+    utilities: { g: 'M3.5 9h13v6a5 5 0 0 1-5 5h-3a5 5 0 0 1-5-5z', s: R(5.5, 21, 9, 1.8, 0.9), w: 'M16.5 11h1.2a2.6 2.6 0 0 1 0 5.2h-1.4M8 3c-.9.9.9 1.8 0 3.2M12 3c-.9.9.9 1.8 0 3.2' },
+    capture: { g: R(6, 6, 12, 12, 3.2), s: C(12, 12, 3), w: 'M2.5 8V5.5a3 3 0 0 1 3-3H8M16 2.5h2.5a3 3 0 0 1 3 3V8M21.5 16v2.5a3 3 0 0 1-3 3H16M8 21.5H5.5a3 3 0 0 1-3-3V16' },
+    vision: { g: C(7.5, 16.5, 5.5), s: 'M15.2 3.3a2.6 2.6 0 0 1 3.7 0l1.8 1.8a2.6 2.6 0 0 1 0 3.7l-2.2 2.2-5.5-5.5z', w: 'M14 7.8L6.8 15v2.2H9l7.2-7.2' },
+    download: { g: R(2.5, 13.5, 19, 8, 3.5), s: 'M10.4 2.5h3.2v7.3h3.4L12 15.3 7 9.8h3.4z' },
   };
-  const ratio = (pair) => (value) => value.replaceChildren(String(pair()[0]), h('small', { text: '/ ' + pair()[1] }));
-  return h('div', { class: 'metrics' },
-    tile('sparkles', 'metric.features', ratio(features)),
-    tile('rectangle.topthird.inset.filled', 'metric.tabs', ratio(tabs)),
-    tile('doc.on.clipboard.fill', 'metric.clips', (value) => { value.textContent = String((S.clipboard && S.clipboard.count) || 0); }),
-    tile('checkmark.shield.fill', 'metric.access', (value, el) => {
-      value.classList.add('word');
-      value.textContent = S.env.accessibility ? t('access.granted') : t('access.missing');
-      el.classList.toggle('warn', !S.env.accessibility);
-    }));
+})();
+
+// The light and deep colour of each page: its icon runs from one to the other, its hero is mostly the deep one.
+const PAGE_LOOK = {
+  general: ['#2592ff', '#0058d6'], keys: ['#7c7af8', '#403dc2'], mole: ['#2dd4bf', '#0f766e'], about: ['#a1a1aa', '#52525b'],
+  notch: ['#3b82f6', '#1e3a8a'], islands: ['#71717a', '#18181b'], musicwidget: ['#f472b6', '#9d174d'],
+  agents: ['#2dd4bf', '#0d726b'], prs: ['#94a3b8', '#1f2937'], calendar: ['#fb7185', '#be123c'], pomodoro: ['#fca5a5', '#b91c1c'],
+  dayprogress: ['#fdba74', '#c2410c'], screentime: ['#c4b5fd', '#6d28d9'], notes: ['#fde047', '#a16207'], launcher: ['#a78bfa', '#5738cc'],
+  weather: ['#7dd3fc', '#0369a1'], video: ['#f9a8d4', '#be185d'], system: ['#94a3b8', '#334155'], updates: ['#86efac', '#15803d'],
+  devices: ['#67e8f9', '#0e7490'], displays: ['#a5b4fc', '#4338ca'], scroll: ['#67d4ff', '#0067b0'], cursor: ['#f0abfc', '#a21caf'],
+  wheel: ['#818cf8', '#3730a3'], tiling: ['#6ee7a0', '#15803d'], pin: ['#ff8a80', '#c81e1e'], clipboard: ['#ffc14d', '#b45309'],
+  typing: ['#ff6b81', '#b5121b'], snippets: ['#fcd34d', '#92400e'], smart: ['#d8b4fe', '#7e22ce'], translate: ['#93c5fd', '#1d4ed8'],
+  utilities: ['#d6d3d1', '#44403c'], capture: ['#f9a8d4', '#be185d'], vision: ['#6ee7b7', '#047857'], download: ['#fca5a5', '#991b1b'],
+};
+
+function glyphSvg(id) {
+  const g = GLYPHS[id];
+  const path = (d, attrs) => (d ? `<path d="${d}" ${attrs}/>` : '');
+  const round = 'stroke-linecap="round" stroke-linejoin="round"';
+  return '<svg viewBox="0 0 24 24" focusable="false">' +
+    path(g.g, 'fill="currentColor" fill-opacity=".45" fill-rule="evenodd"') + path(g.s, 'fill="currentColor"') +
+    path(g.w, `fill="none" stroke="currentColor" stroke-width="2" ${round}`) +
+    path(g.k, `fill="none" style="stroke:var(--c2)" stroke-width="1.8" ${round}`) + '</svg>';
+}
+
+/** The icon of a page: its glyph on a squircle of its colours, or its SF Symbol on grey for a page with no look. */
+function pageIcon(id, cls) {
+  const look = PAGE_LOOK[id];
+  const el = h('span', { class: 'pico' + (cls ? ' ' + cls : ''), 'aria-hidden': 'true', style: look ? `--c1:${look[0]};--c2:${look[1]}` : null });
+  if (look && GLYPHS[id]) el.innerHTML = glyphSvg(id);
+  else el.append(icon((PAGES.find((p) => p.id === id) || {}).icon || 'gearshape.fill'));
+  return el;
+}
+
+/** The setting that turns a page's feature on and off, or null for a page that is not a feature. */
+function masterPath(id) {
+  if (id === 'scroll') return 'mouse.smooth';
+  return S[id] && typeof S[id].enabled === 'boolean' ? id + '.enabled' : null;
+}
+
+/** The General page's tiles, one per feature and grouped as the sidebar is: the circle turns it on and off, the
+ *  name opens its page. */
+function featureGrid() {
+  const tile = (id) => {
+    const path = masterPath(id);
+    const name = t('nav.' + id);
+    const power = h('button', { class: 'cc-ic', 'aria-label': name, onclick: () => change(path, !get(path)) }, pageIcon(id));
+    const state = h('span', { class: 'cc-state' });
+    reg(() => {
+      power.setAttribute('aria-pressed', String(!!get(path)));
+      state.textContent = get(path) ? t('hero.on') : t('hero.off');
+    });
+    return h('div', { class: 'card cc', 'data-page': id }, power,
+      h('button', { class: 'cc-txt', onclick: () => { go.rise = true; go(id); } }, h('span', { class: 'cc-name', text: name }), state));
+  };
+  return SECTIONS.flatMap((sec) => {
+    const ids = sectionPages(sec).filter(masterPath);
+    if (!ids.length) return [];
+    const count = h('span', { class: 'cc-count' });
+    reg(() => { count.textContent = t('feat.count', { n: ids.filter((id) => get(masterPath(id))).length, m: ids.length }); });
+    return [h('div', { class: 'cc-head' }, h('span', { text: t('nav.sec.' + sec) }), count), h('div', { class: 'cc-grid' }, ids.map(tile))];
+  });
 }
 
 function pageGeneral() {
@@ -886,7 +995,10 @@ function pageGeneral() {
       h('p', { text: t('hero.tagline') }),
       h('div', { class: 'chips' },
         h('span', { class: 'chip', text: t('chip.version', { v: S.app.version }) }),
-        pill(() => (S.env.accessibility ? t('chip.access.ok') : t('chip.access.no')), () => S.env.accessibility))),
+        pill(() => {
+          const ids = SECTIONS.flatMap(sectionPages).filter(masterPath);
+          return t('feat.total', { n: ids.filter((id) => get(masterPath(id))).length, m: ids.length });
+        }, () => true))),
     spirit);
 
   // Launch at login depends on how the app was installed, so its row has more states than a plain switch.
@@ -916,20 +1028,15 @@ function pageGeneral() {
     button(t('access.open'), () => send({ t: 'action', name: 'open_accessibility' }), { small: true }),
   ]);
 
-  const featureTile = (page, path) => {
-    const el = h('section', { class: 'card feat', 'data-page': page },
-      h('div', { class: 'feat-top' }, h('span', { class: 'feat-badge' }, icon(PAGES.find((p) => p.id === page).icon)), switchEl(path, t('nav.' + page))),
-      h('div', { class: 'feat-name', text: t('nav.' + page) }));
-    reg(() => el.classList.toggle('off', !get(path)));
-    return el;
-  };
-
   return [
     hero,
-    metricsStrip(),
-    h('div', { class: 'tiles-grid' },
-      featureTile('scroll', 'mouse.smooth'), featureTile('notch', 'notch.enabled'),
-      featureTile('agents', 'agents.enabled'), featureTile('tiling', 'tiling.enabled')),
+    sectionTitle(t('feat.title')),
+    ...featureGrid(),
+    sectionTitle(t('sec.permissions')),
+    card(
+      access,
+      row(t('perm.all_title'), t('perm.all_desc'), button(t('perm.all_btn'), () => send({ t: 'action', name: 'check_permissions' }), { small: true })),
+      row(t('data.title'), t('data.desc'), button(t('data.open'), () => send({ t: 'action', name: 'open_config' }), { icon: 'folder', small: true }))),
     sectionTitle(t('sec.startup')),
     card(
       loginRow,
@@ -946,11 +1053,6 @@ function pageGeneral() {
         onPick: (v) => { change('general.language', v); applyLanguage(); },
       }))),
     restart,
-    sectionTitle(t('sec.permissions')),
-    card(
-      access,
-      row(t('perm.all_title'), t('perm.all_desc'), button(t('perm.all_btn'), () => send({ t: 'action', name: 'check_permissions' }), { small: true })),
-      row(t('data.title'), t('data.desc'), button(t('data.open'), () => send({ t: 'action', name: 'open_config' }), { icon: 'folder', small: true }))),
   ];
 }
 
@@ -1860,8 +1962,8 @@ const MIT_LICENSE = [
 Object.assign(I18N.en, {
   'about.sec.what': 'About Figghost',
   'about.sec.map': 'What is where',
-  'about.map.title': 'Six groups, one dock',
-  'about.map.body': 'The icons of the dock at the foot of this window open six groups of pages. Press one and drag along the dock to look through them; Command-K finds any setting by name.',
+  'about.map.title': 'Every page in the sidebar',
+  'about.map.body': 'The sidebar lists every page in five groups, and a green dot marks a feature that is on. Press a page and drag along the sidebar to look through them; Command-K finds any setting by name.',
   'about.what.title': 'One light app for the small tools of a Mac',
   'about.what.body': 'Smooth mouse-wheel scrolling and a pointer of your own, a clipboard history, window snapping from the notch, and a panel that grows out of the notch with tabs for files, media, your calendar, coding agents, weather, system health and more. Vietnamese typing in every app, Smart Select, Translate, screenshots, screen recordings, a colour picker, sound for each app and a window kept on top can be switched on when you want them.',
   'about.native.title': 'Native, and kept on this Mac',
@@ -1886,13 +1988,13 @@ Object.assign(I18N.en, {
   'about.license.body': 'Figghost is free, open source software under the MIT License, copyright 2026 Doanh Thai Bui. You may use it for any purpose, at home or at work, copy it, change it, share it and even sell what you make from it. The one condition is that the copyright notice and the licence text stay with every copy or substantial part of it. It comes without any warranty: the authors are not liable for what it does on your Mac.',
   'about.license.show': 'Show the licence text', 'about.license.hide': 'Hide the licence text',
   'about.others.title': 'Other licences',
-  'about.others.body': 'The font Inter is bundled as the fallback of this window, under the SIL Open Font License 1.1 (copyright 2020 The Inter Project Authors); its text is in Resources/Inter-OFL.txt inside the app, and that of Figghost in Resources/LICENSE.txt. Patrick Hand, the handwriting of the titles and of the ghost, is under the same licence (Resources/PatrickHand-OFL.txt). Vietnamese typing puts its marks with the engine of Gõ Nhanh (copyright 2025 Gõ Nhanh Contributors), under the BSD 3-Clause License, whose text is in Resources/GoNhanh-LICENSE.txt. The icons of the interface are SF Symbols, which macOS draws itself and which are not part of Figghost. The Rust libraries it is built from keep their own licences.',
+  'about.others.body': 'The font Inter is bundled as the fallback of this window, under the SIL Open Font License 1.1 (copyright 2020 The Inter Project Authors); its text is in Resources/Inter-OFL.txt inside the app, and that of Figghost in Resources/LICENSE.txt. Patrick Hand, the handwriting of the titles and of the ghost, is under the same licence (Resources/PatrickHand-OFL.txt). Vietnamese typing puts its marks with the engine of Gõ Nhanh (copyright 2025 Gõ Nhanh Contributors), under the BSD 3-Clause License, whose text is in Resources/GoNhanh-LICENSE.txt. The icons of the pages are drawn by Figghost; the other icons of the interface are SF Symbols, which macOS draws itself and which are not part of Figghost. The Rust libraries it is built from keep their own licences.',
 });
 Object.assign(I18N.vi, {
   'about.sec.what': 'Giới thiệu Figghost',
   'about.sec.map': 'Có gì ở đâu',
-  'about.map.title': 'Sáu nhóm, một dock',
-  'about.map.body': 'Các biểu tượng trên dock ở chân cửa sổ này mở sáu nhóm trang. Nhấn một biểu tượng rồi kéo dọc dock để xem lần lượt; Command-K tìm mọi cài đặt theo tên.',
+  'about.map.title': 'Mọi trang nằm ở thanh bên',
+  'about.map.body': 'Thanh bên liệt kê mọi trang, chia thành năm nhóm; chấm xanh là tính năng đang bật. Nhấn một trang rồi kéo dọc thanh bên để xem lần lượt; Command-K tìm mọi cài đặt theo tên.',
   'about.what.title': 'Một ứng dụng nhẹ cho các công cụ nhỏ của máy Mac',
   'about.what.body': 'Cuộn chuột mượt và con trỏ của riêng bạn, lịch sử clipboard, chia cửa sổ từ notch, và một bảng mở ra từ notch với các tab cho tệp, nhạc, lịch, tác tử lập trình, thời tiết, sức khỏe hệ thống và nhiều thứ khác. Gõ tiếng Việt ở mọi ứng dụng, Chọn thông minh, Dịch, chụp màn hình, quay màn hình, chọn màu, âm thanh riêng cho từng ứng dụng và giữ một cửa sổ luôn trên cùng có thể bật khi bạn cần.',
   'about.native.title': 'Bản địa, và ở lại trên máy này',
@@ -1917,13 +2019,12 @@ Object.assign(I18N.vi, {
   'about.license.body': 'Figghost là phần mềm mã nguồn mở, miễn phí, theo Giấy phép MIT, bản quyền 2026 Doanh Thai Bui. Bạn được dùng cho mọi mục đích, ở nhà hay ở nơi làm việc, sao chép, sửa đổi, chia sẻ và thậm chí bán sản phẩm bạn làm ra từ nó. Điều kiện duy nhất là thông báo bản quyền và nội dung giấy phép phải đi kèm mọi bản sao hoặc phần đáng kể của phần mềm. Phần mềm được cung cấp nguyên trạng, không bảo hành: tác giả không chịu trách nhiệm về những gì nó làm trên máy Mac của bạn.',
   'about.license.show': 'Xem nội dung giấy phép', 'about.license.hide': 'Ẩn nội dung giấy phép',
   'about.others.title': 'Các giấy phép khác',
-  'about.others.body': 'Phông Inter đi kèm làm phông dự phòng cho cửa sổ này, theo SIL Open Font License 1.1 (bản quyền 2020 The Inter Project Authors); nội dung giấy phép nằm ở Resources/Inter-OFL.txt trong ứng dụng, còn của Figghost ở Resources/LICENSE.txt. Patrick Hand, nét chữ tay của các tiêu đề và của chú ma, theo cùng giấy phép (Resources/PatrickHand-OFL.txt). Gõ tiếng Việt đặt dấu bằng bộ máy của Gõ Nhanh (bản quyền 2025 Gõ Nhanh Contributors), theo giấy phép BSD 3-Clause, nội dung nằm ở Resources/GoNhanh-LICENSE.txt. Các biểu tượng của giao diện là SF Symbols do macOS tự vẽ, không thuộc về Figghost. Các thư viện Rust dùng để xây dựng ứng dụng giữ giấy phép riêng của chúng.',
+  'about.others.body': 'Phông Inter đi kèm làm phông dự phòng cho cửa sổ này, theo SIL Open Font License 1.1 (bản quyền 2020 The Inter Project Authors); nội dung giấy phép nằm ở Resources/Inter-OFL.txt trong ứng dụng, còn của Figghost ở Resources/LICENSE.txt. Patrick Hand, nét chữ tay của các tiêu đề và của chú ma, theo cùng giấy phép (Resources/PatrickHand-OFL.txt). Gõ tiếng Việt đặt dấu bằng bộ máy của Gõ Nhanh (bản quyền 2025 Gõ Nhanh Contributors), theo giấy phép BSD 3-Clause, nội dung nằm ở Resources/GoNhanh-LICENSE.txt. Biểu tượng của các trang do Figghost tự vẽ; các biểu tượng khác của giao diện là SF Symbols do macOS tự vẽ, không thuộc về Figghost. Các thư viện Rust dùng để xây dựng ứng dụng giữ giấy phép riêng của chúng.',
 });
 
-/** A group of the dock with the pages inside it, as the dock and the tabs name them, so this list cannot drift from them. */
+/** A group of pages, as the sidebar names them, so this list cannot drift from it. */
 function mapRow(cat) {
-  const tile = h('span', { 'data-cat': cat.id }, h('span', { class: 'nav-icon map-tile' }, icon(cat.icon)));
-  return row(h('span', { class: 'map-title' }, tile, t('cat.' + cat.id)), cat.pages.map((id) => t('nav.' + id)).join(' · '), null);
+  return row(h('span', { class: 'map-title' }, pageIcon(cat.pages[0]), t('cat.' + cat.id)), cat.pages.map((id) => t('nav.' + id)).join(' · '), null);
 }
 
 /** What Figghost itself uses, as numbers that follow the state. */
@@ -1992,15 +2093,17 @@ function pageAbout() {
   ];
 }
 
+// The groups of pages, in the order of the sidebar; `sec` is the heading they are listed under.
 const CATEGORIES = [
-  { id: 'general', sec: 'overview', icon: 'gearshape.fill', pages: ['general', 'about'] },
-  { id: 'mole', sec: 'overview', icon: 'wand.and.stars', pages: ['mole'] },
+  { id: 'general', sec: 'overview', icon: 'gearshape.fill', pages: ['general'] },
   { id: 'keys', sec: 'overview', icon: 'keyboard.fill', pages: ['keys'] },
+  { id: 'mole', sec: 'overview', icon: 'wand.and.stars', pages: ['mole'] },
+  { id: 'about', sec: 'overview', icon: 'info.circle.fill', pages: ['about'] },
   { id: 'notch', sec: 'notch', icon: 'rectangle.topthird.inset.filled', pages: ['notch', 'islands', 'musicwidget'] },
-  { id: 'agents', sec: 'notch', icon: 'terminal.fill', pages: ['agents', 'prs'] },
-  { id: 'calendar', sec: 'notch', icon: 'calendar.badge.clock', pages: ['calendar', 'pomodoro', 'dayprogress', 'screentime'] },
-  { id: 'tabs', sec: 'notch', icon: 'square.stack.3d.up.fill', pages: ['notes', 'launcher', 'weather', 'video'] },
-  { id: 'system', sec: 'notch', icon: 'cpu.fill', pages: ['system', 'updates', 'devices', 'displays'] },
+  { id: 'agents', sec: 'tabs', icon: 'terminal.fill', pages: ['agents', 'prs'] },
+  { id: 'calendar', sec: 'tabs', icon: 'calendar.badge.clock', pages: ['calendar', 'pomodoro', 'dayprogress', 'screentime'] },
+  { id: 'tabs', sec: 'tabs', icon: 'square.stack.3d.up.fill', pages: ['notes', 'launcher', 'weather', 'video'] },
+  { id: 'system', sec: 'tabs', icon: 'cpu.fill', pages: ['system', 'updates', 'devices', 'displays'] },
   { id: 'scroll', sec: 'mouse', icon: 'computermouse.fill', pages: ['scroll', 'cursor', 'wheel'] },
   { id: 'tiling', sec: 'mouse', icon: 'rectangle.split.2x1.fill', pages: ['tiling', 'pin'] },
   { id: 'clipboard', sec: 'tools', icon: 'doc.on.clipboard.fill', pages: ['clipboard', 'typing', 'snippets'] },
@@ -2011,6 +2114,8 @@ const CATEGORIES = [
 function categoryOf(pageId) {
   return CATEGORIES.find((c) => c.pages.includes(pageId)) || CATEGORIES[0];
 }
+const SECTIONS = [...new Set(CATEGORIES.map((c) => c.sec))];
+function sectionPages(sec) { return CATEGORIES.filter((c) => c.sec === sec).flatMap((c) => c.pages); }
 
 const PAGES = [
   { id: 'general', icon: 'gearshape.fill', build: pageGeneral },
@@ -2116,7 +2221,7 @@ function applySearch(query) {
       onmousedown: (e) => e.preventDefault(),
       onclick: () => openResult(pid),
     },
-    h('span', { class: 'nav-icon' }, icon((PAGES.find((p) => p.id === pid) || cat).icon)),
+    pageIcon(pid),
     h('span', { class: 'result-text' },
       h('span', { class: 'result-name', text: t('nav.' + pid) }),
       h('span', { class: 'result-cat', text: t('cat.' + cat.id) })),
@@ -2139,7 +2244,7 @@ function openResult(pid) {
 /** On the page just opened from a search, brings the first row that says the words into view and marks it. */
 function reveal(words) {
   if (!words.length) return;
-  const rows = [...document.querySelectorAll('#scroller .row, #scroller .section-title, #scroller .feat')];
+  const rows = [...document.querySelectorAll('#scroller .row, #scroller .section-title, #scroller .cc')];
   const hit = rows.find((row) => words.every((w) => folded(row.textContent).includes(w)));
   if (!hit) return;
   hit.scrollIntoView({ block: 'center', behavior: document.documentElement.classList.contains('reduce-motion') ? 'auto' : 'smooth' });
@@ -2185,33 +2290,49 @@ function navSearch() {
     box);
 }
 
-function openCategory(cat) {
-  if (categoryOf(current).id === cat.id) return placeLens();
+function openPage(id) {
+  if (id === current) return placeLens();
   go.rise = true;
-  go(cat.lastPage || cat.pages[0]);
+  go(id);
 }
 
+// The groups of the sidebar folded away by a press on their heading.
+const foldedSecs = new Set();
+
+/** Every page in the sidebar, under the heading of its group, with a green dot while its feature is on. */
 function renderNavItems() {
-  const out = [];
-  let lastSec = null;
-  for (const cat of CATEGORIES) {
-    if (cat.sec && cat.sec !== lastSec) {
-      lastSec = cat.sec;
-      out.push(h('div', { class: 'nav-sec', text: t('nav.sec.' + cat.sec) }));
-    }
-    out.push(h('button', {
-      class: 'nav-item',
-      'data-page': cat.id,
-      'data-cat': cat.id,
-      title: t('cat.' + cat.id),
-      'aria-label': t('cat.' + cat.id),
-      // A press of the pointer is handled by the sidebar's lens; this is the keyboard's Space and Return.
-      onclick: (e) => { if (e.detail === 0) openCategory(cat); },
-    },
-    h('span', { class: 'nav-icon' }, icon(cat.icon)),
-    h('span', { class: 'nav-label', text: t('cat.' + cat.id) })));
-  }
-  return out;
+  return SECTIONS.flatMap((sec) => {
+    const items = sectionPages(sec).map((id) => {
+      const path = masterPath(id);
+      const dot = path && h('span', { class: 'nav-dot', title: t('hero.on') });
+      if (dot) reg(() => { dot.hidden = !get(path); });
+      return h('button', {
+        class: 'nav-item',
+        'data-page': id,
+        'data-sec': sec,
+        // A press of the pointer is handled by the sidebar's lens; this is the keyboard's Space and Return.
+        onclick: (e) => { if (e.detail === 0) openPage(id); },
+      }, pageIcon(id), h('span', { class: 'nav-label', text: t('nav.' + id) }), dot);
+    });
+    if (sec === 'overview') return items;
+    const head = h('button', {
+      class: 'nav-sec',
+      'data-sec': sec,
+      'aria-expanded': 'true',
+      onclick: () => {
+        if (foldedSecs.has(sec)) foldedSecs.delete(sec); else foldedSecs.add(sec);
+        foldNav();
+        placeLens(false);
+      },
+    }, h('span', { text: t('nav.sec.' + sec) }), icon('chevron.down', 'chev'));
+    return [head, ...items];
+  });
+}
+
+/** Hides the pages of the folded groups, all but the open page, which stays in sight. */
+function foldNav() {
+  for (const head of document.querySelectorAll('#nav .nav-sec')) head.setAttribute('aria-expanded', String(!foldedSecs.has(head.dataset.sec)));
+  for (const item of document.querySelectorAll('#nav .nav-item')) item.hidden = foldedSecs.has(item.dataset.sec) && item.dataset.page !== current;
 }
 
 /** Puts the lens of the sidebar under the item of the open group: gliding there when a person chose it, at once
@@ -2230,9 +2351,9 @@ function placeLens(glide = true) {
 }
 
 /** The sidebar's lens follows a press: it swells where the pointer goes down, slides with a drag (stretched by its
- *  speed, like a drop of water), lights the item under it, and on release opens that item's group. */
+ *  speed, like a drop of water), lights the item under it, and on release opens that item's page. */
 function dockLens(nav) {
-  const items = () => [...nav.querySelectorAll('.nav-item')];
+  const items = () => [...nav.querySelectorAll('.nav-item:not([hidden])')];
   const centre = (item) => item.offsetTop + item.offsetHeight / 2;
   const nearest = (y) => items().reduce((best, item) => (Math.abs(centre(item) - y) < Math.abs(centre(best) - y) ? item : best));
   let press = null;
@@ -2258,11 +2379,11 @@ function dockLens(nav) {
     clearTimeout(settle);
     nav.classList.remove('pressing', 'dragging');
     for (const item of items()) item.classList.remove('lit');
-    if (open) openCategory(CATEGORIES.find((c) => c.id === target.dataset.page));
+    if (open) openPage(target.dataset.page);
     else placeLens();
   };
   nav.addEventListener('pointerdown', (e) => {
-    if (e.button !== 0) return;
+    if (e.button !== 0 || e.target.closest('.nav-sec')) return;
     e.preventDefault();
     try { nav.setPointerCapture(e.pointerId); } catch (_) { /* a synthetic pointer has nothing to capture */ }
     press = { y: 0, t: 0, y0: e.clientY };
@@ -2281,64 +2402,57 @@ function dockLens(nav) {
   return nav;
 }
 
-function renderSubtabs(cat, activeId) {
-  const container = $('#subtabs');
-  if (!container) return;
-  if (!cat || cat.pages.length <= 1) {
-    container.replaceChildren();
-    container.hidden = true;
-    return;
+/** Lifts the row of a feature's switch out of its page for the hero: the switch itself moves, so there is one switch
+ *  for the setting and the page's own checks still find it. A row with more than the switch in it stays where it is. */
+function liftSwitch(nodes, path, label) {
+  for (const node of nodes) {
+    const sw = node.nodeType === 1 && node.querySelector(`.switch[data-path="${path}"]`);
+    if (!sw) continue;
+    const line = sw.closest('.row');
+    if (!line || sw.parentElement.children.length !== 1) return null;
+    const desc = line.querySelector('.row-desc');
+    const box = line.parentElement;
+    line.remove();
+    if (box && box.classList.contains('card') && !box.children.length && box.parentElement) box.remove();
+    return { el: sw, note: desc ? desc.textContent : '' };
   }
-  container.hidden = false;
-  const pills = cat.pages.map((pid) => {
-    const isCur = pid === activeId;
-    const page = PAGES.find((p) => p.id === pid);
-    return h('button', {
-      class: 'subtab' + (isCur ? ' active' : ''),
-      'aria-pressed': String(isCur),
-      'aria-label': t('nav.' + pid),
-      onclick: () => { go.rise = true; go(pid); },
-    }, page && page.icon ? icon(page.icon) : null, t('nav.' + pid));
-  });
-  const bar = h('div', { class: 'subtabs-bar' }, ...pills);
-  // A mouse wheel turns sideways here when the bar is longer than the window.
-  bar.addEventListener('wheel', (e) => {
-    if (bar.scrollWidth <= bar.clientWidth || Math.abs(e.deltaY) <= Math.abs(e.deltaX)) return;
-    e.preventDefault();
-    bar.scrollLeft += e.deltaY;
-  }, { passive: false });
-  container.replaceChildren(bar);
-  // A bar that scrolls keeps the chosen page in view.
-  const chosen = bar.querySelector('.subtab.active');
-  if (chosen) bar.scrollLeft = Math.max(0, chosen.offsetLeft - (bar.clientWidth - chosen.offsetWidth) / 2);
+  return { el: switchEl(path, label), note: '' };
 }
 
-/** What the ghost says about a page: its first sentence, which is what the page is for. */
-function guideLine(pageId) {
-  const sub = t('page.' + pageId + '.sub');
-  const end = sub.search(/[.!?](\s|$)/);
-  return end > 0 && end < sub.length - 1 ? sub.slice(0, end + 1) : sub;
+/** A card left empty by the lift goes, and the heading over it. */
+function withoutEmpty(nodes) {
+  const empty = (n) => !!n && n.nodeType === 1 && n.classList.contains('card') && !n.children.length;
+  return nodes.filter((n, i) => !empty(n) && !(n.nodeType === 1 && n.classList.contains('section-title') && empty(nodes[i + 1])));
 }
 
-let quipTimer = 0;
-let quipNext = 0;
-/** A click on the ghost: it hops and says something else for a moment, then goes back to the page. */
-function poke() {
-  const bubble = $('.bubble');
-  const say = $('#guide-text');
-  const ghostButton = $('.guide-ghost');
-  if (!bubble || !say || !ghostButton) return;
-  say.textContent = t('guide.q' + ((quipNext++ % 4) + 1));
-  bubble.classList.add('quip');
-  ghostButton.classList.remove('hop');
-  void ghostButton.offsetWidth;
-  ghostButton.classList.add('hop');
-  clearTimeout(quipTimer);
-  quipTimer = setTimeout(() => { bubble.classList.remove('quip'); say.textContent = guideLine(current); }, 3200);
+/** The top of every page: its icon, name and what it is for on its colours, and the switch of its feature. */
+function pageHero(page, nodes) {
+  const look = PAGE_LOOK[page.id];
+  const path = masterPath(page.id);
+  const lifted = path && liftSwitch(nodes, path, t('nav.' + page.id));
+  const state = h('span');
+  if (lifted) reg(() => { state.textContent = get(path) ? t('hero.on') : t('hero.off'); });
+  return h('section', { class: 'hero page-hero', style: look ? `--c1:${look[0]};--c2:${look[1]}` : null },
+    pageIcon(page.id, 'hero-icon'),
+    h('div', { class: 'hero-body' },
+      h('h2', { text: t('page.' + page.id) }),
+      h('p', { text: t('page.' + page.id + '.sub') }),
+      lifted && lifted.note && h('p', { class: 'hero-note', text: lifted.note })),
+    lifted && h('div', { class: 'hero-toggle' }, state, lifted.el));
 }
 
 function buildShell() {
   document.documentElement.lang = lang;
+  const scroller = h('div', { id: 'scroller' });
+  const main = h('main', { id: 'main' },
+    h('header', { class: 'toolbar' },
+      h('div', { class: 'nav-buttons' },
+        h('button', { id: 'back', 'aria-label': t('nav.back'), onclick: () => step(-1) }, icon('chevron.left')),
+        h('button', { id: 'forward', 'aria-label': t('nav.forward'), onclick: () => step(1) }, icon('chevron.right'))),
+      h('h1', { class: 'toolbar-title', id: 'title' })),
+    scroller);
+  // The name of the page comes into the toolbar once its hero has scrolled away under it.
+  scroller.addEventListener('scroll', () => main.classList.toggle('scrolled', scroller.scrollTop > 90), { passive: true });
   $('#root').replaceChildren(
     h('div', { id: 'app' },
       h('div', { class: 'dragzone', 'data-drag': '' }),
@@ -2346,51 +2460,60 @@ function buildShell() {
         navSearch(),
         dockLens(h('nav', { id: 'nav', 'aria-label': 'Figghost' }, ...renderNavItems())),
         h('div', { class: 'side-foot' }, accessPill())),
-      h('main', { id: 'main' },
-        h('header', { class: 'page-head' },
-          h('div', { class: 'page-head-main' },
-            h('div', { class: 'page-head-text' },
-              h('h1', { class: 'page-title', id: 'title' }),
-              h('p', { class: 'page-sub', id: 'subtitle' })),
-            h('div', { id: 'subtabs', class: 'page-subtabs' }))),
-        h('div', { id: 'scroller' }),
-        h('div', { class: 'guide' },
-          h('p', { class: 'bubble' }, h('span', { class: 'bubble-text', id: 'guide-text' })),
-          h('button', { class: 'guide-ghost', 'aria-label': t('guide.label'), onclick: poke }, ghost())))),
+      main),
     h('div', { id: 'toast', 'aria-live': 'polite' }),
     h('div', { id: 'modal' }),
     h('div', { class: 'defs', 'aria-hidden': 'true', html: WOBBLE_SVG }));
 }
 
-function go(id) {
+// The pages seen, for the toolbar's back and forward.
+const trail = { list: [], at: -1 };
+function step(by) {
+  const at = trail.at + by;
+  if (at < 0 || at >= trail.list.length) return;
+  trail.at = at;
+  go.rise = true;
+  go(trail.list[at], true);
+}
+
+function go(id, fromTrail) {
   stopRecording();
   closeMenu();
   const page = PAGES.find((p) => p.id === id) || PAGES[0];
+  if (!fromTrail && trail.list[trail.at] !== page.id) {
+    trail.list = trail.list.slice(0, trail.at + 1).concat(page.id);
+    trail.at = trail.list.length - 1;
+  }
   current = page.id;
-  const cat = categoryOf(current);
-  cat.lastPage = current;
   dropSyncs(pageSyncs);
   graphs.clear();
   const title = $('#title');
   if (title) title.textContent = t('page.' + page.id);
-  const sub = $('#subtitle');
-  if (sub) sub.textContent = t('page.' + page.id + '.sub');
-  renderSubtabs(cat, current);
-  const say = $('#guide-text');
-  if (say && !say.parentElement.classList.contains('quip')) say.textContent = guideLine(page.id);
-  const guide = $('.guide-ghost');
-  if (guide) guide.title = t('page.' + page.id + '.sub');
   const scroller = $('#scroller');
   // A page rises into place only when a person chose it; a page that is built for any other reason (the first one, a
   // new language, a check or a picture) is simply there, so nothing waits on an animation clock.
   const rise = go.rise === true;
   go.rise = false;
-  pageSyncs = scoped(() => scroller.replaceChildren(h('div', { class: 'page' + (rise ? ' rise' : '') }, [].concat(page.build(), slotsFor(page.id)))));
+  pageSyncs = scoped(() => {
+    let nodes = [].concat(page.build(), slotsFor(page.id));
+    // A page with a hero of its own (General, About) keeps it; every other one gets the hero of its feature.
+    if (!(nodes[0] && nodes[0].nodeType === 1 && nodes[0].classList.contains('hero'))) {
+      const hero = pageHero(page, nodes);
+      nodes = [hero, ...withoutEmpty(nodes)];
+    }
+    scroller.replaceChildren(h('div', { class: 'page' + (rise ? ' rise' : '') }, nodes));
+  });
   scroller.scrollTop = 0;
+  $('#main').classList.remove('scrolled');
+  $('#back').disabled = trail.at <= 0;
+  $('#forward').disabled = trail.at >= trail.list.length - 1;
   for (const item of document.querySelectorAll('.nav-item')) {
-    if (item.dataset.page === cat.id) item.setAttribute('aria-current', 'page'); else item.removeAttribute('aria-current');
+    if (item.dataset.page === current) item.setAttribute('aria-current', 'page'); else item.removeAttribute('aria-current');
   }
+  foldNav();
   placeLens(rise);
+  const item = $(`.nav-item[data-page="${current}"]`);
+  if (item) item.scrollIntoView({ block: 'nearest' });
   send({ t: 'page', id: current });
 }
 
@@ -2512,8 +2635,45 @@ window.__selftest = function () {
       pointer('pointermove', items[4]);
       expect(nav.classList.contains('dragging') && items[4].classList.contains('lit') && !items[0].classList.contains('lit'), 'a drag moves the light along');
       pointer('pointerup', items[4]);
-      expect(categoryOf(current).id === CATEGORIES[4].id && !nav.classList.contains('pressing'), 'letting go opens the group under the lens: ' + current);
+      expect(current === items[4].dataset.page && !nav.classList.contains('pressing'), 'letting go opens the page under the lens: ' + current);
       expect(nav.style.getPropertyValue('--y') === items[4].offsetTop + items[4].offsetHeight / 2 + 'px', 'the lens rests under the open group');
+      go('general');
+    }
+
+    // Every page opens on its hero; a feature's switch is lifted into it and is the only one for its setting.
+    {
+      go('notch');
+      const lifted = [...document.querySelectorAll('#scroller .switch[data-path="notch.enabled"]')];
+      expect(lifted.length === 1 && !!lifted[0].closest('.page-hero'), 'the notch switch is in the hero, once');
+      sent.length = 0;
+      lifted[0].click();
+      expect(sent.some((m) => m.t === 'set' && m.path === 'notch.enabled'), 'the hero switch sends its setting: ' + JSON.stringify(sent));
+      lifted[0].click();
+      const dot = $('.nav-item[data-page="notch"] .nav-dot');
+      expect(dot && dot.hidden === !S.notch.enabled, 'the dot in the sidebar follows the feature');
+      go('keys');
+      expect($('.page-hero') && !$('.page-hero .switch'), 'a page that is not a feature has a hero with no switch');
+      // Back and forward walk the pages seen.
+      go('scroll');
+      $('#back').click();
+      expect(current === 'keys', 'back returns to the page before: ' + current);
+      $('#forward').click();
+      expect(current === 'scroll' && $('#forward').disabled, 'forward comes back, and no further');
+      // The General page turns a feature on and off from its tile, and opens its page from its name.
+      go('general');
+      const tile = $('.cc[data-page="weather"]');
+      sent.length = 0;
+      tile.querySelector('.cc-ic').click();
+      expect(sent.some((m) => m.t === 'set' && m.path === 'weather.enabled'), 'a tile turns its feature on or off: ' + JSON.stringify(sent));
+      tile.querySelector('.cc-ic').click();
+      tile.querySelector('.cc-txt').click();
+      expect(current === 'weather', 'a tile opens its page');
+      // A folded group hides its pages, all but the open one.
+      const head = $('.nav-sec[data-sec="tabs"]');
+      head.click();
+      const shown = [...document.querySelectorAll('.nav-item[data-sec="tabs"]')].filter((i) => !i.hidden).map((i) => i.dataset.page);
+      expect(shown.join() === 'weather' && head.getAttribute('aria-expanded') === 'false', 'a folded group keeps only the open page: ' + shown);
+      head.click();
       go('general');
     }
 

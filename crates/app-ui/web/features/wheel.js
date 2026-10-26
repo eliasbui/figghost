@@ -218,7 +218,7 @@
         setLang(code);
         go('wheel');
         const root = document.querySelector('#scroller');
-        expect(root.querySelectorAll('.card').length === 4, `${code}: the feature card and one card for each wheel`);
+        expect(root.querySelectorAll('.card').length === 3, `${code}: one card for each wheel, the feature switch being in the hero`);
         for (const wheel of WHEELS) {
           expect(root.textContent.includes(t('wheel.' + wheel + '.title')), `${code}: the ${wheel} wheel has its card`);
         }
@@ -246,7 +246,7 @@
 
       // Each wheel's switch.
       WHEELS.forEach((wheel, i) => {
-        const sw = cards[i + 1].querySelector('.switch');
+        const sw = cards[i].querySelector('.switch');
         const before = state.wheel[wheel].enabled;
         sw.click();
         expect(sent.some((m) => m.t === 'set' && m.path === `wheel.${wheel}.enabled` && m.value === !before), `${wheel}: the switch sends its setting`);
@@ -255,7 +255,7 @@
       });
 
       // A key that no other wheel on uses is sent; one that is taken is not, and says so.
-      const seg = (i) => [...cards[i + 1].querySelectorAll('.seg button')];
+      const seg = (i) => [...cards[i].querySelectorAll('.seg button')];
       seg(0)[3].click();
       expect(sent.some((m) => m.path === 'wheel.formats.key' && m.value === 'option'), 'a free key is sent: ' + JSON.stringify(sent));
       reset();
@@ -270,12 +270,12 @@
       seg(0)[1].click();
       expect(state.wheel.formats.key === 'command', 'a wheel that is off takes any key');
       sent.length = 0;
-      cards[1].querySelector('.switch').click();
+      cards[0].querySelector('.switch').click();
       expect(!sent.some((m) => m.path === 'wheel.formats.enabled'), 'turning it on with a taken key is not sent');
       reset();
 
       // Any other key: the button records the next key pressed and sends its name; Escape only gives up.
-      const other = (i) => cards[i + 1].querySelector('.wheel-other');
+      const other = (i) => cards[i].querySelector('.wheel-other');
       const press = (code) => window.dispatchEvent(new KeyboardEvent('keydown', { code, bubbles: true, cancelable: true }));
       sent.length = 0;
       other(0).click();
@@ -293,19 +293,19 @@
       reset();
 
       // The slots: a checkbox hides or shows one, and Show all clears the list.
-      const picks = (i) => [...cards[i + 1].querySelectorAll('.wheel-pick')];
+      const picks = (i) => [...cards[i].querySelectorAll('.wheel-pick')];
       const half = picks(1).find((p) => p.dataset.id === 'half');
       expect(half.getAttribute('aria-pressed') === 'true', 'a slot that is not hidden is checked');
       half.click();
       expect(sent.some((m) => m.path === 'wheel.tools.hidden' && m.value.includes('half') && m.value.includes('quarter')), 'hiding a slot sends the list: ' + JSON.stringify(sent));
       expect(half.getAttribute('aria-pressed') === 'false', 'and unchecks it');
-      expect(cards[2].querySelector('.wheel-foot .row-desc').textContent.includes('of'), 'the count of shown slots is there');
+      expect(cards[1].querySelector('.wheel-foot .row-desc').textContent.includes('of'), 'the count of shown slots is there');
       sent.length = 0;
-      cards[2].querySelector('.wheel-showall').click();
+      cards[1].querySelector('.wheel-showall').click();
       // Two changes of one setting within 40 ms are sent a moment apart, so the local state is what shows.
       expect(state.wheel.tools.hidden.length === 0, 'Show all clears the list');
       expect(half.getAttribute('aria-pressed') === 'true', 'and checks every slot again');
-      expect(cards[2].querySelector('.wheel-showall').disabled, 'with nothing hidden there is nothing to show');
+      expect(cards[1].querySelector('.wheel-showall').disabled, 'with nothing hidden there is nothing to show');
       // A slot that two groups share is one slot.
       reset();
       const pdfs = picks(0).filter((p) => p.dataset.id === 'to_pdf');

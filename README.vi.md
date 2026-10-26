@@ -47,7 +47,7 @@ Figghost viết bằng Rust với lớp vỏ AppKit thuần (các crate `objc2`)
 
 ## Danh sách tính năng
 
-Cửa sổ cài đặt gom mọi tính năng dưới sáu biểu tượng trên một dock ở chân cửa sổ, và danh sách này đi theo đúng sáu nhóm và tên trang đó: tên trong giao diện tiếng Việt, kèm tên tiếng Anh. Tính năng ghi "tắt mặc định" được bật ở trang riêng của nó.
+Cửa sổ cài đặt liệt kê mọi trang ở thanh bên dưới năm tiêu đề, và danh sách này giữ đúng tên các trang đó, chia thành sáu nhóm: tên trong giao diện tiếng Việt, kèm tên tiếng Anh. Tính năng ghi "tắt mặc định" được bật ở thẻ đầu trang của chính nó, hoặc ở ô của nó trên trang Chung.
 
 ### Cài đặt chung (General)
 
@@ -120,11 +120,11 @@ Notch luôn có Clipboard, Khay tệp, Media (kèm lời bài hát), Tập trung
 
 ## Cửa sổ cài đặt
 
-Mở ứng dụng là mở cửa sổ cài đặt; đóng cửa sổ thì ứng dụng về lại thanh menu. Các nhóm trang là sáu biểu tượng của dock kính ở chân cửa sổ: bấm một biểu tượng, hoặc bấm giữ rồi kéo dọc dock, một thấu kính trong suốt sẽ đi theo ngón tay và mở nhóm nằm dưới nó. Ô tìm ở thanh tiêu đề (Command-K) tìm trang theo nội dung cài đặt của nó.
+Mở ứng dụng là mở cửa sổ cài đặt; đóng cửa sổ thì ứng dụng về lại thanh menu. Một thanh bên bằng kính liệt kê mọi trang dưới năm tiêu đề (Tổng quan, Notch & Đảo động, Tab của notch, Chuột & Cửa sổ, Bảng tạm & Công cụ), mỗi trang một biểu tượng riêng và một chấm xanh khi tính năng của nó đang bật: bấm một trang, hoặc bấm giữ rồi kéo dọc thanh bên, một thấu kính trong suốt sẽ đi theo ngón tay và mở trang nằm dưới nó; bấm một tiêu đề để gập nhóm đó lại. Trang nào cũng mở đầu bằng một thẻ mang màu của riêng nó, có công tắc bật tắt tính năng; thanh công cụ có nút Quay lại và Tiếp; ô tìm ở đầu thanh bên (Command-K) tìm trang theo nội dung cài đặt của nó. Trang Chung có một ô cho mỗi tính năng, như Trung tâm điều khiển: bấm vòng tròn để bật tắt, bấm tên để mở trang của nó.
 
 | | |
 | --- | --- |
-| ![Trang Chung: phần đầu, các con số và ô bật tắt các tính năng chính](docs/images/settings-general.png) | ![Trang Cuộn chuột của nhóm Chuột & Thao tác](docs/images/settings-scroll.png) |
+| ![Trang Chung: phần đầu và một ô bật tắt cho mỗi tính năng](docs/images/settings-general.png) | ![Trang Cuộn chuột của nhóm Chuột & Thao tác](docs/images/settings-scroll.png) |
 | ![Trang Gõ tiếng Việt: ngôn ngữ, phím tắt, công tắc notch và thanh menu](docs/images/settings-typing.png) | ![Trang Giới thiệu với phiên bản, cập nhật và danh sách có gì ở đâu](docs/images/settings-about.png) |
 
 ## Điểm nổi bật
@@ -161,7 +161,7 @@ Bắt đầu kéo một tệp rồi chạm một phím bổ trợ: một vòng m
 
 ### Cửa sổ cài đặt theo phong cách macOS
 
-Liquid Glass, cả hai giao diện sáng tối, sáu nhóm trên một dock, và mỗi tính năng đều tắt được ở trang riêng. Xem [Cửa sổ cài đặt](#cửa-sổ-cài-đặt).
+Liquid Glass, cả hai giao diện sáng tối, mọi trang trên một thanh bên bằng kính với biểu tượng riêng, và mỗi tính năng bật tắt ngay ở thẻ đầu trang của nó. Xem [Cửa sổ cài đặt](#cửa-sổ-cài-đặt).
 
 ## Tính năng chi tiết
 
@@ -415,7 +415,7 @@ Cửa sổ cài đặt có một thế giới riêng bên trên thế giới c�
 
 ![Trang Chung ở giao diện sáng ban ngày](docs/images/ghost-world-general-light.png)
 
-Bản thân cửa sổ là một cửa sổ macOS trên Liquid Glass. Một dock kính nổi ở chân cửa sổ giữ một biểu tượng cho mỗi nhóm trong sáu nhóm trang, là các SF Symbol trắng trên ô màu, với một thấu kính đi theo cú bấm và kéo; ô tìm nằm giữa thanh tiêu đề; nội dung là các thẻ kính của những mục gom nhóm, mỗi hàng một nhãn và điều khiển của nó, trên một nền mềm, và các trang Chung và Giới thiệu mở bằng một thẻ đầu trang màu xanh của ứng dụng. Các điều khiển theo hệ thống: chúng lấy màu nhấn mà người dùng chọn trong Cài đặt Hệ thống, một trạng thái lấy màu hệ thống của riêng nó (xanh lá khi thứ gì đó bật hoặc được cấp), nút cao 24 điểm còn nút bật xuống và ô nhập cao 24 hoặc 28, tiêu đề mục đậm 13 pt, và mọi biểu tượng, trong cửa sổ này và trong bảng thanh menu, là SF Symbol do hệ thống vẽ. Trong notch, chữ màu trắng ở ba mức trên nền đen, mức mờ nhất vẫn đạt 5,3:1; một trang chỉ hiện gợi ý phím khi notch đang có bàn phím, và trên màn hình có khuyết camera thì phần đầu nằm cạnh khuyết khi vừa, nên hình khối mở ra không có dải trống ngang phía trên. Chỉ thứ người dùng chạm vào mới chuyển động, ngắn gọn để phản hồi và bằng lò xo cho thứ di chuyển. Độ tương phản được đo chứ không đoán: chữ ít nhất 4,5:1 và viền của điều khiển đang tắt ít nhất 3:1 trên những nền tệ nhất, ở cả hai giao diện. Mọi hiệu ứng đều có phương án dự phòng cho Giảm độ trong suốt, Tăng độ tương phản và Giảm chuyển động, tiêu điểm luôn nhìn thấy, mọi điều khiển đều có tên, và cả cửa sổ dùng được bằng bàn phím. Mọi token là biến CSS ở đầu `crates/app-ui/web/app.css`.
+Bản thân cửa sổ là một cửa sổ macOS trên Liquid Glass. Một thanh bên bằng kính nổi liệt kê mọi trang dưới năm tiêu đề, mỗi trang một biểu tượng riêng là các lớp kính trắng trên ô bo góc mang hai màu của trang, với một thấu kính đi theo cú bấm và kéo; ô tìm nằm ở đầu thanh bên; thanh công cụ làm mờ phần nội dung cuộn bên dưới; nội dung là các thẻ kính mờ có viền sáng từ góc trên trái, mỗi hàng một nhãn và điều khiển của nó, và trang nào cũng mở đầu bằng một thẻ mang màu của riêng nó. Các điều khiển theo hệ thống: chúng lấy màu nhấn mà người dùng chọn trong Cài đặt Hệ thống, một trạng thái lấy màu hệ thống của riêng nó (xanh lá khi thứ gì đó bật hoặc được cấp), nút và nút bật xuống là hình viên thuốc cao 28 điểm (26 khi nhỏ), công tắc có núm hình viên thuốc giãn ra khi nhấn giữ, phím tắt hiện mỗi phím thành một nắp phím riêng, tiêu đề mục 13 pt đậm vừa, và mọi biểu tượng khác, trong cửa sổ này và trong bảng thanh menu, là SF Symbol do hệ thống vẽ. Trong notch, chữ màu trắng ở ba mức trên nền đen, mức mờ nhất vẫn đạt 5,3:1; một trang chỉ hiện gợi ý phím khi notch đang có bàn phím, và trên màn hình có khuyết camera thì phần đầu nằm cạnh khuyết khi vừa, nên hình khối mở ra không có dải trống ngang phía trên. Chỉ thứ người dùng chạm vào mới chuyển động, ngắn gọn để phản hồi và bằng lò xo cho thứ di chuyển. Độ tương phản được đo chứ không đoán: chữ ít nhất 4,5:1 và viền của điều khiển đang tắt ít nhất 3:1 trên những nền tệ nhất, ở cả hai giao diện. Mọi hiệu ứng đều có phương án dự phòng cho Giảm độ trong suốt, Tăng độ tương phản và Giảm chuyển động, tiêu điểm luôn nhìn thấy, mọi điều khiển đều có tên, và cả cửa sổ dùng được bằng bàn phím. Mọi token là biến CSS ở đầu `crates/app-ui/web/app.css`.
 
 ## Cấu hình
 
