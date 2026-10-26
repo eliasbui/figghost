@@ -242,6 +242,8 @@ const SYMBOLS: &[&str] = &[
     "power",
     "chevron.up",
     "chevron.down",
+    "chevron.left",
+    "chevron.right",
     "chart.pie.fill",
     "checkmark.shield",
     "checkmark.shield.fill",

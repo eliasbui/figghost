@@ -19,6 +19,7 @@
     'sec.weather.units': 'Units',
     'weather.units.title': 'Units', 'weather.units.desc': 'Degrees and the speed of the wind.',
     'weather.units.metric': 'Celsius, km/h', 'weather.units.imperial': 'Fahrenheit, mph',
+    'sec.weather.sound': 'Sound', 'weather.sound.title': 'Weather sounds', 'weather.sound.desc': 'Rain, wind and thunder play softly behind the tab while it is open, matching the weather. Off by default.',
   },
   vi: {
     'nav.weather': 'Thời tiết', 'page.weather': 'Thời tiết',
@@ -37,6 +38,7 @@
     'sec.weather.units': 'Đơn vị',
     'weather.units.title': 'Đơn vị', 'weather.units.desc': 'Độ và tốc độ gió.',
     'weather.units.metric': 'Độ C, km/h', 'weather.units.imperial': 'Độ F, mph',
+    'sec.weather.sound': 'Âm thanh', 'weather.sound.title': 'Âm thanh thời tiết', 'weather.sound.desc': 'Tiếng mưa, gió và sấm nhỏ nhẹ phát phía sau tab khi tab đang mở, theo đúng thời tiết. Tắt mặc định.',
   },
   build() {
     const on = () => S.weather.enabled;
@@ -96,6 +98,8 @@
         row(null, null, h('div', { class: 'weather-found' }, results, status), { block: true, when: on })),
       sectionTitle(t('sec.weather.units')),
       card(selectRow({ path: 'weather.units', title: t('weather.units.title'), desc: t('weather.units.desc'), options: units, when: on })),
+      sectionTitle(t('sec.weather.sound')),
+      card(toggleRow('weather.sound', t('weather.sound.title'), t('weather.sound.desc'), { when: on })),
     ];
   },
   selftest({ expect, go, sent, S }) {
@@ -162,5 +166,12 @@
     expect(S.weather.units === 'imperial', 'weather: the units are a word');
     pick.value = 'metric';
     pick.dispatchEvent(new Event('change'));
+
+    sent.length = 0;
+    const sound = page.querySelectorAll('.switch')[1];
+    const soundWas = S.weather.sound;
+    sound.click();
+    expect(sent.some((m) => m.t === 'set' && m.path === 'weather.sound' && m.value === !soundWas), 'weather: the sound switch sends its setting: ' + JSON.stringify(sent));
+    sound.click();
   },
 });

@@ -12,6 +12,7 @@ pub fn state(config: &Config, runtime: &Value) -> Value {
     json!({
         "enabled": config.enabled,
         "units": config.units,
+        "sound": config.sound,
         "places": config.places.iter().map(|p| json!({ "label": p.label() })).collect::<Vec<_>>(),
         "full": config.places.len() >= super::logic::MAX_CITIES,
         "searching": runtime.get("searching").and_then(Value::as_bool).unwrap_or(false),
@@ -29,6 +30,7 @@ pub fn set(config: &mut Config, path: &str, value: &Value) -> Option<Result<(), 
             .as_bool()
             .map(|on| config.enabled = on)
             .ok_or_else(bad),
+        "sound" => value.as_bool().map(|on| config.sound = on).ok_or_else(bad),
         "units" => value
             .as_str()
             .filter(|u| super::UNITS.contains(u))

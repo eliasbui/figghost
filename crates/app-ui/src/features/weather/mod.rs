@@ -15,11 +15,12 @@ use crate::{
     trace,
 };
 use core_smart::net;
-use logic::{DAYS, FORECAST_URL, Forecast, GEOCODING_URL, HOURS, MAX_CITIES, Place};
+use logic::{AIR_URL, DAYS, FORECAST_URL, Forecast, GEOCODING_URL, HOURS, MAX_CITIES, Place};
 use macos_sys::{
     app,
     weather_ui::{
-        Current, Day, Hour, PAGE_SIZE, Pager, WeatherCallbacks, WeatherDisplay, WeatherView,
+        Advice, AirCard, Current, Day, Hour, Hue, Insight, PAGE_SIZE, Pager, Tile,
+        WeatherCallbacks, WeatherDisplay, WeatherView,
     },
 };
 use serde::{Deserialize, Serialize};
@@ -49,6 +50,9 @@ pub struct Config {
     pub enabled: bool,
     /// "metric" (degrees Celsius, kilometres an hour) or "imperial" (degrees Fahrenheit, miles an hour).
     pub units: String,
+    /// Rain, wind and thunder played softly behind the tab while it is open. Off until chosen, as a sound nobody asked
+    /// for is a surprise.
+    pub sound: bool,
     /// The cities chosen from searches, in the order the tab flips through them. A city of the wrong shape is dropped,
     /// not an unreadable file.
     #[serde(deserialize_with = "lenient_places")]
@@ -83,6 +87,7 @@ impl Default for Config {
         Self {
             enabled: false,
             units: UNITS[0].into(),
+            sound: false,
             places: Vec::new(),
             place: None,
         }
@@ -395,7 +400,15 @@ impl Feature {
         std::thread::spawn(move || {
             let query = logic::forecast_query(&place, imperial);
             let result = match net::get(FORECAST_URL, &query, FETCH_SECONDS) {
-                Ok(body) => logic::parse_forecast(&body).map_err(|_| Problem::Service),
+                Ok(body) => logic::parse_forecast(&body)
+                    .map_err(|_| Problem::Service)
+                    .map(|mut forecast| {
+                        // The air is a second service; the forecast is shown without it when it does not answer.
+                        forecast.air = net::get(AIR_URL, &logic::air_query(&place), FETCH_SECONDS)
+                            .ok()
+                            .and_then(|body| logic::parse_air(&body).ok());
+                        forecast
+                    }),
                 Err(net::NetError::Status | net::NetError::TooLarge | net::NetError::Failed(_)) => {
                     Err(Problem::Service)
                 }
@@ -623,7 +636,141 @@ fn display(
         note: None,
         action: None,
         pager,
+        fx: Some(forecast.atmosphere(place, imperial)),
+        sound: config.sound,
+        insight: Some(insight(language, forecast, place, imperial)),
+        views: (
+            language.weather_forecast().to_owned(),
+            language.weather_details().to_owned(),
+        ),
     }
+}
+
+/// The second view of the tab: the air and what suits it, the season, the rain and sun, the wind and the feel.
+fn insight(language: Language, forecast: &Forecast, place: &Place, imperial: bool) -> Insight {
+    let now = &forecast.now;
+    let air = forecast.air.as_ref().map(|air| {
+        let level = logic::air_level(air.aqi);
+        AirCard {
+            title: language.weather_air_title().to_owned(),
+            value: format!("{:.0}", air.aqi),
+            level: language.weather_air_level(level).to_owned(),
+            position: logic::air_position(air.aqi),
+            rgb: logic::air_rgb(level),
+            detail: air
+                .pm25
+                .map(|pm| language.weather_air_detail(pm, logic::who_ratio(pm)))
+                .unwrap_or_default(),
+            advice: advice_list(language, level),
+        }
+    });
+    let month = now.time.get(5..7).and_then(|m| m.parse().ok()).unwrap_or(6);
+    let season = logic::season(place.latitude, month);
+    let sky = logic::sky(now.code);
+    let rain = logic::rain_level(now.code, now.precip);
+    let thunder = logic::is_thunder(now.code);
+    let chance = forecast
+        .upcoming_hours(HOURS)
+        .into_iter()
+        .filter_map(|h| h.rain)
+        .reduce(f64::max);
+    let sky_tile = if logic::snow_intensity(now.code) > 0.0 {
+        (
+            language.weather_snowing().to_owned(),
+            language.weather_chance(chance),
+            Hue::Snow,
+        )
+    } else if rain != logic::RainLevel::Dry {
+        (
+            language.weather_rain_level(rain).to_owned(),
+            language.weather_rain_note(rain, thunder, now.precip),
+            if thunder { Hue::Storm } else { Hue::Rain },
+        )
+    } else if now.day {
+        let level = logic::uv_level(now.uv);
+        let across = logic::sun_progress(
+            &now.time,
+            forecast.upcoming_days(1).first().map_or("", |d| &d.sunrise),
+            forecast.upcoming_days(1).first().map_or("", |d| &d.sunset),
+            true,
+        );
+        (
+            language.weather_uv(now.uv, language.weather_uv_level(level)),
+            language.weather_sun_note(across * 100.0, level),
+            Hue::Sun,
+        )
+    } else {
+        (
+            language.weather_sky(sky).to_owned(),
+            language.weather_chance(chance),
+            Hue::Moon,
+        )
+    };
+    let unit = if imperial { "mph" } else { "km/h" };
+    let wind_level = logic::wind_level(logic::to_kmh(now.wind, imperial));
+    let gust = (now.gust > now.wind + 3.0).then_some(now.gust);
+    let feels = logic::feel(logic::to_celsius(now.feels, imperial));
+    let tiles = vec![
+        Tile {
+            title: language.weather_season_title().to_owned(),
+            value: language.weather_season(season).to_owned(),
+            note: language.weather_season_note(season).to_owned(),
+            hue: Hue::Leaf,
+        },
+        Tile {
+            title: language.weather_sky_title().to_owned(),
+            value: sky_tile.0,
+            note: sky_tile.1,
+            hue: sky_tile.2,
+        },
+        Tile {
+            title: language.weather_wind_title().to_owned(),
+            value: format!(
+                "{}, {:.0} {unit}",
+                language.weather_wind_level(wind_level),
+                now.wind
+            ),
+            note: language.weather_wind_note(
+                now.direction.map(logic::compass),
+                gust,
+                unit,
+                language.weather_wind_effect(wind_level),
+            ),
+            hue: Hue::Cloud,
+        },
+        Tile {
+            title: language.weather_feel_title().to_owned(),
+            value: format!(
+                "{}, {}",
+                language.weather_feel(feels),
+                logic::temp_text(now.feels)
+            ),
+            note: language.weather_feel_note(feels).to_owned(),
+            hue: match feels {
+                logic::Feel::Freezing | logic::Feel::Cold | logic::Feel::Cool => Hue::Snow,
+                logic::Feel::Mild => Hue::Leaf,
+                _ => Hue::Sun,
+            },
+        },
+    ];
+    Insight {
+        air,
+        air_missing: language.weather_air_missing().to_owned(),
+        tiles,
+    }
+}
+
+/// What the air at this level suits, one line each.
+fn advice_list(language: Language, level: logic::AirLevel) -> Vec<Advice> {
+    logic::air_advice(level)
+        .into_iter()
+        .enumerate()
+        .map(|(i, verdict)| Advice {
+            activity: language.weather_air_activity(i).to_owned(),
+            verdict,
+            word: language.weather_air_word(i, verdict).to_owned(),
+        })
+        .collect()
 }
 
 #[cfg(test)]
@@ -646,6 +793,7 @@ mod tests {
         Config {
             enabled: true,
             units: if imperial { "imperial" } else { "metric" }.into(),
+            sound: false,
             places: vec![hanoi()],
             place: None,
         }
@@ -969,5 +1117,71 @@ mod tests {
             at,
         );
         assert!(one.pager.is_none(), "one city needs no flipping");
+    }
+
+    #[test]
+    fn the_details_say_the_season_the_rain_the_wind_and_what_the_air_suits_in_both_languages() {
+        let mut forecast = logic::parse_forecast(FORECAST).unwrap();
+        forecast.now.code = 95;
+        forecast.now.precip = 9.0;
+        forecast.now.wind = 38.0;
+        forecast.now.gust = 61.0;
+        forecast.now.direction = Some(225.0);
+        forecast.air = Some(logic::Air {
+            aqi: 165.0,
+            pm25: Some(60.0),
+            pm10: None,
+        });
+        let place = hanoi();
+        let english = insight(Language::English, &forecast, &place, true);
+        let air = english.air.as_ref().unwrap();
+        assert_eq!(air.value, "165");
+        assert_eq!(air.level, "Unhealthy");
+        assert!(air.detail.contains("4.0x"), "{}", air.detail);
+        assert_eq!(air.advice.len(), 4);
+        assert_eq!(air.advice[0].verdict, macos_sys::weather_ui::Verdict::Avoid);
+        assert_eq!(english.tiles[0].value, "Autumn");
+        assert_eq!(english.tiles[1].value, "Heavy rain");
+        assert!(
+            english.tiles[1].note.contains("thunder"),
+            "{}",
+            english.tiles[1].note
+        );
+        assert!(
+            english.tiles[2].note.starts_with("Southwest, gusts 61 mph"),
+            "{}",
+            english.tiles[2].note
+        );
+        let vietnamese = insight(Language::Vietnamese, &forecast, &place, false);
+        assert_eq!(vietnamese.tiles[0].value, "Mùa thu");
+        assert!(vietnamese.tiles[1].note.contains("sấm sét"));
+        assert_eq!(vietnamese.air.as_ref().unwrap().level, "Có hại");
+        // No air reading: the tiles stay and the air card says so.
+        forecast.air = None;
+        let without = insight(Language::English, &forecast, &place, true);
+        assert!(
+            without.air.is_none() && without.tiles.len() == 4 && !without.air_missing.is_empty()
+        );
+        // A clear day tells the sun and the UV, and a clear night the sky.
+        forecast.now.code = 0;
+        forecast.now.precip = 0.0;
+        forecast.now.uv = 9.0;
+        let sunny = insight(Language::English, &forecast, &place, true);
+        assert_eq!(sunny.tiles[1].value, "UV 9, very high");
+        forecast.now.day = false;
+        let night = insight(Language::English, &forecast, &place, true);
+        assert_eq!(night.tiles[1].value, "Clear");
+        // The display carries both views and the sky once a forecast is in.
+        let shown = display(
+            Language::English,
+            &ready(false),
+            0,
+            Some(&fetched(1, false)),
+            1,
+        );
+        assert!(shown.fx.is_some() && shown.insight.is_some());
+        assert_eq!(shown.views, ("Forecast".to_owned(), "Details".to_owned()));
+        let note = display(Language::English, &Config::default(), 0, None, 0);
+        assert!(note.fx.is_none() && note.insight.is_none());
     }
 }

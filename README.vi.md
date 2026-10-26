@@ -84,7 +84,7 @@ Notch luôn có Clipboard, Khay tệp, Media (kèm lời bài hát), Tập trung
 | Tác tử AI | AI agents | Phiên Claude Code, Codex và pi, giới hạn sử dụng, token và chi phí, trả lời Cho phép hoặc Từ chối và lựa chọn ngay trên notch; tài khoản Orca và chuyển tài khoản |
 | Ghi chú | Notes | Nơi nháp bằng các tệp văn bản thuần (tắt mặc định) |
 | Mở nhanh | Launcher | Lưới tối đa mười hai ứng dụng, thư mục và Phím tắt Shortcuts (tắt mặc định) |
-| Thời tiết | Weather | Tối đa tám thành phố: hiện tại, những giờ và ngày sắp tới (tắt mặc định) |
+| Thời tiết | Weather | Tối đa tám thành phố: hiện tại, những giờ và ngày sắp tới, bầu trời chuyển động phía sau và phần chi tiết về mùa, gió, mưa, chất lượng không khí (tắt mặc định) |
 | Yêu cầu duyệt | Pull requests | Các yêu cầu duyệt đang chờ bạn trên GitHub và GitLab (tắt mặc định) |
 | Pomodoro | Pomodoro | Phiên làm việc và nghỉ có vòng tròn tiến độ, chuỗi ngày và phím tắt (tắt mặc định) |
 | Thời gian dùng | Screen Time | Mỗi ứng dụng ở phía trước bao lâu, hôm nay và bảy ngày qua (tắt mặc định) |

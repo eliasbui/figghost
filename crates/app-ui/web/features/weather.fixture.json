@@ -1,6 +1,7 @@
 {
   "enabled": true,
   "units": "metric",
+  "sound": false,
   "places": [{ "label": "Hanoi, Vietnam" }, { "label": "Ho Chi Minh City, Vietnam" }, { "label": "Tokyo, Japan" }],
   "full": false,
   "searching": false,

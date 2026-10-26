@@ -2,12 +2,13 @@
 //! weather now, the next hours and the next days. No network, no clock and no drawing, so the tests feed it the
 //! real answers of the service kept in `testdata`.
 
-use macos_sys::weather_ui::{Glyph, Hue};
+use macos_sys::weather_ui::{Atmosphere, Glyph, Hue, Verdict};
 use serde::{Deserialize, Serialize};
 use serde_json::Value;
 
 pub const FORECAST_URL: &str = "https://api.open-meteo.com/v1/forecast";
 pub const GEOCODING_URL: &str = "https://geocoding-api.open-meteo.com/v1/search";
+pub const AIR_URL: &str = "https://air-quality-api.open-meteo.com/v1/air-quality";
 /// How many hours and days the tab shows.
 pub const HOURS: usize = 6;
 pub const DAYS: usize = 5;
@@ -167,6 +168,11 @@ pub fn forecast_query(place: &Place, imperial: bool) -> Vec<(&'static str, Strin
                 "is_day",
                 "weather_code",
                 "wind_speed_10m",
+                "wind_gusts_10m",
+                "wind_direction_10m",
+                "precipitation",
+                "cloud_cover",
+                "uv_index",
             ]),
         ),
         (
@@ -211,6 +217,15 @@ pub struct Now {
     pub wind: f64,
     pub code: i64,
     pub day: bool,
+    /// The strongest gust, in the units asked for; the wind itself when the service does not say.
+    pub gust: f64,
+    /// Where the wind blows from, in degrees.
+    pub direction: Option<f64>,
+    /// The rain falling now, in millimetres an hour.
+    pub precip: f64,
+    /// How much of the sky is cloud, in percent, when the service says.
+    pub cloud: Option<f64>,
+    pub uv: f64,
 }
 
 #[derive(Debug, Clone, PartialEq)]
@@ -240,6 +255,8 @@ pub struct Forecast {
     pub now: Now,
     pub hours: Vec<Hour>,
     pub days: Vec<Day>,
+    /// The air at the place, which comes from another service and may be missing without the forecast being so.
+    pub air: Option<Air>,
 }
 
 /// The numbers of a list in the answer; a gap in the service's data stays a gap.
@@ -270,14 +287,26 @@ fn number(block: &Value, key: &str) -> Result<f64, String> {
 pub fn parse_forecast(body: &str) -> Result<Forecast, String> {
     let answer: Value = serde_json::from_str(body).map_err(|e| e.to_string())?;
     let current = answer.get("current").ok_or("no current weather")?;
+    let wind = number(current, "wind_speed_10m")?;
+    let optional = |key: &str| {
+        current
+            .get(key)
+            .and_then(Value::as_f64)
+            .filter(|n| n.is_finite())
+    };
     let now = Now {
         time: current["time"].as_str().ok_or("no time")?.to_owned(),
         temp: number(current, "temperature_2m")?,
         feels: number(current, "apparent_temperature")?,
         humidity: number(current, "relative_humidity_2m")?,
-        wind: number(current, "wind_speed_10m")?,
+        wind,
         code: number(current, "weather_code")? as i64,
         day: number(current, "is_day")? >= 1.0,
+        gust: optional("wind_gusts_10m").unwrap_or(wind).max(wind),
+        direction: optional("wind_direction_10m"),
+        precip: optional("precipitation").unwrap_or(0.0).max(0.0),
+        cloud: optional("cloud_cover").map(|c| c.clamp(0.0, 100.0)),
+        uv: optional("uv_index").unwrap_or(0.0).max(0.0),
     };
 
     let hourly = answer.get("hourly").ok_or("no hourly forecast")?;
@@ -324,7 +353,12 @@ pub fn parse_forecast(body: &str) -> Result<Forecast, String> {
             })
         })
         .collect();
-    Ok(Forecast { now, hours, days })
+    Ok(Forecast {
+        now,
+        hours,
+        days,
+        air: None,
+    })
 }
 
 impl Forecast {
@@ -452,6 +486,352 @@ pub fn rain_text(percent: Option<f64>) -> String {
     match percent {
         Some(p) if p >= 20.0 => format!("{:.0}%", (p / 5.0).round() * 5.0),
         _ => String::new(),
+    }
+}
+
+/// What is asked of the air quality service: the index of the United States, which is the one with a scale of
+/// advice everyone knows, and the fine dust it is made of.
+pub fn air_query(place: &Place) -> Vec<(&'static str, String)> {
+    vec![
+        ("latitude", format!("{:.4}", place.latitude)),
+        ("longitude", format!("{:.4}", place.longitude)),
+        ("current", "us_aqi,pm2_5,pm10".to_owned()),
+        ("timezone", "auto".to_owned()),
+    ]
+}
+
+#[derive(Debug, Clone, PartialEq)]
+pub struct Air {
+    /// The United States Air Quality Index, 0 up.
+    pub aqi: f64,
+    /// Fine dust and coarse dust, in micrograms a cubic metre.
+    pub pm25: Option<f64>,
+    pub pm10: Option<f64>,
+}
+
+pub fn parse_air(body: &str) -> Result<Air, String> {
+    let answer: Value = serde_json::from_str(body).map_err(|e| e.to_string())?;
+    let current = answer.get("current").ok_or("no current air")?;
+    let value = |key: &str| {
+        current
+            .get(key)
+            .and_then(Value::as_f64)
+            .filter(|n| n.is_finite() && *n >= 0.0)
+    };
+    Ok(Air {
+        aqi: value("us_aqi").ok_or("no air index")?,
+        pm25: value("pm2_5"),
+        pm10: value("pm10"),
+    })
+}
+
+/// The bands of the index, as the United States names them.
+#[derive(Debug, Clone, Copy, PartialEq, Eq)]
+pub enum AirLevel {
+    Good,
+    Moderate,
+    Sensitive,
+    Unhealthy,
+    VeryUnhealthy,
+    Hazardous,
+}
+
+pub fn air_level(aqi: f64) -> AirLevel {
+    match aqi {
+        a if a <= 50.0 => AirLevel::Good,
+        a if a <= 100.0 => AirLevel::Moderate,
+        a if a <= 150.0 => AirLevel::Sensitive,
+        a if a <= 200.0 => AirLevel::Unhealthy,
+        a if a <= 300.0 => AirLevel::VeryUnhealthy,
+        _ => AirLevel::Hazardous,
+    }
+}
+
+pub fn air_rgb(level: AirLevel) -> (f64, f64, f64) {
+    match level {
+        AirLevel::Good => (0.35, 0.86, 0.50),
+        AirLevel::Moderate => (0.98, 0.85, 0.25),
+        AirLevel::Sensitive => (1.0, 0.62, 0.22),
+        AirLevel::Unhealthy => (1.0, 0.40, 0.36),
+        AirLevel::VeryUnhealthy | AirLevel::Hazardous => (0.72, 0.42, 0.90),
+    }
+}
+
+/// Where the index stands on the bar, which ends at 300.
+pub fn air_position(aqi: f64) -> f64 {
+    (aqi / 300.0).clamp(0.0, 1.0)
+}
+
+/// How the air suits, in this order: exercise outdoors, open windows, going without a mask, and the people who feel
+/// it first (children, the old, those with asthma or a heart condition).
+pub fn air_advice(level: AirLevel) -> [Verdict; 4] {
+    use Verdict::{Avoid, Caution, Good};
+    match level {
+        AirLevel::Good => [Good; 4],
+        AirLevel::Moderate => [Good, Good, Good, Caution],
+        AirLevel::Sensitive => [Caution, Caution, Caution, Avoid],
+        AirLevel::Unhealthy => [Avoid, Avoid, Caution, Avoid],
+        AirLevel::VeryUnhealthy | AirLevel::Hazardous => [Avoid; 4],
+    }
+}
+
+/// The World Health Organization's limit for the day, in micrograms a cubic metre of fine dust.
+const WHO_PM25: f64 = 15.0;
+
+/// How many times the limit the fine dust is.
+pub fn who_ratio(pm25: f64) -> f64 {
+    pm25 / WHO_PM25
+}
+
+#[derive(Debug, Clone, Copy, PartialEq, Eq)]
+pub enum WindLevel {
+    Calm,
+    Light,
+    Moderate,
+    Strong,
+    Gale,
+    Storm,
+}
+
+/// The wind by its speed in kilometres an hour.
+pub fn wind_level(kmh: f64) -> WindLevel {
+    match kmh {
+        v if v < 2.0 => WindLevel::Calm,
+        v if v < 12.0 => WindLevel::Light,
+        v if v < 29.0 => WindLevel::Moderate,
+        v if v < 50.0 => WindLevel::Strong,
+        v if v < 75.0 => WindLevel::Gale,
+        _ => WindLevel::Storm,
+    }
+}
+
+#[derive(Debug, Clone, Copy, PartialEq, Eq, PartialOrd, Ord)]
+pub enum RainLevel {
+    Dry,
+    Drizzle,
+    Light,
+    Moderate,
+    Heavy,
+}
+
+impl RainLevel {
+    /// How hard it falls on the screen, from 0 to 1.
+    pub fn intensity(self) -> f64 {
+        match self {
+            RainLevel::Dry => 0.0,
+            RainLevel::Drizzle => 0.15,
+            RainLevel::Light => 0.35,
+            RainLevel::Moderate => 0.62,
+            RainLevel::Heavy => 0.95,
+        }
+    }
+}
+
+/// The rain now: what the code says it looks like, or what the gauge says it measures, whichever is the harder.
+pub fn rain_level(code: i64, mm_an_hour: f64) -> RainLevel {
+    let by_code = match sky(code) {
+        Sky::Drizzle => RainLevel::Drizzle,
+        Sky::Rain => RainLevel::Moderate,
+        Sky::HeavyRain => RainLevel::Heavy,
+        Sky::Thunderstorm => RainLevel::Moderate,
+        _ => RainLevel::Dry,
+    };
+    let by_gauge = match mm_an_hour {
+        m if m < 0.05 => RainLevel::Dry,
+        m if m < 0.5 => RainLevel::Drizzle,
+        m if m < 2.5 => RainLevel::Light,
+        m if m < 7.6 => RainLevel::Moderate,
+        _ => RainLevel::Heavy,
+    };
+    by_code.max(by_gauge)
+}
+
+pub fn is_thunder(code: i64) -> bool {
+    matches!(code, 95 | 96 | 99)
+}
+
+/// How hard it snows, from 0 to 1.
+pub fn snow_intensity(code: i64) -> f64 {
+    match code {
+        71 | 77 => 0.35,
+        73 | 85 => 0.6,
+        75 | 86 => 1.0,
+        _ => 0.0,
+    }
+}
+
+/// What the air feels like on the skin, from the apparent temperature in degrees Celsius.
+#[derive(Debug, Clone, Copy, PartialEq, Eq)]
+pub enum Feel {
+    Freezing,
+    Cold,
+    Cool,
+    Mild,
+    Warm,
+    Hot,
+    Scorching,
+}
+
+pub fn feel(celsius: f64) -> Feel {
+    match celsius {
+        c if c <= 5.0 => Feel::Freezing,
+        c if c <= 12.0 => Feel::Cold,
+        c if c <= 18.0 => Feel::Cool,
+        c if c <= 27.0 => Feel::Mild,
+        c if c <= 32.0 => Feel::Warm,
+        c if c <= 37.0 => Feel::Hot,
+        _ => Feel::Scorching,
+    }
+}
+
+#[derive(Debug, Clone, Copy, PartialEq, Eq)]
+pub enum UvLevel {
+    Low,
+    Moderate,
+    High,
+    VeryHigh,
+    Extreme,
+}
+
+pub fn uv_level(uv: f64) -> UvLevel {
+    match uv {
+        u if u < 3.0 => UvLevel::Low,
+        u if u < 6.0 => UvLevel::Moderate,
+        u if u < 8.0 => UvLevel::High,
+        u if u < 11.0 => UvLevel::VeryHigh,
+        _ => UvLevel::Extreme,
+    }
+}
+
+/// The eight points of the compass, from the degrees the wind blows from; 0 is north.
+pub fn compass(degrees: f64) -> usize {
+    (((degrees.rem_euclid(360.0) + 22.5) / 45.0) as usize) % 8
+}
+
+#[derive(Debug, Clone, Copy, PartialEq, Eq)]
+pub enum Season {
+    Spring,
+    Summer,
+    Autumn,
+    Winter,
+    /// The tropics have two seasons, not four: the one with the rains and the one without.
+    Wet,
+    Dry,
+}
+
+/// The season of a place in a month (1 to 12). Away from the tropics there are four, turned round in the south; in
+/// them, the rains come in the summer half of the year of their side of the equator. A guide, not a calendar of the
+/// local weather service.
+pub fn season(latitude: f64, month: u32) -> Season {
+    let month = month.clamp(1, 12);
+    if latitude.abs() < 20.0 {
+        let northern_summer = (5..=10).contains(&month);
+        return if northern_summer == (latitude >= 0.0) {
+            Season::Wet
+        } else {
+            Season::Dry
+        };
+    }
+    let month = if latitude < 0.0 {
+        (month + 5) % 12 + 1
+    } else {
+        month
+    };
+    match month {
+        3..=5 => Season::Spring,
+        6..=8 => Season::Summer,
+        9..=11 => Season::Autumn,
+        _ => Season::Winter,
+    }
+}
+
+fn leaf_colour(season: Season) -> (f64, f64, f64) {
+    match season {
+        Season::Spring => (1.0, 0.72, 0.80),
+        Season::Summer | Season::Wet => (0.40, 0.78, 0.32),
+        Season::Autumn => (0.95, 0.56, 0.16),
+        Season::Winter => (0.62, 0.46, 0.30),
+        Season::Dry => (0.80, 0.68, 0.30),
+    }
+}
+
+/// "05:54" or "2026-10-20T05:54" as minutes after midnight.
+fn minutes(time: &str) -> Option<f64> {
+    let clock = time.rsplit('T').next()?;
+    let (hour, minute) = (clock.get(..2)?, clock.get(3..5)?);
+    Some(f64::from(
+        hour.parse::<u32>().ok()? * 60 + minute.parse::<u32>().ok()?,
+    ))
+}
+
+/// How far through the daylight (by day) or the night (by night) it is, from 0 to 1.
+pub fn sun_progress(now: &str, rise: &str, set: &str, day: bool) -> f64 {
+    let Some(at) = minutes(now) else {
+        return 0.5;
+    };
+    let (rise, set) = match (minutes(rise), minutes(set)) {
+        (Some(r), Some(s)) if s > r => (r, s),
+        _ => (360.0, 1080.0),
+    };
+    if day {
+        ((at - rise) / (set - rise)).clamp(0.0, 1.0)
+    } else {
+        let since = if at >= set {
+            at - set
+        } else {
+            at + 1440.0 - set
+        };
+        (since / (1440.0 - (set - rise))).clamp(0.0, 1.0)
+    }
+}
+
+pub fn to_kmh(speed: f64, imperial: bool) -> f64 {
+    if imperial { speed * 1.609_344 } else { speed }
+}
+
+pub fn to_celsius(degrees: f64, imperial: bool) -> f64 {
+    if imperial {
+        (degrees - 32.0) / 1.8
+    } else {
+        degrees
+    }
+}
+
+impl Forecast {
+    /// The sky behind the tab, from the weather now.
+    pub fn atmosphere(&self, place: &Place, imperial: bool) -> Atmosphere {
+        let now = &self.now;
+        let by_sky = match sky(now.code) {
+            Sky::Clear => 0.1,
+            Sky::PartlyCloudy => 0.45,
+            Sky::Overcast => 0.9,
+            _ => 1.0,
+        };
+        let day = self.upcoming_days(1).into_iter().next();
+        let (rise, set) = day.map_or(("", ""), |d| (d.sunrise.as_str(), d.sunset.as_str()));
+        let wind = to_kmh(now.wind, imperial);
+        let gust = to_kmh(now.gust, imperial);
+        let month = now.time.get(5..7).and_then(|m| m.parse().ok()).unwrap_or(6);
+        let travel = now.direction.map_or(1.0, |from| -from.to_radians().sin());
+        let rain = rain_level(now.code, now.precip);
+        Atmosphere {
+            day: now.day,
+            progress: sun_progress(&now.time, rise, set, now.day),
+            cloud: now.cloud.map_or(by_sky, |c| c / 100.0),
+            rain: rain.intensity(),
+            thunder: is_thunder(now.code),
+            snow: snow_intensity(now.code),
+            fog: if sky(now.code) == Sky::Fog { 0.8 } else { 0.0 },
+            cold: ((16.0 - to_celsius(now.feels, imperial)) / 22.0).clamp(0.0, 1.0),
+            // A fresh breeze starts to show at 8 km/h and a storm fills the screen at 60.
+            wind: ((wind * 0.65 + gust * 0.35 - 8.0) / 52.0).clamp(0.0, 1.0),
+            wind_dir: if travel < 0.0 { -1.0 } else { 1.0 },
+            haze: self
+                .air
+                .as_ref()
+                .map_or(0.0, |a| ((a.aqi - 50.0) / 200.0).clamp(0.0, 1.0)),
+            leaf: leaf_colour(season(place.latitude, month)),
+        }
     }
 }
 
@@ -769,6 +1149,156 @@ mod tests {
         );
         assert!(
             at("a", 1.0).same_spot(&at("b", 1.000_04)) && !at("a", 1.0).same_spot(&at("b", 1.0002))
+        );
+    }
+
+    #[test]
+    fn the_air_answer_is_read_and_graded_with_advice_that_gets_stricter() {
+        let air =
+            parse_air(r#"{ "current": { "us_aqi": 132, "pm2_5": 48.2, "pm10": 70.0 } }"#).unwrap();
+        assert_eq!((air.aqi, air.pm25), (132.0, Some(48.2)));
+        let bare = parse_air(r#"{ "current": { "us_aqi": 20 } }"#).unwrap();
+        assert!(bare.pm25.is_none() && bare.pm10.is_none());
+        assert!(parse_air(r#"{ "current": { "pm2_5": 5 } }"#).is_err());
+        assert!(parse_air(r#"{ "current": { "us_aqi": -3 } }"#).is_err());
+        assert!(parse_air("not json").is_err());
+        let levels: Vec<AirLevel> = [0.0, 50.0, 51.0, 101.0, 151.0, 201.0, 301.0]
+            .map(air_level)
+            .into();
+        assert_eq!(
+            levels,
+            [
+                AirLevel::Good,
+                AirLevel::Good,
+                AirLevel::Moderate,
+                AirLevel::Sensitive,
+                AirLevel::Unhealthy,
+                AirLevel::VeryUnhealthy,
+                AirLevel::Hazardous
+            ]
+        );
+        // The worse the air, the fewer things it suits.
+        let rank = |v: Verdict| v as u8;
+        let mut last = [0u8; 4];
+        for level in [
+            AirLevel::Good,
+            AirLevel::Moderate,
+            AirLevel::Sensitive,
+            AirLevel::Unhealthy,
+            AirLevel::Hazardous,
+        ] {
+            let now = air_advice(level).map(rank);
+            assert!(now.iter().zip(last).all(|(n, l)| *n >= l), "{level:?}");
+            last = now;
+        }
+        assert_eq!(air_position(900.0), 1.0);
+        assert!((who_ratio(30.0) - 2.0).abs() < 1e-9);
+    }
+
+    #[test]
+    fn rain_wind_cold_and_sun_are_graded_by_what_they_do() {
+        assert_eq!(rain_level(0, 0.0), RainLevel::Dry);
+        assert_eq!(rain_level(51, 0.0), RainLevel::Drizzle);
+        assert_eq!(rain_level(63, 0.0), RainLevel::Moderate);
+        assert_eq!(
+            rain_level(80, 12.0),
+            RainLevel::Heavy,
+            "the gauge may say more than the code"
+        );
+        assert_eq!(
+            rain_level(65, 0.2),
+            RainLevel::Heavy,
+            "and the code more than the gauge"
+        );
+        assert!(RainLevel::Drizzle.intensity() < RainLevel::Heavy.intensity());
+        assert!(is_thunder(95) && is_thunder(99) && !is_thunder(65));
+        assert!(snow_intensity(75) > snow_intensity(71) && snow_intensity(61) == 0.0);
+        assert_eq!(wind_level(1.0), WindLevel::Calm);
+        assert_eq!(wind_level(20.0), WindLevel::Moderate);
+        assert_eq!(wind_level(60.0), WindLevel::Gale);
+        assert_eq!(feel(-3.0), Feel::Freezing);
+        assert_eq!(feel(24.0), Feel::Mild);
+        assert_eq!(feel(41.0), Feel::Scorching);
+        assert_eq!(uv_level(2.0), UvLevel::Low);
+        assert_eq!(uv_level(8.0), UvLevel::VeryHigh);
+        assert_eq!(
+            [0.0, 20.0, 46.0, 180.0, 270.0, 359.0].map(compass),
+            [0, 0, 1, 4, 6, 0]
+        );
+    }
+
+    #[test]
+    fn the_season_follows_the_month_the_hemisphere_and_the_tropics() {
+        // Hanoi in October is autumn; the same month in Sydney is spring.
+        assert_eq!(season(21.0, 10), Season::Autumn);
+        assert_eq!(season(-33.9, 10), Season::Spring);
+        assert_eq!(season(21.0, 1), Season::Winter);
+        assert_eq!(season(-33.9, 1), Season::Summer);
+        // Ho Chi Minh City has the rains from May to October; Jakarta, south of the equator, the other half.
+        assert_eq!(season(10.8, 7), Season::Wet);
+        assert_eq!(season(10.8, 1), Season::Dry);
+        assert_eq!(season(-6.2, 1), Season::Wet);
+        assert_eq!(season(-6.2, 7), Season::Dry);
+        for month in 1..=12 {
+            let _ = season(45.0, month);
+            let _ = season(-45.0, month);
+        }
+    }
+
+    #[test]
+    fn the_sun_goes_over_the_day_and_the_moon_over_the_night() {
+        let at =
+            |now: &str, day: bool| sun_progress(now, "2026-10-20T05:54", "2026-10-20T17:28", day);
+        assert_eq!(at("2026-10-20T05:54", true), 0.0);
+        assert!((at("2026-10-20T11:41", true) - 0.5).abs() < 0.01);
+        assert_eq!(at("2026-10-20T17:28", true), 1.0);
+        assert!(at("2026-10-20T23:40", false) > 0.4 && at("2026-10-20T23:40", false) < 0.6);
+        assert!(
+            at("2026-10-20T02:00", false) > 0.5,
+            "after midnight the night is more than half gone"
+        );
+        // No sunrise to go by: the day is taken as six to six, and a nonsense time as noon.
+        assert!((sun_progress("2026-10-20T12:00", "", "", true) - 0.5).abs() < 1e-9);
+        assert_eq!(sun_progress("garbage", "", "", true), 0.5);
+    }
+
+    #[test]
+    fn the_sky_behind_the_tab_follows_the_forecast() {
+        let place = Place {
+            name: "Hanoi".into(),
+            region: String::new(),
+            country: String::new(),
+            latitude: 21.02,
+            longitude: 105.84,
+        };
+        let mut forecast = parse_forecast(include_str!("testdata/forecast.json")).unwrap();
+        let clear = forecast.atmosphere(&place, true);
+        assert!(clear.day && clear.rain == 0.0 && !clear.thunder && clear.cold == 0.0);
+        assert!(clear.progress > 0.2 && clear.progress < 0.8);
+        assert!(clear.wind == 0.0, "4 mph is not a wind worth drawing");
+        forecast.now.code = 95;
+        forecast.now.precip = 12.0;
+        forecast.now.wind = 40.0;
+        forecast.now.gust = 70.0;
+        forecast.now.direction = Some(270.0);
+        forecast.air = Some(Air {
+            aqi: 250.0,
+            pm25: Some(120.0),
+            pm10: None,
+        });
+        let storm = forecast.atmosphere(&place, false);
+        assert!(storm.thunder && storm.rain > 0.9);
+        assert!(
+            storm.wind > 0.6 && storm.wind_dir > 0.0,
+            "a west wind blows to the right"
+        );
+        assert_eq!(storm.haze, 1.0);
+        forecast.now.direction = Some(90.0);
+        forecast.now.feels = 14.0;
+        let cold = forecast.atmosphere(&place, true);
+        assert!(
+            cold.wind_dir < 0.0 && cold.cold > 0.9,
+            "14 degrees Fahrenheit is far below freezing"
         );
     }
 }

@@ -7,8 +7,8 @@ use macos_sys::{
     notch::{Notch, NotchGeometry},
     ui::AppCallbacks,
     weather_ui::{
-        Current, Day, Glyph, Hour, Hue, PAGE_SIZE, Pager, WeatherCallbacks, WeatherDisplay,
-        WeatherView,
+        Advice, AirCard, Atmosphere, Current, Day, Glyph, Hour, Hue, Insight, PAGE_SIZE, Pager,
+        Tile, Verdict, WeatherCallbacks, WeatherDisplay, WeatherView,
     },
 };
 use std::{env, fs, path::PathBuf, process, rc::Rc};
@@ -143,6 +143,98 @@ fn scene(vi: bool, rainy: bool) -> WeatherDisplay {
         note: None,
         action: None,
         pager: None,
+        fx: None,
+        sound: false,
+        insight: Some(insight(vi)),
+        views: if vi {
+            ("Dự báo".into(), "Chi tiết".into())
+        } else {
+            ("Forecast".into(), "Details".into())
+        },
+    }
+}
+
+fn insight(vi: bool) -> Insight {
+    let t = |en: &str, vn: &str| if vi { vn.to_owned() } else { en.to_owned() };
+    let verdicts = [
+        (Verdict::Good, t("Fine", "Thoải mái")),
+        (Verdict::Caution, t("Briefly", "Mở ngắn thôi")),
+        (Verdict::Caution, t("Advised", "Nên đeo")),
+        (Verdict::Avoid, t("Stay in", "Ở trong nhà")),
+    ];
+    let activities = [
+        t("Exercise outdoors", "Tập thể dục ngoài trời"),
+        t("Open windows", "Mở cửa sổ"),
+        t("Mask outdoors", "Khẩu trang khi ra ngoài"),
+        t("Children, elderly, asthma", "Trẻ em, người già, hen suyễn"),
+    ];
+    Insight {
+        air: Some(AirCard {
+            title: t("Air quality (AQI)", "Chất lượng không khí (AQI)"),
+            value: "132".into(),
+            level: t("Unhealthy for some", "Hại người nhạy cảm"),
+            position: 132.0 / 300.0,
+            rgb: (1.0, 0.62, 0.22),
+            detail: t(
+                "PM2.5 48 µg/m³, 3.2x the WHO limit",
+                "PM2.5 48 µg/m³, gấp 3.2 lần ngưỡng WHO",
+            ),
+            advice: activities
+                .into_iter()
+                .zip(verdicts)
+                .map(|(activity, (verdict, word))| Advice {
+                    activity,
+                    verdict,
+                    word,
+                })
+                .collect(),
+        }),
+        air_missing: String::new(),
+        tiles: vec![
+            Tile {
+                title: t("Season", "Mùa"),
+                value: t("Autumn", "Mùa thu"),
+                note: t("Mild and drier, falling leaves", "Dịu mát, ít mưa, lá rụng"),
+                hue: Hue::Leaf,
+            },
+            Tile {
+                title: t("Rain and sun", "Mưa nắng"),
+                value: t("Heavy rain", "Mưa to"),
+                note: t(
+                    "Big drops, thunder and lightning, 9.2 mm/h",
+                    "Hạt lớn, có sấm sét, 9.2 mm/h",
+                ),
+                hue: Hue::Storm,
+            },
+            Tile {
+                title: t("Wind", "Gió"),
+                value: t("Gale, 58 km/h", "Gió rất mạnh, 58 km/h"),
+                note: t(
+                    "Southwest, gusts 71 km/h. Leaves swirl up",
+                    "Tây Nam, giật 71 km/h. Lá cuộn xoáy, cành có thể gãy",
+                ),
+                hue: Hue::Cloud,
+            },
+            Tile {
+                title: t("Feels like", "Cảm giác"),
+                value: t("Cold, 9°", "Lạnh, 9°"),
+                note: t(
+                    "Wear a warm jacket and cover your neck",
+                    "Mặc áo khoác ấm, che cổ",
+                ),
+                hue: Hue::Snow,
+            },
+        ],
+    }
+}
+
+fn sky(day: bool, progress: f64) -> Atmosphere {
+    Atmosphere {
+        day,
+        progress,
+        leaf: (0.95, 0.56, 0.16),
+        wind_dir: 1.0,
+        ..Atmosphere::default()
     }
 }
 
@@ -188,7 +280,126 @@ fn main() {
         notch.add_page(view.page("Weather".into(), || {}, || {}));
         let (shot, shown) = (Rc::clone(&notch), Rc::clone(&view));
         app::after(0.4, move || {
+            let with = |fx: Atmosphere, detail: bool| {
+                let mut display = scene(false, fx.rain > 0.0);
+                display.fx = Some(fx);
+                if !detail {
+                    display.insight = None;
+                }
+                display
+            };
             let mut scenes = vec![
+                (
+                    "fx_noon",
+                    with(
+                        Atmosphere {
+                            cloud: 0.2,
+                            ..sky(true, 0.5)
+                        },
+                        true,
+                    ),
+                ),
+                (
+                    "fx_sunset",
+                    with(
+                        Atmosphere {
+                            cloud: 0.35,
+                            ..sky(true, 0.93)
+                        },
+                        true,
+                    ),
+                ),
+                ("fx_night", with(sky(false, 0.4), true)),
+                (
+                    "fx_drizzle",
+                    with(
+                        Atmosphere {
+                            cloud: 0.8,
+                            rain: 0.15,
+                            ..sky(true, 0.4)
+                        },
+                        true,
+                    ),
+                ),
+                (
+                    "fx_downpour",
+                    with(
+                        Atmosphere {
+                            cloud: 1.0,
+                            rain: 0.95,
+                            thunder: true,
+                            wind: 0.5,
+                            ..sky(true, 0.4)
+                        },
+                        true,
+                    ),
+                ),
+                (
+                    "fx_snow",
+                    with(
+                        Atmosphere {
+                            cloud: 0.9,
+                            snow: 0.8,
+                            cold: 0.9,
+                            ..sky(true, 0.4)
+                        },
+                        true,
+                    ),
+                ),
+                (
+                    "fx_cold",
+                    with(
+                        Atmosphere {
+                            cloud: 0.2,
+                            cold: 0.8,
+                            ..sky(false, 0.3)
+                        },
+                        true,
+                    ),
+                ),
+                (
+                    "fx_wind",
+                    with(
+                        Atmosphere {
+                            cloud: 0.5,
+                            wind: 0.5,
+                            ..sky(true, 0.6)
+                        },
+                        true,
+                    ),
+                ),
+                (
+                    "fx_gale",
+                    with(
+                        Atmosphere {
+                            cloud: 0.7,
+                            wind: 1.0,
+                            ..sky(true, 0.6)
+                        },
+                        true,
+                    ),
+                ),
+                (
+                    "fx_haze",
+                    with(
+                        Atmosphere {
+                            haze: 0.8,
+                            ..sky(true, 0.3)
+                        },
+                        true,
+                    ),
+                ),
+                (
+                    "fx_fog",
+                    with(
+                        Atmosphere {
+                            fog: 0.8,
+                            cloud: 0.8,
+                            ..sky(true, 0.3)
+                        },
+                        true,
+                    ),
+                ),
                 ("sunny_en", scene(false, false)),
                 ("rainy_en", scene(false, true)),
                 ("sunny_vi", scene(true, false)),
@@ -253,7 +464,14 @@ fn main() {
                 ));
             }
             for (name, display) in scenes {
-                shown.show(display);
+                shown.show(display.clone());
+                // The details view, for the scenes that have it.
+                if name.starts_with("fx_") {
+                    shown.show_details(true);
+                    let png = shot.snapshot_png(index).expect("the page");
+                    fs::write(dir.join(format!("{name}_details.png")), png).expect("write png");
+                    shown.show_details(false);
+                }
                 let png = shot.snapshot_png(index).expect("the page");
                 let path = dir.join(format!("{name}.png"));
                 fs::write(&path, png).expect("write png");
