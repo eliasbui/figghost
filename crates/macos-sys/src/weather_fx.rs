@@ -1,16 +1,20 @@
 //! The moving sky behind the Weather tab: the sun or the moon where it is in the day, clouds, rain of every size,
 //! lightning, snow, frost, wind with the leaves it carries and the dust of dirty air. The app says what the sky is like
-//! as numbers (`Atmosphere`); where every drop and leaf is at each moment is worked out here by `Sim`, which knows
-//! nothing of AppKit so that its rules can be tested, and `FxView` only paints it.
+//! as numbers (`Atmosphere`); the GPU paints the air itself (`weather_gpu`), and `Sim` works out what has a body of its
+//! own: where each leaf is, and when lightning strikes and its thunder arrives. `Sim` knows nothing of AppKit, so its
+//! rules can be tested.
 
+use crate::weather_gpu::{Gpu, MAX_LEAVES, Uniforms};
 use objc2::{
     AnyThread, DefinedClass, MainThreadMarker, MainThreadOnly, define_class, msg_send, rc::Retained,
 };
-use objc2_app_kit::{NSBezierPath, NSColor, NSGradient, NSGradientDrawingOptions, NSView};
+use objc2_app_kit::{NSBitmapImageRep, NSDeviceRGBColorSpace, NSView};
 use objc2_foundation::{NSObjectProtocol, NSPoint, NSRect, NSSize};
+use objc2_quartz_core::CAMetalLayer;
 use std::{
-    cell::RefCell,
-    f64::consts::{PI, TAU},
+    cell::{Cell, RefCell},
+    f64::consts::TAU,
+    time::{Duration, Instant},
 };
 
 /// What the sky is like, every figure from 0 to 1 unless it says otherwise.
@@ -51,12 +55,12 @@ impl Rng {
 }
 
 #[derive(Clone, Copy)]
-struct Particle {
+struct Leaf {
     x: f64,
     y: f64,
-    /// A speed factor or a size, by the kind of particle.
-    a: f64,
-    b: f64,
+    /// A speed factor, a size and a phase, each from its own draw.
+    speed: f64,
+    size: f64,
     phase: f64,
 }
 
@@ -66,69 +70,37 @@ pub struct Sim {
     h: f64,
     t: f64,
     rng: Rng,
-    drops: Vec<Particle>,
-    ripples: Vec<(f64, f64, f64)>,
-    flakes: Vec<Particle>,
-    streaks: Vec<Particle>,
-    leaves: Vec<Particle>,
-    motes: Vec<Particle>,
-    clouds: Vec<Particle>,
-    sparkles: Vec<Particle>,
-    mist: Vec<Particle>,
-    stars: Vec<Particle>,
+    leaves: Vec<Leaf>,
     /// 1 at the instant of a flash, fading to 0.
     flash: f64,
     next_bolt: f64,
-    bolt: Vec<(f64, f64)>,
+    /// Where the last bolt fell, from 0 at the left edge to 1 at the right.
+    bolt_x: f64,
     /// Seconds until the thunder of the last bolt arrives: light is quicker than sound.
     thunder_in: Option<f64>,
     rumble: bool,
 }
 
-fn count(base: f64, scale: f64, level: f64) -> usize {
-    if level <= 0.0 {
-        0
-    } else {
-        (base + scale * level.min(1.0)) as usize
-    }
-}
-
 impl Sim {
     pub fn new(atm: Atmosphere, w: f64, h: f64) -> Self {
         let mut rng = Rng(0x9E37_79B9_7F4A_7C15);
-        let scatter = |n: usize, rng: &mut Rng| -> Vec<Particle> {
-            (0..n)
-                .map(|_| Particle {
-                    x: rng.range(0.0, w),
-                    y: rng.range(0.0, h),
-                    a: rng.range(0.7, 1.3),
-                    b: rng.range(0.0, 1.0),
-                    phase: rng.range(0.0, TAU),
-                })
-                .collect()
+        // Leaves start to come at a fresh breeze and swirl in a gale.
+        let count = if atm.wind > 0.2 {
+            ((3.0 + atm.wind * 13.0) as usize).min(MAX_LEAVES)
+        } else {
+            0
         };
-        let rain = if atm.rain > 0.02 { atm.rain } else { 0.0 };
-        let snow = atm.snow;
-        let wind = if atm.wind > 0.1 { atm.wind } else { 0.0 };
-        let sim = Self {
-            drops: scatter(count(24.0, 190.0, rain), &mut rng),
-            flakes: scatter(count(30.0, 110.0, snow), &mut rng),
-            streaks: scatter(count(2.0, 14.0, wind), &mut rng),
-            // Leaves start to come at a fresh breeze and swirl in a gale.
-            leaves: scatter(
-                if atm.wind > 0.2 {
-                    (3.0 + atm.wind * 13.0) as usize
-                } else {
-                    0
-                },
-                &mut rng,
-            ),
-            motes: scatter(count(24.0, 110.0, atm.haze), &mut rng),
-            clouds: scatter(count(2.0, 5.0, atm.cloud), &mut rng),
-            sparkles: scatter(count(6.0, 22.0, atm.cold), &mut rng),
-            mist: scatter(count(5.0, 8.0, atm.cold), &mut rng),
-            stars: scatter(if atm.day { 0 } else { 46 }, &mut rng),
-            ripples: Vec::new(),
+        let leaves = (0..count)
+            .map(|_| Leaf {
+                x: rng.range(0.0, w),
+                y: rng.range(0.0, h),
+                speed: rng.range(0.7, 1.3),
+                size: rng.range(0.0, 1.0),
+                phase: rng.range(0.0, TAU),
+            })
+            .collect();
+        let mut sim = Self {
+            leaves,
             atm,
             w,
             h,
@@ -136,12 +108,11 @@ impl Sim {
             rng,
             flash: 0.0,
             next_bolt: 1.2,
-            bolt: Vec::new(),
+            bolt_x: 0.5,
             thunder_in: None,
             rumble: false,
         };
-        let mut sim = sim;
-        // A frame of a sky that has been going on for a while, not one that is only starting.
+        // A sky that has been going on for a while, not one that is only starting.
         for _ in 0..90 {
             sim.step(1.0 / 30.0);
         }
@@ -152,6 +123,10 @@ impl Sim {
         self.atm
     }
 
+    pub fn time(&self) -> f64 {
+        self.t
+    }
+
     /// Moves everything on by `dt` seconds.
     pub fn step(&mut self, dt: f64) {
         let dt = dt.clamp(0.0, 0.05);
@@ -159,57 +134,12 @@ impl Sim {
         let (w, h) = (self.w, self.h);
         let atm = self.atm;
         let dir = if atm.wind_dir < 0.0 { -1.0 } else { 1.0 };
-
-        // Rain falls on a slant that the wind sets, and a drop that lands rings the water for a moment.
-        let slant = dir * (30.0 + atm.wind * 360.0);
-        let fall = 300.0 + 520.0 * atm.rain;
-        let length = rain_length(atm.rain);
-        let mut landed = Vec::new();
-        for d in &mut self.drops {
-            d.y += fall * d.a * dt;
-            d.x += slant * dt;
-            if d.y > h {
-                landed.push(d.x);
-                d.y = -length;
-                d.x = self.rng.range(-0.3 * w, 1.1 * w);
-            }
-        }
-        for x in landed {
-            if self.rng.next() < 0.3 && self.ripples.len() < 28 && (0.0..w).contains(&x) {
-                let y = self.rng.range(h - 18.0, h - 3.0);
-                self.ripples.push((x, y, 0.0));
-            }
-        }
-        for r in &mut self.ripples {
-            r.2 += dt;
-        }
-        self.ripples.retain(|r| r.2 < 0.7);
-
-        for f in &mut self.flakes {
-            f.y += (22.0 + 36.0 * f.a) * dt;
-            f.x += ((self.t * 1.3 + f.phase).sin() * 14.0 + dir * atm.wind * 140.0) * dt;
-            if f.y > h + 4.0 {
-                f.y = -4.0;
-                f.x = self.rng.range(0.0, w);
-            }
-            f.x = f.x.rem_euclid(w);
-        }
-
-        // Wind streaks and leaves travel across, and come back in at the other side.
-        for s in &mut self.streaks {
-            s.x += dir * (150.0 + 820.0 * atm.wind) * s.a * dt;
-            let len = 40.0 + 110.0 * atm.wind;
-            if s.x > w + len || s.x < -len {
-                s.x = if dir > 0.0 { -len } else { w + len };
-                s.y = self.rng.range(14.0, h - 10.0);
-            }
-        }
         let swirl = swirl_of(atm.wind);
         for l in &mut self.leaves {
-            l.x += dir * (50.0 + 420.0 * atm.wind) * l.a * dt;
-            l.y += (8.0 + 14.0 * l.b) * dt;
+            l.x += dir * (50.0 + 420.0 * atm.wind) * l.speed * dt;
+            l.y += (8.0 + 14.0 * l.size) * dt;
             // A leaf in a gale goes round as it goes along, which is what rolls it up.
-            l.phase += (1.6 + 5.5 * swirl + 2.0 * l.b) * dt;
+            l.phase += (1.6 + 5.5 * swirl + 2.0 * l.size) * dt;
             if l.x > w + 40.0 || l.x < -40.0 {
                 l.x = if dir > 0.0 { -30.0 } else { w + 30.0 };
                 l.y = self.rng.range(h * 0.25, h * 0.95);
@@ -219,30 +149,6 @@ impl Sim {
             }
         }
 
-        for m in &mut self.motes {
-            m.x += (6.0 * dir * (0.5 + atm.wind) + 8.0 * (self.t * 0.4 + m.phase).sin()) * dt;
-            m.y += 5.0 * (self.t * 0.3 + m.phase * 2.0).cos() * dt;
-            m.x = m.x.rem_euclid(w);
-            m.y = m.y.rem_euclid(h);
-        }
-        for c in &mut self.clouds {
-            c.x += dir * (5.0 + 55.0 * atm.wind) * c.a * dt;
-            if c.x > w + 120.0 {
-                c.x = -120.0;
-            } else if c.x < -120.0 {
-                c.x = w + 120.0;
-            }
-        }
-        for m in &mut self.mist {
-            m.y -= 9.0 * m.a * dt;
-            m.x += 5.0 * dir * dt;
-            if m.y < h * 0.3 {
-                m.y = h + 20.0;
-                m.x = self.rng.range(0.0, w);
-            }
-            m.x = m.x.rem_euclid(w);
-        }
-
         // Thunder weather: a bolt now and then, bright at first and gone in a third of a second.
         self.flash = (self.flash - dt * 3.2).max(0.0);
         if atm.thunder {
@@ -250,7 +156,7 @@ impl Sim {
             if self.next_bolt <= 0.0 {
                 self.next_bolt = self.rng.range(2.5, 7.0);
                 self.flash = 1.0;
-                self.bolt = self.make_bolt();
+                self.bolt_x = self.rng.range(0.15, 0.85);
                 self.thunder_in = Some(self.rng.range(0.4, 2.2));
             }
         }
@@ -268,21 +174,54 @@ impl Sim {
         std::mem::take(&mut self.rumble)
     }
 
-    fn make_bolt(&mut self) -> Vec<(f64, f64)> {
-        let (w, h) = (self.w, self.h);
-        let mut x = self.rng.range(w * 0.15, w * 0.85);
-        let mut y = 0.0;
-        let mut points = vec![(x, y)];
-        while y < h * 0.8 {
-            y += self.rng.range(14.0, 30.0);
-            x += self.rng.range(-22.0, 22.0);
-            points.push((x, y));
-        }
-        points
-    }
-
     pub fn flash(&self) -> f64 {
         self.flash
+    }
+
+    /// The leaves for the shader: where each is across and down the area from 0 to 1, how far it has turned, and its
+    /// size as a part of the height.
+    fn leaf_data(&self) -> Vec<[f32; 4]> {
+        let swirl = swirl_of(self.atm.wind);
+        self.leaves
+            .iter()
+            .map(|l| {
+                // Going round in the wind: the wider the circle, the stronger the gale.
+                let radius = 6.0 * l.size + swirl * (16.0 + 22.0 * l.size);
+                let x = l.x + radius * l.phase.cos();
+                let y = l.y + radius * 0.7 * l.phase.sin() + 10.0 * (l.phase * 0.5).sin();
+                [
+                    (x / self.w) as f32,
+                    (y / self.h) as f32,
+                    (l.phase * 1.4 + l.size * TAU) as f32,
+                    ((5.0 + 3.0 * l.size) / self.h * 1.15) as f32,
+                ]
+            })
+            .collect()
+    }
+
+    /// What the shader needs for this moment, for an area drawn at `scale` pixels to a point.
+    fn uniforms(&self, scale: f64) -> Uniforms {
+        let a = &self.atm;
+        let f = |v: f64| v as f32;
+        let flag = |on: bool| if on { 1.0 } else { 0.0 };
+        Uniforms([
+            [f(self.w * scale), f(self.h * scale), f(self.t), flag(a.day)],
+            [f(a.progress), f(a.cloud), f(a.rain), flag(a.thunder)],
+            [f(a.snow), f(a.fog), f(a.cold), f(a.wind)],
+            [
+                f(if a.wind_dir < 0.0 { -1.0 } else { 1.0 }),
+                f(a.haze),
+                f(self.flash),
+                f(self.bolt_x),
+            ],
+            [
+                f(a.leaf.0),
+                f(a.leaf.1),
+                f(a.leaf.2),
+                self.leaves.len() as f32,
+            ],
+            [f(scale), 0.0, 0.0, 0.0],
+        ])
     }
 }
 
@@ -291,409 +230,52 @@ fn swirl_of(wind: f64) -> f64 {
     ((wind - 0.55) / 0.35).clamp(0.0, 1.0)
 }
 
-fn rain_length(rain: f64) -> f64 {
-    6.0 + 16.0 * rain
+/// One picture of a sky `seconds` into its life, `width` by `height` points at `scale` pixels to a point, as BGRA with
+/// the top row first, for the checks. `None` where there is no GPU.
+pub fn render_image(
+    atm: Atmosphere,
+    seconds: f64,
+    width: f64,
+    height: f64,
+    scale: f64,
+) -> Option<Vec<u8>> {
+    render_with(&Gpu::new().ok()?, atm, seconds, width, height, scale)
 }
 
-fn rgba(r: f64, g: f64, b: f64, a: f64) -> Retained<NSColor> {
-    NSColor::colorWithSRGBRed_green_blue_alpha(r, g, b, a.clamp(0.0, 1.0))
-}
-
-fn pt(x: f64, y: f64, h: f64) -> NSPoint {
-    NSPoint::new(x, h - y)
-}
-
-/// A soft round light: `rgb` at `alpha` in the middle, nothing at `radius`.
-fn glow(x: f64, y: f64, radius: f64, rgb: (f64, f64, f64), alpha: f64, h: f64) {
-    if alpha <= 0.002 {
-        return;
+fn render_with(
+    gpu: &Gpu,
+    atm: Atmosphere,
+    seconds: f64,
+    width: f64,
+    height: f64,
+    scale: f64,
+) -> Option<Vec<u8>> {
+    let mut sim = Sim::new(atm, width, height);
+    while sim.time() < seconds {
+        sim.step(1.0 / 30.0);
     }
-    let Some(gradient) = NSGradient::initWithStartingColor_endingColor(
-        NSGradient::alloc(),
-        &rgba(rgb.0, rgb.1, rgb.2, alpha),
-        &rgba(rgb.0, rgb.1, rgb.2, 0.0),
-    ) else {
-        return;
-    };
-    let centre = pt(x, y, h);
-    gradient.drawFromCenter_radius_toCenter_radius_options(
-        centre,
-        0.0,
-        centre,
-        radius,
-        NSGradientDrawingOptions::empty(),
-    );
-}
-
-fn dot(path: &NSBezierPath, x: f64, y: f64, r: f64, h: f64) {
-    path.appendBezierPathWithOvalInRect(NSRect::new(
-        NSPoint::new(x - r, h - y - r),
-        NSSize::new(r * 2.0, r * 2.0),
-    ));
-}
-
-fn lerp(a: f64, b: f64, t: f64) -> f64 {
-    a + (b - a) * t.clamp(0.0, 1.0)
-}
-
-fn paint_sun(sim: &Sim, h: f64) {
-    let atm = sim.atm;
-    let (w, t) = (sim.w, sim.t);
-    let p = atm.progress.clamp(0.0, 1.0);
-    // The sun climbs from the left and goes down at the right; how high it is sets its colour and its strength.
-    let height = (PI * p).sin();
-    let (x, y) = (w * (0.10 + 0.80 * p), h * (0.86 - 0.58 * height));
-    // The sky hides it, and so does the smoke of dirty air, which also turns what is left of it red.
-    let hidden = (atm.cloud * 0.75 + atm.rain * 0.6 + atm.fog * 0.5 + atm.snow * 0.3).min(0.95);
-    let strength = (1.0 - hidden) * (1.0 - atm.haze * 0.35);
-    let low = (1.0 - height * 3.0).clamp(0.0, 1.0);
-    let smoke = atm.haze * 0.6;
-    let rgb = (
-        1.0,
-        lerp(lerp(0.86, 0.5, low), 0.45, smoke),
-        lerp(lerp(0.40, 0.18, low), 0.2, smoke),
-    );
-    glow(x, y, 150.0, rgb, 0.30 * strength, h);
-    glow(x, y, 62.0, rgb, 0.55 * strength, h);
-    if strength < 0.12 {
-        return;
-    }
-    // Rays turn slowly round a bright disc.
-    let rays = NSBezierPath::bezierPath();
-    for i in 0..14 {
-        let a = t * 0.18 + f64::from(i) * TAU / 14.0;
-        let (s, c) = a.sin_cos();
-        let (inner, outer) = (21.0, 29.0 + 7.0 * (t * 1.4 + f64::from(i) * 1.7).sin());
-        rays.moveToPoint(pt(x + c * inner, y + s * inner, h));
-        rays.lineToPoint(pt(x + c * outer, y + s * outer, h));
-    }
-    rays.setLineWidth(1.6);
-    rgba(rgb.0, rgb.1, rgb.2, 0.55 * strength).setStroke();
-    rays.stroke();
-    rgba(
-        1.0,
-        lerp(0.95, 0.75, low),
-        lerp(0.7, 0.4, low),
-        0.95 * strength,
+    gpu.render(
+        &sim.uniforms(scale),
+        &sim.leaf_data(),
+        (width * scale) as usize,
+        (height * scale) as usize,
     )
-    .setFill();
-    let disc = NSBezierPath::bezierPath();
-    dot(&disc, x, y, 15.0, h);
-    disc.fill();
-}
-
-fn paint_moon(sim: &Sim, h: f64) {
-    let atm = sim.atm;
-    let (w, t) = (sim.w, sim.t);
-    let veiled = (atm.cloud * 0.7 + atm.rain * 0.6 + atm.fog * 0.5).min(0.9);
-    // Stars that twinkle, where the sky is clear enough to see them.
-    let stars = NSBezierPath::bezierPath();
-    for s in &sim.stars {
-        let twinkle = 0.55 + 0.45 * (t * (1.2 + s.b * 2.5) + s.phase).sin();
-        if s.y < h * 0.7 {
-            dot(&stars, s.x, s.y, 0.6 + s.b * 0.9 * twinkle, h);
-        }
-    }
-    rgba(0.85, 0.9, 1.0, 0.75 * (1.0 - veiled)).setFill();
-    stars.fill();
-    let p = atm.progress.clamp(0.0, 1.0);
-    let height = (PI * p).sin();
-    let (x, y) = (w * (0.10 + 0.80 * p), h * (0.80 - 0.50 * height));
-    let strength = 1.0 - veiled;
-    glow(x, y, 120.0, (0.7, 0.78, 1.0), 0.26 * strength, h);
-    glow(x, y, 48.0, (0.85, 0.9, 1.0), 0.40 * strength, h);
-    rgba(0.93, 0.95, 1.0, 0.95 * strength).setFill();
-    let disc = NSBezierPath::bezierPath();
-    dot(&disc, x, y, 13.0, h);
-    disc.fill();
-    rgba(0.62, 0.68, 0.85, 0.35 * strength).setFill();
-    let craters = NSBezierPath::bezierPath();
-    dot(&craters, x - 4.0, y - 3.0, 3.2, h);
-    dot(&craters, x + 5.0, y + 3.0, 2.4, h);
-    dot(&craters, x + 1.0, y - 7.0, 1.6, h);
-    craters.fill();
-}
-
-fn paint_clouds(sim: &Sim, h: f64) {
-    let atm = sim.atm;
-    let dark = (atm.rain * 0.6 + if atm.thunder { 0.5 } else { 0.0 }).min(1.0);
-    let rgb = (
-        lerp(0.92, 0.42, dark),
-        lerp(0.94, 0.46, dark),
-        lerp(1.0, 0.58, dark),
-    );
-    let alpha = 0.05 + 0.10 * atm.cloud.max(atm.rain) + 0.06 * dark;
-    for c in &sim.clouds {
-        let scale = 0.8 + c.b * 0.7;
-        let y = 16.0 + c.b * h * 0.34;
-        for (dx, dy, r) in [
-            (-34.0, 6.0, 30.0),
-            (0.0, -4.0, 40.0),
-            (34.0, 5.0, 32.0),
-            (62.0, 10.0, 22.0),
-        ] {
-            glow(
-                c.x + dx * scale,
-                y + dy * scale,
-                r * scale * 1.5,
-                rgb,
-                alpha,
-                h,
-            );
-        }
-    }
-}
-
-fn paint_rain(sim: &Sim, h: f64) {
-    let atm = sim.atm;
-    if sim.drops.is_empty() {
-        return;
-    }
-    let dir = if atm.wind_dir < 0.0 { -1.0 } else { 1.0 };
-    let slant = dir * (30.0 + atm.wind * 360.0) / (300.0 + 520.0 * atm.rain);
-    let len = rain_length(atm.rain);
-    let path = NSBezierPath::bezierPath();
-    for d in &sim.drops {
-        path.moveToPoint(pt(d.x, d.y, h));
-        path.lineToPoint(pt(d.x - slant * len, d.y - len * d.a, h));
-    }
-    // A drizzle is fine and faint, a downpour thick and bright.
-    path.setLineWidth(0.7 + 1.2 * atm.rain);
-    rgba(0.66, 0.82, 1.0, 0.30 + 0.35 * atm.rain).setStroke();
-    path.stroke();
-    let rings = NSBezierPath::bezierPath();
-    for &(x, y, age) in &sim.ripples {
-        let (rx, ry) = (3.0 + age * 34.0, 1.0 + age * 8.0);
-        rings.appendBezierPathWithOvalInRect(NSRect::new(
-            NSPoint::new(x - rx, h - y - ry),
-            NSSize::new(rx * 2.0, ry * 2.0),
-        ));
-    }
-    rings.setLineWidth(0.8);
-    rgba(0.7, 0.85, 1.0, 0.35).setStroke();
-    rings.stroke();
-}
-
-fn paint_snow(sim: &Sim, h: f64) {
-    if sim.flakes.is_empty() {
-        return;
-    }
-    let path = NSBezierPath::bezierPath();
-    for f in &sim.flakes {
-        dot(&path, f.x, f.y, 1.1 + f.b * 2.0, h);
-    }
-    rgba(0.96, 0.98, 1.0, 0.85).setFill();
-    path.fill();
-}
-
-fn paint_wind(sim: &Sim, h: f64) {
-    let atm = sim.atm;
-    let dir = if atm.wind_dir < 0.0 { -1.0 } else { 1.0 };
-    let len = 40.0 + 110.0 * atm.wind;
-    let lines = NSBezierPath::bezierPath();
-    for s in &sim.streaks {
-        // A long thin ribbon that waves a little, drawn from its tail to its head.
-        for k in 0..=6 {
-            let f = f64::from(k) / 6.0;
-            let x = s.x - dir * len * (1.0 - f);
-            let y = s.y + (4.0 + 8.0 * atm.wind) * (sim.t * 3.0 + s.phase + f * 3.0).sin();
-            if k == 0 {
-                lines.moveToPoint(pt(x, y, h));
-            } else {
-                lines.lineToPoint(pt(x, y, h));
-            }
-        }
-    }
-    lines.setLineWidth(1.1);
-    rgba(0.9, 0.96, 1.0, 0.10 + 0.20 * atm.wind).setStroke();
-    lines.stroke();
-
-    let swirl = swirl_of(atm.wind);
-    for l in &sim.leaves {
-        // Going round in the wind: the wider the circle, the stronger the gale.
-        let radius = 6.0 * l.b + swirl * (16.0 + 22.0 * l.b);
-        let x = l.x + radius * l.phase.cos();
-        let y = l.y + radius * 0.7 * l.phase.sin() + 10.0 * (l.phase * 0.5).sin();
-        let turn = l.phase * 1.4 + l.b * TAU;
-        paint_leaf(x, y, turn, 5.0 + 3.0 * l.b, atm.leaf, 0.85, h);
-    }
-}
-
-fn paint_leaf(x: f64, y: f64, turn: f64, size: f64, rgb: (f64, f64, f64), alpha: f64, h: f64) {
-    let (s, c) = turn.sin_cos();
-    // The outline in the leaf's own frame, from the stalk to the tip and back; then turned and placed.
-    let outline = [
-        (-1.0, 0.0),
-        (-0.4, 0.55),
-        (0.35, 0.6),
-        (1.0, 0.0),
-        (0.35, -0.6),
-        (-0.4, -0.55),
-    ];
-    let at = |(lx, ly): (f64, f64)| {
-        let (lx, ly) = (lx * size, ly * size);
-        pt(x + lx * c - ly * s, y + lx * s + ly * c, h)
-    };
-    let path = NSBezierPath::bezierPath();
-    path.moveToPoint(at(outline[0]));
-    for p in &outline[1..] {
-        path.lineToPoint(at(*p));
-    }
-    path.closePath();
-    rgba(rgb.0, rgb.1, rgb.2, alpha).setFill();
-    path.fill();
-    let rib = NSBezierPath::bezierPath();
-    rib.moveToPoint(at((-1.2, 0.0)));
-    rib.lineToPoint(at((0.8, 0.0)));
-    rib.setLineWidth(0.7);
-    rgba(rgb.0 * 0.6, rgb.1 * 0.6, rgb.2 * 0.6, alpha).setStroke();
-    rib.stroke();
-}
-
-fn paint_cold(sim: &Sim, h: f64) {
-    let atm = sim.atm;
-    let w = sim.w;
-    if atm.cold <= 0.0 {
-        return;
-    }
-    // Frost creeps in from the edges, the colder the further.
-    if let Some(gradient) = NSGradient::initWithStartingColor_endingColor(
-        NSGradient::alloc(),
-        &rgba(0.7, 0.88, 1.0, 0.0),
-        &rgba(0.7, 0.88, 1.0, 0.10 + 0.34 * atm.cold),
-    ) {
-        let centre = NSPoint::new(w / 2.0, h / 2.0);
-        // The colour past the outer circle is drawn out to the corners.
-        gradient.drawFromCenter_radius_toCenter_radius_options(
-            centre,
-            h * (0.62 - 0.22 * atm.cold),
-            centre,
-            w * 0.62,
-            NSGradientDrawingOptions::DrawsAfterEndingLocation,
-        );
-    }
-    for m in &sim.mist {
-        glow(
-            m.x,
-            m.y,
-            44.0 + 30.0 * m.b,
-            (0.85, 0.94, 1.0),
-            0.05 + 0.09 * atm.cold,
-            h,
-        );
-    }
-    // Ice that glints: a small cross that swells and fades.
-    let glints = NSBezierPath::bezierPath();
-    for s in &sim.sparkles {
-        let k = (sim.t * 1.6 + s.phase).sin().max(0.0).powi(3);
-        let r = 1.0 + 4.5 * k * (0.6 + s.b * 0.6);
-        glints.moveToPoint(pt(s.x - r, s.y, h));
-        glints.lineToPoint(pt(s.x + r, s.y, h));
-        glints.moveToPoint(pt(s.x, s.y - r, h));
-        glints.lineToPoint(pt(s.x, s.y + r, h));
-    }
-    glints.setLineWidth(0.9);
-    rgba(0.85, 0.96, 1.0, 0.8).setStroke();
-    glints.stroke();
-}
-
-fn paint_haze(sim: &Sim, h: f64, rect: NSRect) {
-    let atm = sim.atm;
-    if atm.haze <= 0.0 {
-        return;
-    }
-    rgba(0.66, 0.55, 0.38, atm.haze * 0.26).setFill();
-    NSBezierPath::bezierPathWithRect(rect).fill();
-    let dust = NSBezierPath::bezierPath();
-    for m in &sim.motes {
-        dot(&dust, m.x, m.y, 0.8 + m.b * 1.5, h);
-    }
-    rgba(0.82, 0.72, 0.54, 0.16 + 0.22 * atm.haze).setFill();
-    dust.fill();
-}
-
-fn paint_fog(sim: &Sim, h: f64) {
-    if sim.atm.fog <= 0.0 {
-        return;
-    }
-    for k in 0..7 {
-        let drift = (sim.t * (3.0 + f64::from(k % 3)) + f64::from(k) * 90.0)
-            .rem_euclid(sim.w * 1.4)
-            - sim.w * 0.2;
-        let y = h * (0.3 + 0.12 * f64::from(k % 4));
-        glow(drift, y, 110.0, (0.82, 0.85, 0.9), 0.20 * sim.atm.fog, h);
-    }
-}
-
-/// The whole sky into `rect`, whose height is `h`.
-fn paint(sim: &Sim, rect: NSRect) {
-    let h = rect.size.height;
-    let atm = sim.atm;
-    // Nothing falls or glows outside the page, nor past the rounded corners of the notch under it.
-    NSBezierPath::bezierPathWithRoundedRect_xRadius_yRadius(rect, 18.0, 18.0).addClip();
-    // The colour of the air: blue by day, gold when the sun is low, deep blue at night, and grey in a storm.
-    let height = (PI * atm.progress.clamp(0.0, 1.0)).sin();
-    let clear = 1.0 - atm.cloud * 0.6;
-    let (top, bottom) = if atm.day {
-        let low = (1.0 - height * 3.0).clamp(0.0, 1.0);
-        (
-            rgba(0.25, 0.55, 1.0, 0.20 * clear),
-            rgba(
-                1.0,
-                lerp(0.8, 0.5, low),
-                lerp(0.55, 0.25, low),
-                (0.04 + 0.20 * low) * clear,
-            ),
-        )
-    } else {
-        (rgba(0.05, 0.08, 0.30, 0.36), rgba(0.10, 0.12, 0.32, 0.08))
-    };
-    if let Some(gradient) =
-        NSGradient::initWithStartingColor_endingColor(NSGradient::alloc(), &top, &bottom)
-    {
-        gradient.drawInRect_angle(rect, -90.0);
-    }
-    let gloom = (atm.rain * 0.8 + if atm.thunder { 0.4 } else { 0.0 }).min(1.0);
-    if gloom > 0.0 {
-        rgba(0.08, 0.10, 0.16, 0.34 * gloom).setFill();
-        NSBezierPath::bezierPathWithRect(rect).fill();
-    }
-    if atm.day {
-        paint_sun(sim, h);
-    } else {
-        paint_moon(sim, h);
-    }
-    paint_clouds(sim, h);
-    paint_fog(sim, h);
-    paint_haze(sim, h, rect);
-    paint_wind(sim, h);
-    paint_rain(sim, h);
-    paint_snow(sim, h);
-    paint_cold(sim, h);
-    let flash = sim.flash();
-    if flash > 0.0 {
-        rgba(0.9, 0.93, 1.0, 0.32 * flash).setFill();
-        NSBezierPath::bezierPathWithRect(rect).fill();
-        if flash > 0.45 && sim.bolt.len() > 1 {
-            for (width, alpha) in [(7.0, 0.20), (2.2, 0.95)] {
-                let bolt = NSBezierPath::bezierPath();
-                for (i, &(x, y)) in sim.bolt.iter().enumerate() {
-                    if i == 0 {
-                        bolt.moveToPoint(pt(x, y, h));
-                    } else {
-                        bolt.lineToPoint(pt(x, y, h));
-                    }
-                }
-                bolt.setLineWidth(width);
-                rgba(0.85, 0.9, 1.0, alpha * flash).setStroke();
-                bolt.stroke();
-            }
-        }
-    }
 }
 
 pub struct FxIvars {
     sim: RefCell<Option<Sim>>,
+    /// The GPU, and the layer it draws in on a real screen. Made when a sky is first shown, not when the app starts: most
+    /// people never turn the Weather tab on, and a GPU costs memory and time. None on a Mac that cannot run the shader,
+    /// which leaves the tab plain.
+    gpu: RefCell<Option<Gpu>>,
+    layer: RefCell<Option<Retained<CAMetalLayer>>>,
+    asked_for_gpu: Cell<bool>,
+    /// Drawing is put off until then after the window server held a frame back: a hidden window does not give frames
+    /// back, and the main thread must not wait for them.
+    resume_at: Cell<Option<Instant>>,
+    /// For the checks that cannot look at a screen (`FIGGHOST_NOTCH_OFFSCREEN`): the sky as a picture the view draws.
+    still: RefCell<Option<Retained<NSBitmapImageRep>>>,
+    offscreen: bool,
 }
 
 define_class!(
@@ -707,8 +289,8 @@ define_class!(
     impl FxView {
         #[unsafe(method(drawRect:))]
         fn draw_rect(&self, _dirty: NSRect) {
-            if let Some(sim) = self.ivars().sim.borrow().as_ref() {
-                paint(sim, self.bounds());
+            if let Some(rep) = self.ivars().still.borrow().as_ref() {
+                rep.drawInRect(self.bounds());
             }
         }
 
@@ -724,38 +306,164 @@ define_class!(
 
 impl FxView {
     pub fn new(mtm: MainThreadMarker, frame: NSRect) -> Retained<Self> {
+        let offscreen = std::env::var_os("FIGGHOST_NOTCH_OFFSCREEN").is_some();
         let this = mtm.alloc::<Self>().set_ivars(FxIvars {
             sim: RefCell::new(None),
+            gpu: RefCell::new(None),
+            layer: RefCell::new(None),
+            asked_for_gpu: Cell::new(false),
+            resume_at: Cell::new(None),
+            still: RefCell::new(None),
+            offscreen,
         });
         // SAFETY: designated initializer with valid arguments on the main thread.
         unsafe { msg_send![super(this), initWithFrame: frame] }
     }
 
+    /// Makes the GPU the first time it is wanted.
+    fn ensure_gpu(&self) {
+        let ivars = self.ivars();
+        if ivars.asked_for_gpu.replace(true) {
+            return;
+        }
+        let Ok(gpu) = Gpu::new() else {
+            return;
+        };
+        if !ivars.offscreen {
+            let layer = gpu.layer();
+            // The view hosts the layer: the GPU draws in it, and AppKit keeps it the size of the view.
+            self.setLayer(Some(&layer));
+            self.setWantsLayer(true);
+            *ivars.layer.borrow_mut() = Some(layer);
+        }
+        *ivars.gpu.borrow_mut() = Some(gpu);
+    }
+
+    fn scale(&self) -> f64 {
+        self.window().map_or(2.0, |w| w.backingScaleFactor())
+    }
+
+    /// Draws the sky as it is now.
+    fn paint(&self) {
+        if self.ivars().offscreen {
+            self.paint_still();
+            return;
+        }
+        let slot = self.ivars().sim.borrow();
+        let (gpu, layer) = (self.ivars().gpu.borrow(), self.ivars().layer.borrow());
+        let (Some(sim), Some(gpu), Some(layer)) = (slot.as_ref(), gpu.as_ref(), layer.as_ref())
+        else {
+            return;
+        };
+        // Nothing is drawn for a window that is not on screen: its frames are not given back.
+        if self.isHiddenOrHasHiddenAncestor() || !self.window().is_some_and(|w| w.isVisible()) {
+            return;
+        }
+        if self
+            .ivars()
+            .resume_at
+            .get()
+            .is_some_and(|at| Instant::now() < at)
+        {
+            return;
+        }
+        let scale = self.scale();
+        let size = self.bounds().size;
+        layer.setContentsScale(scale);
+        layer.setDrawableSize(NSSize::new(size.width * scale, size.height * scale));
+        let mut uniforms = sim.uniforms(scale);
+        uniforms.0[0][0] = (size.width * scale) as f32;
+        uniforms.0[0][1] = (size.height * scale) as f32;
+        if !gpu.draw(layer, &uniforms, &sim.leaf_data()) {
+            self.ivars()
+                .resume_at
+                .set(Some(Instant::now() + Duration::from_secs(3)));
+        }
+    }
+
+    fn paint_still(&self) {
+        let size = self.bounds().size;
+        let atmosphere = self
+            .ivars()
+            .sim
+            .borrow()
+            .as_ref()
+            .map(|s| (s.atmosphere(), s.time()));
+        let rep = atmosphere.and_then(|(atm, seconds)| {
+            let bgra = render_with(
+                self.ivars().gpu.borrow().as_ref()?,
+                atm,
+                seconds,
+                size.width,
+                size.height,
+                2.0,
+            )?;
+            let (w, h) = ((size.width * 2.0) as isize, (size.height * 2.0) as isize);
+            // SAFETY: a plain RGBA bitmap with valid dimensions, which is then filled to its last byte.
+            let rep = unsafe {
+                NSBitmapImageRep::initWithBitmapDataPlanes_pixelsWide_pixelsHigh_bitsPerSample_samplesPerPixel_hasAlpha_isPlanar_colorSpaceName_bytesPerRow_bitsPerPixel(
+                    NSBitmapImageRep::alloc(), std::ptr::null_mut(), w, h, 8, 4, true, false, NSDeviceRGBColorSpace, 0, 0,
+                )
+            }?;
+            let out = rep.bitmapData();
+            if out.is_null() || rep.bytesPerRow() as usize != bgra.len() / h as usize {
+                return None;
+            }
+            for (i, px) in bgra.chunks_exact(4).enumerate() {
+                // SAFETY: `i` is below the number of pixels, which the bitmap holds.
+                unsafe { std::slice::from_raw_parts_mut(out.add(i * 4), 4) }
+                    .copy_from_slice(&[px[2], px[1], px[0], px[3]]);
+            }
+            rep.setSize(size);
+            Some(rep)
+        });
+        *self.ivars().still.borrow_mut() = rep;
+        self.setNeedsDisplay(true);
+    }
+
     /// Changes the sky. The same one again keeps what is in flight, so a refresh of the forecast does not restart it.
     pub fn set(&self, atmosphere: Option<Atmosphere>) {
+        if atmosphere.is_some() {
+            self.ensure_gpu();
+        }
         let size = self.bounds().size;
-        let mut slot = self.ivars().sim.borrow_mut();
-        match atmosphere {
-            None => *slot = None,
-            Some(atm) => {
-                if slot.as_ref().map(Sim::atmosphere) != Some(atm) {
-                    *slot = Some(Sim::new(atm, size.width, size.height));
+        {
+            let mut slot = self.ivars().sim.borrow_mut();
+            match atmosphere {
+                None => *slot = None,
+                Some(atm) => {
+                    if slot.as_ref().map(Sim::atmosphere) != Some(atm) {
+                        *slot = Some(Sim::new(atm, size.width, size.height));
+                    }
                 }
             }
         }
-        drop(slot);
-        self.setNeedsDisplay(true);
+        self.setHidden(atmosphere.is_none());
+        self.paint();
+    }
+
+    /// Draws the sky again as it is, which is all a still sky needs.
+    pub fn repaint(&self) {
+        if !self.ivars().offscreen {
+            self.paint();
+        }
     }
 
     /// One frame of `dt` seconds. True when the thunder of a bolt has just arrived.
     pub fn tick(&self, dt: f64) -> bool {
-        let mut slot = self.ivars().sim.borrow_mut();
-        let Some(sim) = slot.as_mut() else {
-            return false;
+        let rumble = {
+            let mut slot = self.ivars().sim.borrow_mut();
+            let Some(sim) = slot.as_mut() else {
+                return false;
+            };
+            sim.step(dt);
+            sim.take_rumble()
         };
-        sim.step(dt);
-        self.setNeedsDisplay(true);
-        sim.take_rumble()
+        // The still of a check is drawn when the sky is set, not on every frame.
+        if !self.ivars().offscreen {
+            self.paint();
+        }
+        rumble
     }
 }
 
@@ -778,66 +486,27 @@ mod tests {
     }
 
     #[test]
-    fn a_clear_calm_sky_has_nothing_falling_or_blowing() {
-        let sim = Sim::new(
-            Atmosphere {
-                day: true,
-                progress: 0.5,
-                ..Atmosphere::default()
-            },
-            580.0,
-            250.0,
-        );
-        assert!(sim.drops.is_empty() && sim.flakes.is_empty() && sim.leaves.is_empty());
-        assert!(sim.streaks.is_empty() && sim.motes.is_empty() && sim.clouds.is_empty());
-    }
-
-    #[test]
-    fn a_drizzle_is_fewer_and_finer_than_a_downpour_and_wind_brings_leaves() {
-        let make = |rain: f64, wind: f64| {
-            Sim::new(
-                Atmosphere {
-                    rain,
-                    wind,
-                    ..storm()
-                },
-                580.0,
-                250.0,
-            )
-        };
-        let (fine, heavy) = (make(0.15, 0.0), make(0.9, 0.0));
-        assert!(fine.drops.len() < heavy.drops.len());
-        assert!(rain_length(0.15) < rain_length(0.9));
-        assert!(
-            make(0.0, 0.1).leaves.is_empty(),
-            "a light breeze lifts no leaf"
-        );
-        assert!(make(0.0, 0.5).leaves.len() < make(0.0, 1.0).leaves.len());
+    fn a_calm_sky_has_no_leaf_and_wind_brings_them_in_numbers_that_grow() {
+        let make = |wind: f64| Sim::new(Atmosphere { wind, ..storm() }, 580.0, 250.0);
+        assert!(make(0.1).leaves.is_empty(), "a light breeze lifts no leaf");
+        assert!(make(0.5).leaves.len() < make(1.0).leaves.len());
+        assert!(make(1.0).leaves.len() <= MAX_LEAVES);
         assert_eq!(swirl_of(0.3), 0.0);
         assert_eq!(swirl_of(1.0), 1.0);
     }
 
     #[test]
-    fn everything_stays_in_the_area_while_time_runs_and_lightning_strikes_only_in_thunder() {
+    fn leaves_stay_finite_while_time_runs_and_lightning_strikes_only_in_thunder() {
         let mut sim = Sim::new(storm(), 580.0, 250.0);
-        let mut flashed = false;
-        for _ in 0..1800 {
+        let (mut flashed, mut rumbles) = (false, 0);
+        for _ in 0..3600 {
             sim.step(1.0 / 30.0);
             flashed |= sim.flash() > 0.9;
-            assert!(
-                sim.leaves
-                    .iter()
-                    .all(|l| l.x.is_finite() && l.y.is_finite())
-            );
-            assert!(sim.drops.iter().all(|d| d.y <= 250.0 + 1.0));
-            assert!(sim.ripples.len() <= 28);
-        }
-        assert!(flashed, "a minute of thunder weather without a bolt");
-        let mut rumbles = 0;
-        for _ in 0..1800 {
-            sim.step(1.0 / 30.0);
             rumbles += usize::from(sim.take_rumble());
+            assert!(sim.leaf_data().iter().flatten().all(|v| v.is_finite()));
+            assert!((0.0..=1.0).contains(&sim.bolt_x));
         }
+        assert!(flashed, "two minutes of thunder weather without a bolt");
         assert!(rumbles > 0, "every bolt is followed by its thunder");
         let mut dry = Sim::new(
             Atmosphere {
@@ -850,6 +519,47 @@ mod tests {
         for _ in 0..1800 {
             dry.step(1.0 / 30.0);
             assert_eq!(dry.flash(), 0.0);
+            assert!(!dry.take_rumble());
         }
+    }
+
+    #[test]
+    fn the_shader_compiles_and_a_sky_comes_out_lit_and_with_its_corners_cut() {
+        // On a machine with no GPU there is nothing to look at.
+        let Some(sunny) = render_image(
+            Atmosphere {
+                day: true,
+                progress: 0.5,
+                cloud: 0.2,
+                ..Atmosphere::default()
+            },
+            5.0,
+            290.0,
+            125.0,
+            1.0,
+        ) else {
+            return;
+        };
+        assert_eq!(sunny.len(), 290 * 125 * 4);
+        let pixel = |x: usize, y: usize| &sunny[(y * 290 + x) * 4..][..4];
+        assert_eq!(pixel(0, 0)[3], 0, "the corner is cut");
+        assert_eq!(pixel(145, 60)[3], 255, "the middle is solid");
+        let night = render_image(
+            Atmosphere {
+                day: false,
+                progress: 0.4,
+                ..Atmosphere::default()
+            },
+            5.0,
+            290.0,
+            125.0,
+            1.0,
+        )
+        .unwrap();
+        let brightness = |image: &[u8]| image.iter().map(|b| u64::from(*b)).sum::<u64>();
+        assert!(
+            brightness(&sunny) > 2 * brightness(&night),
+            "a day is brighter than a night"
+        );
     }
 }

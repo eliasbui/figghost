@@ -22,6 +22,8 @@ objc2-av-foundation.workspace = true
 objc2-image-io.workspace = true
 # Its default features give CALayer the geometry setters (corner radius) the camera bubble uses.
 objc2-quartz-core.workspace = true
+# Draws the sky of the Weather tab on the GPU.
+objc2-metal.workspace = true
 core-calendar.workspace = true
 objc2-foundation.workspace = true
 objc2-app-kit.workspace = true

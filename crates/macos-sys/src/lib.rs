@@ -85,6 +85,7 @@ pub mod vision;
 pub mod volume;
 pub mod volumes;
 pub mod weather_fx;
+pub mod weather_gpu;
 pub mod weather_sound;
 pub mod weather_ui;
 pub mod webview;

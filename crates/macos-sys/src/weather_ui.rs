@@ -829,20 +829,24 @@ impl WeatherView {
     pub fn set_active(&self, active: bool) {
         self.open.set(active);
         self.sync_audio();
-        let still = NSWorkspace::sharedWorkspace().accessibilityDisplayShouldReduceMotion();
-        if !active || still {
+        if !active {
             self.frames.borrow_mut().take();
             return;
         }
+        // A person who asked for less motion gets a still sky, looked at again twice a second so that it shows as soon as
+        // the tab is on screen and follows the window if it changes size.
+        let still = NSWorkspace::sharedWorkspace().accessibilityDisplayShouldReduceMotion();
         let (fx, last) = (Weak::from_retained(&self.fx), Cell::new(Instant::now()));
         let (audio, wanted) = (Rc::clone(&self.audio), self.wanted.clone());
-        *self.frames.borrow_mut() = Some(app::every(FRAME, move || {
+        *self.frames.borrow_mut() = Some(app::every(if still { 0.5 } else { FRAME }, move || {
             let now = Instant::now();
             let dt = now.duration_since(last.replace(now)).as_secs_f64();
-            if let Some(fx) = fx.load()
-                && fx.tick(dt)
-                && wanted.get()
-            {
+            let Some(fx) = fx.load() else {
+                return;
+            };
+            if still {
+                fx.repaint();
+            } else if fx.tick(dt) && wanted.get() {
                 audio.borrow_mut().thunder();
             }
         }));
