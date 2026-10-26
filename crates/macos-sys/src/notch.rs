@@ -74,7 +74,6 @@ const SWITCHER_INSET: f64 = 16.0;
 const BAND_GAP: f64 = 8.0;
 /// Width of the resting shape on a screen without a hardware notch.
 pub const PILL_WIDTH: f64 = 200.0;
-const HOT_ZONE_HEIGHT: f64 = 4.0;
 const TRIGGER_MIN_HEIGHT: f64 = 8.0;
 const TRIGGER_SIDE_SLACK: f64 = 10.0;
 /// The bottom corners of the resting shape, close to the hardware notch's own.
@@ -280,7 +279,7 @@ impl NotchGeometry {
         if std::env::var_os("FIGGHOST_NOTCH_OFFSCREEN").is_some() {
             return Some(Self {
                 screen: NSRect::new(NSPoint::new(-30_000.0, 0.0), NSSize::new(1_920.0, 1_080.0)),
-                notch: NSSize::new(PILL_WIDTH, 24.0),
+                notch: NSSize::new(PILL_WIDTH, 32.0),
                 hardware: false,
             });
         }
@@ -357,12 +356,10 @@ impl NotchGeometry {
         self.frame(size.width, size.height)
     }
 
-    /// The size of the resting shape.
-    pub fn rest_size(&self, rest: Rest) -> NSSize {
-        match (self.hardware, rest) {
-            (true, _) | (false, Rest::Notch) => self.notch,
-            (false, Rest::Hidden) => NSSize::new(PILL_WIDTH, HOT_ZONE_HEIGHT),
-        }
+    /// The size of the resting shape: always the cutout or the pill, because the date, the time and the step buttons
+    /// are drawn in it; the "hidden" setting no longer shrinks it to a thin strip.
+    pub fn rest_size(&self, _rest: Rest) -> NSSize {
+        self.notch
     }
 
     /// Where the pointer must be to open a shape of this size. Taller than the shape when it is a thin strip, and
@@ -501,6 +498,7 @@ pub struct Activity {
 type Signal = Rc<dyn Fn()>;
 type DragSignal = Rc<dyn Fn(bool)>;
 type Resize = Rc<dyn Fn(NSSize)>;
+type RestStep = Rc<dyn Fn(i32) -> bool>;
 
 pub struct RootIvars {
     /// Called when the pointer enters or leaves the window.
@@ -1370,7 +1368,7 @@ struct Inner {
     /// Keeps the time current while the pill is on screen at rest.
     rest_clock: RefCell<Option<app::Timer>>,
     /// Asked first when a step button is pressed with -1 or 1; true when it dealt with the press (music).
-    on_rest_step: RefCell<Option<Rc<dyn Fn(i32) -> bool>>>,
+    on_rest_step: RefCell<Option<RestStep>>,
     /// Bumped by every movement; a movement that finishes late does nothing when another has started since.
     generation: Cell<u64>,
     /// The shape as it is on screen now.
@@ -1761,8 +1759,6 @@ impl Inner {
         let style = self.style.borrow().clone();
         let largest = union_size(self.window_size(Shape::Open), self.window_size(previous));
         self.set_window(union_size(largest, self.window_size(target)));
-        let hidden_rest =
-            target == Shape::Rest && !self.geometry.get().hardware && style.rest == Rest::Hidden;
         let alphas = Alphas {
             // The closed shape is black, like a notch; the material shows only when it opens.
             ink: if open { 0.0 } else { 1.0 },
@@ -1778,7 +1774,7 @@ impl Inner {
             },
             content: if open { 1.0 } else { 0.0 },
             // Fully transparent pixels would let the pointer through; this keeps the invisible strip catchable.
-            surface: if hidden_rest { 0.01 } else { 1.0 },
+            surface: 1.0,
         };
         // The open notch casts the window's own shadow, redrawn on every frame of a movement so it follows the shape.
         if open && style.shadow {
@@ -2131,7 +2127,7 @@ impl Inner {
     fn sync_rest_bar(&self) {
         let hardware = self.geometry.get().hardware;
         let idle = match self.shape.get() {
-            Shape::Rest => !hardware && self.style.borrow().rest == Rest::Notch,
+            Shape::Rest => !hardware,
             Shape::Compact { .. } => hardware && self.current_activity().is_none(),
             Shape::Open => false,
         };
@@ -3827,7 +3823,7 @@ mod tests {
         let plain = geometry(false).collapsed_frame();
         assert_eq!(
             (plain.size.width, plain.size.height),
-            (PILL_WIDTH, HOT_ZONE_HEIGHT)
+            (PILL_WIDTH, 32.0)
         );
         // Both stay glued to the top edge so the pointer reaches them by moving up.
         for f in [hardware, plain] {
@@ -3839,7 +3835,7 @@ mod tests {
     fn a_screen_without_a_notch_can_show_one_or_nothing() {
         let plain = geometry(false);
         assert_eq!(plain.rest_size(Rest::Notch).height, 32.0);
-        assert_eq!(plain.rest_size(Rest::Hidden).height, HOT_ZONE_HEIGHT);
+        assert_eq!(plain.rest_size(Rest::Hidden).height, 32.0);
         // The hardware cutout is always the cutout, whatever the setting says.
         assert_eq!(geometry(true).rest_size(Rest::Hidden).height, 32.0);
     }
@@ -3874,7 +3870,7 @@ mod tests {
         assert!(contains(trigger, NSPoint::new(centre, top - 1.0)));
         assert!(!contains(
             trigger,
-            NSPoint::new(centre, top - TRIGGER_MIN_HEIGHT - 1.0)
+            NSPoint::new(centre, top - trigger.size.height - 1.0)
         ));
         assert!(!contains(trigger, NSPoint::new(centre + 200.0, top)));
     }
