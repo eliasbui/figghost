@@ -867,6 +867,7 @@ const GLYPHS = (() => {
     about: { g: C(12, 12, 10), s: C(12, 7.2, 1.6) + R(10.7, 10.2, 2.6, 7.8, 1.3) },
     notch: { g: R(1.5, 4, 21, 16, 4), s: 'M7.5 4h9v1.4a2.4 2.4 0 0 1-2.4 2.4h-4.2A2.4 2.4 0 0 1 7.5 5.4z' + R(5, 16.2, 14, 1.8, 0.9) },
     islands: { g: R(2, 8, 20, 8, 4), s: C(17.8, 12, 2) + R(5.8, 11, 7.5, 2, 1) },
+    outlook: { g: R(2, 5, 20, 14, 3), w: 'M3.6 7.2 12 13l8.4-5.8' },
     notifications: { g: 'M11 3.2a6.3 6.3 0 0 0-6.3 6.3v3.9l-1.6 3c-.4.7.1 1.6.9 1.6h14.1c.8 0 1.3-.9.9-1.6l-1.6-3V9.5A6.3 6.3 0 0 0 11 3.2z', s: C(11, 20, 2.2) + C(18.2, 5.6, 3.2) },
     musicwidget: { g: R(2.5, 2.5, 19, 19, 5.5), s: C(9.5, 16, 2.6) + R(11, 6.5, 1.8, 9.5, 0.9) + 'M11 6.5l5.5-1.6v3.1L11 9.6z' },
     agents: { g: R(1.5, 3.5, 21, 17, 4.5), w: 'M6.5 9.5l3.5 3-3.5 3', s: R(12, 14, 5.5, 2, 1) },
@@ -918,7 +919,7 @@ const GLYPHS = (() => {
 // The light and deep colour of each page: its icon runs from one to the other, its hero is mostly the deep one.
 const PAGE_LOOK = {
   general: ['#2592ff', '#0058d6'], keys: ['#7c7af8', '#403dc2'], mole: ['#2dd4bf', '#0f766e'], about: ['#a1a1aa', '#52525b'],
-  notch: ['#3b82f6', '#1e3a8a'], islands: ['#71717a', '#18181b'], notifications: ['#ff7a7a', '#d7263d'], musicwidget: ['#f472b6', '#9d174d'],
+  notch: ['#3b82f6', '#1e3a8a'], islands: ['#71717a', '#18181b'], notifications: ['#ff7a7a', '#d7263d'], outlook: ['#3aa0ff', '#0f6cbd'], musicwidget: ['#f472b6', '#9d174d'],
   agents: ['#2dd4bf', '#0d726b'], prs: ['#94a3b8', '#1f2937'], calendar: ['#fb7185', '#be123c'], pomodoro: ['#fca5a5', '#b91c1c'],
   dayprogress: ['#fdba74', '#c2410c'], screentime: ['#c4b5fd', '#6d28d9'], notes: ['#fde047', '#a16207'], launcher: ['#a78bfa', '#5738cc'],
   weather: ['#7dd3fc', '#0369a1'], video: ['#f9a8d4', '#be185d'], system: ['#94a3b8', '#334155'], updates: ['#86efac', '#15803d'],
@@ -2101,7 +2102,7 @@ const CATEGORIES = [
   { id: 'keys', sec: 'overview', icon: 'keyboard.fill', pages: ['keys'] },
   { id: 'mole', sec: 'overview', icon: 'wand.and.stars', pages: ['mole'] },
   { id: 'about', sec: 'overview', icon: 'info.circle.fill', pages: ['about'] },
-  { id: 'notch', sec: 'notch', icon: 'rectangle.topthird.inset.filled', pages: ['notch', 'islands', 'notifications', 'musicwidget'] },
+  { id: 'notch', sec: 'notch', icon: 'rectangle.topthird.inset.filled', pages: ['notch', 'islands', 'notifications', 'outlook', 'musicwidget'] },
   { id: 'agents', sec: 'tabs', icon: 'terminal.fill', pages: ['agents', 'prs'] },
   { id: 'calendar', sec: 'tabs', icon: 'calendar.badge.clock', pages: ['calendar', 'pomodoro', 'dayprogress', 'screentime'] },
   { id: 'tabs', sec: 'tabs', icon: 'square.stack.3d.up.fill', pages: ['notes', 'launcher', 'weather', 'video'] },

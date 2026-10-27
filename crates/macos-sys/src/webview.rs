@@ -675,20 +675,6 @@ impl TrayPanel {
     /// Closes the panel on a press outside it (in any app) or on Escape.
     fn watch(&self, mtm: MainThreadMarker, anchor: NSRect) {
         self.unwatch();
-        let panel = Weak::from_retained(&self.panel);
-        let own = self.panel.windowNumber();
-        let close = {
-            let panel = panel.clone();
-            move || {
-                if let Some(panel) = panel.load() {
-                    panel.orderOut(None);
-                }
-            }
-        };
-        let mask = NSEventMask::LeftMouseDown
-            | NSEventMask::RightMouseDown
-            | NSEventMask::OtherMouseDown
-            | NSEventMask::KeyDown;
         // Where the pointer is, not which window the press is for: the system gives the menu bar item another
         // window number to the monitors of other apps than to this one, and a press that closed the panel
         // before the item's click came would only have it opened again by that click.
@@ -699,41 +685,7 @@ impl TrayPanel {
                 && at.y >= anchor.origin.y
                 && at.y < anchor.origin.y + anchor.size.height
         };
-        let outside = {
-            let close = close.clone();
-            RcBlock::new(move |event: NonNull<NSEvent>| {
-                // SAFETY: AppKit passes a live event for the duration of the call.
-                let event = unsafe { event.as_ref() };
-                if event.r#type() == NSEventType::KeyDown {
-                    if event.keyCode() == KEY_ESCAPE {
-                        close();
-                    }
-                } else if !on_item() {
-                    close();
-                }
-            })
-        };
-        let inside = RcBlock::new(move |event: NonNull<NSEvent>| -> *mut NSEvent {
-            // SAFETY: AppKit passes a live event for the duration of the call.
-            let e = unsafe { event.as_ref() };
-            let number = e.windowNumber();
-            let key = e.r#type() == NSEventType::KeyDown;
-            if (!key && number != own && !on_item()) || (key && e.keyCode() == KEY_ESCAPE) {
-                close();
-            }
-            event.as_ptr()
-        });
-        let mut tokens = self.monitors.borrow_mut();
-        if let Some(token) = NSEvent::addGlobalMonitorForEventsMatchingMask_handler(mask, &outside)
-        {
-            tokens.push(token);
-        }
-        // SAFETY: the block returns the event it was given, which AppKit then delivers as usual.
-        if let Some(token) =
-            unsafe { NSEvent::addLocalMonitorForEventsMatchingMask_handler(mask, &inside) }
-        {
-            tokens.push(token);
-        }
+        *self.monitors.borrow_mut() = close_outside(&self.panel, on_item);
         let _ = mtm;
     }
 
@@ -746,6 +698,159 @@ impl TrayPanel {
 }
 
 impl Drop for TrayPanel {
+    fn drop(&mut self) {
+        self.unwatch();
+        self.host.detach();
+        self.panel.setContentView(None);
+        self.panel.close();
+    }
+}
+
+/// Orders `panel` out on a press outside it (in any app) or on Escape, except for a press `exempt` says to leave
+/// alone. Returns the monitors, which the caller removes.
+fn close_outside(
+    panel: &Retained<NSPanel>,
+    exempt: impl Fn() -> bool + Clone + 'static,
+) -> Vec<Retained<objc2::runtime::AnyObject>> {
+    let own = panel.windowNumber();
+    let panel = Weak::from_retained(panel);
+    let close = {
+        let panel = panel.clone();
+        move || {
+            if let Some(panel) = panel.load() {
+                panel.orderOut(None);
+            }
+        }
+    };
+    let mask = NSEventMask::LeftMouseDown
+        | NSEventMask::RightMouseDown
+        | NSEventMask::OtherMouseDown
+        | NSEventMask::KeyDown;
+    let outside = {
+        let close = close.clone();
+        let exempt = exempt.clone();
+        RcBlock::new(move |event: NonNull<NSEvent>| {
+            // SAFETY: AppKit passes a live event for the duration of the call.
+            let event = unsafe { event.as_ref() };
+            if event.r#type() == NSEventType::KeyDown {
+                if event.keyCode() == KEY_ESCAPE {
+                    close();
+                }
+            } else if !exempt() {
+                close();
+            }
+        })
+    };
+    let inside = RcBlock::new(move |event: NonNull<NSEvent>| -> *mut NSEvent {
+        // SAFETY: AppKit passes a live event for the duration of the call.
+        let e = unsafe { event.as_ref() };
+        let number = e.windowNumber();
+        let key = e.r#type() == NSEventType::KeyDown;
+        if (!key && number != own && !exempt()) || (key && e.keyCode() == KEY_ESCAPE) {
+            close();
+        }
+        event.as_ptr()
+    });
+    let mut tokens = Vec::new();
+    if let Some(token) = NSEvent::addGlobalMonitorForEventsMatchingMask_handler(mask, &outside) {
+        tokens.push(token);
+    }
+    // SAFETY: the block returns the event it was given, which AppKit then delivers as usual.
+    if let Some(token) =
+        unsafe { NSEvent::addLocalMonitorForEventsMatchingMask_handler(mask, &inside) }
+    {
+        tokens.push(token);
+    }
+    tokens
+}
+
+/// A clear panel with a web view for a card in the middle of a screen, which may first fall from the notch as a drop.
+/// It never takes the focus from the app in front, and goes away on a press anywhere else or on Escape.
+pub struct DropPanel {
+    pub host: WebHost,
+    panel: Retained<NSPanel>,
+    monitors: RefCell<Vec<Retained<objc2::runtime::AnyObject>>>,
+    /// Where the card is, in screen coordinates.
+    card: Cell<NSRect>,
+}
+
+impl DropPanel {
+    pub fn new(
+        mtm: MainThreadMarker,
+        html: &str,
+        on_message: impl Fn(String) + 'static,
+    ) -> Rc<Self> {
+        let frame = NSRect::new(NSPoint::ZERO, NSSize::new(400.0, 300.0));
+        let panel = crate::capture_ui::panel(mtm, frame, NSStatusWindowLevel);
+        // The page draws the card's shadow; the window's own would outline the clear column the drop falls in.
+        panel.setHasShadow(false);
+        let host = WebHost::new(mtm, frame, html, on_message, |_| {}, |_| {});
+        panel.setContentView(Some(&host.view));
+        Rc::new(Self {
+            host,
+            panel,
+            monitors: RefCell::new(Vec::new()),
+            card: Cell::new(frame),
+        })
+    }
+
+    /// Shows a card of `size` in the middle of `screen`. With `fall` the panel first reaches from the card up to the
+    /// top of the screen, where the notch is, and lets presses through while the page lets the drop fall; the page
+    /// says when it has landed, and from then the panel is only the card. The page keeps the card at its bottom, so
+    /// it does not move when the panel shrinks.
+    pub fn show(&self, screen: NSRect, size: NSSize, fall: bool) {
+        self.unwatch();
+        let card = NSRect::new(
+            NSPoint::new(
+                screen.origin.x + (screen.size.width - size.width) / 2.0,
+                screen.origin.y + (screen.size.height - size.height) / 2.0,
+            ),
+            size,
+        );
+        self.card.set(card);
+        let frame = if fall {
+            let top = screen.origin.y + screen.size.height;
+            NSRect::new(card.origin, NSSize::new(size.width, top - card.origin.y))
+        } else {
+            card
+        };
+        self.panel.setIgnoresMouseEvents(fall);
+        self.panel.setFrame_display(frame, true);
+        self.panel.orderFrontRegardless();
+        if !fall {
+            self.landed();
+        }
+    }
+
+    /// The drop has landed: the panel becomes the card, takes presses, and closes on one elsewhere.
+    pub fn landed(&self) {
+        if !self.panel.isVisible() {
+            return;
+        }
+        self.panel.setFrame_display(self.card.get(), true);
+        self.panel.setIgnoresMouseEvents(false);
+        self.unwatch();
+        *self.monitors.borrow_mut() = close_outside(&self.panel, || false);
+    }
+
+    pub fn is_visible(&self) -> bool {
+        self.panel.isVisible()
+    }
+
+    pub fn hide(&self) {
+        self.unwatch();
+        self.panel.orderOut(None);
+    }
+
+    fn unwatch(&self) {
+        for token in self.monitors.borrow_mut().drain(..) {
+            // SAFETY: each token came from an add...Monitor call and is removed once.
+            unsafe { NSEvent::removeMonitor(&token) };
+        }
+    }
+}
+
+impl Drop for DropPanel {
     fn drop(&mut self) {
         self.unwatch();
         self.host.detach();

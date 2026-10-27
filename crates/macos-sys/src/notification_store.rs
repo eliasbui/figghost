@@ -39,6 +39,8 @@ pub struct Fields {
     pub title: String,
     pub subtitle: String,
     pub body: String,
+    /// The category the app gave it, which tells its kinds apart (a message, a reminder).
+    pub category: String,
 }
 
 fn value(dict: &CFDictionary, key: &str) -> Option<CFType> {
@@ -77,6 +79,7 @@ pub fn decode(data: &[u8]) -> Option<Fields> {
         title: field("titl"),
         subtitle: field("subt"),
         body: field("body"),
+        category: field("cate"),
     })
 }
 
@@ -94,6 +97,7 @@ mod tests {
     <key>titl</key><string>Họp lúc 3 giờ</string>
     <key>subt</key><string>Phòng 2</string>
     <key>body</key><string>Mang theo laptop</string>
+    <key>cate</key><string>REMINDER</string>
   </dict>
   <key>styl</key><integer>1</integer>
 </dict></plist>"#;
@@ -111,6 +115,7 @@ mod tests {
             ),
             ("Họp lúc 3 giờ", "Phòng 2", "Mang theo laptop")
         );
+        assert_eq!(fields.category, "REMINDER");
     }
 
     #[test]

@@ -234,17 +234,19 @@ impl NotificationsView {
         self.root.setNeedsDisplay(true);
     }
 
-    /// The notch tab for this view.
+    /// The notch tab for this view, under the id and the SF Symbol of the feature that shows it.
     pub fn page(
         self: &Rc<Self>,
+        id: &'static str,
+        symbol: &'static str,
         title: String,
         on_show: impl Fn() + 'static,
         on_hide: impl Fn() + 'static,
     ) -> Page {
         Page {
-            id: "notifications",
+            id,
             title,
-            symbol: "bell.badge.fill",
+            symbol,
             root: Retained::into_super(Retained::clone(&self.root)),
             on_show: Box::new(on_show),
             on_hide: Box::new(on_hide),

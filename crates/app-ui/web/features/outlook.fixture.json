@@ -1,0 +1,11 @@
+{
+  "enabled": true,
+  "notch": true,
+  "seconds": 5,
+  "preview": true,
+  "drop": false,
+  "events": true,
+  "access": null,
+  "count": 0,
+  "installed": true
+}

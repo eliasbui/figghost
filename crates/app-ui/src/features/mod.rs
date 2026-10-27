@@ -37,6 +37,7 @@ pub mod mole;
 pub mod musicwidget;
 pub mod notes;
 pub mod notifications;
+pub mod outlook;
 pub mod pin;
 pub mod pomodoro;
 pub mod present;
@@ -58,7 +59,7 @@ pub mod wheel;
 
 /// The tabs of the notch that have a place in the strip only while their feature is on, so that a tab which would only
 /// say "this is off" is not there to be opened. Each follows the `enabled` of its own feature.
-pub(crate) const OPT_IN_TABS: [&str; 14] = [
+pub(crate) const OPT_IN_TABS: [&str; 15] = [
     "notes",
     "launcher",
     "weather",
@@ -72,6 +73,7 @@ pub(crate) const OPT_IN_TABS: [&str; 14] = [
     "displays",
     "present",
     "notifications",
+    "outlook",
     "video",
 ];
 
@@ -91,6 +93,7 @@ pub fn tab_waits(id: &str, config: &Config) -> bool {
         "displays" => !config.displays.enabled,
         "present" => !config.present.enabled,
         "notifications" => !config.notifications.enabled,
+        "outlook" => !config.outlook.enabled,
         "video" => !config.video.enabled,
         _ => false,
     }
@@ -297,6 +300,7 @@ pub struct Features {
     pub displays: Option<Rc<displays::Feature>>,
     pub present: Option<Rc<present::Feature>>,
     pub notifications: Option<Rc<notifications::Feature>>,
+    pub outlook: Option<Rc<outlook::Feature>>,
     pub video: Option<Rc<video::Feature>>,
     pub system: Option<Rc<system::Feature>>,
     pub typing: Option<Rc<typing::Feature>>,
@@ -343,6 +347,7 @@ impl Features {
             displays: displays::attach(env),
             present: present::attach(env),
             notifications: notifications::attach(env),
+            outlook: outlook::attach(env),
             video: video::attach(env),
             snippets: snippets::attach(typing.as_ref()),
             typing,
@@ -437,6 +442,9 @@ impl Features {
         }
         if let Some(f) = &self.notifications {
             out.insert("notifications", f.runtime());
+        }
+        if let Some(f) = &self.outlook {
+            out.insert("outlook", f.runtime());
         }
         if let Some(f) = &self.typing {
             out.insert("typing", f.runtime());
@@ -580,6 +588,10 @@ impl Features {
                 .notifications
                 .as_ref()
                 .map_or(Ok(()), |f| f.configure(&config.notifications)),
+            "outlook" => self
+                .outlook
+                .as_ref()
+                .map_or(Ok(()), |f| f.configure(&config.outlook)),
             "video" => self
                 .video
                 .as_ref()
@@ -814,6 +826,11 @@ impl Features {
         {
             return Some(result);
         }
+        if let Some(f) = &self.outlook
+            && let Some(result) = f.action(name)
+        {
+            return Some(result);
+        }
         if let Some(f) = &self.prs
             && let Some(result) = f.action(name)
         {
@@ -1042,6 +1059,10 @@ pub fn state(
             runtime.get("notifications").unwrap_or(&none),
         ),
     );
+    root.insert(
+        "outlook".into(),
+        outlook::settings::state(&config.outlook, runtime.get("outlook").unwrap_or(&none)),
+    );
     root.insert("video".into(), video::settings::state(&config.video));
     root.insert(
         "mole".into(),
@@ -1115,8 +1136,9 @@ pub fn set(config: &mut Config, path: &str, value: &Value) -> Option<Result<&'st
             weather::settings::set(&mut config.weather, rest, value).map(|r| r.map(|()| "weather"))
         }
         "prs" => prs::settings::set(&mut config.prs, rest, value).map(|r| r.map(|()| "prs")),
-        "updates" => updates::settings::set(&mut config.updates, rest, value)
-            .map(|r| r.map(|()| "updates")),
+        "updates" => {
+            updates::settings::set(&mut config.updates, rest, value).map(|r| r.map(|()| "updates"))
+        }
         "pomodoro" => pomodoro::settings::set(&mut config.pomodoro, rest, value)
             .map(|r| r.map(|()| "pomodoro")),
         "screentime" => screentime::settings::set(&mut config.screentime, rest, value)
@@ -1136,6 +1158,9 @@ pub fn set(config: &mut Config, path: &str, value: &Value) -> Option<Result<&'st
         }
         "notifications" => notifications::settings::set(&mut config.notifications, rest, value)
             .map(|r| r.map(|()| "notifications")),
+        "outlook" => {
+            outlook::settings::set(&mut config.outlook, rest, value).map(|r| r.map(|()| "outlook"))
+        }
         "video" => {
             video::settings::set(&mut config.video, rest, value).map(|r| r.map(|()| "video"))
         }

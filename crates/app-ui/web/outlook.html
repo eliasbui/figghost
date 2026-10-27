@@ -1,0 +1,136 @@
+<!doctype html>
+<html>
+<head>
+<meta charset="utf-8">
+<style>
+  :root { --card-h: 236px; --inset: 24px; --ink: #f5f5f7; --dim: rgba(245, 245, 247, 0.62); --faint: rgba(245, 245, 247, 0.42); --blue: #0f6cbd; }
+  html, body { margin: 0; height: 100%; background: transparent; overflow: hidden; font: 13px -apple-system, BlinkMacSystemFont, sans-serif; color: var(--ink); -webkit-user-select: none; cursor: default; }
+  /* The drop and the card are as black as the notch they come from. */
+  .blob, .card { position: absolute; background: #0b0b0c; }
+  .blob { display: none; }
+  /* The card stays at the bottom of the page, so it does not move when the panel shrinks to it. */
+  .card { left: var(--inset); right: var(--inset); bottom: var(--inset); height: var(--card-h); border-radius: 22px; box-shadow: 0 14px 40px rgba(0, 0, 0, 0.45), inset 0 0 0 0.5px rgba(255, 255, 255, 0.12); display: flex; flex-direction: column; padding: 16px 18px 14px; box-sizing: border-box; opacity: 0; }
+  .card.shown { opacity: 1; }
+  .card > * { opacity: 0; transition: opacity 160ms ease-out; }
+  .card.shown > * { opacity: 1; }
+  .head { display: flex; align-items: center; gap: 8px; color: var(--faint); font-size: 11.5px; }
+  .head img { width: 18px; height: 18px; }
+  .head .where { flex: 1; overflow: hidden; white-space: nowrap; text-overflow: ellipsis; }
+  .x { width: 22px; height: 22px; border-radius: 11px; border: 0; background: rgba(255, 255, 255, 0.1); color: var(--dim); font-size: 13px; line-height: 22px; padding: 0; }
+  .x:hover { background: rgba(255, 255, 255, 0.18); color: var(--ink); }
+  .from { margin-top: 10px; font-size: 15px; font-weight: 600; white-space: nowrap; overflow: hidden; text-overflow: ellipsis; }
+  .subject { margin-top: 3px; font-weight: 500; color: rgba(245, 245, 247, 0.86); white-space: nowrap; overflow: hidden; text-overflow: ellipsis; }
+  .body { margin-top: 8px; flex: 1; overflow-y: auto; color: var(--dim); line-height: 1.45; white-space: pre-wrap; word-break: break-word; -webkit-user-select: text; cursor: text; }
+  .foot { display: flex; justify-content: flex-end; gap: 8px; margin-top: 10px; }
+  .foot button { border: 0; border-radius: 8px; padding: 6px 14px; font: 500 12.5px -apple-system, sans-serif; color: var(--ink); background: rgba(255, 255, 255, 0.12); }
+  .foot button:hover { background: rgba(255, 255, 255, 0.2); }
+  .foot button.primary { background: var(--blue); }
+  .foot button.primary:hover { background: #1a7fd6; }
+  @media (prefers-reduced-motion: reduce) { .card > * { transition: none; } }
+</style>
+</head>
+<body>
+<div class="blob" id="blob"></div>
+<div class="card" id="card" role="dialog" aria-labelledby="from">
+  <div class="head"><img id="icon" alt=""><span class="where" id="where"></span><button class="x" id="x" aria-label="">&#x2715;</button></div>
+  <div class="from" id="from"></div>
+  <div class="subject" id="subject"></div>
+  <div class="body" id="body"></div>
+  <div class="foot"><button id="close"></button><button class="primary" id="open"></button></div>
+</div>
+<script>
+(function () {
+  const $ = (id) => document.getElementById(id);
+  const card = $('card'), blob = $('blob');
+  const INSET = 24, DROP = 28;
+  let serial = 0;
+
+  const close = () => fig.send({ t: 'close' });
+  $('x').onclick = close;
+  $('close').onclick = close;
+  $('open').onclick = () => fig.send({ t: 'open' });
+  document.addEventListener('keydown', (e) => {
+    if (e.key === 'Escape') close();
+    if (e.key === 'Enter') fig.send({ t: 'open' });
+  });
+
+  function fill(m) {
+    $('icon').src = m.icon || '';
+    $('icon').style.display = m.icon ? '' : 'none';
+    $('where').textContent = m.where || '';
+    $('from').textContent = m.from || '';
+    $('subject').textContent = m.subject || '';
+    $('subject').style.display = m.subject ? '' : 'none';
+    $('body').textContent = m.body || '';
+    $('body').scrollTop = 0;
+    $('open').textContent = m.open || '';
+    $('close').textContent = m.close || '';
+    $('x').setAttribute('aria-label', m.close || '');
+  }
+
+  // The drop comes out of the notch, falls to the middle of the screen, splashes and opens into the card. Only
+  // transforms and the blob's own box are animated; the panel lets presses through until it is told the drop landed.
+  async function fall(run) {
+    const w = innerWidth, h = innerHeight;
+    const cardH = card.offsetHeight, cardW = card.offsetWidth;
+    const x = (w - DROP) / 2;
+    const landY = h - INSET - cardH / 2 - DROP / 2;
+    const alive = () => run === serial;
+    Object.assign(blob.style, { display: 'block', left: x + 'px', top: '0px', width: DROP + 'px', height: DROP + 'px', borderRadius: DROP / 2 + 'px' });
+    await blob.animate([
+      { transform: 'translateY(-' + DROP + 'px) scale(1.25, 0.2)', borderRadius: '6px' },
+      { transform: 'translateY(0) scale(0.9, 1.2)', borderRadius: '50% 50% 50% 50% / 40% 40% 60% 60%' },
+    ], { duration: 220, easing: 'ease-out', fill: 'forwards' }).finished;
+    if (!alive()) return;
+    // Gravity: slow at the notch, fast at the bottom.
+    const time = Math.min(720, Math.max(380, Math.sqrt(landY) * 22));
+    await blob.animate([
+      { transform: 'translateY(0) scale(0.9, 1.2)' },
+      { transform: 'translateY(' + landY + 'px) scale(0.85, 1.25)' },
+    ], { duration: time, easing: 'cubic-bezier(0.5, 0, 0.9, 0.6)', fill: 'forwards' }).finished;
+    if (!alive()) return;
+    await blob.animate([
+      { transform: 'translateY(' + landY + 'px) scale(0.85, 1.25)' },
+      { transform: 'translateY(' + landY + 'px) scale(1.5, 0.6)' },
+      { transform: 'translateY(' + landY + 'px) scale(1, 1)' },
+    ], { duration: 160, easing: 'ease-out', fill: 'forwards' }).finished;
+    if (!alive()) return;
+    blob.getAnimations().forEach((a) => a.cancel());
+    const top = h - INSET - cardH;
+    const from = { left: x + 'px', top: landY + 'px', width: DROP + 'px', height: DROP + 'px', borderRadius: DROP / 2 + 'px' };
+    const to = { left: INSET + 'px', top: top + 'px', width: cardW + 'px', height: cardH + 'px', borderRadius: '22px' };
+    Object.assign(blob.style, from);
+    await blob.animate([from, to], { duration: 380, easing: 'cubic-bezier(0.2, 1.25, 0.4, 1)', fill: 'forwards' }).finished;
+    if (!alive()) return;
+    open(run);
+  }
+
+  function open(run) {
+    card.classList.add('shown');
+    blob.getAnimations().forEach((a) => a.cancel());
+    blob.style.display = 'none';
+    if (run === serial) fig.send({ t: 'landed' });
+  }
+
+  window.__fig = {
+    recv(m) {
+      if (m.t !== 'show') return;
+      const run = ++serial;
+      fill(m);
+      card.classList.remove('shown');
+      blob.getAnimations().forEach((a) => a.cancel());
+      blob.style.display = 'none';
+      const still = matchMedia('(prefers-reduced-motion: reduce)').matches;
+      if (m.fall && !still) {
+        fall(run);
+      } else {
+        card.animate([{ transform: 'scale(0.94)', opacity: 0 }, { transform: 'scale(1)', opacity: 1 }], { duration: still ? 0 : 160, easing: 'ease-out' });
+        open(run);
+      }
+    },
+  };
+  fig.send({ t: 'ready' });
+})();
+</script>
+</body>
+</html>

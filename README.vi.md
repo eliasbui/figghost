@@ -72,6 +72,7 @@ Cửa sổ cài đặt liệt kê mọi trang ở thanh bên dưới năm tiêu 
 | Notch | Notch | Hình khối mọc ra từ mép trên màn hình: kích thước, chất liệu, quy tắc mở, hành vi trên ứng dụng toàn màn hình, các tab hiển thị, chia cửa sổ và chỉ báo âm lượng bảy kiểu |
 | Đảo trạng thái | Live islands | Thông báo nhỏ ló ra từ notch đóng: Caps Lock, sạc, pin, ổ đĩa, tải xuống, camera và micro (tắt mặc định) |
 | Thông báo | Notifications | Thông báo của các ứng dụng trên notch: qua hệ thống như cũ, có tab giữ danh sách, hoặc qua notch, mỗi thông báo hiện ngay, lấn cả nhạc lẫn ngày giờ (tắt mặc định) |
+| Outlook | Outlook | Thư mới và nhắc lịch của app Outlook trong một tab của notch, thẻ đọc nhanh ở giữa màn hình, và tuỳ chọn giọt nước rơi từ notch khi có thư mới (tắt mặc định) |
 | Widget nhạc | Music widget | Trình phát Liquid Glass nổi trên màn hình nền, năm kiểu, có thể đặt trên màn hình khóa (tắt mặc định) |
 
 ### Tab của notch (Notch tabs)
@@ -344,6 +345,10 @@ Thông báo nhỏ ló ra từ notch đóng trong chốc lát: Caps Lock bật ho
 Thông báo các ứng dụng gửi tới, hiện trên notch. Bạn chọn cách nhận: qua hệ thống, khi đó macOS vẫn hiện banner như cũ và tab Thông báo của notch giữ danh sách, mới nhất ở trên; hoặc qua notch, khi đó mỗi thông báo hiện ngay trên notch đóng kèm icon ứng dụng, tiêu đề và nội dung, lấn cả nhạc, ngày giờ và mọi thông báo nhỏ khác, rồi tự ẩn sau số giây bạn chọn. Bấm vào một dòng trong tab để mở ứng dụng đã gửi nó. macOS cất thông báo ở chỗ chỉ ứng dụng có quyền Truy cập toàn bộ ổ đĩa mới đọc được, nên tính năng cần quyền này (trang cài đặt mở đúng danh sách trong Cài đặt hệ thống); với những ứng dụng chỉ muốn nhận qua notch, hãy đặt kiểu thông báo của chúng là Không có trong Cài đặt hệ thống, mục Thông báo (trang cài đặt cũng mở được mục này), thông báo vẫn vào Trung tâm thông báo và vẫn lên notch. Figghost chỉ đọc kho đó, và chỉ khi kho thay đổi; không ghi gì vào đó, không lưu xuống ổ đĩa, không gửi đi đâu, và có thể ẩn nội dung khỏi notch. Tắt cho tới khi bật trong Cài đặt, mục Notch & Đảo động, Thông báo.
 
 ![Tab Thông báo: các dòng có icon của Tin nhắn, Lịch và Mail](docs/images/notch-notifications.png)
+
+### Outlook
+
+Thư mới và nhắc lịch của app Outlook, trong tab Outlook của notch, mới nhất ở trên, lấy từ thông báo Outlook gửi vào Trung tâm thông báo; không cần đăng nhập tài khoản. Bấm vào một dòng để mở thẻ đen ở giữa màn hình với người gửi, tiêu đề và vài dòng đầu, kèm nút đưa Outlook lên trước; bấm ra chỗ khác hoặc nhấn Escape để cất đi. Thư mới có thể hiện trên notch đóng trong vài giây, và khi bật Giọt nước từ notch thì rơi từ notch xuống như một giọt nước rồi mở thành thẻ đó. Cần quyền Truy cập toàn bộ ổ đĩa như tính năng Thông báo, và Outlook đang chạy với thông báo được bật; nên tắt banner của Outlook trong Cài đặt hệ thống để một thư không hiện hai lần. Tắt cho tới khi bật trong Cài đặt, mục Notch & Đảo động, Outlook.
 
 ### Tiện ích
 

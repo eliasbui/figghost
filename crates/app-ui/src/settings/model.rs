@@ -1660,6 +1660,7 @@ mod tests {
             "displays",
             "present",
             "notifications",
+            "outlook",
             "video",
             "system",
             "snippets",

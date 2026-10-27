@@ -45,7 +45,7 @@ impl TilingConfig {
 }
 
 /// The tabs of the notch, in their default order.
-pub const NOTCH_PAGES: [&str; 20] = [
+pub const NOTCH_PAGES: [&str; 21] = [
     "clipboard",
     "shelf",
     "media",
@@ -64,6 +64,7 @@ pub const NOTCH_PAGES: [&str; 20] = [
     "displays",
     "present",
     "notifications",
+    "outlook",
     "video",
     "sound",
 ];
@@ -490,6 +491,8 @@ pub struct Config {
     pub present: crate::features::present::Config,
     #[serde(deserialize_with = "lenient_section")]
     pub notifications: crate::features::notifications::Config,
+    #[serde(deserialize_with = "lenient_section")]
+    pub outlook: crate::features::outlook::Config,
     pub video: crate::features::video::Config,
     #[serde(deserialize_with = "lenient_section")]
     pub system: crate::features::system::Config,
@@ -555,6 +558,7 @@ impl Default for Config {
             displays: crate::features::displays::Config::default(),
             present: crate::features::present::Config::default(),
             notifications: crate::features::notifications::Config::default(),
+            outlook: crate::features::outlook::Config::default(),
             video: crate::features::video::Config::default(),
             system: crate::features::system::Config::default(),
             typing: crate::features::typing::Config::default(),
@@ -619,6 +623,7 @@ impl Config {
                 cfg.video = cfg.video.sanitized();
                 cfg.present = cfg.present.sanitized();
                 cfg.notifications = cfg.notifications.sanitized();
+                cfg.outlook = cfg.outlook.sanitized();
                 cfg.system = cfg.system.sanitized();
                 cfg.typing = cfg.typing.sanitized();
                 cfg.snippets = cfg.snippets.sanitized();

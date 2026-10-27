@@ -39,6 +39,7 @@ const FEATURE_SCRIPTS: &[&str] = &[
     include_str!("../../web/features/displays.js"),
     include_str!("../../web/features/present.js"),
     include_str!("../../web/features/notifications.js"),
+    include_str!("../../web/features/outlook.js"),
     include_str!("../../web/features/video.js"),
     include_str!("../../web/features/system.js"),
     include_str!("../../web/features/typing.js"),
@@ -174,6 +175,10 @@ const FEATURE_FIXTURES: &[(&str, &str)] = &[
     (
         "notifications",
         include_str!("../../web/features/notifications.fixture.json"),
+    ),
+    (
+        "outlook",
+        include_str!("../../web/features/outlook.fixture.json"),
     ),
     (
         "video",

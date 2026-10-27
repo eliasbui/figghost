@@ -154,7 +154,13 @@ fn main() {
             },
         );
         let index = notch.page_count();
-        notch.add_page(view.page("Notifications".into(), || {}, || {}));
+        notch.add_page(view.page(
+            "notifications",
+            "bell.badge.fill",
+            "Notifications".into(),
+            || {},
+            || {},
+        ));
         let dir = Rc::new(dir);
         let write = {
             let dir = Rc::clone(&dir);

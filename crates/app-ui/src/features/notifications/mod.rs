@@ -95,18 +95,20 @@ impl Config {
     }
 }
 
-/// One notification, as the tab and the notch show it.
+/// One notification, as the tab and the notch show it. The Outlook tab reads the same notifications.
 #[derive(Debug, Clone, PartialEq)]
 pub struct Notice {
     /// Its number in the store.
-    id: i64,
+    pub(crate) id: i64,
     /// The bundle identifier of the app that sent it.
-    app: String,
+    pub(crate) app: String,
     /// When, in seconds since 1970.
-    date: f64,
-    title: String,
-    subtitle: String,
-    body: String,
+    pub(crate) date: f64,
+    pub(crate) title: String,
+    pub(crate) subtitle: String,
+    pub(crate) body: String,
+    /// The category the app gave it.
+    pub(crate) category: String,
 }
 
 impl Notice {
@@ -119,6 +121,7 @@ impl Notice {
             title: fields.title.trim().to_owned(),
             subtitle: fields.subtitle.trim().to_owned(),
             body: fields.body.trim().to_owned(),
+            category: fields.category,
         };
         // One that says nothing (a silent update of a badge) is nothing to show.
         let says =
@@ -127,7 +130,7 @@ impl Notice {
     }
 
     /// The words under the title: the body, else the subtitle.
-    fn words(&self) -> &str {
+    pub(crate) fn words(&self) -> &str {
         if self.body.is_empty() {
             &self.subtitle
         } else {
@@ -137,7 +140,7 @@ impl Notice {
 }
 
 /// What the watcher found, for the main thread.
-enum Event {
+pub(crate) enum Event {
     /// The store was looked into, or could not be: what is in it at the start.
     Opened { readable: bool, recent: Vec<Notice> },
     /// Notifications that came since the last look, oldest first.
@@ -146,7 +149,7 @@ enum Event {
 
 /// Watches the store on a thread of its own until `stop` speaks or goes away. The store is looked into only when the
 /// times of its files changed; without access it is tried again now and then, as access may have been given.
-fn watch(path: PathBuf, stop: mpsc::Receiver<()>, deliver: impl Fn(Event)) {
+pub(crate) fn watch(path: PathBuf, stop: mpsc::Receiver<()>, deliver: impl Fn(Event)) {
     let read = |raws: &[store::Raw]| raws.iter().filter_map(Notice::read).collect::<Vec<_>>();
     let mut last: Option<i64> = None;
     let mut stamp = None;
@@ -277,6 +280,8 @@ pub fn attach(env: &AttachEnv) -> Option<Rc<Feature>> {
     FEATURE.with(|slot| *slot.borrow_mut() = Rc::downgrade(&feature));
     let (shown, hidden) = (Rc::downgrade(&feature), Rc::downgrade(&feature));
     notch.add_page(feature.view.page(
+        "notifications",
+        "bell.badge.fill",
         i18n::current().notifications_tab().to_owned(),
         move || {
             if let Some(f) = shown.upgrade() {
@@ -644,6 +649,7 @@ mod tests {
             title: title.into(),
             subtitle: subtitle.into(),
             body: body.into(),
+            category: String::new(),
         }
     }
 
