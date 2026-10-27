@@ -500,9 +500,14 @@ pub struct Activity {
     pub detail: Option<Detail>,
     /// The tab that opens from it: on a click, and on a hover with the "activity" opening rule.
     pub page: Option<usize>,
-    /// The highest priority is shown; among equals, the one that started last.
+    /// The highest priority is shown; among equals, the one that started last. From `URGENT` up it is the only thing on
+    /// the closed notch: the date and time of a pill step aside for it too.
     pub priority: u8,
 }
+
+/// The priority of what has to be seen at once and goes again by itself, such as a notification: it comes before
+/// everything else that is live, and before the date and time.
+pub const URGENT: u8 = 100;
 
 type Signal = Rc<dyn Fn()>;
 type DragSignal = Rc<dyn Fn(bool)>;
@@ -2164,10 +2169,13 @@ impl Inner {
             let style = self.style.borrow();
             (style.rest_clock, style.rest_steps)
         };
+        let live = self.current_activity();
+        let urgent = live.as_ref().is_some_and(|a| a.priority >= URGENT);
         let idle = clock_on && match self.shape.get() {
             Shape::Rest => !hardware,
-            // A pill keeps the date and time in the middle while something is live; a hardware notch has the camera there.
-            Shape::Compact { .. } => !hardware || self.current_activity().is_none(),
+            // A pill keeps the date and time in the middle while something is live, unless it is urgent; a hardware
+            // notch has the camera there.
+            Shape::Compact { .. } => !urgent && (!hardware || live.is_none()),
             Shape::Open => false,
         };
         let wanted = idle && self.flight.get().is_none() && self.shows();

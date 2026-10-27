@@ -1659,6 +1659,7 @@ mod tests {
             "devices",
             "displays",
             "present",
+            "notifications",
             "video",
             "system",
             "snippets",

@@ -71,6 +71,7 @@ The settings window lists every page in its sidebar under five headings, and thi
 | --- | --- | --- |
 | Notch | Notch | The shape that grows out of the top edge: size, material, opening rule, behaviour over full-screen apps, the tabs it shows, window snapping and the volume indicator in seven styles |
 | Live islands | Đảo trạng thái | Small notices out of the closed notch: Caps Lock, charger, battery, drives, downloads, camera and microphone (off by default) |
+| Notifications | Thông báo | The notifications of your apps on the notch: through the system as before, with a tab keeping the list, or through the notch, each one shown at once ahead of the music and the date and time (off by default) |
 | Music widget | Widget nhạc | A floating Liquid Glass player on the desktop in five styles, optionally above the lock screen (off by default) |
 
 ### Tab của notch (Notch tabs)
@@ -339,6 +340,12 @@ Small notices that come out of the closed notch for a moment: Caps Lock turning 
 ![The closed notch with eighteen live islands: Caps Lock, power, battery, drives, a download, camera and microphone, keep awake, microphone muted and the keyboard lock](docs/images/live-islands.png)
 
 ![The Live islands page of the settings](docs/images/settings-islands.png)
+
+### Notifications
+
+The notifications your apps send, on the notch. Choose how they arrive: through the system, where macOS shows its banners as before and a Notifications tab of the notch keeps the list, newest first; or through the notch, where each one comes out of the closed notch at once with the app's icon, its title and its words, ahead of the music, the date and time and every other live notice, and goes again after the seconds you choose. A click on a row of the tab opens the app that sent it. macOS keeps notifications where only an app with Full Disk Access may read them, so it needs that access (the page opens the list in System Settings); for the apps whose notifications should come only through the notch, set their alert style to None in System Settings, Notifications (the page opens it too), and they still reach Notification Center and the notch. Figghost only reads that store, only when it changes; nothing is written to it, kept on disk or sent anywhere, and what they say can be kept off the notch. It is off until it is turned on in Settings, under Notch & Island, Notifications.
+
+![The Notifications tab: rows with the icons of Messages, Calendar and Mail](docs/images/notch-notifications.png)
 
 ### Utilities
 

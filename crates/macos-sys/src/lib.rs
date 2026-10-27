@@ -43,6 +43,8 @@ pub mod modifiers;
 pub mod mux;
 pub mod notch;
 pub mod notes_ui;
+pub mod notification_store;
+pub mod notifications_ui;
 pub mod now_playing;
 pub mod ocr;
 pub mod panel;

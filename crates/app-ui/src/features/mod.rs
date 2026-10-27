@@ -36,6 +36,7 @@ pub mod menubar;
 pub mod mole;
 pub mod musicwidget;
 pub mod notes;
+pub mod notifications;
 pub mod pin;
 pub mod pomodoro;
 pub mod present;
@@ -57,7 +58,7 @@ pub mod wheel;
 
 /// The tabs of the notch that have a place in the strip only while their feature is on, so that a tab which would only
 /// say "this is off" is not there to be opened. Each follows the `enabled` of its own feature.
-pub(crate) const OPT_IN_TABS: [&str; 13] = [
+pub(crate) const OPT_IN_TABS: [&str; 14] = [
     "notes",
     "launcher",
     "weather",
@@ -70,6 +71,7 @@ pub(crate) const OPT_IN_TABS: [&str; 13] = [
     "devices",
     "displays",
     "present",
+    "notifications",
     "video",
 ];
 
@@ -88,6 +90,7 @@ pub fn tab_waits(id: &str, config: &Config) -> bool {
         "devices" => !config.devices.enabled,
         "displays" => !config.displays.enabled,
         "present" => !config.present.enabled,
+        "notifications" => !config.notifications.enabled,
         "video" => !config.video.enabled,
         _ => false,
     }
@@ -293,6 +296,7 @@ pub struct Features {
     pub devices: Option<Rc<devices::Feature>>,
     pub displays: Option<Rc<displays::Feature>>,
     pub present: Option<Rc<present::Feature>>,
+    pub notifications: Option<Rc<notifications::Feature>>,
     pub video: Option<Rc<video::Feature>>,
     pub system: Option<Rc<system::Feature>>,
     pub typing: Option<Rc<typing::Feature>>,
@@ -338,6 +342,7 @@ impl Features {
             devices: devices::attach(env),
             displays: displays::attach(env),
             present: present::attach(env),
+            notifications: notifications::attach(env),
             video: video::attach(env),
             snippets: snippets::attach(typing.as_ref()),
             typing,
@@ -429,6 +434,9 @@ impl Features {
         }
         if let Some(f) = &self.present {
             out.insert("present", f.runtime());
+        }
+        if let Some(f) = &self.notifications {
+            out.insert("notifications", f.runtime());
         }
         if let Some(f) = &self.typing {
             out.insert("typing", f.runtime());
@@ -568,6 +576,10 @@ impl Features {
                 .present
                 .as_ref()
                 .map_or(Ok(()), |f| f.configure(&config.present)),
+            "notifications" => self
+                .notifications
+                .as_ref()
+                .map_or(Ok(()), |f| f.configure(&config.notifications)),
             "video" => self
                 .video
                 .as_ref()
@@ -797,6 +809,11 @@ impl Features {
         {
             return Some(result);
         }
+        if let Some(f) = &self.notifications
+            && let Some(result) = f.action(name)
+        {
+            return Some(result);
+        }
         if let Some(f) = &self.prs
             && let Some(result) = f.action(name)
         {
@@ -1018,6 +1035,13 @@ pub fn state(
         "present".into(),
         present::settings::state(&config.present, runtime.get("present").unwrap_or(&none)),
     );
+    root.insert(
+        "notifications".into(),
+        notifications::settings::state(
+            &config.notifications,
+            runtime.get("notifications").unwrap_or(&none),
+        ),
+    );
     root.insert("video".into(), video::settings::state(&config.video));
     root.insert(
         "mole".into(),
@@ -1110,6 +1134,8 @@ pub fn set(config: &mut Config, path: &str, value: &Value) -> Option<Result<&'st
         "present" => {
             present::settings::set(&mut config.present, rest, value).map(|r| r.map(|()| "present"))
         }
+        "notifications" => notifications::settings::set(&mut config.notifications, rest, value)
+            .map(|r| r.map(|()| "notifications")),
         "video" => {
             video::settings::set(&mut config.video, rest, value).map(|r| r.map(|()| "video"))
         }

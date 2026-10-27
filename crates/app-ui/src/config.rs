@@ -45,7 +45,7 @@ impl TilingConfig {
 }
 
 /// The tabs of the notch, in their default order.
-pub const NOTCH_PAGES: [&str; 19] = [
+pub const NOTCH_PAGES: [&str; 20] = [
     "clipboard",
     "shelf",
     "media",
@@ -63,6 +63,7 @@ pub const NOTCH_PAGES: [&str; 19] = [
     "devices",
     "displays",
     "present",
+    "notifications",
     "video",
     "sound",
 ];
@@ -487,6 +488,8 @@ pub struct Config {
     pub displays: crate::features::displays::Config,
     #[serde(deserialize_with = "lenient_section")]
     pub present: crate::features::present::Config,
+    #[serde(deserialize_with = "lenient_section")]
+    pub notifications: crate::features::notifications::Config,
     pub video: crate::features::video::Config,
     #[serde(deserialize_with = "lenient_section")]
     pub system: crate::features::system::Config,
@@ -551,6 +554,7 @@ impl Default for Config {
             devices: crate::features::devices::Config::default(),
             displays: crate::features::displays::Config::default(),
             present: crate::features::present::Config::default(),
+            notifications: crate::features::notifications::Config::default(),
             video: crate::features::video::Config::default(),
             system: crate::features::system::Config::default(),
             typing: crate::features::typing::Config::default(),
@@ -614,6 +618,7 @@ impl Config {
                 cfg.devices = cfg.devices.sanitized();
                 cfg.video = cfg.video.sanitized();
                 cfg.present = cfg.present.sanitized();
+                cfg.notifications = cfg.notifications.sanitized();
                 cfg.system = cfg.system.sanitized();
                 cfg.typing = cfg.typing.sanitized();
                 cfg.snippets = cfg.snippets.sanitized();

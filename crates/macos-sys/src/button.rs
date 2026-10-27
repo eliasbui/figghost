@@ -53,7 +53,7 @@ pub struct ButtonIvars {
     tone: Cell<Option<Tone>>,
     /// The glyph and label start at the left edge instead of the middle.
     leading: Cell<bool>,
-    /// A picture for a tile, drawn instead of the glyph.
+    /// A picture for a tile, drawn instead of the glyph, or at the left of a row.
     image: RefCell<Option<Retained<NSImage>>>,
     on_click: RefCell<Option<Rc<dyn Fn()>>>,
 }
@@ -326,9 +326,18 @@ impl TouchButton {
             style::fill_rounded(bounds, 9.0, &white(shade));
         }
         let (title, detail) = (iv.title.borrow(), iv.detail.borrow());
-        let pad = 10.0;
-        let width = (bounds.size.width - 2.0 * pad).max(0.0);
         let mid = bounds.size.height / 2.0;
+        // A row with a picture (an app's icon) has it at its left, and the words after it.
+        let mut pad = 10.0;
+        if let Some(image) = iv.image.borrow().as_ref() {
+            let side = (bounds.size.height - 14.0).clamp(16.0, 32.0);
+            image.drawInRect(NSRect::new(
+                NSPoint::new(pad, mid - side / 2.0),
+                NSSize::new(side, side),
+            ));
+            pad += side + 8.0;
+        }
+        let width = (bounds.size.width - pad - 10.0).max(0.0);
         let title_attrs = text_attributes(
             &style::font(12.0, Weight::Medium),
             &white(TEXT),
