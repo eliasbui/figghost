@@ -1,7 +1,10 @@
 //! The Displays tab of the notch: the brightness and contrast of each external display, set in the display itself
 //! over DDC/CI as its own buttons would, the colour profile of every display, chosen among the ones macOS comes with
 //! as System Settings offers them, and, when the person turns it on, the brightness keys for the external displays
-//! with the volume indicator's look. It is off until the person turns it on.
+//! with the volume indicator's look. With more than one display connected the tab also arranges them as System Settings
+//! does: the displays drawn where they are, to be dragged into place, the menu bar to be dragged onto the display that
+//! should be the main one, and what each display is used as: the main display, an extended one, or a mirror of another.
+//! It is off until the person turns it on.
 //!
 //! Every message to a display waits on it for tens of milliseconds, so all of them go through one worker thread,
 //! which also keeps two messages from crossing on a display's bus; a slider that is dragged sends only its latest
@@ -14,11 +17,17 @@ use crate::{
     settings::model::Fault,
     trace,
 };
+use arrange::{Fit, Place};
+use core_capture::Rect;
 use macos_sys::{
-    MainThreadMarker, app,
+    MainThreadMarker, NSPoint, NSRect, NSSize, app,
     color_profiles::{self, ScreenProfiles},
     ddc::{self, Control, Level, Monitor},
-    displays_ui::{DisplaysDisplay, DisplaysTexts, DisplaysView, PAGE_SIZE, Screen},
+    display_layout::{self, Placed},
+    displays_ui::{
+        ARRANGE_SIZE, ArrangeCallbacks, Arranged, Arrangement, DisplaysDisplay, DisplaysTexts,
+        DisplaysView, PAGE_SIZE, Screen,
+    },
     event_tap::{EventTap, Verdict, mask},
     hud, permissions,
     system_keys::{SYSTEM_DEFINED, SystemKey},
@@ -37,6 +46,7 @@ use std::{
     time::{Duration, Instant},
 };
 
+mod arrange;
 pub mod settings;
 mod text;
 
@@ -51,6 +61,12 @@ const RETRY_SECONDS: f64 = 3.0;
 /// displays while a built-in screen is lit, as it does for an Apple display.
 const FINE_STEP_FLAGS: u64 = 0x0002_0000 | 0x0008_0000;
 const CONTROL_FLAG: u64 = 0x0004_0000;
+/// The room around the desktop on the canvas of the arrangement.
+const CANVAS_MARGIN: f64 = 14.0;
+/// A dropped display lines up with an edge this near it on the canvas.
+const SNAP_POINTS: f64 = 8.0;
+/// The system may take a moment to move the displays; they are read again after it.
+const SETTLE_SECONDS: f64 = 0.6;
 
 #[derive(Debug, Clone, PartialEq, Eq, Serialize, Deserialize)]
 #[serde(default)]
@@ -60,6 +76,8 @@ pub struct Config {
     pub keys: bool,
     /// Each card has a menu of the display's colour profiles, and every display gets a card.
     pub profiles: bool,
+    /// With more than one display, the tab has a second view that arranges them.
+    pub arrange: bool,
 }
 
 impl Default for Config {
@@ -68,6 +86,7 @@ impl Default for Config {
             enabled: false,
             keys: false,
             profiles: true,
+            arrange: true,
         }
     }
 }
@@ -294,6 +313,14 @@ pub struct Feature {
     tap: RefCell<Option<EventTap>>,
     retry: RefCell<Option<app::Timer>>,
     showing: Cell<bool>,
+    /// The connected displays, read when the arrangement shows and after each change to it.
+    layout: RefCell<Vec<Placed>>,
+    /// The view of the tab: the cards, or the arrangement.
+    mode: Cell<usize>,
+    /// The display whose settings show beside the canvas.
+    chosen: Cell<Option<u32>>,
+    /// What the canvas showed last: which displays it drew and how the desktop fitted it.
+    drawn: RefCell<Option<Drawn>>,
     me: Weak<Feature>,
 }
 
@@ -308,6 +335,7 @@ pub fn attach(env: &AttachEnv) -> Option<Rc<Feature>> {
     };
     let feature = Rc::new_cyclic(|me: &Weak<Feature>| {
         let (weak, chooser) = (me.clone(), me.clone());
+        let callbacks = arrange_callbacks(me);
         let view = DisplaysView::new(
             env.mtm,
             notch.page_area(PAGE_SIZE.width, PAGE_SIZE.height),
@@ -322,6 +350,7 @@ pub fn attach(env: &AttachEnv) -> Option<Rc<Feature>> {
                     f.chosen(index, choice);
                 }
             }),
+            callbacks,
         );
         Feature {
             mtm: env.mtm,
@@ -335,6 +364,10 @@ pub fn attach(env: &AttachEnv) -> Option<Rc<Feature>> {
             tap: RefCell::default(),
             retry: RefCell::default(),
             showing: Cell::new(false),
+            layout: RefCell::default(),
+            mode: Cell::new(0),
+            chosen: Cell::new(None),
+            drawn: RefCell::default(),
             me: me.clone(),
         }
     });
@@ -346,6 +379,7 @@ pub fn attach(env: &AttachEnv) -> Option<Rc<Feature>> {
             if let Some(f) = shown.upgrade() {
                 f.showing.set(true);
                 f.read_profiles();
+                f.read_layout();
                 f.render();
                 if f.config.borrow().enabled {
                     f.send(Job::Look);
@@ -392,6 +426,7 @@ impl Feature {
         }
         if self.showing.get() {
             self.read_profiles();
+            self.read_layout();
         }
         self.render();
         Ok(())
@@ -529,15 +564,357 @@ impl Feature {
     }
 
     fn render(&self) {
-        let (shown, cards) = display(
-            i18n::current(),
+        let language = i18n::current();
+        let (mut shown, cards) = display(
+            language,
             self.config.borrow().enabled,
             self.known.borrow().as_deref(),
             &self.color.borrow(),
         );
         *self.cards.borrow_mut() = cards;
+        let config = self.config.borrow();
+        let layout = self.layout.borrow();
+        let drawn = if config.enabled && config.arrange && layout.len() > 1 {
+            let (arrangement, drawn) = arrangement(language, &layout, self.chosen.get());
+            shown.modes = Some((
+                [
+                    language.displays_mode_adjust().to_owned(),
+                    language.displays_mode_arrange().to_owned(),
+                ],
+                self.mode.get().min(1),
+            ));
+            shown.arrangement = Some(arrangement);
+            Some(drawn)
+        } else {
+            None
+        };
+        *self.drawn.borrow_mut() = drawn;
+        drop((config, layout));
         self.view.show(shown);
     }
+
+    // -- the arrangement ----------------------------------------------------------------------------------------
+
+    /// Reads where the displays are, while the tab can show them.
+    fn read_layout(&self) {
+        let config = self.config.borrow();
+        *self.layout.borrow_mut() = if config.enabled && config.arrange {
+            display_layout::displays(self.mtm)
+        } else {
+            Vec::new()
+        };
+    }
+
+    fn set_mode(&self, mode: usize) {
+        self.mode.set(mode.min(1));
+        if mode == 1 {
+            self.read_layout();
+        }
+        self.render();
+    }
+
+    /// A display on the canvas was clicked: it is chosen, or, when it already was, the next display of its stack.
+    fn choose_screen(&self, index: usize) {
+        let next = self.drawn.borrow().as_ref().and_then(|drawn| {
+            let members = drawn.stacks.get(index)?;
+            let at = self
+                .chosen
+                .get()
+                .and_then(|id| members.iter().position(|m| *m == id));
+            Some(match at {
+                Some(i) => members[(i + 1) % members.len()],
+                None => members[0],
+            })
+        });
+        if next.is_some() {
+            self.chosen.set(next);
+            self.render();
+        }
+    }
+
+    /// A display was let go at a frame of the canvas: it goes against the nearest side of another, and the main
+    /// display stays where it is.
+    fn move_screen(&self, index: usize, frame: NSRect) {
+        let origins = {
+            let drawn = self.drawn.borrow();
+            let layout = self.layout.borrow();
+            drawn.as_ref().and_then(|drawn| {
+                let id = *drawn.stacks.get(index)?.first()?;
+                let places = places(&layout);
+                let rect = places.iter().find(|p| p.id == id)?.rect;
+                let dropped = drawn.fit.to_desktop(Rect::new(
+                    frame.origin.x,
+                    frame.origin.y,
+                    frame.size.width,
+                    frame.size.height,
+                ));
+                let others: Vec<Rect> = places
+                    .iter()
+                    .filter(|p| p.id != id)
+                    .map(|p| p.rect)
+                    .collect();
+                let to = arrange::settle(
+                    Rect::new(dropped.x, dropped.y, rect.w, rect.h),
+                    &others,
+                    SNAP_POINTS / drawn.fit.scale,
+                )?;
+                let main = layout.iter().find(|p| p.main).map_or(id, |p| p.id);
+                self.chosen.set(Some(id));
+                Some(arrange::origins_after_move(&places, main, id, to))
+            })
+        };
+        match origins {
+            Some(origins) => self.apply("arrange", display_layout::arrange(&origins)),
+            None => self.render(),
+        }
+    }
+
+    /// The menu bar was let go on a display: it becomes the main one.
+    fn make_main(&self, index: usize) {
+        let id = self
+            .drawn
+            .borrow()
+            .as_ref()
+            .and_then(|drawn| drawn.stacks.get(index)?.first().copied());
+        if let Some(id) = id {
+            self.chosen.set(Some(id));
+            self.main_display(id);
+        }
+    }
+
+    fn main_display(&self, id: u32) {
+        let origins = arrange::origins_with_main(&places(&self.layout.borrow()), id);
+        if let Some(origins) = origins {
+            self.apply("main", display_layout::arrange(&origins));
+        }
+    }
+
+    /// A choice in the menu of the chosen display: the main display, an extended one, or a mirror of another.
+    fn use_as(&self, choice: usize) {
+        let Some((id, targets)) = self
+            .drawn
+            .borrow()
+            .as_ref()
+            .map(|drawn| (drawn.chosen, drawn.mirror_targets.clone()))
+        else {
+            return;
+        };
+        let placed = self.layout.borrow().iter().find(|p| p.id == id).cloned();
+        let Some(placed) = placed else {
+            return;
+        };
+        match choice {
+            0 | 1 if placed.mirror_of.is_some() => {
+                let result = display_layout::mirror(id, None);
+                self.apply("unmirror", result);
+                if choice == 0 {
+                    self.main_display(id);
+                }
+            }
+            0 if !placed.main => self.main_display(id),
+            1 if placed.main => {
+                // Another display takes the menu bar, as in System Settings.
+                let other = places(&self.layout.borrow())
+                    .iter()
+                    .find(|p| p.id != id)
+                    .map(|p| p.id);
+                if let Some(other) = other {
+                    self.main_display(other);
+                }
+            }
+            n if n >= 2 => {
+                if let Some(of) = targets.get(n - 2).copied() {
+                    self.apply("mirror", display_layout::mirror(id, Some(of)));
+                }
+            }
+            _ => self.render(),
+        }
+    }
+
+    /// After a change to the displays: says how it went, and shows where they are now, and again once the system has
+    /// settled them.
+    fn apply(&self, what: &str, result: Result<(), i32>) {
+        match result {
+            Ok(()) => trace::log(&format!("displays: {what} done")),
+            Err(code) => eprintln!("displays: {what} refused by the system (error {code})"),
+        }
+        self.read_layout();
+        self.render();
+        let weak = self.me.clone();
+        app::after(SETTLE_SECONDS, move || {
+            if let Some(f) = weak.upgrade()
+                && f.showing.get()
+            {
+                f.read_layout();
+                f.render();
+            }
+        });
+    }
+}
+
+/// What the arrangement tells the feature.
+fn arrange_callbacks(me: &Weak<Feature>) -> ArrangeCallbacks {
+    let with = |me: &Weak<Feature>, act: fn(&Feature, usize)| -> Rc<dyn Fn(usize)> {
+        let me = me.clone();
+        Rc::new(move |index| {
+            if let Some(f) = me.upgrade() {
+                act(&f, index);
+            }
+        })
+    };
+    let mover = me.clone();
+    ArrangeCallbacks {
+        on_mode: with(me, Feature::set_mode),
+        on_choose: with(me, Feature::choose_screen),
+        on_move: Rc::new(move |index, frame| {
+            if let Some(f) = mover.upgrade() {
+                f.move_screen(index, frame);
+            }
+        }),
+        on_main: with(me, Feature::make_main),
+        on_use: with(me, Feature::use_as),
+    }
+}
+
+/// What the canvas of the arrangement stands for.
+#[derive(Debug, Clone, PartialEq)]
+struct Drawn {
+    /// For each display drawn, the ids of its stack: the display, then the ones that mirror it.
+    stacks: Vec<Vec<u32>>,
+    fit: Fit,
+    /// The display whose settings show, and the display each "mirror for" choice of its menu stands for.
+    chosen: u32,
+    mirror_targets: Vec<u32>,
+}
+
+fn rect_of(p: &Placed) -> Rect {
+    let (x, y, w, h) = p.frame;
+    Rect::new(x, y, w, h)
+}
+
+/// The displays of the desktop that show their own picture.
+fn places(layout: &[Placed]) -> Vec<Place> {
+    layout
+        .iter()
+        .filter(|p| p.mirror_of.is_none())
+        .map(|p| Place {
+            id: p.id,
+            rect: rect_of(p),
+        })
+        .collect()
+}
+
+/// The second view of the tab: each display that shows its own picture where it is in the desktop, stacked with the
+/// ones that mirror it, and the chosen display's name, what it is and what it can be used as. Pure, so that the tests
+/// drive it without displays.
+fn arrangement(language: Language, layout: &[Placed], chosen: Option<u32>) -> (Arrangement, Drawn) {
+    let name = |id: u32| {
+        layout
+            .iter()
+            .position(|p| p.id == id)
+            .map(|i| {
+                let given = &layout[i].name;
+                if given.is_empty() {
+                    language.displays_unnamed(i + 1)
+                } else {
+                    given.clone()
+                }
+            })
+            .unwrap_or_default()
+    };
+    let masters: Vec<&Placed> = layout.iter().filter(|p| p.mirror_of.is_none()).collect();
+    let stacks: Vec<Vec<u32>> = masters
+        .iter()
+        .map(|m| {
+            std::iter::once(m.id)
+                .chain(
+                    layout
+                        .iter()
+                        .filter(|p| p.mirror_of == Some(m.id))
+                        .map(|p| p.id),
+                )
+                .collect()
+        })
+        .collect();
+    let rects: Vec<Rect> = masters.iter().map(|m| rect_of(m)).collect();
+    let fit = Fit::new(
+        &rects,
+        ARRANGE_SIZE.width,
+        ARRANGE_SIZE.height,
+        CANVAS_MARGIN,
+    );
+    let chosen = chosen
+        .and_then(|id| layout.iter().find(|p| p.id == id))
+        .or_else(|| layout.iter().find(|p| p.main))
+        .or(layout.first());
+    let chosen_id = chosen.map_or(0, |p| p.id);
+    let lit = stacks
+        .iter()
+        .position(|stack| stack.contains(&chosen_id))
+        .unwrap_or(0);
+    let screens = masters
+        .iter()
+        .zip(&stacks)
+        .map(|(m, stack)| {
+            let c = fit.to_canvas(rect_of(m));
+            Arranged {
+                name: name(m.id),
+                frame: NSRect::new(NSPoint::new(c.x, c.y), NSSize::new(c.w, c.h)),
+                main: m.main,
+                mirrored_by: stack.len() - 1,
+            }
+        })
+        .collect();
+    // It can mirror any display that shows its own picture, other than itself.
+    let mirror_targets: Vec<u32> = masters
+        .iter()
+        .map(|m| m.id)
+        .filter(|id| *id != chosen_id)
+        .collect();
+    let mut uses = vec![
+        language.displays_use_main().to_owned(),
+        language.displays_use_extended().to_owned(),
+    ];
+    uses.extend(
+        mirror_targets
+            .iter()
+            .map(|id| language.displays_use_mirror(&name(*id))),
+    );
+    let using = chosen.map(|p| match p.mirror_of {
+        Some(of) => mirror_targets
+            .iter()
+            .position(|id| *id == of)
+            .map_or(1, |i| i + 2),
+        None if p.main => 0,
+        None => 1,
+    });
+    let (title, detail) = chosen.map_or_else(Default::default, |p| {
+        let of = p.mirror_of.map(name);
+        (
+            name(p.id),
+            language.displays_detail((p.frame.2, p.frame.3), p.built_in, p.main, of.as_deref()),
+        )
+    });
+    (
+        Arrangement {
+            screens,
+            chosen: lit,
+            title,
+            detail,
+            use_label: language.displays_use_label().to_owned(),
+            uses,
+            using,
+            hint: language
+                .displays_arrange_hint(stacks.iter().any(|s| s.len() > 1))
+                .to_owned(),
+        },
+        Drawn {
+            stacks,
+            fit,
+            chosen: chosen_id,
+            mirror_targets,
+        },
+    )
 }
 
 /// What a card stands for: a display the system shows, by its place in the colour list, the display of the same
@@ -601,6 +978,7 @@ fn display(
         let shown = DisplaysDisplay {
             screens: Vec::new(),
             note: Some((title.to_owned(), hint.to_owned())),
+            ..DisplaysDisplay::default()
         };
         (shown, Vec::new())
     };
@@ -649,7 +1027,7 @@ fn display(
     (
         DisplaysDisplay {
             screens,
-            note: None,
+            ..DisplaysDisplay::default()
         },
         cards,
     )
@@ -683,6 +1061,7 @@ mod tests {
         assert_eq!(config, Config::default());
         assert!(!config.enabled && !config.keys);
         assert!(config.profiles, "the profiles show once the tab is on");
+        assert!(config.arrange, "and so does the arrangement");
         let partial: Config = serde_json::from_str(r#"{ "enabled": true, "future": 1 }"#).unwrap();
         assert!(partial.enabled && !partial.keys && partial.profiles);
     }
@@ -751,6 +1130,84 @@ mod tests {
         // While nothing has answered yet, the cards are there with their profiles.
         let (waiting, _) = display(Language::English, true, None, &color);
         assert!(waiting.note.is_none() && waiting.screens.len() == 3);
+    }
+
+    fn placed(
+        id: u32,
+        name: &str,
+        frame: (f64, f64, f64, f64),
+        main: bool,
+        mirror_of: Option<u32>,
+    ) -> Placed {
+        Placed {
+            id,
+            name: name.into(),
+            frame,
+            main,
+            built_in: id == 1,
+            mirror_of,
+        }
+    }
+
+    #[test]
+    fn the_arrangement_draws_each_picture_once_and_offers_what_the_chosen_display_can_be() {
+        let layout = [
+            placed(
+                1,
+                "Built-in Retina Display",
+                (0.0, 0.0, 1512.0, 982.0),
+                true,
+                None,
+            ),
+            placed(
+                2,
+                "LG HDR 4K",
+                (1512.0, -458.0, 2560.0, 1440.0),
+                false,
+                None,
+            ),
+            placed(3, "", (0.0, 0.0, 1512.0, 982.0), false, Some(1)),
+        ];
+        let (shown, drawn) = arrangement(Language::English, &layout, None);
+        assert_eq!(
+            shown.screens.len(),
+            2,
+            "the mirror is in the stack of the built-in display"
+        );
+        assert_eq!(drawn.stacks, [vec![1, 3], vec![2]]);
+        assert_eq!(shown.screens[0].mirrored_by, 1);
+        assert!(shown.screens[0].main && !shown.screens[1].main);
+        assert_eq!(shown.chosen, 0, "the main display is chosen at first");
+        assert_eq!(
+            shown.uses,
+            ["Main display", "Extended display", "Mirror for LG HDR 4K"]
+        );
+        assert_eq!(shown.using, Some(0));
+        assert!(shown.detail.contains("1512 x 982") && shown.detail.contains("built in"));
+        // The display that mirrors is named by its place, and its menu says whose picture it shows.
+        let (mirror, drawn) = arrangement(Language::English, &layout, Some(3));
+        assert_eq!(mirror.title, "Display 3");
+        assert_eq!(mirror.chosen, 0, "its stack is lit");
+        assert_eq!(drawn.mirror_targets, [1, 2]);
+        assert_eq!(mirror.using, Some(2), "a mirror for the built-in display");
+        assert!(mirror.detail.contains("Built-in Retina Display"));
+        // Side by side on the canvas, the monitor higher, both on it.
+        let (a, b) = (shown.screens[0].frame, shown.screens[1].frame);
+        assert!(a.origin.x < b.origin.x);
+        assert!(b.origin.y + b.size.height > a.origin.y + a.size.height);
+        for f in [a, b] {
+            assert!(f.origin.x >= 0.0 && f.origin.x + f.size.width <= ARRANGE_SIZE.width + 1e-9);
+        }
+        let (vi, _) = arrangement(Language::Vietnamese, &layout, Some(2));
+        assert_eq!(vi.using, Some(1));
+        assert_eq!(vi.uses[1], "Màn hình mở rộng");
+        assert_ne!(vi.hint, shown.hint);
+        let (gone, drawn) = arrangement(Language::English, &layout, Some(99));
+        assert_eq!(
+            (gone.chosen, drawn.chosen),
+            (0, 1),
+            "a display that left gives way to the main one"
+        );
     }
 
     #[test]

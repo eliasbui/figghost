@@ -1,5 +1,6 @@
 {
   "enabled": true,
   "keys": false,
-  "profiles": true
+  "profiles": true,
+  "arrange": true
 }

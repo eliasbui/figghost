@@ -1,0 +1,28 @@
+{
+  "enabled": true,
+  "source": "display",
+  "cursor": true,
+  "border": true,
+  "fps": 60,
+  "auto_zoom": true,
+  "zoom": 2.0,
+  "zoom_out": 3,
+  "ring": false,
+  "clicks": true,
+  "spotlight": 18,
+  "closed_notch": true,
+  "shortcuts": {
+    "start": "ctrl+opt+p",
+    "black": "ctrl+opt+b",
+    "white": "ctrl+opt+w",
+    "freeze": "ctrl+opt+h",
+    "zoom_in": "ctrl+opt+z",
+    "zoom_out": "ctrl+opt+x",
+    "zoom_reset": "ctrl+opt+0",
+    "auto": "ctrl+opt+a",
+    "spotlight": "ctrl+opt+l",
+    "ring": "ctrl+opt+m"
+  },
+  "screen_access": true,
+  "presenting": false
+}

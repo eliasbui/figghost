@@ -1477,8 +1477,8 @@ mod tests {
     #[test]
     fn tiling_shortcuts_keep_the_config_minimal() {
         let mut config = Config::default();
-        hotkey(&mut config, "tiling:left", "ctrl+opt+h").unwrap();
-        assert_eq!(config.tiling.shortcuts["left"], "ctrl+opt+h");
+        hotkey(&mut config, "tiling:left", "ctrl+opt+y").unwrap();
+        assert_eq!(config.tiling.shortcuts["left"], "ctrl+opt+y");
         // Typing the default back removes the override.
         hotkey(&mut config, "tiling:left", "ctrl+opt+left").unwrap();
         assert!(config.tiling.shortcuts.is_empty());
@@ -1658,6 +1658,7 @@ mod tests {
             "dayprogress",
             "devices",
             "displays",
+            "present",
             "video",
             "system",
             "snippets",

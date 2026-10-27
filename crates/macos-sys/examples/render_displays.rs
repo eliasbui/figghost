@@ -1,12 +1,16 @@
 //! Draws the Displays tab of the open notch into PNGs with sample displays, in both languages, without showing
-//! anything, and moves a slider and chooses a profile as a person would to check that the app is told which display
-//! and which setting: run it with FIGGHOST_NOTCH_OFFSCREEN=1.
+//! anything, the arrangement of three displays among them, and moves a slider, chooses a profile and chooses what a
+//! display is used as, as a person would, to check that the app is told which display and which setting: run it with
+//! FIGGHOST_NOTCH_OFFSCREEN=1.
 //! `FIGGHOST_NOTCH_OFFSCREEN=1 cargo run -p macos-sys --example render_displays -- /tmp/displays`
 
 use macos_sys::{
-    MainThreadMarker, app,
+    MainThreadMarker, NSPoint, NSRect, NSSize, app,
     ddc::Control,
-    displays_ui::{DisplaysDisplay, DisplaysTexts, DisplaysView, PAGE_SIZE, Screen},
+    displays_ui::{
+        ARRANGE_SIZE, ArrangeCallbacks, Arranged, Arrangement, DisplaysDisplay, DisplaysTexts,
+        DisplaysView, PAGE_SIZE, Screen,
+    },
     notch::{Notch, NotchGeometry},
     ui::AppCallbacks,
 };
@@ -30,8 +34,68 @@ fn scene(count: usize) -> DisplaysDisplay {
     ];
     DisplaysDisplay {
         screens: all.into_iter().take(count).collect(),
-        note: None,
+        ..DisplaysDisplay::default()
     }
+}
+
+/// Three displays: the built-in one, the main one, a monitor above it to the right, and one that mirrors the monitor.
+fn arranged(vietnamese: bool, view: usize) -> DisplaysDisplay {
+    let at = |x: f64, y: f64, w: f64, h: f64| NSRect::new(NSPoint::new(x, y), NSSize::new(w, h));
+    let middle = (ARRANGE_SIZE.height - 70.0) / 2.0;
+    let screen = |name: &str, frame: NSRect, main: bool, mirrored_by: usize| Arranged {
+        name: name.into(),
+        frame,
+        main,
+        mirrored_by,
+    };
+    let (names, label, uses, hint, detail) = if vietnamese {
+        (
+            ["Độ sáng & màu", "Sắp xếp"],
+            "Dùng làm",
+            [
+                "Màn hình chính",
+                "Màn hình mở rộng",
+                "Phản chiếu cho LG HDR 4K",
+            ],
+            "Kéo màn hình để đổi chỗ, kéo thanh trắng để chọn màn hình chính. Bấm lại vào một chồng để chọn màn hình đang phản chiếu.",
+            "1512 x 982, liền máy, màn hình chính",
+        )
+    } else {
+        (
+            ["Brightness & color", "Arrange"],
+            "Use as",
+            ["Main display", "Extended display", "Mirror for LG HDR 4K"],
+            "Drag a display to move it, or the white bar to choose the main display. Click a stack again for the display that mirrors it.",
+            "1512 x 982, built in, main display",
+        )
+    };
+    DisplaysDisplay {
+        screens: vec![screen_card("S24i-30", 0.8, Some(0.75))],
+        modes: Some((names.map(String::from), view)),
+        arrangement: Some(Arrangement {
+            screens: vec![
+                screen(
+                    "Built-in Retina Display",
+                    at(40.0, middle - 20.0, 110.0, 71.0),
+                    true,
+                    0,
+                ),
+                screen("LG HDR 4K", at(150.0, middle + 2.0, 150.0, 84.0), false, 1),
+            ],
+            chosen: 0,
+            title: "Built-in Retina Display".into(),
+            detail: detail.into(),
+            use_label: label.into(),
+            uses: uses.map(String::from).to_vec(),
+            using: Some(0),
+            hint: hint.into(),
+        }),
+        ..DisplaysDisplay::default()
+    }
+}
+
+fn screen_card(name: &str, brightness: f64, contrast: Option<f64>) -> Screen {
+    screen(name, brightness, contrast)
 }
 
 /// The macOS profiles, after the display's own, with the one in use.
@@ -66,7 +130,7 @@ fn profiles_scene(count: usize) -> DisplaysDisplay {
     ];
     DisplaysDisplay {
         screens: all.into_iter().take(count).collect(),
-        note: None,
+        ..DisplaysDisplay::default()
     }
 }
 
@@ -88,6 +152,24 @@ fn main() {
         let moved: Rc<RefCell<Vec<(usize, Control, f64)>>> = Rc::default();
         let chosen: Rc<RefCell<Vec<(usize, usize)>>> = Rc::default();
         let (told, picked) = (Rc::clone(&moved), Rc::clone(&chosen));
+        let used: Rc<RefCell<Vec<String>>> = Rc::default();
+        let note = |what: &'static str| {
+            let used = Rc::clone(&used);
+            Rc::new(move |index: usize| used.borrow_mut().push(format!("{what} {index}")))
+                as Rc<dyn Fn(usize)>
+        };
+        let dropped = Rc::clone(&used);
+        let callbacks = ArrangeCallbacks {
+            on_mode: note("mode"),
+            on_choose: note("choose"),
+            on_move: Rc::new(move |index, frame: NSRect| {
+                dropped
+                    .borrow_mut()
+                    .push(format!("move {index} {:.0}", frame.origin.x))
+            }),
+            on_main: note("main"),
+            on_use: note("use"),
+        };
         let view = DisplaysView::new(
             mtm,
             notch.page_area(PAGE_SIZE.width, PAGE_SIZE.height),
@@ -98,6 +180,7 @@ fn main() {
             },
             Rc::new(move |index, control, value| told.borrow_mut().push((index, control, value))),
             Rc::new(move |index, choice| picked.borrow_mut().push((index, choice))),
+            callbacks,
         );
         let index = notch.page_count();
         notch.add_page(view.page("Displays".into(), || {}, || {}));
@@ -109,6 +192,9 @@ fn main() {
                 ("three", scene(3)),
                 ("profiles_one", profiles_scene(1)),
                 ("profiles_three", profiles_scene(3)),
+                ("arrange_en", arranged(false, 1)),
+                ("arrange_vi", arranged(true, 1)),
+                ("arrange_cards", arranged(false, 0)),
             ];
             for (name, title, hint) in [
                 (
@@ -127,6 +213,7 @@ fn main() {
                     DisplaysDisplay {
                         screens: Vec::new(),
                         note: Some((title.into(), hint.into())),
+                        ..DisplaysDisplay::default()
                     },
                 ));
             }
@@ -166,6 +253,27 @@ fn main() {
                 "a display without profiles has no menu"
             );
             assert_eq!(*chosen.borrow(), [(1, 3)]);
+            // The arrangement: its menu says the choice, a drop says the display and where; the cards are gone.
+            shown.show(arranged(false, 1));
+            assert!(shown.choose_use(2));
+            shown.drop_screen(
+                1,
+                NSRect::new(NSPoint::new(12.0, 30.0), NSSize::new(150.0, 84.0)),
+            );
+            assert!(
+                !shown.press(0, Control::Brightness, 0.5),
+                "no slider while arranging"
+            );
+            shown.show(arranged(false, 0));
+            assert!(
+                shown.press(0, Control::Brightness, 0.5),
+                "the sliders are back on the first view"
+            );
+            assert!(
+                !shown.choose_use(0),
+                "and the menu of the arrangement is gone"
+            );
+            assert_eq!(*used.borrow(), ["use 2", "move 1 12"]);
             println!("the sliders and the menus say which display and which setting");
             process::exit(0);
         });

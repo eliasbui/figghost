@@ -86,6 +86,7 @@ pub mod symbols {
         AWAKE = "cup.and.saucer.fill",
         SNOOZE = "moon.zzz.fill",
         POMODORO = "timer",
+        PRESENT = "rectangle.on.rectangle",
         MIC_MUTE = "mic.slash.fill",
         KEYBOARD = "keyboard.fill",
         TYPING = "waveform.and.mic",

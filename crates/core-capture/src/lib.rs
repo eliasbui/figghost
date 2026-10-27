@@ -3,6 +3,7 @@
 //! file names, stitching a scrolling capture, and the editor's annotation model.
 
 mod annotate;
+pub mod camera;
 mod geometry;
 mod keys;
 mod naming;

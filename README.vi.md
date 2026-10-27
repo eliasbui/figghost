@@ -90,7 +90,8 @@ Notch luôn có Clipboard, Khay tệp, Media (kèm lời bài hát), Tập trung
 | Thời gian dùng | Screen Time | Mỗi ứng dụng ở phía trước bao lâu, hôm nay và bảy ngày qua (tắt mặc định) |
 | Hệ thống | System | Bộ xử lý, bộ nhớ, mạng, đồ họa, ổ đĩa, nhiệt, quạt và sức khỏe pin (tắt mặc định) |
 | Thiết bị | Devices | Mức pin của các thiết bị Bluetooth đang kết nối, cảnh báo khi sắp hết (tắt mặc định) |
-| Màn hình | Displays | Độ sáng và độ tương phản của màn hình ngoài qua DDC/CI, và phím độ sáng cho chúng (tắt mặc định) |
+| Màn hình | Displays | Độ sáng và độ tương phản của màn hình ngoài qua DDC/CI, phím độ sáng cho chúng, cấu hình màu của từng màn hình, và khi có từ hai màn hình trở lên thì có chế độ Sắp xếp để kéo đổi chỗ, chọn màn hình chính và phản chiếu màn hình (tắt mặc định) |
+| Trình chiếu | Present | Chiếu một màn hình, một vùng, một cửa sổ hay một ứng dụng cho khán giả lên màn hình khác hoặc vào một cửa sổ riêng, có phóng to theo cú bấm chuột, đèn chiếu, vòng con trỏ, đứng hình, màn hình đen và trắng, cùng phím tắt cho tất cả (tắt mặc định) |
 
 ### Bảng tạm & Công cụ (Clipboard & Tools)
 
@@ -230,6 +231,14 @@ Tab Thiết bị cho thấy mức pin của các thiết bị Bluetooth đang k�
 Tab Màn hình đặt độ sáng và độ tương phản cho từng màn hình ngoài, như các nút của chính màn hình sẽ làm (như MonitorControl): một thẻ cho mỗi màn hình trả lời qua DDC/CI, với một thanh trượt cho mỗi thiết lập nó có. Chính màn hình thay đổi; không có gì phủ lên hình. Khi bật thêm phím độ sáng, chúng điều chỉnh mọi màn hình ngoài cùng lúc và hiện mức trong kiểu chỉ báo âm lượng, với mặt trời thay cho loa; trong lúc màn hình tích hợp còn sáng, các phím vẫn thuộc về nó, và Control cùng một phím sẽ đặt màn hình ngoài. Các màn hình được tìm khi tab mở và khi một phím cần đến, và chỉ độ sáng và độ tương phản được hỏi hoặc đặt. Tab không cần quyền, còn các phím cần Trợ năng. Màn hình sau hub, bộ chuyển DisplayLink hoặc một số cổng HDMI không trả lời và không được liệt kê. Tắt cho tới khi bật trong Cài đặt, mục Tab của notch, Màn hình.
 
 ![Tab Màn hình của notch](docs/images/notch-displays.png)
+
+Khi có từ hai màn hình trở lên, tab có thêm chế độ Sắp xếp, vẽ các màn hình đúng vị trí như trong Cài đặt hệ thống. Kéo một màn hình để đổi chỗ: thả ở đâu thì nó áp sát cạnh gần nhất của màn hình khác và thẳng hàng với mép khi ở gần; kéo thanh trắng sang màn hình khác để đặt màn hình đó làm màn hình chính, có thanh menu và Dock; bấm vào một màn hình để chọn nó, và menu của nó cho biết cách dùng: màn hình chính, màn hình mở rộng, hoặc phản chiếu một màn hình khác. Màn hình đang phản chiếu được vẽ thành một chồng dưới màn hình nó hiện hình, bấm lần nữa vào chồng đó để chọn nó. Thay đổi được giữ lại như khi chỉnh trong Cài đặt hệ thống. Có thể tắt chế độ này ở trang Màn hình.
+
+![Chế độ Sắp xếp của tab Màn hình: màn hình tích hợp có thanh menu bên cạnh một màn hình rời đang được màn hình khác phản chiếu](docs/images/notch-displays-arrange.png)
+
+Tab Trình chiếu chiếu một phần màn hình của bạn cho khán giả: cả một màn hình, một vùng kéo chọn trên màn hình đóng băng, một cửa sổ (kể cả khi bị cửa sổ khác che) hoặc mọi cửa sổ của một ứng dụng, hiện toàn màn hình trên màn hình khác, máy chiếu hay TV, hoặc trong một cửa sổ riêng để chia sẻ qua cuộc gọi video. Phần còn lại của màn hình vẫn là của bạn, notch và mọi cửa sổ của Figghost không bao giờ lọt vào hình (thông báo hiện trên màn hình đang chiếu thì có, nên bật Không làm phiền trước buổi thuyết trình); một viền xanh mảnh trên màn hình của bạn đánh dấu vùng hay màn hình đang được chiếu. Trong lúc chiếu, mỗi cú bấm chuột phóng to hình của khán giả vào đúng chỗ đó, khung nhìn đi theo con trỏ khi nó gần tới mép, và sau một lúc yên thì trở về toàn cảnh; phím tắt phóng to, thu nhỏ từng bậc quanh con trỏ, bật đèn chiếu quanh con trỏ, khoanh vòng con trỏ, giữ đứng hình trong lúc bạn tra cứu gì đó, và đưa lên màn hình đen hoặc trắng như phím B và W khi trình chiếu slide. Thời gian chạy trong notch đóng, màu xanh khi khán giả đang thấy hình trực tiếp và màu cam khi đang đứng hình hoặc bị che. Phím tắt là Control với Option cộng P để bắt đầu hoặc dừng, rồi Z và X để phóng to, thu nhỏ, 0 để về toàn cảnh, A để bật tắt tự phóng to, L cho đèn chiếu, M cho vòng con trỏ, H để đứng hình, B và W; chỉ phím bắt đầu được giữ khi không trình chiếu, và mỗi phím đổi được ở trang Trình chiếu. Cần quyền Ghi màn hình. Tắt cho tới khi bật trong Cài đặt, mục Tab của notch, Trình chiếu. [docs/research-presenting.md](docs/research-presenting.md) nói cách các phím được chọn.
+
+![Tab Trình chiếu trong lúc chiếu: thời gian, chiếu gì lên đâu, các công tắc và mức phóng to](docs/images/notch-present.png)
 
 ![Trang Notch của phần cài đặt với các kiểu kích thước và công tắc hành vi](docs/images/settings-notch.png)
 

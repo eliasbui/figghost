@@ -38,6 +38,7 @@ pub mod musicwidget;
 pub mod notes;
 pub mod pin;
 pub mod pomodoro;
+pub mod present;
 pub mod prs;
 pub mod screentime;
 pub mod smart;
@@ -56,7 +57,7 @@ pub mod wheel;
 
 /// The tabs of the notch that have a place in the strip only while their feature is on, so that a tab which would only
 /// say "this is off" is not there to be opened. Each follows the `enabled` of its own feature.
-pub(crate) const OPT_IN_TABS: [&str; 12] = [
+pub(crate) const OPT_IN_TABS: [&str; 13] = [
     "notes",
     "launcher",
     "weather",
@@ -68,6 +69,7 @@ pub(crate) const OPT_IN_TABS: [&str; 12] = [
     "system",
     "devices",
     "displays",
+    "present",
     "video",
 ];
 
@@ -85,6 +87,7 @@ pub fn tab_waits(id: &str, config: &Config) -> bool {
         "system" => !config.system.enabled,
         "devices" => !config.devices.enabled,
         "displays" => !config.displays.enabled,
+        "present" => !config.present.enabled,
         "video" => !config.video.enabled,
         _ => false,
     }
@@ -289,6 +292,7 @@ pub struct Features {
     pub dayprogress: Option<Rc<dayprogress::Feature>>,
     pub devices: Option<Rc<devices::Feature>>,
     pub displays: Option<Rc<displays::Feature>>,
+    pub present: Option<Rc<present::Feature>>,
     pub video: Option<Rc<video::Feature>>,
     pub system: Option<Rc<system::Feature>>,
     pub typing: Option<Rc<typing::Feature>>,
@@ -333,6 +337,7 @@ impl Features {
             system: system::attach(env),
             devices: devices::attach(env),
             displays: displays::attach(env),
+            present: present::attach(env),
             video: video::attach(env),
             snippets: snippets::attach(typing.as_ref()),
             typing,
@@ -421,6 +426,9 @@ impl Features {
         }
         if let Some(f) = &self.screentime {
             out.insert("screentime", f.runtime());
+        }
+        if let Some(f) = &self.present {
+            out.insert("present", f.runtime());
         }
         if let Some(f) = &self.typing {
             out.insert("typing", f.runtime());
@@ -556,6 +564,10 @@ impl Features {
                 .displays
                 .as_ref()
                 .map_or(Ok(()), |f| f.configure(&config.displays)),
+            "present" => self
+                .present
+                .as_ref()
+                .map_or(Ok(()), |f| f.configure(&config.present)),
             "video" => self
                 .video
                 .as_ref()
@@ -624,6 +636,9 @@ impl Features {
         if let Some(f) = &self.pomodoro {
             f.suspend_hotkeys();
         }
+        if let Some(f) = &self.present {
+            f.suspend_hotkeys();
+        }
         if let Some(f) = &self.typing {
             f.suspend_hotkeys();
         }
@@ -671,6 +686,9 @@ impl Features {
         }
         if let Some(f) = &self.pomodoro {
             f.resume_hotkeys(&config.pomodoro);
+        }
+        if let Some(f) = &self.present {
+            f.resume_hotkeys(&config.present);
         }
         if let Some(f) = &self.typing {
             f.resume_hotkeys(&config.typing);
@@ -774,6 +792,11 @@ impl Features {
         {
             return Some(result);
         }
+        if let Some(f) = &self.present
+            && let Some(result) = f.action(name)
+        {
+            return Some(result);
+        }
         if let Some(f) = &self.prs
             && let Some(result) = f.action(name)
         {
@@ -862,6 +885,9 @@ impl Features {
         }
         if let Some(f) = &self.pomodoro {
             entries.extend(pomodoro::Feature::menu_entries(f));
+        }
+        if let Some(f) = &self.present {
+            entries.extend(present::Feature::menu_entries(f));
         }
         if let Some(f) = &self.typing {
             entries.extend(typing::Feature::menu_entries(f));
@@ -988,6 +1014,10 @@ pub fn state(
         "displays".into(),
         displays::settings::state(&config.displays),
     );
+    root.insert(
+        "present".into(),
+        present::settings::state(&config.present, runtime.get("present").unwrap_or(&none)),
+    );
     root.insert("video".into(), video::settings::state(&config.video));
     root.insert(
         "mole".into(),
@@ -1077,6 +1107,9 @@ pub fn set(config: &mut Config, path: &str, value: &Value) -> Option<Result<&'st
         }
         "displays" => displays::settings::set(&mut config.displays, rest, value)
             .map(|r| r.map(|()| "displays")),
+        "present" => {
+            present::settings::set(&mut config.present, rest, value).map(|r| r.map(|()| "present"))
+        }
         "video" => {
             video::settings::set(&mut config.video, rest, value).map(|r| r.map(|()| "video"))
         }
@@ -1109,6 +1142,7 @@ pub fn shortcut_owner(target: &str) -> Option<&'static str> {
         "pin",
         "utilities",
         "pomodoro",
+        "present",
         "typing",
     ]
     .into_iter()
@@ -1132,6 +1166,7 @@ pub fn shortcuts(config: &Config) -> Vec<(String, String)> {
     all.extend(pin::settings::shortcuts(&config.pin));
     all.extend(utilities::settings::shortcuts(&config.utilities));
     all.extend(pomodoro::settings::shortcuts(&config.pomodoro));
+    all.extend(present::settings::shortcuts(&config.present));
     all.extend(typing::settings::shortcuts(&config.typing));
     all
 }
@@ -1172,6 +1207,8 @@ pub fn set_shortcut(
             .map(|r| r.map(|()| "utilities")),
         "pomodoro" => pomodoro::settings::set_shortcut(&mut config.pomodoro, target, value)
             .map(|r| r.map(|()| "pomodoro")),
+        "present" => present::settings::set_shortcut(&mut config.present, target, value)
+            .map(|r| r.map(|()| "present")),
         "typing" => typing::settings::set_shortcut(&mut config.typing, target, value)
             .map(|r| r.map(|()| "typing")),
         _ => None,

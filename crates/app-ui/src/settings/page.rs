@@ -37,6 +37,7 @@ const FEATURE_SCRIPTS: &[&str] = &[
     include_str!("../../web/features/dayprogress.js"),
     include_str!("../../web/features/devices.js"),
     include_str!("../../web/features/displays.js"),
+    include_str!("../../web/features/present.js"),
     include_str!("../../web/features/video.js"),
     include_str!("../../web/features/system.js"),
     include_str!("../../web/features/typing.js"),
@@ -166,6 +167,10 @@ const FEATURE_FIXTURES: &[(&str, &str)] = &[
         include_str!("../../web/features/displays.fixture.json"),
     ),
     (
+        "present",
+        include_str!("../../web/features/present.fixture.json"),
+    ),
+    (
         "video",
         include_str!("../../web/features/video.fixture.json"),
     ),
@@ -259,6 +264,7 @@ const SYMBOLS: &[&str] = &[
     "airpodspro",
     "display",
     "display.2",
+    "rectangle.on.rectangle",
     "play.rectangle.fill",
     "timer",
     "arrow.triangle.pull",

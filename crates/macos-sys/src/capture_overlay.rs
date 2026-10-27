@@ -1,7 +1,8 @@
 //! The selection overlay: every display shows its frozen picture, under the system crosshair
 //! cursor, dimmed only while a selection is drawn. Drag to pick an area; Space switches to picking a window, which lights up under the
 //! pointer; a click without a drag takes the window under the pointer; Return takes the whole display;
-//! Escape or a right click cancels.
+//! Escape or a right click cancels. A presentation asks for a whole display instead: the one under the pointer lights
+//! up and a click takes it.
 //!
 //! The overlay panels take keyboard focus without activating the app (macOS no longer lets an app
 //! activate itself), so the app in front stays in front.
@@ -36,6 +37,8 @@ pub enum Mode {
     Window,
     /// Only an area (text recognition, scrolling capture, recording a region).
     AreaOnly,
+    /// Only a whole display, lit up under the pointer (what to present).
+    Display,
 }
 
 #[derive(Debug, Clone, PartialEq)]
@@ -118,6 +121,13 @@ fn inset(r: NSRect, by: f64) -> NSRect {
     )
 }
 
+fn bounds_contain(bounds: NSRect, p: NSPoint) -> bool {
+    p.x >= bounds.origin.x
+        && p.y >= bounds.origin.y
+        && p.x < bounds.origin.x + bounds.size.width
+        && p.y < bounds.origin.y + bounds.size.height
+}
+
 fn is_click(r: NSRect) -> bool {
     r.size.width < 3.0 && r.size.height < 3.0
 }
@@ -155,7 +165,8 @@ define_class!(
         fn mouse_down(&self, event: &NSEvent) {
             let point = self.local(event);
             self.ivars().pointer.set(Some(point));
-            if !self.ivars().session.window_mode.get() {
+            let session = &self.ivars().session;
+            if !session.window_mode.get() && session.mode != Mode::Display {
                 self.ivars().drag_start.set(Some(point));
             }
         }
@@ -171,6 +182,10 @@ define_class!(
             let ivars = self.ivars();
             let session = &ivars.session;
             let start = ivars.drag_start.take();
+            if session.mode == Mode::Display {
+                session.finish(Picked::Display(ivars.display));
+                return;
+            }
             match start.map(|s| rect_between(s, point)) {
                 Some(rect) if !is_click(rect) => session.finish(Picked::Area {
                     display: ivars.display,
@@ -196,7 +211,9 @@ define_class!(
             let session = &self.ivars().session;
             match event.keyCode() {
                 53 => session.finish(Picked::Cancelled),
-                49 if session.mode != Mode::AreaOnly && self.ivars().drag_start.get().is_none() => {
+                49 if matches!(session.mode, Mode::Any | Mode::Window)
+                    && self.ivars().drag_start.get().is_none() =>
+                {
                     session.window_mode.set(!session.window_mode.get());
                     redraw_all(self);
                 }
@@ -248,7 +265,11 @@ impl OverlayView {
             window.makeKeyWindow();
         }
         NSCursor::crosshairCursor().set();
-        self.setNeedsDisplay(true);
+        if self.ivars().session.mode == Mode::Display {
+            redraw_all(self);
+        } else {
+            self.setNeedsDisplay(true);
+        }
     }
 
     fn dim(&self, hole: Option<NSRect>) {
@@ -268,7 +289,22 @@ impl OverlayView {
         let session = &ivars.session;
         let pointer = ivars.pointer.get();
 
-        if session.window_mode.get() {
+        if session.mode == Mode::Display {
+            // The display under the pointer is lit, the others dimmed; each view asks where the pointer is, since only
+            // the one under it hears it move.
+            let global = NSEvent::mouseLocation();
+            let here = NSPoint::new(global.x - ivars.origin.x, global.y - ivars.origin.y);
+            if bounds_contain(bounds, here) {
+                NSColor::colorWithRed_green_blue_alpha(0.25, 0.55, 1.0, 0.22).setFill();
+                NSBezierPath::fillRect(bounds);
+                NSColor::colorWithRed_green_blue_alpha(0.35, 0.65, 1.0, 0.9).setStroke();
+                let border = NSBezierPath::bezierPathWithRect(inset(bounds, 2.0));
+                border.setLineWidth(4.0);
+                border.stroke();
+            } else {
+                self.dim(None);
+            }
+        } else if session.window_mode.get() {
             let hovered = pointer.and_then(|p| session.window_at(self.global(p)));
             let hole = hovered.map(|(_, f)| {
                 NSRect::new(
