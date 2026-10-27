@@ -374,6 +374,10 @@ Không dùng Homebrew:
 
     curl -fsSL https://raw.githubusercontent.com/eliasbui/figghost/main/scripts/install.sh | sh
 
+Trên Windows (beta), trong PowerShell:
+
+    irm https://raw.githubusercontent.com/eliasbui/figghost/main/scripts/install.ps1 | iex
+
 Viết đầy đủ tên cask sẽ cài từ tap và chỉ tin đúng cask đó, nên không cần `brew trust`. Cả hai cách đều đặt `Figghost.app` vào `/Applications` (script nhận `DEST=~/Applications` nếu muốn chỗ khác). Ứng dụng được ký ad hoc và chưa notarize, nên cả hai cách đều gỡ cờ cách ly sau khi cài, như các ứng dụng notch mã nguồn mở khác; hãy tự build (bên dưới) nếu bạn không muốn vậy. `brew uninstall --cask figghost` gỡ ứng dụng, và thêm `--zap` sẽ xóa luôn dữ liệu trong `~/Library/Application Support/Figghost`. Figghost tìm bản mới mỗi ngày một lần và hỏi trước khi cài, kèm những gì mới; khi bật *Tự động cập nhật* ở trang Giới thiệu thì nó cài mà không hỏi, và *Kiểm tra* ở đó làm ngay. Một bản cập nhật thay ứng dụng tại chỗ, xóa bản cũ và tệp tải về, và có hiệu lực khi Figghost được khởi động lại (cửa sổ thông báo có nút cho việc đó). Nó cần ghi được vào thư mục chứa ứng dụng, điều mà quản trị viên làm được với `/Applications`; nơi không ghi được thì trang Giới thiệu dẫn tới bản phát hành, và chạy lại lệnh cài vẫn dùng như trước. Quyền Trợ năng được giữ qua các bản cập nhật, vì ứng dụng được ký bằng một tên mà mọi bản build đều chung; bản cập nhật từ một phiên bản từng ký riêng cho từng bản build sẽ hỏi lại một lần cuối (xóa Figghost cũ khỏi danh sách trong Cài đặt Hệ thống, Quyền riêng tư & Bảo mật, Trợ năng, rồi cấp lại).
 
 ## Build và chạy
@@ -397,7 +401,11 @@ Biểu tượng ứng dụng được vẽ bằng mã: `cargo run -p macos-sys -
 
 ## Windows và Linux (beta)
 
-Figghost cho Windows 10, 11 và Linux đang là **bản beta**. Đây là một chương trình riêng, `figghost` (`crates/desktop`), dùng chung phần Rust đã có kiểm thử với bản macOS (`core-clipboard`, `core-agents`, `core-notes`): một biểu tượng ở khay hệ thống và một cửa sổ là trang web chạy trong web view của hệ thống (WebView2 trên Windows, WebKitGTK trên Linux). Từ 2.0.4, mỗi [bản phát hành trên GitHub](https://github.com/eliasbui/figghost/releases/latest) có kèm bản beta cho Windows (`figghost-<version>-windows-x86_64.zip`) và cho Linux (`figghost-<version>-linux-<arch>.tar.gz`); giải nén rồi chạy `figghost`. Các bản này chưa có chữ ký và chưa có bộ cài: Windows SmartScreen sẽ hỏi một lần, còn trên Linux cần cài các thư viện WebKitGTK, GTK và AppIndicator trong danh sách build bên dưới (bỏ hậu tố `-dev`). Hoặc build từ mã nguồn như bên dưới.
+Figghost cho Windows 10, 11 và Linux đang là **bản beta**. Đây là một chương trình riêng, `figghost` (`crates/desktop`), dùng chung phần Rust đã có kiểm thử với bản macOS (`core-clipboard`, `core-agents`, `core-notes`): một biểu tượng ở khay hệ thống và một cửa sổ là trang web chạy trong web view của hệ thống (WebView2 trên Windows, WebKitGTK trên Linux). Từ 2.0.4, mỗi [bản phát hành trên GitHub](https://github.com/eliasbui/figghost/releases/latest) có kèm bản beta cho Windows (`figghost-<version>-windows-x86_64.zip`) và cho Linux (`figghost-<version>-linux-<arch>.tar.gz`); giải nén rồi chạy `figghost`. Các bản này chưa có chữ ký và Windows SmartScreen sẽ hỏi một lần. Cài đặt trên Windows bằng PowerShell:
+
+    irm https://raw.githubusercontent.com/eliasbui/figghost/main/scripts/install.ps1 | iex
+
+Trên Linux cần cài các thư viện WebKitGTK, GTK và AppIndicator trong danh sách build bên dưới (bỏ hậu tố `-dev`). Hoặc build từ mã nguồn như bên dưới.
 
 Có trong bản beta:
 

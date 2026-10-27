@@ -376,6 +376,10 @@ Without Homebrew:
 
     curl -fsSL https://raw.githubusercontent.com/eliasbui/figghost/main/scripts/install.sh | sh
 
+On Windows (beta), in PowerShell:
+
+    irm https://raw.githubusercontent.com/eliasbui/figghost/main/scripts/install.ps1 | iex
+
 Writing the cask out in full installs it from the tap and trusts only that cask, so no `brew trust` is needed. Both ways put `Figghost.app` in `/Applications` (the script takes `DEST=~/Applications` for somewhere else). The app is signed ad hoc and not notarized, so both remove the quarantine flag after installing it, as other open source notch apps do; build it yourself (below) if you would rather not. `brew uninstall --cask figghost` removes the app, and `--zap` its data in `~/Library/Application Support/Figghost` too. Figghost looks for a new version once a day and asks before it installs one, with what is new in it; with *Update automatically* on in the About page it installs without asking, and *Check now* there does it at once. An update replaces the app where it is, deletes the old copy and the download, and takes effect when Figghost is restarted (the popup has a button for that). It needs to be able to write in the folder the app is in, which an administrator can for `/Applications`; where it cannot, the About page links to the release instead, and running the install command again works as before. Accessibility stays granted through updates, because the app is signed with a name that every build shares; the update from a version that was signed per build asks for it one last time (remove the old Figghost from the list in System Settings, Privacy & Security, Accessibility, then grant it again).
 
 ## Build and run
@@ -399,7 +403,11 @@ The app icon is drawn by code: `cargo run -p macos-sys --example make_icon -- X.
 
 ## Windows and Linux (beta)
 
-Figghost for Windows 10 and 11 and for Linux is a **beta**. It is a program of its own, `figghost` (`crates/desktop`), built on the same tested Rust as the macOS app (`core-clipboard`, `core-agents`, `core-notes`): an icon in the tray and one window, which is a web page in the system's web view (WebView2 on Windows, WebKitGTK on Linux). From 2.0.4 each [GitHub release](https://github.com/eliasbui/figghost/releases/latest) has the beta for Windows (`figghost-<version>-windows-x86_64.zip`) and for Linux (`figghost-<version>-linux-<arch>.tar.gz`); unzip it and run `figghost`. They are not signed and there is no installer yet: Windows SmartScreen asks once, and on Linux the WebKitGTK, GTK and AppIndicator libraries of the build list below (without `-dev`) must be installed. Or build it from source as below.
+Figghost for Windows 10 and 11 and for Linux is a **beta**. It is a program of its own, `figghost` (`crates/desktop`), built on the same tested Rust as the macOS app (`core-clipboard`, `core-agents`, `core-notes`): an icon in the tray and one window, which is a web page in the system's web view (WebView2 on Windows, WebKitGTK on Linux). From 2.0.4 each [GitHub release](https://github.com/eliasbui/figghost/releases/latest) has the beta for Windows (`figghost-<version>-windows-x86_64.zip`) and for Linux (`figghost-<version>-linux-<arch>.tar.gz`); unzip it and run `figghost`. They are not signed and Windows SmartScreen asks once. Install on Windows with PowerShell:
+
+    irm https://raw.githubusercontent.com/eliasbui/figghost/main/scripts/install.ps1 | iex
+
+On Linux the WebKitGTK, GTK and AppIndicator libraries of the build list below (without `-dev`) must be installed. Or build it from source as below.
 
 In the beta:
 
