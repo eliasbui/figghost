@@ -76,9 +76,9 @@
       'menubar.limits.title': 'Những gì không làm được',
       'menubar.limits.body': 'Các biểu tượng không còn chỗ cạnh notch sẽ do chính macOS ẩn đi và tính năng này không hiện lại được. Trên một số phiên bản macOS, độ dài lớn nhất của vạch ngăn còn dùng được phụ thuộc vào màn hình và ứng dụng đang ở phía trước, nên Figghost đo độ dài đó và kiểm tra lại sau mỗi thay đổi; nơi nào không có độ dài nào dùng được, Figghost để mọi thứ hiện và báo tại đây. Tắt tính năng hoặc thoát Figghost sẽ gỡ mũi tên và vạch ngăn, mọi biểu tượng trở lại.',
     },
-    slots: { notch: cards },
+    slots: { menubar: cards },
     selftest({ expect, go, sent, S: state }) {
-      go('notch');
+      go('menubar');
       expect(!!document.querySelector('.pick'), 'the delay is a choice');
       const sw = [...document.querySelectorAll('.switch')].find((s) => s.getAttribute('aria-label') === t('menubar.enable.title'));
       expect(!!sw, 'the switch exists');

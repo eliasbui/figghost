@@ -1,8 +1,7 @@
-/* Figghost settings: a split-view macOS window on Liquid Glass. This first part holds the system's metrics
-   and colours and the plain controls; the glass layer further down (from "Liquid Glass, as macOS 26 draws it")
-   draws the sidebar, the toolbar, the cards and the coloured heroes on top of them. Controls take the user's
-   accent colour (--tint), a state takes its own system colour (--good, --warn, --bad), and only the heroes and
-   the page icons use the colours of the pages. */
+/* Figghost settings: a split-view macOS window drawn as System Settings is. This first part holds the system's
+   metrics and colours and the plain controls; the forms layer further down (from "macOS forms") draws the sidebar,
+   the toolbar, the groups and the controls on top of them. Controls take the user's accent colour (--tint), a
+   state takes its own system colour (--good, --warn, --bad), and nothing else carries colour. */
 
 :root {
   color-scheme: light dark;
@@ -486,23 +485,7 @@ kbd {
 }
 .banner .grow { flex: 1; font-size: var(--fs-small); }
 
-/* MOUSE CURVE & TEST PAD */
-.graph { position: relative; padding: 12px 14px 4px; }
-.graph canvas { display: block; width: 100%; height: 180px; }
-.graph-legend {
-  display: flex;
-  gap: 16px;
-  padding: 6px 2px 6px;
-  color: var(--text-2);
-  font-size: var(--fs-small);
-}
-.graph-legend b {
-  display: inline-block;
-  width: 8px;
-  height: 8px;
-  border-radius: 50%;
-  margin-right: 6px;
-}
+/* SCROLLING: the presets and the pad to try them on */
 .presets { display: flex; gap: 6px; flex-wrap: wrap; }
 .pad-wrap {
   display: grid;
@@ -644,119 +627,6 @@ kbd {
 .menu img { width: 18px; height: 18px; border-radius: 4px; }
 .menu .menu-icon { width: 16px; height: 16px; }
 .menu .section-title { color: var(--text-2); font-size: var(--fs-small); margin: 4px 8px; }
-
-/* NOTCH STAGE: modern macOS dark nebula wallpaper */
-.notch-stage {
-  position: relative;
-  height: 180px;
-  overflow: hidden;
-  border-radius: var(--r-card);
-  background:
-    radial-gradient(ellipse 80% 60% at 50% 120%, rgba(120, 119, 198, 0.35), transparent),
-    radial-gradient(circle at 15% 25%, rgba(99, 102, 241, 0.3) 0%, transparent 40%),
-    radial-gradient(circle at 85% 75%, rgba(236, 72, 153, 0.25) 0%, transparent 40%),
-    linear-gradient(135deg, #1e1b4b 0%, #0f172a 50%, #020617 100%);
-  box-shadow: inset 0 0 0 0.5px rgba(255, 255, 255, 0.1), 0 8px 24px -12px rgba(0, 0, 0, 0.5);
-}
-.menubar {
-  position: absolute;
-  left: 0;
-  right: 0;
-  top: 0;
-  height: 22px;
-  background: rgba(255, 255, 255, 0.14);
-  -webkit-backdrop-filter: blur(12px);
-  backdrop-filter: blur(12px);
-}
-.notch {
-  position: absolute;
-  left: 50%;
-  top: 0;
-  z-index: 2;
-  width: 150px;
-  height: 22px;
-  transform: translateX(-50%);
-  background: #000;
-  border-radius: 0 0 14px 14px;
-  overflow: hidden;
-  color: #fff;
-  transition: width 0.5s var(--spring), height 0.5s var(--spring), border-radius 0.5s var(--spring), background 0.3s;
-}
-.notch-stage:hover .notch, .notch.open {
-  width: 360px;
-  height: 140px;
-  border-radius: 0 0 22px 22px;
-}
-.notch-stage:hover .notch.mat-glass, .notch.open.mat-glass {
-  background: rgba(24, 24, 28, 0.65);
-  -webkit-backdrop-filter: blur(18px) saturate(1.7);
-  backdrop-filter: blur(18px) saturate(1.7);
-  box-shadow: inset 0 0 0 0.5px rgba(255, 255, 255, 0.3), 0 10px 26px -10px rgba(0, 0, 0, 0.6);
-}
-.notch-stage:hover .notch.mat-clear, .notch.open.mat-clear {
-  background: rgba(24, 24, 28, 0.28);
-  -webkit-backdrop-filter: blur(8px) saturate(1.5);
-  backdrop-filter: blur(8px) saturate(1.5);
-  box-shadow: inset 0 0 0 0.5px rgba(255, 255, 255, 0.45);
-}
-.notch-stage:hover .notch.mat-ink, .notch.open.mat-ink {
-  background: rgba(12, 12, 14, 0.8);
-  -webkit-backdrop-filter: blur(20px) saturate(1.5);
-  backdrop-filter: blur(20px) saturate(1.5);
-  box-shadow: inset 0 0 0 0.5px rgba(255, 255, 255, 0.22), 0 10px 26px -10px rgba(0, 0, 0, 0.6);
-}
-.notch-stage:hover .notch.mat-accent, .notch.open.mat-accent {
-  background: color-mix(in srgb, var(--tint) 48%, transparent);
-  -webkit-backdrop-filter: blur(10px) saturate(1.6);
-  backdrop-filter: blur(10px) saturate(1.6);
-  box-shadow: inset 0 0 0 0.5px rgba(255, 255, 255, 0.45);
-}
-.notch-stage:hover .notch.mat-black, .notch.open.mat-black {
-  background: linear-gradient(180deg, #000, #222428);
-}
-.notch-stage.mo-smooth .notch { transition-timing-function: var(--ease-out); }
-.notch-stage.mo-none .notch, .notch-stage.mo-none .notch-body { transition: none; }
-.tab-order { display: flex; gap: 4px; }
-.tab-order .btn.icon:disabled { opacity: 0.3; }
-.notch-body {
-  position: absolute;
-  left: 0;
-  right: 0;
-  top: 30px;
-  padding: 0 16px;
-  opacity: 0;
-  transition: opacity 0.25s 0.08s;
-}
-.notch-stage:hover .notch-body, .notch.open .notch-body { opacity: 1; }
-.notch-tabs {
-  display: flex;
-  gap: 4px;
-  padding: 3px;
-  margin: 0 auto 10px;
-  width: max-content;
-  border-radius: 8px;
-  background: rgba(255, 255, 255, 0.12);
-}
-.notch-tabs span {
-  padding: 2px 9px;
-  border-radius: 5px;
-  font-size: var(--fs-small);
-  color: rgba(255, 255, 255, 0.78);
-}
-.notch-tabs span:first-child { background: rgba(255, 255, 255, 0.24); color: #fff; }
-.notch-line { height: 18px; border-radius: 5px; margin-bottom: 6px; background: rgba(255, 255, 255, 0.1); }
-.notch-line:first-of-type { background: color-mix(in srgb, var(--accent) 85%, black); }
-.notch-note {
-  position: absolute;
-  left: 0;
-  right: 0;
-  bottom: 12px;
-  text-align: center;
-  color: #fff;
-  font-size: var(--fs-small);
-  font-weight: 500;
-  text-shadow: 0 1px 4px rgba(0, 0, 0, 0.5);
-}
 
 /* WINDOW SNAPPING: 2-column shortcuts table */
 .tiles {
@@ -945,130 +815,89 @@ html.reduce-motion *::after {
   input[type="range"] { width: 150px; }
 }
 
-/* Liquid Glass, as macOS 26 draws it: the window is glass, the sidebar floats on it as a brighter pane, the toolbar
-   blurs what scrolls under it, cards are frosted with a rim lit from the top left, every page opens on a hero of its
-   own colours, and the controls take the system's capsule shapes. Controls take the user's accent (--tint), a
-   state its own colour (--good, --warn, --bad); only heroes and page icons use the colours of the pages. */
+/* macOS forms. The window is one solid colour, the sidebar a lighter pane floating on it, and each page a grouped form
+   as System Settings draws one. One colour carries meaning, the system's accent (--tint); a state takes its own (--good,
+   --warn, --bad). The radii are concentric: window 26, sidebar 18 (26 less the 8 around it), group 12, page icon 9,
+   sidebar item 8, and the controls are round. Only the controls move. */
 :root {
-  --canvas: rgba(244, 245, 250, 0.62);
-  --aurora-1: rgba(135, 175, 255, 0.24);
-  --aurora-2: rgba(200, 170, 255, 0.18);
-  --aurora-3: rgba(150, 220, 230, 0.16);
-  --card-glass: rgba(255, 255, 255, 0.66);
-  --card-edge: rgba(20, 30, 60, 0.08);
-  --card-hi: rgba(255, 255, 255, 0.9);
-  --card-shadow: 0 1px 2px rgba(30, 40, 90, 0.05), 0 8px 20px -10px rgba(30, 40, 90, 0.16);
-  --rim: linear-gradient(135deg, rgba(255, 255, 255, 1), rgba(255, 255, 255, 0.3) 28%, rgba(255, 255, 255, 0) 50%, rgba(255, 255, 255, 0.65));
-  --bar-glass: rgba(255, 255, 255, 0.44);
-  --bar-edge: rgba(255, 255, 255, 0.85);
-  --bar-shadow: 0 12px 32px -12px rgba(30, 40, 90, 0.22), 0 1px 2px rgba(30, 40, 90, 0.06);
-  --lens-fill: rgba(255, 255, 255, 0.86);
-  --lens-edge: rgba(255, 255, 255, 0.96);
-  --lens-shadow: inset 0 1px 0 #ffffff, 0 1px 2px rgba(30, 40, 90, 0.08), 0 6px 16px -8px rgba(30, 40, 90, 0.25);
-  --btn: rgba(255, 255, 255, 0.8);
-  --btn-shadow: inset 0 1px 0 #ffffff, inset 0 0 0 0.5px rgba(0, 0, 0, 0.08), 0 1px 2px rgba(0, 0, 0, 0.08);
-  --cap: #ffffff;
-  --cap-shadow: 0 1px 0 rgba(0, 0, 0, 0.14), inset 0 0 0 0.5px rgba(0, 0, 0, 0.08);
-  --brand: #007aff;
-  --r-card: 22px;
-  --thumb-bg: #ffffff;
+  --canvas: #efeff2;
+  --side: #fafafb;
+  --side-edge: rgba(0, 0, 0, 0.09);
+  --side-shadow: 0 2px 10px rgba(0, 0, 0, 0.06);
+  --group: #ffffff;
+  --group-edge: rgba(0, 0, 0, 0.08);
+  --card-edge: var(--group-edge);
+  --stroke: rgba(0, 0, 0, 0.08);
+  --hover: rgba(0, 0, 0, 0.05);
+  --sheet: #f6f6f8;
+  --scrim: rgba(0, 0, 0, 0.12);
+  --good-text: #1f7d36;
+  --warn-text: #c93400;
+  --r-card: 12px;
+  --row-inset: 12px;
+  --h-control: 24px;
+  --h-small: 24px;
 }
 
 @media (prefers-color-scheme: dark) {
   :root {
-    --canvas: rgba(22, 22, 30, 0.62);
-    --aurora-1: rgba(65, 100, 220, 0.18);
-    --aurora-2: rgba(110, 80, 200, 0.14);
-    --aurora-3: rgba(70, 130, 210, 0.12);
-    --card-glass: rgba(46, 46, 56, 0.55);
-    --card-edge: rgba(255, 255, 255, 0.07);
-    --card-hi: rgba(255, 255, 255, 0.08);
-    --card-shadow: 0 1px 2px rgba(0, 0, 0, 0.25), 0 8px 20px -10px rgba(0, 0, 0, 0.5);
-    --rim: linear-gradient(135deg, rgba(255, 255, 255, 0.5), rgba(255, 255, 255, 0.1) 28%, rgba(255, 255, 255, 0) 50%, rgba(255, 255, 255, 0.22));
-    --bar-glass: rgba(255, 255, 255, 0.07);
-    --bar-edge: rgba(255, 255, 255, 0.13);
-    --bar-shadow: 0 16px 36px -12px rgba(0, 0, 0, 0.6), 0 1px 2px rgba(0, 0, 0, 0.3);
-    --lens-fill: rgba(255, 255, 255, 0.15);
-    --lens-edge: rgba(255, 255, 255, 0.26);
-    --lens-shadow: inset 0 1px 0 rgba(255, 255, 255, 0.22), 0 1px 2px rgba(0, 0, 0, 0.3), 0 6px 16px -8px rgba(0, 0, 0, 0.5);
-    --btn: rgba(255, 255, 255, 0.12);
-    --btn-shadow: inset 0 1px 0 rgba(255, 255, 255, 0.14), inset 0 0 0 0.5px rgba(255, 255, 255, 0.08), 0 1px 2px rgba(0, 0, 0, 0.3);
-    --cap: rgba(255, 255, 255, 0.16);
-    --cap-shadow: 0 1px 0 rgba(0, 0, 0, 0.4), inset 0 0 0 0.5px rgba(255, 255, 255, 0.1);
-    --brand: #0a84ff;
-    --thumb-bg: #5a5a60;
+    --canvas: #1c1c1e;
+    --side: #2b2b2e;
+    --side-edge: rgba(255, 255, 255, 0.08);
+    --side-shadow: 0 2px 12px rgba(0, 0, 0, 0.35);
+    --group: rgba(255, 255, 255, 0.05);
+    --group-edge: rgba(255, 255, 255, 0.07);
+    --stroke: rgba(255, 255, 255, 0.07);
+    --hover: rgba(255, 255, 255, 0.06);
+    --sheet: #2a2a2d;
+    --scrim: rgba(0, 0, 0, 0.35);
+    --good-text: #30d158;
+    --warn-text: #ff9f0a;
   }
 }
 
-/* The window: the aurora tints the glass the system draws behind the page. */
 #app {
   position: relative;
   display: grid;
-  grid-template-columns: 248px minmax(0, 1fr);
+  grid-template-columns: 236px minmax(0, 1fr);
   height: 100vh;
-  padding: 8px;
-  gap: 8px;
   overflow: hidden;
-  background:
-    radial-gradient(55% 45% at 5% 5%, var(--aurora-1), transparent 60%),
-    radial-gradient(45% 50% at 95% 10%, var(--aurora-2), transparent 65%),
-    radial-gradient(50% 55% at 50% 95%, var(--aurora-3), transparent 70%),
-    var(--canvas);
+  background: var(--canvas);
 }
 .dragzone { position: absolute; top: 0; left: 0; right: 0; height: var(--titlebar); z-index: 5; }
 
-/* A rim of light around glass, brightest where the light comes from: a ring of a gradient, one pixel wide. */
-.card::before,
-#sidebar::before,
-.nav-buttons::before,
-.hero::before {
-  content: "";
-  position: absolute;
-  inset: 0;
-  z-index: 2;
-  padding: 1px;
-  border-radius: inherit;
-  background: var(--rim);
-  -webkit-mask: linear-gradient(#000 0 0) content-box, linear-gradient(#000 0 0);
-  -webkit-mask-composite: xor;
-  mask-composite: exclude;
-  pointer-events: none;
-}
-
-/* SIDEBAR: a floating pane of glass, concentric with the corners of the window. */
+/* SIDEBAR: a pane floating on the window, with the search, the app and the pages. */
 #sidebar {
   position: relative;
   z-index: 10;
   display: flex;
   flex-direction: column;
   min-height: 0;
-  padding: 42px 10px 10px;
+  margin: 8px 0 8px 8px;
+  padding: 40px 10px 10px;
   border-radius: 18px;
-  background: var(--bar-glass);
-  -webkit-backdrop-filter: blur(30px) saturate(190%);
-  backdrop-filter: blur(30px) saturate(190%);
-  box-shadow: var(--bar-shadow), inset 0 0 0 0.5px var(--card-edge);
+  background: var(--side);
+  box-shadow: 0 0 0 0.5px var(--side-edge), var(--side-shadow);
 }
 
 .search { position: relative; z-index: 25; margin-bottom: 8px; }
 .top-search {
   display: flex;
   align-items: center;
-  gap: 7px;
-  height: 32px;
-  padding: 0 6px 0 11px;
-  border-radius: 16px;
-  background: var(--fill);
+  gap: 6px;
+  height: 28px;
+  padding: 0 10px;
+  border-radius: 14px;
+  background: var(--well);
   color: var(--text-2);
   cursor: text;
-  transition: box-shadow var(--motion-fast), background var(--motion-fast);
 }
-.top-search:focus-within { background: var(--card-glass); box-shadow: 0 0 0 3px color-mix(in srgb, var(--tint) 30%, transparent); }
-.top-search .glyph { width: 13px; height: 13px; opacity: 0.7; }
-.top-search input { flex: 1; min-width: 0; height: 100%; padding: 0; border: 0; outline: none; background: none; color: var(--text); font: 12.5px var(--font); }
+.top-search:focus-within { box-shadow: 0 0 0 3px color-mix(in srgb, var(--tint) 30%, transparent); }
+.top-search .glyph { width: 12px; height: 12px; opacity: 0.7; }
+.top-search input { flex: 1; min-width: 0; height: 100%; padding: 0; border: 0; outline: none; background: none; color: var(--text); font: 13px var(--font); }
 .top-search input::placeholder { color: var(--text-2); }
 .top-search input::-webkit-search-cancel-button { display: none; }
-.top-search kbd { height: auto; padding: 1px 6px; border-radius: 6px; background: var(--fill); box-shadow: none; color: var(--text-2); font: 500 10.5px var(--font); }
+.top-search kbd { min-width: 0; height: auto; padding: 0; background: none; box-shadow: none; color: var(--text-3); font: 11px var(--font); }
 .top-search:focus-within kbd { display: none; }
 
 #search-results {
@@ -1078,580 +907,253 @@ html.reduce-motion *::after {
   width: 300px;
   display: flex;
   flex-direction: column;
-  gap: 2px;
+  gap: 1px;
   max-height: 360px;
   overflow-y: auto;
-  padding: 6px;
-  border-radius: 18px;
-  background: color-mix(in srgb, var(--solid) 90%, transparent);
-  -webkit-backdrop-filter: blur(40px) saturate(210%);
-  backdrop-filter: blur(40px) saturate(210%);
-  box-shadow: 0 18px 44px -12px rgba(10, 20, 50, 0.35), 0 2px 8px rgba(10, 20, 50, 0.1), inset 0 0 0 0.5px var(--card-edge);
-  animation: rise var(--motion) var(--spring) backwards;
+  padding: 5px;
+  border-radius: 12px;
+  background: var(--solid);
+  box-shadow: 0 0 0 0.5px var(--stroke), 0 12px 32px rgba(0, 0, 0, 0.22);
 }
 #search-results[hidden] { display: none; }
-.result { display: flex; align-items: center; gap: 10px; flex: none; height: 42px; padding: 0 8px; border: 0; border-radius: 12px; background: transparent; text-align: left; transition: background var(--motion-fast); }
-.result:hover { background: var(--fill); }
-.result[aria-selected="true"] { background: color-mix(in srgb, var(--tint) 16%, var(--solid)); box-shadow: inset 0 0 0 0.5px color-mix(in srgb, var(--tint) 38%, transparent); }
-.result-text { display: flex; flex: 1; flex-direction: column; gap: 1px; min-width: 0; }
-.result-name { overflow: hidden; font-size: 12.5px; font-weight: 600; letter-spacing: -0.01em; text-overflow: ellipsis; white-space: nowrap; color: var(--text); }
+.result { display: flex; align-items: center; gap: 9px; flex: none; height: 38px; padding: 0 8px; border: 0; border-radius: 8px; background: transparent; text-align: left; }
+.result:hover { background: var(--hover); }
+.result[aria-selected="true"] { background: var(--tint); color: #ffffff; }
+.result[aria-selected="true"] .pico, .result[aria-selected="true"] .result-name { color: #ffffff; }
+.result[aria-selected="true"] .result-cat { color: rgba(255, 255, 255, 0.8); }
+.result .pico { width: 18px; height: 18px; }
+.result-text { display: flex; flex: 1; flex-direction: column; min-width: 0; }
+.result-name { overflow: hidden; color: var(--text); font-size: 13px; text-overflow: ellipsis; white-space: nowrap; }
 .result-cat { overflow: hidden; color: var(--text-2); font-size: 11px; text-overflow: ellipsis; white-space: nowrap; }
-.result-key { flex: none; padding: 1px 6px; border-radius: 999px; background: color-mix(in srgb, var(--tint) 14%, transparent); color: var(--tint); font: 600 11px var(--font); opacity: 0; transition: opacity var(--motion-fast); }
-.result[aria-selected="true"] .result-key { opacity: 1; }
-.search-empty { padding: 12px 10px; font-size: 12px; color: var(--text-2); text-align: center; }
+.result-key { display: none; }
+.search-empty { padding: 10px; color: var(--text-2); font-size: 12px; text-align: center; }
 
-#nav {
-  position: relative;
-  flex: 1;
-  min-height: 0;
-  overflow-y: auto;
-  overflow-x: hidden;
-  scrollbar-width: none;
+/* The app at the top of the sidebar, and whether it has the access it needs. */
+.me {
   display: flex;
-  flex-direction: column;
-  gap: 1px;
-  padding: 2px;
-  touch-action: none;
-}
-#nav::-webkit-scrollbar { display: none; }
-
-/* A group's heading folds it away; its arrow shows on hover, and stays while the group is folded. */
-.nav-sec {
-  position: relative;
-  z-index: 1;
-  display: flex;
-  align-items: center;
-  gap: 6px;
   flex: none;
-  width: 100%;
-  height: 26px;
-  margin-top: 10px;
-  padding: 0 10px;
-  border: 0;
-  border-radius: 8px;
-  background: none;
-  color: var(--text-2);
-  font-size: 11px;
-  font-weight: 600;
-  text-align: left;
-}
-.nav-sec:hover { background: var(--fill-2); }
-.nav-sec .chev { width: 9px; height: 9px; margin-left: auto; opacity: 0; transition: opacity var(--motion-fast), transform var(--motion) var(--ease-out); }
-.nav-sec:hover .chev, .nav-sec:focus-visible .chev, .nav-sec[aria-expanded="false"] .chev { opacity: 0.8; }
-.nav-sec[aria-expanded="false"] .chev { transform: rotate(-90deg); }
-
-.nav-item {
-  position: relative;
-  z-index: 1;
-  display: flex;
   align-items: center;
   gap: 10px;
-  flex: none;
   width: 100%;
-  height: 32px;
-  padding: 0 10px 0 5px;
+  margin-bottom: 4px;
+  padding: 6px 8px;
   border: 0;
   border-radius: 10px;
+  background: none;
+  color: var(--text);
+  text-align: left;
+}
+.me:hover:not([aria-current="page"]) { background: var(--hover); }
+.me[aria-current="page"] { background: var(--tint); color: #ffffff; }
+.me-icon { flex: none; width: 32px; height: 32px; }
+.me-text { display: flex; flex-direction: column; min-width: 0; }
+.me-text b { font-size: 13px; font-weight: 600; }
+.me-status { overflow: hidden; color: var(--text-2); font-size: 11px; text-overflow: ellipsis; white-space: nowrap; }
+.me-status.warn { color: var(--warn-text); }
+.me[aria-current="page"] .me-status { color: rgba(255, 255, 255, 0.8); }
+
+#nav { display: flex; flex: 1; flex-direction: column; gap: 1px; min-height: 0; overflow-x: hidden; overflow-y: auto; scrollbar-width: none; }
+#nav::-webkit-scrollbar { display: none; }
+.nav-sec { flex: none; padding: 12px 8px 3px; color: var(--text-2); font-size: 11px; font-weight: 600; }
+.nav-item {
+  display: flex;
+  flex: none;
+  align-items: center;
+  gap: 8px;
+  width: 100%;
+  height: 28px;
+  padding: 0 8px;
+  border: 0;
+  border-radius: 8px;
   background: transparent;
   color: var(--text);
   font-size: 13px;
-  font-weight: 450;
   text-align: left;
-  cursor: default;
-  transition: background var(--motion-fast);
 }
-.nav-item[hidden] { display: none; }
-.nav-item:hover:not([aria-current="page"]) { background: var(--fill-2); }
-.nav-item[aria-current="page"], #nav.pressing .nav-item.lit { font-weight: 600; }
-.nav-item:focus-visible { outline-offset: -2px; }
+.nav-item:hover:not([aria-current="page"]) { background: var(--hover); }
+.nav-item[aria-current="page"] { background: var(--tint); color: #ffffff; }
+.nav-item[aria-current="page"] .pico { color: #ffffff; }
 .nav-label { flex: 1; min-width: 0; overflow: hidden; text-overflow: ellipsis; white-space: nowrap; }
-.nav-dot { flex: none; width: 6px; height: 6px; border-radius: 3px; background: var(--good); box-shadow: 0 0 0 2px color-mix(in srgb, var(--good) 20%, transparent); }
-.nav-dot[hidden] { display: none; }
+.nav-off { flex: none; color: var(--text-2); font-size: 11px; }
+.nav-off[hidden] { display: none; }
+.nav-item[aria-current="page"] .nav-off { color: rgba(255, 255, 255, 0.75); }
+/* In a window that is not in front, the selection turns grey, as in any Mac sidebar. */
+html.inactive .nav-item[aria-current="page"], html.inactive .me[aria-current="page"] { background: var(--selection-idle); color: var(--text); }
+html.inactive .nav-item[aria-current="page"] .pico { color: var(--tint); }
+html.inactive .me[aria-current="page"] .me-status, html.inactive .nav-item[aria-current="page"] .nav-off { color: var(--text-2); }
 
-/* The lens under the open page: a drop of clear glass that follows a press along the sidebar. */
-.lens {
-  position: absolute;
-  top: 0;
-  left: 2px;
-  right: 2px;
-  z-index: 0;
-  height: 32px;
-  margin-top: -16px;
-  border-radius: 10px;
-  pointer-events: none;
-  background: var(--lens-fill);
-  box-shadow: var(--lens-shadow);
-  --lift: 1;
-  transform: translateY(var(--y, 18px)) scale(var(--lift), calc(var(--lift) * var(--s, 1)));
-  transition: transform 320ms var(--spring), background var(--motion), box-shadow var(--motion);
-}
-#nav.pressing .lens { --lift: 1.02; box-shadow: var(--lens-shadow), 0 8px 18px -6px rgba(0, 0, 0, 0.18); }
-#nav.still .lens { transition: none; }
-#nav.dragging .lens { transition: transform 70ms ease-out, background var(--motion), box-shadow var(--motion); }
+/* PAGE ICONS: the glyph of a page in one colour, the accent's. */
+.pico { display: inline-grid; flex: none; place-items: center; width: 16px; height: 16px; color: var(--tint); }
+.pico svg { width: 100%; height: 100%; }
+.pico .glyph { width: 100%; height: 100%; }
 
-.side-foot { margin-top: 6px; padding-top: 8px; }
-.status-pill {
-  display: flex;
-  align-items: center;
-  gap: 9px;
-  width: 100%;
-  height: 36px;
-  padding: 0 12px 0 8px;
-  border: 0;
-  border-radius: 18px;
-  background: var(--fill);
-  color: var(--text-2);
-  font-size: 12px;
-  font-weight: 500;
-  text-align: left;
-  white-space: nowrap;
-  transition: color var(--motion-fast);
-}
-.status-pill:hover { color: var(--text); }
-.status-pill .ghost-wrap.mini { width: 20px; height: 22px; flex: none; }
-.status-pill .dot { margin-left: auto; }
-
-/* PAGE ICONS: the glyph of a page on a squircle of its two colours, lit from above like the system's icons. */
-.pico {
-  position: relative;
-  display: grid;
-  place-items: center;
-  flex: none;
-  width: 24px;
-  height: 24px;
-  border-radius: 7px;
-  color: #ffffff;
-  background:
-    radial-gradient(120% 90% at 28% 0%, rgba(255, 255, 255, 0.5) 0%, rgba(255, 255, 255, 0) 52%),
-    linear-gradient(165deg, var(--c1, #a1a1aa), var(--c2, #52525b));
-  box-shadow:
-    inset 0 1px 0 rgba(255, 255, 255, 0.55),
-    inset 0 -1px 1px rgba(0, 0, 0, 0.14),
-    inset 0 0 0 0.5px rgba(255, 255, 255, 0.18),
-    0 1px 2px rgba(0, 0, 0, 0.2);
-}
-.pico svg { width: 16px; height: 16px; filter: drop-shadow(0 0.5px 0.5px rgba(0, 0, 0, 0.25)); }
-.pico .glyph { width: 14px; height: 14px; }
-.result .pico, .map-title .pico { width: 28px; height: 28px; border-radius: 8px; }
-.result .pico svg, .map-title .pico svg { width: 19px; height: 19px; }
-.map-title { display: flex; align-items: center; gap: 11px; }
-
-/* MAIN: the page sits on the window's glass; the toolbar floats over it. */
-#main {
-  position: relative;
-  display: flex;
-  flex-direction: column;
-  min-width: 0;
-  min-height: 0;
-  --gutter: max(28px, calc((100% - 680px) / 2));
-}
-.toolbar {
-  position: absolute;
-  left: 0;
-  right: 0;
-  top: 0;
-  z-index: 6;
-  display: flex;
-  align-items: center;
-  gap: 12px;
-  height: 56px;
-  padding: 0 16px 0 14px;
-  pointer-events: none;
-}
-/* What scrolls under the toolbar blurs and fades out rather than being cut by a line. */
-.toolbar::before {
-  content: "";
-  position: absolute;
-  left: 0;
-  right: 0;
-  top: -8px;
-  bottom: -20px;
-  z-index: -1;
-  -webkit-backdrop-filter: blur(14px) saturate(160%);
-  backdrop-filter: blur(14px) saturate(160%);
-  -webkit-mask: linear-gradient(#000 45%, transparent);
-  mask: linear-gradient(#000 45%, transparent);
-  opacity: 0;
-  transition: opacity var(--motion);
-}
-#main.scrolled .toolbar::before { opacity: 1; }
+/* MAIN: a toolbar with the history and the name of the page, then the page. */
+#main { position: relative; display: flex; flex-direction: column; min-width: 0; min-height: 0; }
+.toolbar { position: relative; z-index: 6; display: flex; flex: none; align-items: center; gap: 12px; height: 52px; padding: 0 20px; pointer-events: none; }
 .nav-buttons {
-  position: relative;
   display: flex;
-  height: 32px;
-  border-radius: 16px;
-  background: var(--bar-glass);
-  -webkit-backdrop-filter: blur(24px) saturate(190%);
-  backdrop-filter: blur(24px) saturate(190%);
-  box-shadow: var(--bar-shadow), inset 0 0 0 0.5px var(--card-edge);
+  border-radius: 14px;
+  background: var(--control);
+  box-shadow: 0 0.5px 1px rgba(0, 0, 0, 0.08), inset 0 0 0 0.5px var(--control-edge);
   pointer-events: auto;
 }
-.nav-buttons button { position: relative; z-index: 3; display: grid; place-items: center; width: 36px; height: 32px; padding: 0; border: 0; border-radius: 16px; background: none; color: var(--text); }
-.nav-buttons button:hover:not(:disabled) { background: var(--fill-2); }
+.nav-buttons button { display: grid; place-items: center; width: 32px; height: 28px; padding: 0; border: 0; border-radius: 14px; background: none; color: var(--text); }
+.nav-buttons button:hover:not(:disabled) { background: var(--hover); }
 .nav-buttons button:disabled { color: var(--text-3); }
-.nav-buttons .glyph { width: 13px; height: 13px; }
-.toolbar-title {
-  min-width: 0;
-  margin: 0;
-  overflow: hidden;
-  font-size: 15px;
-  font-weight: 650;
-  letter-spacing: -0.01em;
-  text-overflow: ellipsis;
-  white-space: nowrap;
-  opacity: 0;
-  transform: translateY(4px);
-  transition: opacity var(--motion), transform var(--motion) var(--ease-out);
-}
-#main.scrolled .toolbar-title { opacity: 1; transform: none; }
+.nav-buttons .glyph { width: 12px; height: 12px; }
+.toolbar-title { margin: 0; overflow: hidden; font-size: 15px; font-weight: 600; text-overflow: ellipsis; white-space: nowrap; }
+#scroller { padding: 4px max(28px, calc((100% - 600px) / 2)) 28px; }
+.page { gap: 0; }
 
-#scroller { padding: 58px var(--gutter) 40px; }
+/* GROUPS AND ROWS */
+.section-title { margin: 20px 2px 6px; color: var(--text); font-size: 13px; font-weight: 600; }
+.section-title.minor { margin-top: 14px; color: var(--text-2); font-size: 12px; }
+.card { position: relative; overflow: hidden; border-radius: var(--r-card); background: var(--group); box-shadow: inset 0 0 0 0.5px var(--group-edge); }
+.card + .card { margin-top: 10px; }
+.row { gap: 12px; min-height: 38px; padding: 7px var(--row-inset); }
+.row[hidden] { display: none; }
+.row-title { font-size: 13px; font-weight: 400; }
+.row-desc { margin-top: 1px; font-size: 11px; line-height: 1.35; }
+.row-desc.clamp { display: -webkit-box; overflow: hidden; -webkit-box-orient: vertical; -webkit-line-clamp: 2; }
+.row-desc.clamp.open { display: block; }
+.more { padding: 0; border: 0; background: none; color: var(--tint); font-size: 11px; }
+.row > .pico { width: 16px; height: 16px; }
+.row-control .row-title { color: var(--text-2); }
+/* A state is said in words, in its colour: green for what is done, orange for what still needs doing. */
+.chip { height: auto; padding: 0; border: 0; background: none; color: var(--text-2); font-size: 12px; }
+.chip:has(.dot) { color: var(--warn-text); }
+.chip:has(.dot.good) { color: var(--good-text); }
+.chip .dot { display: none; }
 
-.section-title { margin: 22px 8px 2px; font-size: 13px; font-weight: 600; color: var(--text-2); text-transform: none; }
-.page > .section-title:first-child { margin-top: 2px; }
+/* A row that only explains is small print under its group. */
+.row.note { display: block; min-height: 0; margin: 0; padding: 8px 2px 0; }
+.row.note::before { display: none; }
+.row.note .row-title { display: inline; margin-right: 4px; font-size: 11px; font-weight: 600; }
+.row.note .row-desc { display: inline; margin: 0; line-height: 1.45; }
 
-/* CARDS: frosted glass with a lit rim. */
-.card {
-  position: relative;
-  background: var(--card-glass);
-  border: 0;
-  border-radius: var(--r-card);
-  box-shadow: var(--card-shadow), inset 0 0 0 0.5px var(--card-edge);
-  overflow: hidden;
-}
-.row { padding: 12px 18px; min-height: 50px; }
-.row-title { font-size: 13px; font-weight: 500; color: var(--text); }
-.row-desc { margin-top: 2px; color: var(--text-2); font-size: 11.5px; line-height: 1.4; }
-.row + .row::before, .app-row + .app-row::before { left: 18px; right: 18px; border-top: 0.5px solid var(--stroke); }
-.banner { border-radius: 18px; }
+/* The top of every page: its icon on the accent, its name, a line, and the switch of its feature. */
+.page-hero { display: flex; align-items: center; gap: 12px; padding: 12px; border-radius: var(--r-card); background: var(--group); box-shadow: inset 0 0 0 0.5px var(--group-edge); }
+.page-hero + .card { margin-top: 10px; }
+.page-hero .row-text { flex: 1; min-width: 0; }
+.page-hero .row-title { font-weight: 600; }
+.head-icon { width: 38px; height: 38px; border-radius: 9px; background: var(--tint); color: #ffffff; }
+.head-icon svg, .head-icon .glyph { width: 22px; height: 22px; }
+.head-app { flex: none; width: 40px; height: 40px; }
 
-/* HERO: the top of every page, on the page's own colours (--c1 light, --c2 deep; blue by default). */
-.hero {
-  --c1: #2a96ff;
-  --c2: #0058d6;
-  position: relative;
-  display: flex;
-  align-items: center;
-  gap: 16px;
-  padding: 20px;
-  border: 0;
-  border-radius: 30px;
-  overflow: hidden;
-  color: #ffffff;
-  background:
-    radial-gradient(70% 120% at 92% -20%, rgba(255, 255, 255, 0.36) 0%, rgba(255, 255, 255, 0) 55%),
-    radial-gradient(60% 90% at -5% 120%, rgba(255, 255, 255, 0.16) 0%, rgba(255, 255, 255, 0) 60%),
-    linear-gradient(120deg, var(--c2) 0%, var(--c2) 48%, var(--c1) 150%);
-  box-shadow: 0 18px 36px -18px var(--c2), inset 0 1px 0 rgba(255, 255, 255, 0.35), inset 0 -1px 0 rgba(0, 0, 0, 0.12);
-}
-.hero-body { position: relative; z-index: 1; flex: 1; min-width: 0; }
-.hero h2 { margin: 0; font-size: 22px; font-weight: 700; letter-spacing: -0.02em; line-height: 1.15; color: #ffffff; }
-.hero p { max-width: 50ch; margin: 4px 0 0; font-size: 12.5px; line-height: 1.45; color: rgba(255, 255, 255, 0.9); }
-.hero .hero-note { margin-top: 6px; font-size: 11.5px; color: rgba(255, 255, 255, 0.78); }
-.hero-icon, .hero-mark { position: relative; z-index: 1; flex: none; }
-.hero-icon {
-  width: 58px;
-  height: 58px;
-  border-radius: 17px;
-  background: linear-gradient(160deg, rgba(255, 255, 255, 0.34), rgba(255, 255, 255, 0.1));
-  box-shadow: inset 0 1px 0 rgba(255, 255, 255, 0.6), inset 0 -1px 1px rgba(0, 0, 0, 0.1), inset 0 0 0 0.5px rgba(255, 255, 255, 0.3), 0 8px 18px -8px rgba(0, 0, 0, 0.45);
-}
-.hero-icon svg { width: 32px; height: 32px; }
-.hero-icon .glyph { width: 28px; height: 28px; }
-.hero-mark { width: 64px; height: 64px; border-radius: 16px; box-shadow: 0 8px 18px -8px rgba(0, 0, 0, 0.45), 0 0 0 0.5px rgba(255, 255, 255, 0.4); }
-.hero-toggle {
-  position: relative;
-  z-index: 1;
-  display: flex;
-  align-items: center;
-  gap: 10px;
-  flex: none;
-  align-self: flex-start;
-  padding: 5px 5px 5px 13px;
-  border-radius: 18px;
-  background: rgba(0, 0, 0, 0.24);
-  box-shadow: inset 0 1px 0 rgba(255, 255, 255, 0.18), inset 0 0 0 0.5px rgba(255, 255, 255, 0.2);
-  font-size: 12.5px;
-  font-weight: 600;
-  white-space: nowrap;
-}
-.hero-toggle .switch { background: rgba(0, 0, 0, 0.25); box-shadow: inset 0 0 0 0.5px rgba(255, 255, 255, 0.3); }
-.hero-toggle .switch[aria-checked="true"] { background: #34c759; }
-.hero .chip { background: rgba(255, 255, 255, 0.18); border: 0; box-shadow: inset 0 1px 0 rgba(255, 255, 255, 0.25), inset 0 0 0 0.5px rgba(255, 255, 255, 0.22); color: #ffffff; font-weight: 500; }
-.hero .dot.good { background: #6ff59a; box-shadow: none; }
-.hero-ghost .hero-body { padding-right: 96px; }
+/* The features on General: the switch turns one on and off, the name opens its page. */
+.feat-row:hover { background: var(--hover); }
+.feat-name { padding: 0; border: 0; background: none; color: var(--text); font-size: 13px; text-align: left; }
+.chev { display: inline-block; flex: none; width: 7px; height: 7px; margin: 0 3px 0 2px; border-top: 1.5px solid var(--text-3); border-right: 1.5px solid var(--text-3); transform: rotate(45deg); }
 
-/* CONTROLS: the system's capsules. The switch's knob is a pill that stretches while it is held. */
-.switch {
-  width: 44px;
-  height: 24px;
-  border: 0;
-  border-radius: 12px;
-  background: var(--track);
-  box-shadow: none;
-  transition: background var(--motion) var(--ease-out);
-}
-.switch::after {
-  top: 2px;
-  left: 2px;
-  width: 28px;
-  height: 20px;
-  border-radius: 10px;
-  background: #ffffff;
-  box-shadow: 0 1px 3px rgba(0, 0, 0, 0.22), 0 0 0 0.5px rgba(0, 0, 0, 0.04);
-  transition: transform 320ms var(--spring), width 180ms var(--ease-out);
-}
-.switch:active::after { width: 33px; }
-.switch[aria-checked="true"] { background: var(--tint); box-shadow: none; }
-.switch[aria-checked="true"]::after { transform: translateX(12px); }
+/* The tabs of the notch: their order, their switch, and their page. */
+.tab-order { display: flex; gap: 2px; }
+.tab-order .btn.icon:disabled { opacity: 0.3; }
+
+/* CONTROLS: the system's shapes, in the accent. */
+.switch { width: 38px; height: 22px; border-radius: 11px; background: var(--track); box-shadow: none; }
+.switch::after { top: 2px; left: 2px; width: 24px; height: 18px; border-radius: 9px; transition: transform 220ms cubic-bezier(0.3, 1.3, 0.5, 1), width 120ms ease-out; }
+.switch:active::after { width: 27px; }
+.switch[aria-checked="true"] { background: var(--tint); }
+.switch[aria-checked="true"]::after { transform: translateX(10px); }
 .switch[aria-checked="true"]:active::after { transform: translateX(7px); }
 .switch:disabled { opacity: 0.45; }
+.seg { border-radius: 13px; background: var(--well); box-shadow: none; }
+.seg-thumb { border-radius: 11px; box-shadow: 0 0.5px 2px rgba(0, 0, 0, 0.2); transition: transform 200ms ease-out; }
+.seg button { min-width: 0; height: 22px; padding: 0 11px; border-radius: 11px; color: var(--text); font-size: 12.5px; }
+.seg button[aria-checked="true"] { font-weight: 400; }
+select.pick, select.pick.small { height: 24px; padding: 0 26px 0 11px; border-radius: 12px; font-size: 13px; background-position: right 8px center, 0 0; }
+.btn, .btn.small { height: 24px; padding: 0 12px; border-radius: 12px; font-size: 13px; font-weight: 400; }
+.btn:active { transform: none; filter: brightness(0.94); }
+.btn.icon { width: 22px; height: 22px; padding: 0; border-radius: 50%; background: none; box-shadow: none; color: var(--text-2); }
+.btn.icon:hover { background: var(--hover); color: var(--text); }
+.hotkey { min-width: 86px; height: 24px; border-radius: 12px; background: var(--well); box-shadow: none; }
+.hotkey.recording { box-shadow: 0 0 0 2px var(--tint); }
+input[type="range"] { width: 160px; }
 
-.seg { padding: 2px; border: 0; border-radius: 999px; background: var(--fill); box-shadow: none; }
-.seg-thumb { border-radius: 999px; background: var(--lens-fill); box-shadow: var(--lens-shadow); transition: transform var(--motion) var(--spring); }
-.seg button { height: 26px; padding: 0 13px; font-size: 12px; font-weight: 500; }
-.seg button[aria-checked="true"] { color: var(--text); }
+/* The shortcuts that stay as they are, as a list. */
+.cheats { display: flex; flex-direction: column; gap: 0; padding: 0; }
+.cheat { position: relative; min-height: 34px; padding: 6px var(--row-inset); font-size: 13px; }
+.cheat + .cheat::before { content: ""; position: absolute; top: 0; left: var(--row-inset); right: var(--row-inset); border-top: 0.5px solid var(--stroke); }
+.cheat kbd { min-width: 0; height: auto; padding: 0 1px; background: none; box-shadow: none; color: var(--text-2); font-weight: 500; }
 
-.btn {
-  height: 28px;
-  padding: 0 14px;
-  border: 0;
-  border-radius: 14px;
-  background: var(--btn);
-  box-shadow: var(--btn-shadow);
-  color: var(--text);
-  font-size: 12.5px;
-  font-weight: 500;
-  transition: transform var(--motion-fast) var(--spring), filter var(--motion-fast);
+/* WINDOW SNAPPING: one row a layout, with a small picture of where the window goes. */
+.tiles { display: flex; flex-direction: column; gap: 0; padding: 0; }
+.tile { position: relative; min-height: 38px; padding: 7px var(--row-inset); border: 0; border-radius: 0; background: none; }
+.tile:hover { background: none; }
+.tile + .tile::before { content: ""; position: absolute; top: 0; left: var(--row-inset); right: var(--row-inset); border-top: 0.5px solid var(--stroke); }
+.mini { width: 26px; height: 17px; border-radius: 3px; background: none; box-shadow: inset 0 0 0 1px var(--text-3); }
+.mini i { box-shadow: none; }
+.tile-name { font-size: 13px; font-weight: 400; }
+.tile .hotkey { min-width: 86px; height: 24px; }
+
+/* ADVANCED: the groups a page keeps for later, in a sheet over the window. */
+.page-foot { display: flex; justify-content: flex-end; margin-top: 14px; }
+.sheet-scrim { position: fixed; inset: 0; z-index: 30; background: var(--scrim); }
+.sheet-scrim[hidden] { display: none; }
+.sheet {
+  position: absolute;
+  top: 52px;
+  left: calc(50% + 122px);
+  width: min(560px, calc(100% - 290px));
+  max-height: calc(100% - 80px);
+  overflow-y: auto;
+  padding: 16px;
+  border-radius: 18px;
+  background: var(--sheet);
+  box-shadow: 0 0 0 0.5px var(--side-edge), 0 20px 50px rgba(0, 0, 0, 0.3);
+  transform: translateX(-50%);
 }
-.btn:active { transform: scale(0.98); filter: brightness(0.95); opacity: 1; }
-.btn.small { height: 26px; padding: 0 12px; border-radius: 13px; font-size: 12px; }
-.btn.primary { background: var(--tint); color: #ffffff; box-shadow: inset 0 1px 0 rgba(255, 255, 255, 0.3), 0 1px 2px rgba(0, 0, 0, 0.18); }
-.btn.danger { color: var(--bad); }
-.btn.icon { width: 24px; height: 24px; padding: 0; border-radius: 50%; background: var(--fill); box-shadow: none; color: var(--text-2); }
-
-select.pick {
-  height: 28px;
-  padding: 0 28px 0 14px;
-  border-radius: 14px;
-  background: var(--chevrons) no-repeat right 10px center / 8px 12px, var(--btn);
-  box-shadow: var(--btn-shadow);
-  font-size: 12.5px;
-}
-select.pick.small { height: 26px; border-radius: 13px; padding: 0 26px 0 12px; background-position: right 9px center, 0 0; }
-
-input[type="range"] { height: 20px; }
-input[type="range"]::-webkit-slider-runnable-track { height: 5px; border-radius: 3px; }
-input[type="range"]::-webkit-slider-thumb { width: 28px; height: 20px; margin-top: -7.5px; border-radius: 10px; box-shadow: 0 1px 3px rgba(0, 0, 0, 0.25), 0 0 0 0.5px rgba(0, 0, 0, 0.06); transition: width var(--motion-fast) var(--ease-out); }
-input[type="range"]:active::-webkit-slider-thumb { width: 34px; }
-
-/* Shortcuts: each key a cap of its own in a capsule. */
-.hotkey { gap: 3px; min-width: 96px; height: 30px; padding: 0 5px; border-radius: 15px; background: var(--fill); box-shadow: none; }
-.hotkey .keys { gap: 3px; }
-.hotkey kbd { min-width: 22px; height: 22px; padding: 0 6px; border-radius: 7px; background: var(--cap); box-shadow: var(--cap-shadow); font: 600 12px/22px var(--font); color: var(--text); }
-.hotkey.recording { box-shadow: inset 0 0 0 1.5px var(--tint), 0 0 0 3px color-mix(in srgb, var(--tint) 22%, transparent); }
-.hotkey .hint, .hotkey .none { padding: 0 6px; }
-.tile .hotkey { min-width: 88px; height: 28px; }
-
-/* FEATURES on the General page, as the system's Control Center has them: the circle turns a feature on and off,
-   its name opens its page. */
-.cc-head { display: flex; align-items: baseline; justify-content: space-between; gap: 12px; margin: 10px 8px 0; color: var(--text-2); font-size: 12px; font-weight: 600; }
-.cc-count { font-size: 11.5px; font-weight: 450; }
-.cc-grid { display: grid; grid-template-columns: repeat(auto-fill, minmax(156px, 1fr)); gap: 8px; }
-.cc { display: flex; align-items: center; gap: 10px; min-width: 0; padding: 10px; border-radius: 20px; }
-.cc-ic { flex: none; padding: 0; border: 0; border-radius: 50%; background: none; }
-.cc-ic .pico { width: 38px; height: 38px; border-radius: 19px; transition: filter var(--motion), opacity var(--motion); }
-.cc-ic .pico svg { width: 20px; height: 20px; }
-.cc-ic[aria-pressed="false"] .pico { filter: grayscale(1); opacity: 0.5; box-shadow: inset 0 0 0 0.5px var(--card-edge); }
-.cc-txt { display: flex; flex: 1; flex-direction: column; align-items: flex-start; gap: 1px; min-width: 0; padding: 0; border: 0; border-radius: 8px; background: none; text-align: left; }
-.cc-name { max-width: 100%; overflow: hidden; color: var(--text); font-size: 13px; font-weight: 600; text-overflow: ellipsis; white-space: nowrap; }
-.cc-state { color: var(--text-2); font-size: 11.5px; }
+.sheet-title { margin: 0 0 4px; font-size: 13px; font-weight: 600; }
+.sheet .adv > .section-title:first-child { margin-top: 12px; }
+.sheet-foot { display: flex; justify-content: flex-end; margin-top: 14px; }
 
 /* The row a search led to, marked for a moment. */
-.found { box-shadow: inset 0 0 0 2px var(--tint); border-radius: 12px; transition: box-shadow 0.4s var(--ease-out); }
+.found { box-shadow: inset 0 0 0 2px var(--tint); border-radius: 8px; transition: box-shadow 0.4s var(--ease-out); }
 
-html.reduce-transparency { --card-glass: var(--solid); --canvas: var(--solid); }
-html.reduce-transparency #sidebar,
-html.reduce-transparency .nav-buttons,
-html.reduce-transparency .top-search,
-html.reduce-transparency #search-results { background: var(--solid); -webkit-backdrop-filter: none; backdrop-filter: none; }
-html.reduce-transparency .toolbar::before { background: var(--solid); -webkit-backdrop-filter: none; backdrop-filter: none; }
-html.reduce-transparency .lens { background: var(--fill); }
-html.increase-contrast .card::before,
-html.increase-contrast #sidebar::before,
-html.increase-contrast .nav-buttons::before { display: none; }
-html.increase-contrast .card { box-shadow: 0 0 0 1px var(--stroke); }
+html.increase-contrast .card, html.increase-contrast .page-hero, html.increase-contrast #sidebar, html.increase-contrast .sheet { box-shadow: 0 0 0 1px var(--stroke); }
+html.increase-contrast .pico { box-shadow: none; }
+html.increase-contrast .switch:not([aria-checked="true"]) { box-shadow: inset 0 0 0 1px var(--boundary); }
 
-@media (max-width: 920px) {
-  .hero-ghost .hero-body { padding-right: 0; }
-}
-
-/* Notch size styles */
+/* STYLE CARDS: the looks of the volume indicator and the music widget, each with a small picture. */
 .style-wrap { display: flex; flex-direction: column; gap: 10px; }
 .style-wrap.disabled { opacity: 0.45; pointer-events: none; }
-.style-cards { display: grid; grid-template-columns: repeat(4, minmax(0, 1fr)); gap: 10px; }
+.style-wrap + .card { margin-top: 10px; }
+.style-cards { display: grid; grid-template-columns: repeat(auto-fill, minmax(104px, 1fr)); gap: 10px; }
 .style-card {
   display: flex;
   flex-direction: column;
   align-items: stretch;
-  gap: 3px;
-  padding: 10px 10px 12px;
-  border: 0.5px solid var(--card-edge);
-  border-radius: 14px;
-  text-align: left;
+  gap: 2px;
+  padding: 8px;
+  border: 0;
+  border-radius: 12px;
+  background: var(--group);
+  box-shadow: inset 0 0 0 0.5px var(--group-edge);
   color: var(--text);
-  background: var(--card-glass);
-  box-shadow: var(--card-shadow), inset 0 1px 0 var(--card-hi);
-  transition: background var(--motion-fast), box-shadow var(--motion-fast);
+  text-align: left;
 }
-.style-card:hover { background: var(--fill-2, var(--fill)); }
-.style-card[aria-pressed="true"] {
-  background: color-mix(in srgb, var(--tint) 16%, var(--fill));
-  border-color: var(--tint);
-  box-shadow: inset 0 0 0 1.5px var(--tint), 0 2px 8px color-mix(in srgb, var(--tint) 25%, transparent);
-}
-.sc-art {
-  position: relative;
-  display: flex;
-  flex-direction: column;
-  align-items: center;
-  height: 76px;
-  margin-bottom: 6px;
-  overflow: hidden;
-  border-radius: 10px;
-  background: linear-gradient(180deg, rgba(0, 0, 0, 0.18), rgba(0, 0, 0, 0.06));
-}
-.sc-pill { flex: none; background: #000; border-radius: 0 0 6px 6px; max-width: 100%; }
-.sc-open { flex: none; margin-top: 4px; max-width: 94%; max-height: 62px; background: color-mix(in srgb, var(--text) 22%, transparent); border-radius: 4px 4px 10px 10px; box-shadow: inset 0 0 0 0.5px var(--card-edge); }
-.sc-name { font-size: 13px; font-weight: 650; }
-.sc-desc { font-size: 11px; color: var(--text-2); line-height: 1.3; }
-@media (max-width: 920px) { .style-cards { grid-template-columns: repeat(2, minmax(0, 1fr)); } }
-
-/* Volume indicator styles */
+.style-card:hover { box-shadow: inset 0 0 0 1px var(--text-3); }
+.style-card[aria-pressed="true"] { box-shadow: inset 0 0 0 2px var(--tint); }
+.sc-art { position: relative; display: flex; flex-direction: column; align-items: center; height: 64px; margin-bottom: 6px; overflow: hidden; border-radius: 8px; background: var(--well); }
+.sc-name { font-size: 12.5px; font-weight: 600; }
+.sc-desc { color: var(--text-2); font-size: 11px; line-height: 1.3; }
 .hud-art { display: block; }
-.hud-art i { position: absolute; background: color-mix(in srgb, var(--text) 34%, transparent); box-shadow: inset 0 0 0 0.5px var(--card-edge); }
+.hud-art i { position: absolute; background: color-mix(in srgb, var(--text) 34%, transparent); }
 .hud-notch i { left: 50%; top: 0; width: 70px; height: 22px; margin-left: -35px; border-radius: 0 0 11px 11px; background: #000; }
 .hud-glass i { left: 50%; top: 0; width: 70px; height: 22px; margin-left: -35px; border-radius: 0 0 11px 11px; }
 .hud-bar i { left: 50%; top: 0; width: 70px; height: 22px; margin-left: -35px; border-radius: 0 0 11px 11px; background: linear-gradient(90deg, var(--tint) 62%, #000 62%); }
 .hud-corner i { right: 8px; top: 8px; width: 54px; height: 14px; border-radius: 7px; }
 .hud-island i { left: 50%; top: 8px; width: 60px; height: 14px; margin-left: -30px; border-radius: 7px; }
-.hud-side i { right: 8px; top: 12px; width: 12px; height: 52px; border-radius: 6px; }
+.hud-side i { right: 8px; top: 12px; width: 12px; height: 44px; border-radius: 6px; }
 .hud-tile i { left: 50%; bottom: 6px; width: 42px; height: 42px; margin-left: -21px; border-radius: 11px; }
 .hud-ring i { left: 50%; top: 50%; width: 40px; height: 40px; margin: -20px 0 0 -20px; border-radius: 50%; background: conic-gradient(var(--tint) 62%, color-mix(in srgb, var(--text) 24%, transparent) 0); -webkit-mask: radial-gradient(circle, transparent 13px, #000 14px); mask: radial-gradient(circle, transparent 13px, #000 14px); }
-.hud-equalizer i { left: 50%; bottom: 8px; width: 70px; height: 28px; margin-left: -35px; border-radius: 9px; background: repeating-linear-gradient(90deg, var(--tint) 0 3px, transparent 3px 6px); -webkit-mask: linear-gradient(to top right, #000 50%, rgba(0, 0, 0, 0.35) 51%); mask: linear-gradient(to top right, #000 50%, rgba(0, 0, 0, 0.35) 51%); }
+.hud-equalizer i { left: 50%; bottom: 8px; width: 70px; height: 28px; margin-left: -35px; border-radius: 9px; background: repeating-linear-gradient(90deg, var(--tint) 0 3px, transparent 3px 6px); }
 .hud-wide i { left: 50%; bottom: 10px; width: 92px; height: 9px; margin-left: -46px; border-radius: 5px; }
 .hud-place-box { display: flex; align-items: center; gap: 12px; }
-.hud-places { display: grid; grid-template-columns: repeat(3, 26px); grid-auto-rows: 18px; gap: 4px; padding: 5px; border-radius: 8px; background: var(--fill); border: 0.5px solid var(--card-edge); }
-.hud-place { border: 0; border-radius: 4px; background: color-mix(in srgb, var(--text) 18%, transparent); padding: 0; }
+.hud-places { display: grid; grid-template-columns: repeat(3, 26px); grid-auto-rows: 18px; gap: 4px; padding: 5px; border-radius: 8px; background: var(--well); }
+.hud-place { padding: 0; border: 0; border-radius: 4px; background: color-mix(in srgb, var(--text) 18%, transparent); }
 .hud-place:hover { background: color-mix(in srgb, var(--text) 30%, transparent); }
 .hud-place[aria-pressed="true"] { background: var(--tint); }
-.hud-cards { grid-template-columns: repeat(5, minmax(0, 1fr)); }
-@media (max-width: 920px) { .hud-cards { grid-template-columns: repeat(2, minmax(0, 1fr)); } }
-
-/* ==============================================================================================================
-   Ghost world. The window takes its look from one idea, the way the 2026 Apple Design Award apps do: a single
-   made-up place that every part of it belongs to. Here that place is the ghost's night. The sky behind the
-   page follows the hour, and the ghost is the sign of whether the app has what it needs. The controls stay the
-   system's.
-   Everything here sits on top of the glass theme above and can be removed as one block.
-   ============================================================================================================== */
-
-:root {
-  --ghost-fill: #ffffff;
-  --ghost-line: #2b2e48;
-  --ghost-cheek: #ff8fa3;
-  --squiggle: url("data:image/svg+xml,%3Csvg xmlns='http://www.w3.org/2000/svg' width='84' height='9' viewBox='0 0 84 9'%3E%3Cpath d='M2 5 C10 1 14 8 22 4.5 S36 1.5 44 5 S60 8.5 70 4 S80 2 82 4' fill='none' stroke='black' stroke-width='2.4' stroke-linecap='round'/%3E%3C/svg%3E");
-  --stars: url("data:image/svg+xml,%3Csvg xmlns='http://www.w3.org/2000/svg' width='420' height='420'%3E%3Cg fill='white'%3E%3Ccircle cx='390' cy='111' r='1.0' opacity='0.22'/%3E%3Ccircle cx='229' cy='315' r='1.0' opacity='0.22'/%3E%3Ccircle cx='73' cy='405' r='0.8' opacity='0.22'/%3E%3Ccircle cx='381' cy='357' r='1.0' opacity='0.45'/%3E%3Ccircle cx='95' cy='333' r='0.8' opacity='0.22'/%3E%3Ccircle cx='390' cy='217' r='1.0' opacity='0.22'/%3E%3Ccircle cx='410' cy='362' r='0.6' opacity='0.45'/%3E%3Ccircle cx='121' cy='81' r='0.6' opacity='0.22'/%3E%3Ccircle cx='313' cy='255' r='0.8' opacity='0.32'/%3E%3Ccircle cx='132' cy='307' r='0.6' opacity='0.22'/%3E%3Ccircle cx='385' cy='158' r='1.0' opacity='0.45'/%3E%3Ccircle cx='71' cy='268' r='0.6' opacity='0.45'/%3E%3Ccircle cx='11' cy='245' r='1.0' opacity='0.45'/%3E%3Ccircle cx='295' cy='168' r='0.8' opacity='0.45'/%3E%3Ccircle cx='224' cy='229' r='1.0' opacity='0.22'/%3E%3C/g%3E%3C/svg%3E");
-  --ghost-empty: url("data:image/svg+xml,%3Csvg xmlns='http://www.w3.org/2000/svg' viewBox='0 0 64 72'%3E%3Cpath d='M13 63 C12 52 11 40 11.5 31 C12.5 16 21 7 32.5 7 C44 7 52.5 16 53 31 C53.5 41 52.5 52 51 63 C49 62 46.5 59.5 44 61 C41.5 62.5 40 66.5 37 65.5 C34.5 64.6 34 60.5 31.5 60.5 C29 60.5 28.5 65 25.5 65.7 C22.5 66.2 21.5 62 19 61 C16.5 60 14.5 62.5 13 63 Z' fill='white' stroke='rgb(43,46,72)' stroke-width='2.6' stroke-linejoin='round'/%3E%3Cpath d='M21.5 32 Q25 35 28.5 32 M36.5 32 Q40 35 43.5 32' fill='none' stroke='rgb(43,46,72)' stroke-width='2.3' stroke-linecap='round'/%3E%3Cpath d='M29.5 41 Q32.5 44.5 35.5 41' fill='none' stroke='rgb(43,46,72)' stroke-width='2.3' stroke-linecap='round'/%3E%3Cellipse cx='19.5' cy='39.5' rx='3.6' ry='2.2' fill='rgb(255,143,163)' opacity='.55'/%3E%3Cellipse cx='45.5' cy='39.5' rx='3.6' ry='2.2' fill='rgb(255,143,163)' opacity='.55'/%3E%3C/svg%3E");
-}
-@media (prefers-color-scheme: dark) {
-  :root {
-    --ghost-fill: #f4f5ff;
-    --ghost-line: #0e1020;
-  }
-}
-
-/* The sky: app.js sets data-sky from the hour. The day keeps the aurora of the glass theme. */
-html[data-sky="dawn"]  { --aurora-1: rgba(255, 176, 150, 0.30); --aurora-2: rgba(255, 214, 165, 0.22); --aurora-3: rgba(196, 176, 255, 0.18); }
-html[data-sky="dusk"]  { --aurora-1: rgba(255, 150, 125, 0.26); --aurora-2: rgba(194, 124, 232, 0.22); --aurora-3: rgba(124, 146, 255, 0.18); }
-html[data-sky="night"] { --aurora-1: rgba(112, 124, 238, 0.30); --aurora-2: rgba(164, 112, 232, 0.22); --aurora-3: rgba(92, 154, 232, 0.16); }
-@media (prefers-color-scheme: dark) {
-  html[data-sky="dawn"]  { --aurora-1: rgba(255, 140, 120, 0.17); --aurora-2: rgba(255, 190, 140, 0.12); --aurora-3: rgba(150, 120, 230, 0.12); }
-  html[data-sky="dusk"]  { --aurora-1: rgba(255, 120, 100, 0.17); --aurora-2: rgba(170, 90, 220, 0.17); --aurora-3: rgba(90, 110, 230, 0.13); }
-  html[data-sky="night"] { --aurora-1: rgba(72, 92, 235, 0.24); --aurora-2: rgba(134, 82, 224, 0.19); --aurora-3: rgba(62, 124, 214, 0.15); }
-  html[data-sky="night"] #app,
-  html[data-sky="dusk"] #app {
-    background:
-      var(--stars) 0 0 / 420px 420px repeat,
-      radial-gradient(55% 45% at 5% 5%, var(--aurora-1), transparent 60%),
-      radial-gradient(45% 50% at 95% 10%, var(--aurora-2), transparent 65%),
-      radial-gradient(50% 55% at 50% 95%, var(--aurora-3), transparent 70%),
-      var(--canvas);
-  }
-}
-
-/* Holds the SVG filter of the ghost; it draws nothing itself. */
-.defs { position: absolute; width: 0; height: 0; overflow: hidden; }
-
-/* The ghost, drawn once (app.js GHOST_SVG) and used at every size. The filter wobbles the outline a little, as a
-   pen would. */
-.ghost-wrap { display: inline-grid; place-items: center; line-height: 0; }
-.ghost { width: 100%; height: 100%; overflow: visible; filter: url(#wobble); }
-.ghost .g-body { fill: var(--ghost-fill); stroke: var(--ghost-line); stroke-width: 2.6; stroke-linejoin: round; }
-.ghost .g-ink { fill: var(--ghost-line); }
-.ghost .g-line { fill: none; stroke: var(--ghost-line); stroke-width: 2.4; stroke-linecap: round; }
-.ghost .g-cheek { fill: var(--ghost-cheek); opacity: 0.55; }
-.ghost .eyes-shut,
-.ghost .z { display: none; }
-.asleep .ghost .eyes-open { display: none; }
-.asleep .ghost .eyes-shut,
-.asleep .ghost .z { display: inline; }
-.ghost-wrap.mini .g-body { stroke-width: 3.4; }
-.ghost-wrap.mini .g-line { stroke-width: 3; }
-
-/* The ghosts blink from a timer in app.js, so a window left open costs nothing: an endless animation would
-   repaint it sixty times a second for as long as the window is there. */
-.ghost .eyes-open { transform-box: fill-box; transform-origin: center; transition: transform 70ms ease-out; }
-.ghost .eyes-open.blink { transform: scaleY(0.1); }
-
-/* The big ghost in the hero follows the pointer with its eyes. */
-.hero-spirit {
-  position: absolute;
-  right: 26px;
-  bottom: -10px;
-  z-index: 0;
-  width: 104px;
-  height: 118px;
-  transform: rotate(6deg);
-  pointer-events: none;
-  filter: drop-shadow(0 10px 18px rgba(0, 0, 40, 0.3));
-}
-.spirit { width: 100%; height: 100%; overflow: visible; filter: url(#wobble); }
-.spirit .g-body { fill: rgba(255, 255, 255, 0.96); stroke: rgba(10, 30, 110, 0.75); stroke-width: 2.6; stroke-linejoin: round; }
-.spirit .eye-white { fill: #ffffff; stroke: rgba(10, 30, 110, 0.75); stroke-width: 2; }
-.spirit .pupil { fill: #14183a; transform: translate(calc(var(--px, 0) * 1px), calc(var(--py, 0) * 1px)); transition: transform 90ms linear; }
-.spirit .g-line { fill: none; stroke: rgba(10, 30, 110, 0.75); stroke-width: 2.4; stroke-linecap: round; }
-.spirit .g-cheek { fill: #ff8fa3; opacity: 0.6; }
-@media (max-width: 920px) {
-  .hero-spirit { display: none; }
-}
-
-/* An empty list has the ghost looking for something. */
-.empty { padding-top: 60px; font-size: 12.5px; }
-.empty::before {
-  content: "";
-  position: absolute;
-  top: 12px;
-  left: 50%;
-  width: 40px;
-  height: 44px;
-  margin-left: -20px;
-  background: var(--ghost-empty) center / contain no-repeat;
-}
-
-/* A page arrives with a small rise when a person chose it. */
-@keyframes page-in { from { opacity: 0; transform: translateY(6px); } to { opacity: 1; transform: none; } }
-#scroller .page.rise { animation: page-in 220ms var(--ease-out) both; }
 
 /* The limits of one Orca account on the AI agents page: the window, a bar, the share used and when it starts over. */
 .acct-limit { display: grid; grid-template-columns: 56px minmax(60px, 1fr) 40px minmax(0, 150px); align-items: center; gap: 8px; margin-top: 6px; color: var(--text-2); font-size: var(--fs-small); }

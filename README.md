@@ -47,7 +47,7 @@ A first **beta for Windows and Linux** has the tray icon, the clipboard history,
 
 ## Feature list
 
-The settings window lists every page in its sidebar under five headings, and this list keeps the same page names in six groups: the English name, then the one the Vietnamese interface shows. Features marked "off by default" are switched on from the hero at the top of their own page, or from their tile on the General page.
+The settings window lists its pages in the sidebar under six headings, the tabs of the notch on the Notch page, and this list keeps the same page names in six groups: the English name, then the one the Vietnamese interface shows. Features marked "off by default" are switched on at the top of their own page, or from their row on the General page.
 
 ### Cài đặt chung (General)
 
@@ -61,7 +61,7 @@ The settings window lists every page in its sidebar under five headings, and thi
 
 | Page | Vietnamese | What it does |
 | --- | --- | --- |
-| Scrolling | Cuộn chuột | Smooth wheel scrolling with a curve you can see, a reverse direction for external mice only, modifier keys for sideways, faster and zoom, and rules for each app |
+| Scrolling | Cuộn chuột | Smooth wheel scrolling with a pad to try it on, a reverse direction for external mice only, modifier keys for sideways, faster and zoom, and rules for each app |
 | Cursor | Con trỏ | A rainbow arrow, a pixel character or any picture or GIF as the pointer (off by default) |
 | Drag wheel | Vòng kéo thả | A wheel around the pointer while you drag a file: resize, compress, split or merge PDFs, annotate, copy its text, cut out the subject, strip metadata, turn a video into a GIF |
 
@@ -123,12 +123,12 @@ Sound for each app (volume to 400 %, output device, equalizer, bass and treble, 
 
 ## The settings window
 
-Opening the app opens its settings; closing the window sends the app back to the menu bar. A glass sidebar lists every page under five headings (Overview, Notch & Island, Notch tabs, Mouse & Windows, Clipboard & Tools), each page with an icon of its own and a green dot while its feature is on: press one, or press and drag along the sidebar, and a lens of clear glass follows your finger and opens the page under it; a heading folds its group away. Every page opens on a hero in its own colours with the switch that turns its feature on and off, the toolbar has Back and Forward, and the search at the top of the sidebar (Command-K) finds a page by what its settings say. The General page has a tile for every feature, as Control Center has: the circle turns it on and off, the name opens its page.
+Opening the app opens its settings; closing the window sends the app back to the menu bar. The sidebar lists the pages under six headings (Notch, Mouse & Windows, Typing & Text, Capture & Download, This Mac, after General and Shortcuts), each with its icon in the accent colour and Off beside a feature that is off; the app and whether it has Accessibility access sit at its top. The tabs of the notch have pages of their own, opened from the list of tabs on the Notch page. Every page opens on a row with its icon, what it is for and the switch of its feature, the toolbar has Back and Forward, the groups few people need wait behind Advanced… at the foot of a page, and the search at the top of the sidebar (Command-K) finds a page by what its settings say. The General page lists every feature with its switch, and its name opens its page.
 
 | | |
 | --- | --- |
-| ![The General page: the hero and a tile that switches each feature](docs/images/settings-general.png) | ![The Scrolling page, with the switch of smooth scrolling in its hero](docs/images/settings-scroll.png) |
-| ![The Vietnamese typing page: the language, the shortcut, the notch and menu bar switches](docs/images/settings-typing.png) | ![The About page with the version, the updates and the list of what is where](docs/images/settings-about.png) |
+| ![The General page: the app, the permissions and a switch for each feature](docs/images/settings-general.png) | ![The Scrolling page, with the switch of smooth scrolling at its top](docs/images/settings-scroll.png) |
+| ![The Vietnamese typing page: the language, the shortcut, the notch and menu bar switches](docs/images/settings-typing.png) | ![The About page with the version, the updates and the licence](docs/images/settings-about.png) |
 
 ## Highlights
 
@@ -164,7 +164,7 @@ Start dragging a file and tap a modifier key: a wheel opens around the pointer w
 
 ### A settings window that follows macOS
 
-Liquid Glass, both themes, every page in a glass sidebar with an icon of its own, and every feature turned on and off from the hero of its page. See [The settings window](#the-settings-window).
+Drawn as System Settings is, in both themes, with one accent colour, every page in a short sidebar, and every feature turned on and off at the top of its page. See [The settings window](#the-settings-window).
 
 ## Features in detail
 
@@ -174,9 +174,9 @@ Opening the app opens its settings window; closing the window sends the app back
 
 ### Scrolling (like Mos)
 
-Smooth mouse-wheel scrolling, a reverse direction for external mice only, modifier keys (sideways, faster, zoom) and per-app rules. The curve drawn in the settings matches what the smoother really does.
+Smooth mouse-wheel scrolling, a reverse direction for external mice only, modifier keys (sideways, faster, zoom) and per-app rules. A pad on the settings page shows the speed, the peak and the largest jump of each scroll, as the smoother really moves.
 
-![The Scrolling page with the curve, speed and per-app rules](docs/images/settings-scroll.png)
+![The Scrolling page with the feel, the pad to try it on and the modifier keys](docs/images/settings-scroll.png)
 
 ### Clipboard history (like Maccy)
 
@@ -244,7 +244,7 @@ The Present tab shows something on your screen to an audience: a whole display, 
 
 ![The Present tab while presenting: the time, what is shown where, the switches and the zoom](docs/images/notch-present.png)
 
-![The Notch page of the settings with the size styles and behaviour switches](docs/images/settings-notch.png)
+![The Notch page of the settings: size, look, behaviour and the list of tabs](docs/images/settings-notch.png)
 
 The volume indicator has seven styles, each drawn at three levels:
 
@@ -440,13 +440,13 @@ Build on Windows, with Rust for MSVC (WebView2 comes with Windows 11; on Windows
 
 ## Design
 
-The settings window has a world of its own on top of the system's: the ghost's night. Its look follows what the 2026 Apple Design Award apps share, a single made-up place that every part of the window belongs to, with the platform's own controls inside it. The sky behind the page follows the hour (dawn, day, dusk, and a night with stars in the dark theme); titles, the names of sections and what the ghost says are handwritten in Patrick Hand, which is used for nothing else; the ghost is the guide of every page (a bubble with what the page is for, a hop and another line when it is clicked), the sign of whether the app has the access it needs (awake, or asleep with closed eyes, and the words say the same) and the character of every empty list, and the big one in the General hero follows the pointer with its eyes. Nothing in it is the only sign of anything, so it holds for people who cannot tell the colours apart, and every animation stops under Reduce motion. [docs/design.md](docs/design.md) says how it is made and how to add to it.
+The settings window is drawn as System Settings is, so it reads as part of macOS. The sidebar is a lighter pane floating on the window: the search at its top, then the app with whether it has the Accessibility access it needs, then the pages under six headings, with Off beside a feature that is off. The tabs of the notch have pages of their own, opened from the one list of tabs on the Notch page, where they are also turned on and off and put in order, or from General. Every page opens on the same row: its icon on the accent colour, its name, one sentence of what it is for and the switch of its feature. Below are grouped forms with a name, at most two lines of description (More shows the rest) and one control on each row; a row that only explains is small print under its group, and the groups that are rarely needed wait behind Advanced… in a sheet. [docs/design.md](docs/design.md) gives the rules and the tokens.
 
-![The General page in the dark theme at night, with the ghost beside its page title and in the hero](docs/images/ghost-world-general-dark.png)
+![The General page: the app, its permissions and startup, and a switch for each feature](docs/images/settings-general.png)
 
-![The General page in the light theme by day](docs/images/ghost-world-general-light.png)
+![The Notch page in the dark theme: size, look, behaviour and the list of tabs](docs/images/settings-notch-dark.png)
 
-The window itself is a macOS window on Liquid Glass. A floating glass sidebar lists every page under five headings, each page with an icon of its own, a glyph of white glass layers on a squircle of the page's two colours, and a lens of clear glass that follows a press and a drag; the search sits at its top; the toolbar blurs what scrolls under it; the content is frosted glass cards with a rim lit from the top left, a label and its control on each row, and every page opens on a hero in its own colours. Controls follow the system: they take the accent colour the user chose in System Settings, a state takes its own system colour (green when something is on or granted), buttons and pop-up buttons are capsules 28 points tall (26 when small), switches have a pill-shaped knob that stretches while held, a shortcut shows each key as a cap of its own, section headers are 13 pt semibold, and every other icon, in this window and in the menu bar panel, is an SF Symbol drawn by the system. In the notch, text is white at three levels on black, the faintest still 5.3:1; a page shows its key hints only while the notch has the keyboard, and on a screen with a camera cutout the header sits beside the cutout when it fits, so the open shape has no empty band across its top. Only what the user touches moves, briefly for feedback and with springs for things that travel. Contrast was measured, not guessed: text is at least 4.5:1 and the edge of an off control at least 3:1 on the worst backdrops, in both themes. Every effect has a fallback for Reduce transparency, Increase contrast and Reduce motion, focus is always visible, every control has a name, and the whole window works from the keyboard. All tokens are CSS variables at the top of `crates/app-ui/web/app.css`.
+One colour carries meaning, the accent the user chose in System Settings: the open page, the icons, the switches and the sliders take it, a state is said in words in its own system colour (green when something is granted or done, orange when it still needs doing), and nothing else is coloured. The radii are concentric (window 26, sidebar 18, group 12, page icon 9, sidebar item 8, round controls 24 points tall), the type is SF Pro, a shortcut shows each key as a cap of its own, and every other icon, in this window and in the menu bar panel, is an SF Symbol drawn by the system or a glyph in one colour. In the notch, text is white at three levels on black, the faintest still 5.3:1; a page shows its key hints only while the notch has the keyboard, and on a screen with a camera cutout the header sits beside the cutout when it fits, so the open shape has no empty band across its top. Only the controls move, briefly, and nothing does under Reduce motion. Contrast was measured: text in the window's greys and state colours is at least 4.5:1 in both themes, and text on the accent is the system's own pairing. Increase contrast gives the groups, the sidebar and the off switches a firm edge, focus is always visible, every control has a name, and the whole window works from the keyboard. All tokens are CSS variables in `crates/app-ui/web/app.css`.
 
 ## Configuration
 
@@ -460,7 +460,7 @@ Apart from the daily look for a new version (one request to api.github.com that 
 
 ## Technology choices
 
-The shell uses AppKit through `objc2`, not GPUI or Tauri. The search field must accept Telex and VNI typing, which `NSSearchField` handles natively. Non-activating panels, mouse tracking and the app lifecycle are proven in this repository, and idle memory stays low. The settings window is a WKWebView because a settings screen with live graphs, glass effects and two languages is far quicker to build and refine as a page, and the page is a thin client: every rule lives in tested Rust. SQLite is the system library (with FTS5 and the trigram tokenizer), not a bundled build.
+The shell uses AppKit through `objc2`, not GPUI or Tauri. The search field must accept Telex and VNI typing, which `NSSearchField` handles natively. Non-activating panels, mouse tracking and the app lifecycle are proven in this repository, and idle memory stays low. The settings window is a WKWebView because a settings screen with live readings and two languages is far quicker to build and refine as a page, and the page is a thin client: every rule lives in tested Rust. SQLite is the system library (with FTS5 and the trigram tokenizer), not a bundled build.
 
 ## Next steps
 
@@ -477,8 +477,7 @@ The repository layout, the programs in `crates/*/examples` that check the app, a
 
 MIT, see [LICENSE](LICENSE).
 
-The settings window is set in SF Pro, the system's own font, so it reads as the rest of macOS does. Inter is bundled as the fallback for a machine without it, and Patrick Hand for the handwriting of titles, section names and the ghost's speech, both under the SIL Open Font License 1.1: see
-[crates/app-ui/assets/Inter-OFL.txt](crates/app-ui/assets/Inter-OFL.txt) and
-[crates/app-ui/assets/PatrickHand-OFL.txt](crates/app-ui/assets/PatrickHand-OFL.txt).
+The settings window is set in SF Pro, the system's own font, so it reads as the rest of macOS does. Inter is bundled as the fallback for a machine without it, under the SIL Open Font License 1.1: see
+[crates/app-ui/assets/Inter-OFL.txt](crates/app-ui/assets/Inter-OFL.txt).
 
 Vietnamese typing puts its marks with the Telex and VNI engine of [Gõ Nhanh](https://github.com/khaphanspace/gonhanh.org) (the `gonhanh-core` crate, used unchanged), copyright 2025 Gõ Nhanh Contributors, under the BSD 3-Clause License: see [crates/app-ui/assets/GoNhanh-LICENSE.txt](crates/app-ui/assets/GoNhanh-LICENSE.txt), which also travels inside the app. Figghost is not made or endorsed by the authors of Gõ Nhanh.

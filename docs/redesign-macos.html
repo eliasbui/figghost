@@ -1,0 +1,1039 @@
+<!doctype html>
+<html lang="vi">
+<head>
+<meta charset="utf-8">
+<meta name="viewport" content="width=device-width, initial-scale=1">
+<title>Figghost: cài đặt kiểu macOS</title>
+<style>
+/* Tokens. One accent (the system's), three state colours, one radius scale; nothing else carries colour. */
+:root {
+  color-scheme: light;
+  --font: -apple-system, BlinkMacSystemFont, "SF Pro Text", "Helvetica Neue", sans-serif;
+  --accent: var(--accent-l, #007aff);
+  --good: #248a3d;
+  --warn: #c93400;
+  --bad: #d70015;
+
+  --page: #fbfbfd;
+  --page-text: #1d1d1f;
+  --page-2: #6e6e73;
+  --page-line: rgba(0, 0, 0, 0.1);
+  --desk: linear-gradient(165deg, #a9b6c4 0%, #cdd2d6 55%, #e1dcd3 100%);
+
+  --win: #efeff2;
+  --win-edge: rgba(0, 0, 0, 0.2);
+  --win-shadow: 0 30px 80px -10px rgba(20, 30, 45, 0.35), 0 8px 24px rgba(20, 30, 45, 0.12);
+  --side: #fafafb;
+  --side-shadow: 0 0 0 0.5px rgba(0, 0, 0, 0.09), 0 2px 10px rgba(0, 0, 0, 0.06);
+  --grp: #ffffff;
+  --hair: rgba(0, 0, 0, 0.08);
+  --sep: rgba(0, 0, 0, 0.08);
+  --text: #1d1d1f;
+  --text-2: rgba(0, 0, 0, 0.54);
+  --text-3: rgba(0, 0, 0, 0.3);
+  --hover: rgba(0, 0, 0, 0.05);
+  --ctl: #ffffff;
+  --ctl-edge: rgba(0, 0, 0, 0.14);
+  --well: rgba(0, 0, 0, 0.06);
+  --thumb: #ffffff;
+  --track: rgba(0, 0, 0, 0.13);
+  --sheet: #f6f6f8;
+  --scrim: rgba(0, 0, 0, 0.12);
+}
+@media (prefers-color-scheme: dark) {
+  :root:not([data-theme="light"]) {
+    color-scheme: dark;
+    --accent: var(--accent-d, #0a84ff);
+    --good: #30d158; --warn: #ff9f0a; --bad: #ff453a;
+    --page: #111113; --page-text: #f5f5f7; --page-2: #98989d; --page-line: rgba(255, 255, 255, 0.12);
+    --desk: linear-gradient(165deg, #262d37 0%, #161a20 60%, #0e1013 100%);
+    --win: #1c1c1e; --win-edge: rgba(255, 255, 255, 0.13);
+    --win-shadow: 0 30px 80px -10px rgba(0, 0, 0, 0.7), 0 8px 24px rgba(0, 0, 0, 0.4);
+    --side: #2b2b2e; --side-shadow: 0 0 0 0.5px rgba(255, 255, 255, 0.08), 0 2px 12px rgba(0, 0, 0, 0.35);
+    --grp: rgba(255, 255, 255, 0.045); --hair: rgba(255, 255, 255, 0.07); --sep: rgba(255, 255, 255, 0.07);
+    --text: rgba(255, 255, 255, 0.92); --text-2: rgba(255, 255, 255, 0.55); --text-3: rgba(255, 255, 255, 0.3);
+    --hover: rgba(255, 255, 255, 0.06);
+    --ctl: rgba(255, 255, 255, 0.11); --ctl-edge: rgba(255, 255, 255, 0.07); --well: rgba(255, 255, 255, 0.08);
+    --thumb: #636366; --track: rgba(255, 255, 255, 0.16);
+    --sheet: #2a2a2d; --scrim: rgba(0, 0, 0, 0.35);
+  }
+}
+:root[data-theme="dark"] {
+  color-scheme: dark;
+  --accent: var(--accent-d, #0a84ff);
+  --good: #30d158; --warn: #ff9f0a; --bad: #ff453a;
+  --page: #111113; --page-text: #f5f5f7; --page-2: #98989d; --page-line: rgba(255, 255, 255, 0.12);
+  --desk: linear-gradient(165deg, #262d37 0%, #161a20 60%, #0e1013 100%);
+  --win: #1c1c1e; --win-edge: rgba(255, 255, 255, 0.13);
+  --win-shadow: 0 30px 80px -10px rgba(0, 0, 0, 0.7), 0 8px 24px rgba(0, 0, 0, 0.4);
+  --side: #2b2b2e; --side-shadow: 0 0 0 0.5px rgba(255, 255, 255, 0.08), 0 2px 12px rgba(0, 0, 0, 0.35);
+  --grp: rgba(255, 255, 255, 0.045); --hair: rgba(255, 255, 255, 0.07); --sep: rgba(255, 255, 255, 0.07);
+  --text: rgba(255, 255, 255, 0.92); --text-2: rgba(255, 255, 255, 0.55); --text-3: rgba(255, 255, 255, 0.3);
+  --hover: rgba(255, 255, 255, 0.06);
+  --ctl: rgba(255, 255, 255, 0.11); --ctl-edge: rgba(255, 255, 255, 0.07); --well: rgba(255, 255, 255, 0.08);
+  --thumb: #636366; --track: rgba(255, 255, 255, 0.16);
+  --sheet: #2a2a2d; --scrim: rgba(0, 0, 0, 0.35);
+}
+
+* { box-sizing: border-box; }
+html, body { margin: 0; }
+body { background: var(--page); color: var(--page-text); font: 15px/1.55 var(--font); -webkit-font-smoothing: antialiased; }
+:focus-visible { outline: 2px solid color-mix(in srgb, var(--accent) 65%, transparent); outline-offset: 1px; }
+@media (prefers-reduced-motion: reduce) { * { transition: none !important; } }
+
+/* The document around the window. */
+.doc { max-width: 1064px; margin: 0 auto; padding: 40px 16px 80px; }
+.doc h1 { margin: 0 0 6px; font-size: 28px; font-weight: 700; letter-spacing: -0.02em; line-height: 1.2; }
+.doc > h2 { margin: 48px 0 12px; font-size: 20px; font-weight: 650; letter-spacing: -0.01em; }
+.doc > p, .doc > ol > li { max-width: 76ch; }
+.doc > ol { padding-left: 22px; }
+.doc > ol > li { margin: 6px 0; }
+.doc code { font: 13px ui-monospace, "SF Mono", Menlo, monospace; padding: 1px 4px; border-radius: 4px; background: var(--page-line); }
+.doc a { color: var(--accent); }
+.lead { margin: 0 0 24px; color: var(--page-2); }
+.bar { display: flex; flex-wrap: wrap; align-items: center; gap: 12px 28px; margin: 0 0 16px; color: var(--page-2); font-size: 13px; }
+.bar label { display: flex; align-items: center; gap: 10px; }
+.swatches { display: flex; gap: 8px; }
+.swatch { width: 18px; height: 18px; padding: 0; border: 0; border-radius: 50%; background: var(--c); box-shadow: inset 0 0 0 0.5px rgba(0, 0, 0, 0.2); }
+.swatch[aria-pressed="true"] { box-shadow: 0 0 0 2px var(--page), 0 0 0 3.5px var(--c); }
+.spec { width: 100%; border-collapse: collapse; font-size: 14px; }
+.spec th, .spec td { padding: 9px 12px 9px 0; border-bottom: 0.5px solid var(--page-line); text-align: left; vertical-align: top; }
+.spec th { color: var(--page-2); font-weight: 600; }
+.shots { display: grid; grid-template-columns: repeat(auto-fit, minmax(300px, 1fr)); gap: 16px; }
+.shots figure { margin: 0; }
+.shots img { width: 100%; border-radius: 10px; box-shadow: 0 0 0 0.5px var(--page-line); }
+.shots figcaption { margin-top: 6px; color: var(--page-2); font-size: 13px; }
+
+/* The desktop and the window. */
+.desk { padding: 40px 16px; border-radius: 14px; background: var(--desk); overflow-x: auto; }
+.win {
+  position: relative;
+  display: grid;
+  grid-template-columns: 236px minmax(0, 1fr);
+  width: 1000px;
+  height: 700px;
+  margin: 0 auto;
+  overflow: hidden;
+  border-radius: 26px;
+  background: var(--win);
+  box-shadow: 0 0 0 0.5px var(--win-edge), var(--win-shadow);
+  color: var(--text);
+  font: 13px/1.35 var(--font);
+  cursor: default;
+  user-select: none;
+}
+
+/* Sidebar: the one floating pane, concentric with the window (26 = 18 + 8). */
+.side { display: flex; flex-direction: column; min-height: 0; margin: 8px 0 8px 8px; border-radius: 18px; background: var(--side); box-shadow: var(--side-shadow); }
+.lights { display: flex; flex: none; gap: 8px; height: 40px; padding: 15px 0 0 15px; }
+.lights i { width: 12px; height: 12px; border-radius: 50%; background: #ff5f57; box-shadow: inset 0 0 0 0.5px rgba(0, 0, 0, 0.15); }
+.lights i:nth-child(2) { background: #febc2e; }
+.lights i:nth-child(3) { background: #28c840; }
+.search { display: flex; flex: none; align-items: center; height: 28px; margin: 4px 10px 8px; padding: 0 11px; border-radius: 14px; background: var(--well); }
+.search input { flex: 1; min-width: 0; padding: 0; border: 0; outline: 0; background: none; color: var(--text); font: 13px var(--font); }
+.search input::placeholder { color: var(--text-2); }
+.me { display: flex; flex: none; align-items: center; gap: 10px; margin: 0 10px 4px; padding: 7px 8px; border: 0; border-radius: 10px; background: none; color: var(--text); font: inherit; text-align: left; }
+.me img { width: 34px; height: 34px; }
+.me b { display: block; font-weight: 600; }
+.me span { color: var(--text-2); font-size: 11px; }
+.me:hover { background: var(--hover); }
+.me[aria-current="page"] { background: var(--accent); color: #ffffff; }
+.me[aria-current="page"] span { color: rgba(255, 255, 255, 0.8); }
+nav { flex: 1; min-height: 0; overflow-y: auto; padding: 0 10px 10px; scrollbar-width: none; }
+.nh { padding: 12px 8px 3px; color: var(--text-3); font-size: 11px; font-weight: 600; }
+.ni { display: flex; align-items: center; gap: 8px; width: 100%; height: 28px; padding: 0 8px; border: 0; border-radius: 8px; background: none; color: var(--text); font: 13px var(--font); text-align: left; }
+.ni svg { flex: none; width: 16px; height: 16px; color: var(--accent); }
+.ni span { flex: 1; min-width: 0; overflow: hidden; text-overflow: ellipsis; white-space: nowrap; }
+.ni small { color: var(--text-3); font-size: 11px; }
+.ni:hover { background: var(--hover); }
+.ni[aria-current="page"] { background: var(--accent); color: #ffffff; }
+.ni[aria-current="page"] svg { color: #ffffff; }
+.ni[aria-current="page"] small { color: rgba(255, 255, 255, 0.75); }
+.none { padding: 12px 8px; color: var(--text-2); font-size: 12px; }
+
+/* Content: a toolbar with history and the page name, then a grouped form. */
+.main { display: flex; flex-direction: column; min-width: 0; min-height: 0; }
+.tb { display: flex; flex: none; align-items: center; gap: 12px; height: 52px; padding: 0 20px; }
+.tb h2 { margin: 0; font-size: 15px; font-weight: 600; }
+.hist { display: flex; border-radius: 14px; background: var(--ctl); box-shadow: 0 0 0 0.5px var(--ctl-edge), 0 1px 2px rgba(0, 0, 0, 0.06); }
+.hist button { display: grid; place-items: center; width: 32px; height: 28px; padding: 0; border: 0; border-radius: 14px; background: none; color: var(--text); }
+.hist button::before { content: ""; width: 7px; height: 7px; margin-left: 3px; border-bottom: 1.6px solid currentColor; border-left: 1.6px solid currentColor; transform: rotate(45deg); }
+.hist #fwd::before { margin: 0 3px 0 0; transform: rotate(-135deg); }
+.hist button:disabled { color: var(--text-3); }
+.scroll { flex: 1; min-height: 0; overflow-y: auto; padding: 4px 28px 28px; }
+.form { max-width: 600px; margin: 0 auto; }
+
+h3 { margin: 20px 2px 6px; font-size: 13px; font-weight: 600; }
+h3.minor { margin-top: 14px; color: var(--text-2); font-size: 12px; }
+.grp { overflow: hidden; border-radius: 12px; background: var(--grp); box-shadow: inset 0 0 0 0.5px var(--hair); }
+.row { position: relative; display: flex; align-items: center; gap: 12px; min-height: 38px; padding: 7px 12px; }
+.row + .row::before, .listbar + .row::before { content: ""; position: absolute; top: 0; left: 12px; right: 12px; border-top: 0.5px solid var(--sep); }
+.row.dis { opacity: 0.45; }
+.row[hidden] { display: none; }
+.tx { flex: 1; min-width: 0; }
+.lbl { font-size: 13px; }
+.sub { margin-top: 1px; color: var(--text-2); font-size: 11px; line-height: 1.35; }
+.sub.clamp { display: -webkit-box; overflow: hidden; -webkit-box-orient: vertical; -webkit-line-clamp: 2; }
+.tx.open .sub.clamp { display: block; }
+.more { padding: 0; border: 0; background: none; color: var(--accent); font: 11px var(--font); }
+.ctl { display: flex; flex: none; flex-wrap: wrap; justify-content: flex-end; align-items: center; gap: 8px; max-width: 62%; }
+.ctl label { display: flex; align-items: center; gap: 6px; color: var(--text-2); font-size: 11px; }
+.val { color: var(--text-2); }
+.val.num { min-width: 36px; font-variant-numeric: tabular-nums; text-align: right; }
+.kc { color: var(--text-2); font-weight: 500; letter-spacing: 0.06em; }
+.ok { color: var(--good); }
+.warn { color: var(--warn); }
+.fine { margin: 8px 2px 0; color: var(--text-2); font-size: 11px; line-height: 1.45; }
+.fine b { color: var(--text); font-weight: 600; }
+.head { display: flex; align-items: center; gap: 12px; padding: 12px; }
+.head .lbl { font-weight: 600; }
+.tile { display: grid; flex: none; place-items: center; width: 38px; height: 38px; border-radius: 9px; background: var(--accent); color: #ffffff; }
+.tile svg { width: 22px; height: 22px; }
+.appicon { flex: none; width: 40px; height: 40px; }
+.row svg.g { flex: none; width: 16px; height: 16px; color: var(--accent); }
+.row.link:hover { background: var(--hover); }
+.row[draggable="true"].dragging { opacity: 0.4; }
+.chev { flex: none; width: 7px; height: 7px; margin: 0 3px 0 0; border-top: 1.5px solid var(--text-3); border-right: 1.5px solid var(--text-3); transform: rotate(45deg); }
+.foot { display: flex; justify-content: flex-end; gap: 8px; margin-top: 12px; }
+.row[data-item][aria-selected="true"] { background: color-mix(in srgb, var(--accent) 15%, transparent); }
+.listbar { display: flex; justify-content: flex-end; gap: 8px; padding: 8px 12px; border-top: 0.5px solid var(--sep); }
+.listbar .grow { flex: 1; display: flex; align-items: center; gap: 6px; color: var(--text-2); font-size: 12px; }
+.ic { display: grid; flex: none; place-items: center; width: 20px; height: 20px; border-radius: 5px; background: var(--well); color: var(--text-2); font-size: 10px; font-weight: 600; }
+.empty .sub { padding: 4px 0; font-size: 12px; }
+
+/* Controls: the system's shapes, all in the accent. */
+.sw { position: relative; flex: none; width: 38px; height: 22px; padding: 0; border: 0; border-radius: 11px; background: var(--track); transition: background 0.18s; }
+.sw::after { content: ""; position: absolute; top: 2px; left: 2px; width: 24px; height: 18px; border-radius: 9px; background: #ffffff; box-shadow: 0 1px 2px rgba(0, 0, 0, 0.25), 0 0 0 0.5px rgba(0, 0, 0, 0.05); transition: transform 0.22s cubic-bezier(0.3, 1.3, 0.5, 1); }
+.sw[aria-checked="true"] { background: var(--accent); }
+.sw[aria-checked="true"]::after { transform: translateX(10px); }
+select, .btn, .key { flex: none; height: 24px; border: 0; border-radius: 12px; background-color: var(--ctl); box-shadow: 0 0 0 0.5px var(--ctl-edge), 0 0.5px 1.5px rgba(0, 0, 0, 0.08); color: var(--text); font: 13px var(--font); }
+select { max-width: 230px; appearance: none; padding: 0 26px 0 11px; background-image: url("data:image/svg+xml;utf8,<svg xmlns='http://www.w3.org/2000/svg' width='7' height='11' viewBox='0 0 7 11' fill='none' stroke='%238e8e93' stroke-width='1.4' stroke-linecap='round' stroke-linejoin='round'><path d='M1 3.8L3.5 1.3L6 3.8M1 7.2L3.5 9.7L6 7.2'/></svg>"); background-position: right 9px center; background-repeat: no-repeat; background-size: 7px 11px; text-overflow: ellipsis; }
+.btn { padding: 0 12px; white-space: nowrap; }
+.btn:active { filter: brightness(0.94); }
+.btn:disabled { color: var(--text-3); }
+.btn.pri { background: var(--accent); box-shadow: none; color: #ffffff; }
+.btn.danger { color: var(--bad); }
+.key { min-width: 86px; padding: 0 10px; background: var(--well); box-shadow: none; font-weight: 500; letter-spacing: 0.05em; }
+.key.empty { color: var(--text-3); letter-spacing: 0; }
+.key.rec { box-shadow: 0 0 0 2px var(--accent); color: var(--text-2); letter-spacing: 0; }
+.seg { display: inline-flex; flex: none; padding: 2px; border-radius: 13px; background: var(--well); }
+.seg button { height: 22px; padding: 0 11px; border: 0; border-radius: 11px; background: none; color: var(--text); font: 12.5px var(--font); white-space: nowrap; }
+.seg button[aria-pressed="true"] { background: var(--thumb); box-shadow: 0 0.5px 2px rgba(0, 0, 0, 0.2); }
+input[type="range"] { flex: none; width: 150px; margin: 0; accent-color: var(--accent); }
+.rv { flex: none; min-width: 52px; color: var(--text-2); font-variant-numeric: tabular-nums; text-align: right; }
+.field { width: 240px; height: 24px; padding: 0 8px; border: 0; border-radius: 7px; background: var(--ctl); box-shadow: inset 0 0 0 0.5px var(--ctl-edge); color: var(--text); font: 13px var(--font); outline: 0; }
+.field:focus { box-shadow: inset 0 0 0 0.5px var(--ctl-edge), 0 0 0 3px color-mix(in srgb, var(--accent) 35%, transparent); }
+.field.wide { flex: 1; width: auto; }
+textarea.field { height: 60px; padding: 5px 8px; resize: none; }
+.chk { width: 14px; height: 14px; margin: 0; accent-color: var(--accent); }
+.meter { flex: none; width: 140px; height: 6px; overflow: hidden; border-radius: 3px; background: var(--well); }
+.meter i { display: block; height: 100%; border-radius: 3px; background: var(--accent); }
+.stack { display: flex; height: 10px; margin: 10px 12px 4px; overflow: hidden; border-radius: 5px; background: var(--well); }
+.stack i { height: 100%; background: var(--accent); }
+.swatch-dot { flex: none; width: 8px; height: 8px; border-radius: 2px; background: var(--accent); }
+.zone { position: relative; flex: none; width: 26px; height: 17px; border-radius: 3px; box-shadow: inset 0 0 0 1px var(--text-3); }
+.zone i { position: absolute; border-radius: 1.5px; background: var(--accent); }
+.picks { display: grid; grid-template-columns: repeat(auto-fill, minmax(120px, 1fr)); gap: 7px 12px; padding: 2px 12px 10px; }
+.picks label { display: flex; align-items: center; gap: 7px; font-size: 12.5px; }
+.pg { padding: 8px 12px 4px; color: var(--text-2); font-size: 11px; font-weight: 600; }
+.pad { height: 96px; overflow-y: scroll; margin: 2px 12px 10px; padding: 6px 10px; border-radius: 8px; background: var(--well); color: var(--text-2); font-size: 12px; line-height: 1.6; }
+
+/* The sheet of rarely used settings. */
+.scrim { position: absolute; inset: 0; z-index: 10; display: none; background: var(--scrim); }
+.scrim.open { display: block; }
+.sheet { position: absolute; top: 52px; left: 50%; width: 520px; max-height: calc(100% - 80px); overflow-y: auto; padding: 16px; border-radius: 18px; background: var(--sheet); box-shadow: 0 0 0 0.5px var(--win-edge), 0 20px 50px rgba(0, 0, 0, 0.3); transform: translateX(-50%); }
+.sheet h4 { margin: 0 0 4px; font-size: 13px; font-weight: 600; }
+.sheet h3:first-of-type { margin-top: 10px; }
+.sheet pre { margin: 0; padding: 12px; white-space: pre-wrap; font: 11px/1.5 ui-monospace, "SF Mono", Menlo, monospace; color: var(--text-2); }
+</style>
+</head>
+<body>
+<main class="doc">
+  <h1>Figghost: vẽ lại cửa sổ cài đặt theo macOS</h1>
+  <p class="lead">Bản vẽ đủ mọi trang của cửa sổ cài đặt, để duyệt trước khi sửa app. Nội dung từng hàng (tên, mô tả, lựa chọn, giá trị mẫu) lấy từ chính trang cài đặt của bản 2.1.17 chạy với dữ liệu mẫu, tiếng Việt, ngày 28/10/2026; chỉ cách sắp xếp và hình thức là mới. Bấm thử mọi thứ: sidebar, tìm kiếm theo nội dung, các tab trong trang Notch, nút Nâng cao…, công tắc, phím tắt.</p>
+
+  <div class="bar">
+    <label>Giao diện
+      <span class="seg" id="theme" role="group" aria-label="Giao diện">
+        <button data-theme="light">Sáng</button><button data-theme="dark">Tối</button><button data-theme="" aria-pressed="true">Theo máy</button>
+      </span>
+    </label>
+    <label>Màu nhấn của hệ thống <span class="swatches" id="accents"></span></label>
+  </div>
+
+  <div class="desk">
+    <div class="win" id="win">
+      <aside class="side">
+        <div class="lights" aria-hidden="true"><i></i><i></i><i></i></div>
+        <div class="search"><input id="q" type="search" placeholder="Tìm kiếm" aria-label="Tìm trong cài đặt"></div>
+        <button class="me" data-go="about"><img src="images/icon.png" alt=""><div><b>Figghost</b><span>Đã có quyền Trợ năng</span></div></button>
+        <nav id="nav" aria-label="Các trang cài đặt"></nav>
+      </aside>
+      <section class="main">
+        <header class="tb">
+          <div class="hist"><button id="back" aria-label="Quay lại"></button><button id="fwd" aria-label="Tiếp"></button></div>
+          <h2 id="title"></h2>
+        </header>
+        <div class="scroll" id="scroll"><div class="form" id="form"></div></div>
+      </section>
+      <div class="scrim" id="scrim"><div class="sheet" role="dialog" aria-modal="true" aria-labelledby="sheet-t" id="sheet"></div></div>
+    </div>
+  </div>
+
+  <h2>1. Vì sao bản hiện tại bị chê</h2>
+  <ol>
+    <li><b>Loạn màu.</b> Mỗi trang có một cặp màu riêng: 38 cặp trong <code>PAGE_LOOK</code> của <code>app.js</code>, từ cam, hồng, tím đến xanh ngọc. Biểu tượng sidebar, hero và quầng sáng đều lấy màu đó, nên chuyển trang là đổi cả bảng màu.</li>
+    <li><b>Vẻ "AI".</b> Hero là hai radial-gradient chồng lên một linear-gradient, bán kính 30 px, đổ bóng cùng màu; nền cửa sổ là ba vệt aurora xanh tím, tối thì thêm sao; mọi thẻ có viền sáng. Các danh mục về "AI slop" liệt kê đúng những thứ này: gradient xanh tím không mang nghĩa, thẻ kính mờ chồng trên nền nhiều màu, quầng phát sáng.</li>
+    <li><b>Kính ở sai lớp.</b> Thẻ nội dung là kính mờ. HIG Materials nói Liquid Glass dành cho lớp điều hướng và điều khiển, không dùng ở lớp nội dung.</li>
+    <li><b>Năm bán kính không đồng tâm</b> (18, 22, 30, 14 đến 16, 10), và <b>một màu mang hai nghĩa</b>: công tắc trong hero màu xanh lá, mọi công tắc khác theo màu nhấn; chấm xanh lá có ở gần như mọi mục sidebar nên không còn báo được gì.</li>
+    <li><b>Trang trí lấn công cụ.</b> Chữ viết tay, con ma nói trong bong bóng, trời đổi theo giờ, thấu kính lò xo chạy theo con trỏ.</li>
+    <li><b>Khó dùng.</b> 38 trang nằm phẳng trong sidebar. Tab của notch được bật tắt ở hai nơi khác nhau (danh sách "Các tab" trong trang Notch và 16 trang tính năng). Trang Notch có 11 nhóm, gồm cả chỉ báo âm lượng, lời bài hát và ẩn biểu tượng thanh menu. Trang Clipboard có 10 nhóm. Mô tả dài đến năm dòng nằm giữa các công tắc.</li>
+  </ol>
+
+  <div class="shots">
+    <figure><img src="images/settings-general.png" alt="Trang Chung hiện tại: hero xanh có con ma, lưới ô tính năng nhiều màu"><figcaption>Hiện tại: trang Chung.</figcaption></figure>
+    <figure><img src="images/settings-notch.png" alt="Trang Notch hiện tại: hero xanh, ảnh notch tím, bốn thẻ kích thước"><figcaption>Hiện tại: trang Notch.</figcaption></figure>
+  </div>
+
+  <h2>2. Nguyên tắc</h2>
+  <ol>
+    <li>Kính chỉ ở chỗ macOS đặt kính: sidebar nổi, thanh công cụ, sheet. Nội dung là nhóm đặc như form của System Settings.</li>
+    <li>Một màu nhấn duy nhất, là màu nhấn người dùng chọn trong System Settings. Xanh lá chỉ cho "đã cấp", cam cho "cần cấp", đỏ cho hành động xóa. Bấm các chấm màu ở trên để thấy cả cửa sổ đổi theo.</li>
+    <li>Một thang bán kính đồng tâm: cửa sổ 26, sidebar 18, nhóm 12, ô biểu tượng 9, mục sidebar 8, điều khiển hình viên. Chỉ dùng SF Pro.</li>
+    <li>Mọi trang mở bằng cùng một nhóm đầu: ô biểu tượng, tên, một câu mô tả, công tắc của tính năng ở bên phải.</li>
+    <li>Mỗi hàng: tên, mô tả gập còn hai dòng (bấm "Thêm" để đọc hết), một điều khiển bên phải. Hàng chỉ có chữ giải thích thành chữ nhỏ dưới nhóm.</li>
+    <li>Mục hiếm dùng nằm sau nút "Nâng cao…" ở cuối trang, mở thành sheet.</li>
+    <li>Không hiệu ứng trang trí. Chỉ công tắc có chuyển động, và tắt hẳn khi bật Giảm chuyển động. Con ma giữ ở biểu tượng app, màn chào và notch.</li>
+  </ol>
+
+  <h2>3. Sắp xếp lại</h2>
+  <table class="spec">
+    <thead><tr><th>Hiện tại</th><th>Bản mới</th></tr></thead>
+    <tbody>
+      <tr><td>38 mục trong sidebar</td><td>24 mục trong sáu nhóm; trạng thái quyền ở khối Figghost trên cùng</td></tr>
+      <tr><td>16 trang tab trong sidebar, cộng danh sách "Các tab" trong trang Notch</td><td>Một danh sách Tab trong trang Notch (20 tab): công tắc, kéo để sắp xếp, bấm để vào trang của tab</td></tr>
+      <tr><td>Âm lượng, Kiểu chỉ báo trong trang Notch</td><td>Trang riêng "Chỉ báo âm lượng"</td></tr>
+      <tr><td>Biểu tượng trên thanh menu trong trang Notch</td><td>Trang riêng "Thanh menu"</td></tr>
+      <tr><td>Khay tệp, Lời bài hát trong trang Notch</td><td>Trang của tab Khay và tab Media</td></tr>
+      <tr><td>Bốn thẻ kích thước và bốn thanh trượt</td><td>Một nút chọn; thanh trượt chỉ hiện khi chọn Tùy chỉnh</td></tr>
+      <tr><td>Màn hình, Đổ bóng, Phản hồi xúc giác của Notch</td><td>Nâng cao</td></tr>
+      <tr><td>Bàn phím trong Clipboard</td><td>Bỏ, đã có ở Phím tắt. Trợ lý AI và Linh vật vào Nâng cao</td></tr>
+      <tr><td>Tài khoản, Token (Tác tử AI); Phím tắt (Trình chiếu)</td><td>Nâng cao</td></tr>
+      <tr><td>Có gì ở đâu, Vì sao có Figghost, 13 phiên bản (Giới thiệu)</td><td>Nút "Các phiên bản" mở sheet</td></tr>
+      <tr><td>Lưới ô tròn màu ở trang Chung</td><td>Danh sách tính năng có công tắc</td></tr>
+      <tr><td>Bảng 22 ô phím của Chia cửa sổ</td><td>Bảng ba nhóm, mỗi hàng có hình vùng nhỏ và phím tắt</td></tr>
+      <tr><td>Đồ thị cuộn</td><td>Bỏ; giữ ô thử cuộn</td></tr>
+      <tr><td>Mole: nhiều bảng màu và danh sách dài</td><td>Kiểu trang Dung lượng của macOS: mức dùng, thanh dung lượng một màu, mỗi loại một trang con. Số trong bản vẽ là số mẫu</td></tr>
+    </tbody>
+  </table>
+
+  <h2>4. Thông số</h2>
+  <table class="spec">
+    <thead><tr><th>Thành phần</th><th>Hiện tại</th><th>Bản mới</th></tr></thead>
+    <tbody>
+      <tr><td>Màu</td><td>38 cặp màu theo trang, cộng xanh lá ở hero</td><td>Màu nhấn hệ thống, cộng ba màu trạng thái</td></tr>
+      <tr><td>Nền cửa sổ</td><td>Ba vệt aurora, sao khi tối, trời theo giờ</td><td>Màu đặc: #efeff2 sáng, #1c1c1e tối</td></tr>
+      <tr><td>Thẻ</td><td>Kính mờ, viền sáng, bán kính 22</td><td>Nhóm đặc, viền 0,5 px, bán kính 12</td></tr>
+      <tr><td>Đầu trang</td><td>Hero gradient bán kính 30, có quầng</td><td>Nhóm đầu: ô 38 px, tên, một câu, công tắc</td></tr>
+      <tr><td>Sidebar</td><td>Ô gradient nhiều màu, chấm xanh</td><td>Glyph đơn sắc màu nhấn, chữ "Tắt" khi tính năng tắt</td></tr>
+      <tr><td>Chữ</td><td>SF Pro, Inter và Patrick Hand</td><td>SF Pro</td></tr>
+      <tr><td>Hàng</td><td>Cao 50, lề 18, mô tả không giới hạn</td><td>Cao 38, lề 12, mô tả tối đa hai dòng</td></tr>
+      <tr><td>Điều khiển</td><td>Viên 28, công tắc 44 x 24</td><td>Viên 24, công tắc 38 x 22</td></tr>
+      <tr><td>Chuyển động</td><td>Thấu kính lò xo, trang nảy lên, ma chớp mắt</td><td>Chỉ công tắc</td></tr>
+    </tbody>
+  </table>
+
+  <h2>5. Sau khi duyệt</h2>
+  <ol>
+    <li><code>crates/app-ui/web/app.css</code>: bỏ khối "Liquid Glass, as macOS 26 draws it" và khối "Ghost world", thay bằng token và luật ở khối <code>&lt;style&gt;</code> của trang này.</li>
+    <li><code>app.js</code>: bỏ <code>PAGE_LOOK</code> và ô gradient (giữ <code>GLYPHS</code>); <code>pageHero</code> thành nhóm đầu trang; <code>featureGrid</code> thành danh sách; <code>CATEGORIES</code> theo sidebar mới; tab của notch thành trang con (<code>trail</code> sẵn có lo lùi và tiến); thêm sheet Nâng cao và mô tả gập; bỏ <code>guideLine</code>, <code>applySky</code>, thấu kính sidebar và phông Patrick Hand.</li>
+    <li>Từng trang plugin (<code>web/features/*.js</code>): đánh dấu nhóm nào vào Nâng cao; tách trang Chỉ báo âm lượng và Thanh menu khỏi Notch.</li>
+    <li>Kiểm: <code>settings_preview selftest</code>, <code>snap</code> từng trang ở sáng và tối, chụp lại ảnh README.</li>
+  </ol>
+
+  <h2>6. Cần bạn chốt</h2>
+  <ol>
+    <li>Ngày 19/10/2026 đã chọn giữ thẻ kính và hero màu. Bản này bỏ cả hai. Nếu vẫn muốn một chút dấu ấn, có thể giữ một hero một màu ở trang Giới thiệu.</li>
+    <li>Mole là công cụ dọn máy, không phải cài đặt. Có thể tách thành cửa sổ riêng mở từ menu, để cửa sổ cài đặt chỉ còn cài đặt.</li>
+  </ol>
+
+  <h2>Nguồn</h2>
+  <ol>
+    <li>Apple HIG, Materials, Sidebars, Settings: <a href="https://developer.apple.com/design/human-interface-guidelines/materials">materials</a>, <a href="https://developer.apple.com/design/human-interface-guidelines/sidebars">sidebars</a>, <a href="https://developer.apple.com/design/human-interface-guidelines/settings">settings</a>. Trích theo bản đọc ngày 20/10/2026 trong <code>docs/research-ui-references.md</code>.</li>
+    <li>Cửa sổ cài đặt macOS 26: sidebar và chi tiết, nút lùi tiến ở thanh công cụ, form nhóm: <a href="https://www.skills.sh/fayazara/macos-app-skills/macos-settings-ui">macos-settings-ui</a> (cộng đồng).</li>
+    <li>Phê bình kính chồng kính trên Tahoe: <a href="https://eclecticlight.co/2025/09/15/appearance-matters-get-tahoe-looking-in-better-shape/">The Eclectic Light Company</a>.</li>
+    <li>Dấu hiệu giao diện "AI": <a href="https://cdn.jsdelivr.net/npm/pixelslop@0.3.8/dist/skill/resources/ai-slop-patterns.md">AI Slop Pattern Catalog</a>, <a href="https://noqta.tn/en/blog/ai-design-slop-overused-ui-patterns-fix-2026">noqta.tn</a>, <a href="https://prg.sh/ramblings/Why-Your-AI-Keeps-Building-the-Same-Purple-Gradient-Website">prg.sh</a>. Blog và tài liệu cộng đồng, không phải số liệu đo.</li>
+  </ol>
+</main>
+
+<script>
+// GLYPHS is copied from crates/app-ui/web/app.js.
+const GLYPHS = (() => {
+  const f = (n) => +n.toFixed(2);
+  const R = (x, y, w, hh, r) => {
+    r = Math.min(r, w / 2, hh / 2);
+    return `M${f(x + r)} ${f(y)}h${f(w - 2 * r)}a${r} ${r} 0 0 1 ${r} ${r}v${f(hh - 2 * r)}a${r} ${r} 0 0 1 ${-r} ${r}` +
+      `h${f(2 * r - w)}a${r} ${r} 0 0 1 ${-r} ${-r}v${f(2 * r - hh)}a${r} ${r} 0 0 1 ${r} ${-r}z`;
+  };
+  const C = (cx, cy, r) => `M${f(cx - r)} ${cy}a${r} ${r} 0 1 0 ${f(2 * r)} 0a${r} ${r} 0 1 0 ${f(-2 * r)} 0z`;
+  const star = (cx, cy, r) => `M${cx} ${f(cy - r)}Q${cx} ${cy} ${f(cx + r)} ${cy}Q${cx} ${cy} ${cx} ${f(cy + r)}` +
+    `Q${cx} ${cy} ${f(cx - r)} ${cy}Q${cx} ${cy} ${cx} ${f(cy - r)}z`;
+  const gear = (cx, cy, ro, ri, n) => {
+    let d = '';
+    for (let k = 0; k < n * 4; k++) {
+      const a = (k / (n * 4)) * Math.PI * 2 - Math.PI / 2;
+      const r = k % 4 === 1 || k % 4 === 2 ? ro : ri;
+      d += (k ? 'L' : 'M') + f(cx + r * Math.cos(a)) + ' ' + f(cy + r * Math.sin(a));
+    }
+    return d + 'z';
+  };
+  return {
+    general: { g: gear(12, 12, 10.2, 7.8, 8) + C(12, 12, 3.6), s: C(12, 12, 1.8) },
+    keys: { g: R(1.5, 5.5, 21, 13, 3.8), s: R(4.6, 8.6, 2.6, 2.6, 0.8) + R(8.6, 8.6, 2.6, 2.6, 0.8) + R(12.6, 8.6, 2.6, 2.6, 0.8) + R(16.6, 8.6, 2.6, 2.6, 0.8) + R(7, 13.2, 10, 2.4, 1.2) },
+    mole: { g: C(12, 12, 10), s: star(11, 13, 6.2) + star(17.6, 6.2, 2.6) },
+    about: { g: C(12, 12, 10), s: C(12, 7.2, 1.6) + R(10.7, 10.2, 2.6, 7.8, 1.3) },
+    notch: { g: R(1.5, 4, 21, 16, 4), s: 'M7.5 4h9v1.4a2.4 2.4 0 0 1-2.4 2.4h-4.2A2.4 2.4 0 0 1 7.5 5.4z' + R(5, 16.2, 14, 1.8, 0.9) },
+    islands: { g: R(2, 8, 20, 8, 4), s: C(17.8, 12, 2) + R(5.8, 11, 7.5, 2, 1) },
+    outlook: { g: R(2, 5, 20, 14, 3), w: 'M3.6 7.2 12 13l8.4-5.8' },
+    notifications: { g: 'M11 3.2a6.3 6.3 0 0 0-6.3 6.3v3.9l-1.6 3c-.4.7.1 1.6.9 1.6h14.1c.8 0 1.3-.9.9-1.6l-1.6-3V9.5A6.3 6.3 0 0 0 11 3.2z', s: C(11, 20, 2.2) + C(18.2, 5.6, 3.2) },
+    musicwidget: { g: R(2.5, 2.5, 19, 19, 5.5), s: C(9.5, 16, 2.6) + R(11, 6.5, 1.8, 9.5, 0.9) + 'M11 6.5l5.5-1.6v3.1L11 9.6z' },
+    agents: { g: R(1.5, 3.5, 21, 17, 4.5), w: 'M6.5 9.5l3.5 3-3.5 3', s: R(12, 14, 5.5, 2, 1) },
+    prs: { s: C(6.5, 5.5, 2.7) + C(6.5, 18.5, 2.7) + C(17.5, 18.5, 2.7), w: 'M6.5 8.2v7.6M17.5 15.8V10a3 3 0 0 0-3-3h-2.5M13.8 4.8L11.6 7l2.2 2.2' },
+    calendar: {
+      g: R(2.5, 4, 19, 17.5, 4.5),
+      s: 'M2.5 10.2V8.5a4.5 4.5 0 0 1 4.5-4.5h10a4.5 4.5 0 0 1 4.5 4.5v1.7z' + R(6.6, 2, 2.2, 4.6, 1.1) + R(15.2, 2, 2.2, 4.6, 1.1) +
+        C(8, 14, 1.3) + C(12, 14, 1.3) + C(16, 14, 1.3) + C(8, 17.6, 1.3) + C(12, 17.6, 1.3),
+    },
+    pomodoro: { g: C(12, 13.5, 8.5), s: 'M12 13.5V7.5a6 6 0 0 1 5.2 3z' + R(10.5, 2, 3, 3, 1.2) },
+    dayprogress: { g: R(2, 17.6, 20, 3.4, 1.7), s: 'M5.5 16a6.5 6.5 0 0 1 13 0z', w: 'M12 3.5v2.5M4.6 7.6l1.7 1.7M19.4 7.6l-1.7 1.7' },
+    screentime: {
+      g: 'M6 2.5h12v2.5c0 3-2.6 4.8-4.4 7 1.8 2.2 4.4 4 4.4 7v2.5H6V19c0-3 2.6-4.8 4.4-7C8.6 9.8 6 8 6 5z',
+      s: 'M8.6 19.2c0-1.9 1.9-3.3 3.4-4.3 1.5 1 3.4 2.4 3.4 4.3zM9.2 6.4h5.6c-.6 1.1-1.6 2-2.8 2.9-1.2-.9-2.2-1.8-2.8-2.9z',
+    },
+    notes: { g: R(3.5, 2.5, 17, 19, 4.5), s: R(7, 7.5, 10, 2, 1) + R(7, 11, 10, 2, 1) + R(7, 14.5, 6, 2, 1) },
+    launcher: { g: R(2.5, 2.5, 8.6, 8.6, 2.8) + R(12.9, 2.5, 8.6, 8.6, 2.8) + R(2.5, 12.9, 8.6, 8.6, 2.8), s: R(12.9, 12.9, 8.6, 8.6, 2.8) },
+    weather: { g: C(15, 8.5, 5), s: 'M7.5 20.5a4.5 4.5 0 0 1-.9-8.9a6 6 0 0 1 11.3 1.6a3.7 3.7 0 0 1-.4 7.3z' },
+    video: { g: R(1.5, 4.5, 21, 15, 4.5), s: 'M9.8 8.6l6 3.4-6 3.4z' },
+    system: { g: R(4.5, 4.5, 15, 15, 3.8), s: R(8.5, 8.5, 7, 7, 1.8), w: 'M9 2v2.5M15 2v2.5M9 19.5V22M15 19.5V22M2 9h2.5M2 15h2.5M19.5 9H22M19.5 15H22' },
+    updates: { g: C(12, 12, 10), s: 'M10.6 5.5h2.8v6.3h3L12 16.6l-4.4-4.8h3z' },
+    devices: { s: R(2.5, 12.5, 5, 8, 2.2) + R(16.5, 12.5, 5, 8, 2.2), w: 'M4.5 13v-1a7.5 7.5 0 0 1 15 0v1' },
+    displays: { g: R(1.5, 3.5, 21, 14, 3.8), s: R(8, 19.5, 8, 2, 1) + C(12, 10.5, 2.4), w: 'M12 17.5v2M12 5.4v.8M12 14.8v.8M7.2 10.5h.8M16 10.5h.8' },
+    present: { g: R(1.5, 2.5, 15, 11, 3.2), s: R(6.5, 9.5, 16, 12, 3.4), k: 'M12.6 12.6l5.2 2.9-5.2 2.9z' },
+    scroll: { g: R(5.5, 2, 13, 20, 6.5), s: R(10.8, 5.5, 2.4, 5, 1.2) },
+    cursor: { g: C(15.5, 8.5, 6), s: 'M5.5 3.2v15.6l4.1-3.8 2.7 5.8 2.6-1.2-2.7-5.7 5.6-.2z' },
+    wheel: { g: C(12, 12, 10) + C(12, 12, 4.2), s: 'M12 2a10 10 0 0 1 9.5 6.9l-5.5 1.8A4.2 4.2 0 0 0 12 7.8z' },
+    tiling: { g: R(1.5, 3.5, 21, 17, 4.5), s: R(3.8, 5.8, 7.6, 12.4, 2.4) },
+    pin: { g: R(1.5, 9, 21, 12.5, 4), s: 'M9 2.5h6l-.8 5 2.8 2.8V12H7v-1.7l2.8-2.8z', w: 'M12 12v6' },
+    clipboard: { g: R(3.5, 3.5, 17, 19, 4.5), s: R(8, 1.8, 8, 4.4, 1.6) + R(7, 11, 10, 2, 1) + R(7, 14.8, 7, 2, 1) },
+    typing: { g: R(1.5, 5, 21, 15.5, 4.5), w: 'M8 18l4-9.5 4 9.5M9.4 14.6h5.2M10.3 5.9a1.7 1.7 0 0 0 3.4 0' },
+    snippets: {
+      g: R(1.5, 5, 21, 14, 4.5), s: C(12, 12, 1.2),
+      w: 'M9 8.5c-1.4 0-2 .6-2 1.8v.5c0 .7-.4 1.2-1.2 1.2.8 0 1.2.5 1.2 1.2v.5c0 1.2.6 1.8 2 1.8M15 8.5c1.4 0 2 .6 2 1.8v.5c0 .7.4 1.2 1.2 1.2-.8 0-1.2.5-1.2 1.2v.5c0 1.2-.6 1.8-2 1.8',
+    },
+    smart: { g: R(2, 11, 20, 8, 3.5), s: star(9, 9.5, 6.5) + star(18, 5, 3) },
+    translate: {
+      g: 'M4.5 2.5h9a3 3 0 0 1 3 3v5a3 3 0 0 1-3 3H8.5l-3.5 2.8V13.5h-.5a3 3 0 0 1-3-3v-5a3 3 0 0 1 3-3z',
+      s: 'M11 9.5h8.5a3 3 0 0 1 3 3v5a3 3 0 0 1-3 3H19v2.8l-3.5-2.8H11a3 3 0 0 1-3-3v-5a3 3 0 0 1 3-3z',
+      w: 'M4.8 6h5.4M7.5 4.6V6M5.5 10c1.4-.8 2.4-2 2.8-4', k: 'M12.6 18.6l2.6-6.4 2.6 6.4M13.6 16.4h3.2',
+    },
+    utilities: { g: 'M3.5 9h13v6a5 5 0 0 1-5 5h-3a5 5 0 0 1-5-5z', s: R(5.5, 21, 9, 1.8, 0.9), w: 'M16.5 11h1.2a2.6 2.6 0 0 1 0 5.2h-1.4M8 3c-.9.9.9 1.8 0 3.2M12 3c-.9.9.9 1.8 0 3.2' },
+    capture: { g: R(6, 6, 12, 12, 3.2), s: C(12, 12, 3), w: 'M2.5 8V5.5a3 3 0 0 1 3-3H8M16 2.5h2.5a3 3 0 0 1 3 3V8M21.5 16v2.5a3 3 0 0 1-3 3H16M8 21.5H5.5a3 3 0 0 1-3-3V16' },
+    vision: { g: C(7.5, 16.5, 5.5), s: 'M15.2 3.3a2.6 2.6 0 0 1 3.7 0l1.8 1.8a2.6 2.6 0 0 1 0 3.7l-2.2 2.2-5.5-5.5z', w: 'M14 7.8L6.8 15v2.2H9l7.2-7.2' },
+    download: { g: R(2.5, 13.5, 19, 8, 3.5), s: 'M10.4 2.5h3.2v7.3h3.4L12 15.3 7 9.8h3.4z' },
+  };
+})();
+
+// Glyphs for the pages this design adds, drawn the same way.
+Object.assign(GLYPHS, {
+  shelf: { g: 'M3 13h5l1.5 2.5h5L16 13h5v5.5a2.5 2.5 0 0 1-2.5 2.5h-13A2.5 2.5 0 0 1 3 18.5z', w: 'M5 13l2-8h10l2 8' },
+  media: { g: 'M2 12a10 10 0 1 0 20 0a10 10 0 1 0-20 0z', s: 'M10 8.3l6 3.7-6 3.7z' },
+  sound: { s: 'M3 9h3.5L11 5v14l-4.5-4H3z', w: 'M14.5 9a4 4 0 0 1 0 6M17 6.5a7.5 7.5 0 0 1 0 11' },
+  menubar: { g: 'M2 6a3 3 0 0 1 3-3h14a3 3 0 0 1 3 3v12a3 3 0 0 1-3 3H5a3 3 0 0 1-3-3z', s: 'M2 6a3 3 0 0 1 3-3h14a3 3 0 0 1 3 3v2H2z' },
+});
+
+// Every page of the real settings window, read from it with the sample state: sections, rows, controls.
+const DATA = {"pages":[{"id":"general","name":"Chung","sub":"Khởi động, ngôn ngữ và quyền truy cập.","master":null,"secs":[{"t":"Tính năng","items":[]},{"t":"Quyền truy cập","items":[{"k":"row","t":"Trợ năng","d":"Cần cho cuộn mượt, dán vào ứng dụng khác, chia cửa sổ và chỉ báo âm lượng.","c":[{"s":"btn","v":"Mở Cài đặt hệ thống"}]},{"k":"row","t":"Tất cả quyền","d":"Kiểm tra và cấp tất cả quyền hệ thống mà Figghost sử dụng.","c":[{"s":"btn","v":"Kiểm tra tất cả quyền…"}]},{"k":"row","t":"Thư mục dữ liệu","d":"Nơi lưu cài đặt, lịch sử clipboard và khay tệp. Mọi thứ nằm trên máy Mac này.","c":[{"s":"btn","v":"Mở thư mục"}]}]},{"t":"Khởi động","items":[{"k":"row","t":"Mở khi đăng nhập","d":"Chạy Figghost khi bạn đăng nhập. Cửa sổ này không tự mở; dùng biểu tượng trên thanh menu.","c":[{"s":"sw","on":false}]},{"k":"row","t":"Mở cửa sổ này khi khởi động","d":"Hiện Cài đặt mỗi khi bạn tự mở ứng dụng. Không bao giờ khi đăng nhập.","c":[{"s":"sw","on":true}]},{"k":"row","t":"Chào khi mở ứng dụng","d":"Mỗi khi bạn tự mở Figghost, chú ma chui ra từ notch rồi nháy mắt. Không chạy khi đăng nhập hay khi chạy nền, và chỉ khi notch đang bật.","c":[{"s":"sw","on":true}]},{"k":"row","t":"Hiện biểu tượng trên thanh menu","d":"Khi tắt, mở lại Figghost từ Finder hoặc Spotlight để vào phần cài đặt này.","c":[{"s":"sw","on":true}]}]},{"t":"Giao diện","items":[{"k":"row","t":"Cửa sổ cài đặt","d":"Sáng, tối hoặc theo hệ thống.","c":[{"s":"seg","o":["Tự động","Sáng","Tối"],"i":0}]},{"k":"row","t":"Ngôn ngữ","d":"Cửa sổ này đổi ngay. Menu và notch đổi sau khi khởi động lại.","c":[{"s":"seg","o":["Tự động","English","Tiếng Việt"],"i":2}]}]}]},{"id":"keys","name":"Phím tắt","sub":"Mọi phím Figghost dùng, gom về một chỗ. Nhấn vào một phím tắt rồi bấm tổ hợp phím mới.","master":null,"secs":[{"t":"Trong notch và cửa sổ clipboard","items":[{"k":"row","t":"Ghim hoặc bỏ ghim","d":"","c":[{"s":"key","v":"⌥P"}]},{"k":"row","t":"Đưa vào bảng kế tiếp","d":"Bảng gom các mục đã ghim phía trên danh sách clipboard.","c":[{"s":"key","v":"⌥B"}]},{"k":"row","t":"Dán theo kiểu ngược lại","d":"Giữ định dạng khi đang bật Dán không định dạng, và ngược lại.","c":[{"s":"key","v":"⌥⇧↩"}]},{"k":"row","t":"Xóa, từ chối hoặc bỏ qua","d":"Xóa mục đang chọn, từ chối yêu cầu của tác tử và bỏ qua nhắc lịch.","c":[{"s":"key","v":"⌥⌫"}]}]},{"t":"Phím chuẩn","items":[{"k":"cheats","items":[["Dán, cho phép hoặc tham gia","↩"],["Di chuyển lựa chọn","↑↓"],["Chuyển tab hoặc dán một dòng","⌘1-9"],["Dán một mục đã ghim","⌘A-Z"],["Xóa","⌘⌫"],["Đóng","Esc"]]},{"k":"custom","cls":"row-desc","v":"Dùng như ở mọi nơi trên máy Mac và giữ nguyên.","c":[]}]},{"t":"Ở mọi nơi trên máy Mac","items":[{"k":"row","t":"Mở lịch sử clipboard","d":"","c":[{"s":"key","v":"⇧⌘C"}]},{"k":"row","t":"Mở hoặc đóng notch","d":"","c":[{"s":"key","v":""}]},{"k":"row","t":"Chọn thông minh","d":"","c":[{"s":"key","v":"⌃⌥S"}]},{"k":"row","t":"Dịch","d":"","c":[{"s":"key","v":"⌃⌥⌘T"}]},{"k":"row","t":"Chọn màu","d":"","c":[{"s":"key","v":"⌃⌥⌘8"}]},{"k":"row","t":"Luôn trên cùng","d":"","c":[{"s":"key","v":"⌃⌥⌘P"}]},{"k":"row","t":"Chụp màn hình","d":"Nhiều phím tắt, đặt ở trang riêng.","c":[{"s":"btn","v":"Mở"}]},{"k":"row","t":"Chia cửa sổ","d":"Nhiều phím tắt, đặt ở trang riêng.","c":[{"s":"btn","v":"Mở"}]}]}]},{"id":"scroll","name":"Cuộn chuột","sub":"Cuộn mượt và đảo chiều cho con lăn chuột. Trackpad và Magic Mouse không bị can thiệp.","master":true,"secs":[{"t":"Con lăn chuột","items":[{"k":"row","t":"Đảo chiều con lăn","d":"Chỉ đảo con lăn của chuột. Trackpad giữ chiều tự nhiên.","c":[{"s":"sw","on":false}]}]},{"t":"Cảm giác cuộn","items":[{"k":"custom","cls":"canvas"},{"k":"custom","cls":"graph-legend"},{"k":"row","t":"Bước cuộn","d":"Quãng đường của một nấc lăn","c":[{"s":"sl","min":8,"max":120,"v":36,"step":"1","out":"36 px"}]},{"k":"row","t":"Tốc độ","d":"Hệ số nhân cho mọi lần cuộn","c":[{"s":"sl","min":0.3,"max":3,"v":1,"step":"0.05","out":"× 1.00"}]},{"k":"row","t":"Độ trượt","d":"Thời gian để chuyển động dừng hẳn","c":[{"s":"sl","min":80,"max":1000,"v":360,"step":"10","out":"360 ms"}]},{"k":"row","t":"","d":"","c":[{"s":"btn","v":"Chính xác"},{"s":"btn","v":"Cân bằng","p":true},{"s":"btn","v":"Mượt"}]}]},{"t":"Thử ngay","items":[{"k":"custom","cls":"pad-wrap"}]},{"t":"Phím bổ trợ","items":[{"k":"row","t":"⇧Shift để cuộn ngang","d":"Giữ Shift và lăn chuột để cuộn ngang, vẫn mượt.","c":[{"s":"sw","on":true}]},{"k":"row","t":"⌥Option để cuộn nhanh","d":"Giữ Option để cuộn xa gấp nhiều lần. Hợp với tài liệu dài.","c":[{"s":"pop","o":["× 2","× 3","× 5","× 8","× 12"],"i":2},{"s":"sw","on":true}]},{"k":"row","t":"⌘Command để phóng to","d":"Giữ Command và lăn chuột để phóng to hoặc thu nhỏ. Gửi Command + và Command - trong trình duyệt, trình soạn thảo và trình xem ảnh.","c":[{"s":"sw","on":false}]}]},{"t":"Ứng dụng","items":[{"k":"row","t":"Quy tắc theo ứng dụng","d":"Khi Cuộn mượt đang bật, đặt một ứng dụng sang Tắt để bỏ qua nó (danh sách chặn). Khi đang tắt, đặt ứng dụng sang Bật thì chỉ các ứng dụng đó được làm mượt (danh sách cho phép).","c":[{"s":"btn","v":"Thêm ứng dụng"}]},{"k":"list","rows":[{"t":"Xcode","d":"com.apple.dt.Xcode","c":[{"s":"pop","o":["Mặc định","Bật","Tắt"],"i":2},{"s":"pop","o":["Mặc định","Bật","Tắt"],"i":0}]},{"t":"Blender","d":"com.blender.blender","c":[{"s":"pop","o":["Mặc định","Bật","Tắt"],"i":2},{"s":"pop","o":["Mặc định","Bật","Tắt"],"i":1}]}],"empty":""}]}]},{"id":"clipboard","name":"Clipboard","sub":"Lịch sử mọi thứ bạn sao chép, tìm kiếm tức thì, ghim và phím tắt.","master":null,"secs":[{"t":"Dán","items":[{"k":"row","t":"Mở lịch sử clipboard","d":"Dùng ở mọi nơi. Cửa sổ nhỏ hiện cạnh con trỏ.","c":[{"s":"key","v":"⇧⌘C"}]},{"k":"row","t":"Dán tự động","d":"Nhấn Enter ở một mục để dán vào ứng dụng bạn đang dùng. Tắt thì chỉ sao chép.","c":[{"s":"sw","on":true}]},{"k":"row","t":"Dán không định dạng","d":"Văn bản vào ở dạng thuần. ⌥⇧↩ làm ngược lại cho một lần dán.","c":[{"s":"sw","on":false}]}]},{"t":"Lịch sử","items":[{"k":"row","t":"Số mục giữ lại","d":"Mục đã ghim không bao giờ bị xóa.","c":[{"s":"pop","o":["100","250","500","1,000","5,000","20,000"],"i":2}]},{"k":"row","t":"Hiện có trong lịch sử","d":"","c":[{"s":"val","v":"128"}]},{"k":"row","t":"Xóa lịch sử","d":"Xóa mọi mục chưa ghim.","c":[{"s":"btn","v":"Xóa","d":true}]}]},{"t":"Riêng tư","items":[{"k":"row","t":"Không ghi lại nội dung sao chép từ","d":"Trình quản lý mật khẩu và mục được đánh dấu ẩn luôn bị bỏ qua.","c":[{"s":"btn","v":"Thêm ứng dụng"}]},{"k":"list","rows":[{"t":"1Password","d":"com.1password.1password","c":[]},{"t":"Bitwarden","d":"com.bitwarden.desktop","c":[]}],"empty":""}]},{"t":"Trợ lý AI","items":[{"k":"row","t":"Cho trợ lý AI tìm trong lịch sử","d":"Chạy một máy chủ cục bộ (MCP) để Claude và các trợ lý khác tìm nội dung bạn đã sao chép. Mọi thứ trong lịch sử đều đọc được khi bật mục này.","c":[{"s":"sw","on":false}]},{"k":"custom","cls":"row block dim","v":"Thêm đoạn này vào cài đặt MCP của trợ lý:{ \"mcpServers\": { \"figghost\": { \"command\": \"/Applications/Figghost.app/Contents/MacOS/Figghost\", \"args\": [ \"--mcp\" ] } } }Sao chép cấu hình","c":[{"s":"btn","v":"Sao chép cấu hình"}]}]},{"t":"Bàn phím","items":[{"k":"cheats","items":[["Dán","↩"],["Dán theo kiểu ngược lại","⌥⇧↩"],["Ghim hoặc bỏ ghim","⌥P"],["Xóa","⌥⌫"],["Dán một mục đã ghim","⌘B…"],["Đóng","Esc"],["Bộ lọc","@image @link @code @file @pin"]]},{"k":"custom","cls":"","v":"Đổi phím","c":[{"s":"btn","v":"Đổi phím"}]}]},{"t":"Copy Stack","items":[{"k":"row","t":"Copy Stack","d":"Nhấn đúp một phím bổ trợ để bắt đầu một chồng. Khi đang chạy, mỗi lần sao chép được xếp vào hàng đợi và mỗi lần Command+V dán mục kế tiếp theo đúng thứ tự đã sao chép. Chồng kết thúc khi hết hàng đợi hoặc khi nhấn đúp lần nữa.","c":[{"s":"sw","on":false}]},{"k":"row","t":"Phím nhấn đúp","d":"Nhấn hai lần nhanh, chỉ riêng phím đó. Dùng cùng phím khác hoặc giữ lâu thì không có tác dụng.","c":[{"s":"seg","o":["Option","Command","Control","Shift"],"i":0}],"dis":1},{"k":"row","t":"Trạng thái","d":"Chỉ theo dõi Command+V. Dán từ menu hoặc bằng phím tắt khác sẽ dán nội dung đang có trong bộ nhớ tạm.","c":[{"s":"val","v":"Sẵn sàngMở Trợ năng"}]}]},{"t":"Bảng ghim","items":[{"k":"row","t":"Bảng","d":"Bảng gom các mục đã ghim và hiện thành một nhãn phía trên danh sách. ⌥B đưa mục đang chọn vào bảng kế tiếp, nhấn chuột phải vào một dòng để mở menu. Xóa bảng vẫn giữ các mục ở trạng thái đã ghim.","c":[]},{"k":"list","rows":[],"empty":"Chưa có bảng nào."},{"k":"row","t":"","d":"","c":[{"s":"btn","v":"Thêm bảng"}]}]},{"t":"Dữ liệu nhạy cảm","items":[{"k":"row","t":"Khi nội dung sao chép giống thông tin bí mật","d":"Nhận ra số thẻ, khóa API và mã thông báo, khóa riêng tư và giá trị sau nhãn mật khẩu hoặc bí mật. Nội dung từ trình quản lý mật khẩu và nội dung đánh dấu ẩn luôn bị bỏ qua, dù bạn chọn gì ở đây.","c":[{"s":"seg","o":["Không làm gì","Ẩn rồi xóa","Không lưu"],"i":0}]},{"k":"row","t":"Xóa mục bị ẩn sau","d":"Ghim một mục bị ẩn sẽ giữ nó lại.","c":[{"s":"pop","o":["1 phút","5 phút","10 phút","30 phút","1 giờ","4 giờ","1 ngày"],"i":2}],"dis":1},{"k":"row","t":"Mục bị ẩn","d":"Mục bị ẩn hiện thành dấu chấm kèm ổ khóa và không tìm kiếm được. Nhấn Return hoặc bấm vào để xem, nhấn lần nữa để dán. Không bao giờ được đưa cho trợ lý AI.","c":[]}]},{"t":"Linh vật","items":[{"k":"row","t":"Linh vật clipboard","d":"Một nhân vật pixel nhỏ chui ra từ notch để lấy thứ bạn vừa sao chép, mang các tệp bạn thêm từ Finder lên khay, và tiễn tệp khi bạn kéo chúng ra khỏi khay. Nó chỉ mang một hình đại diện, không bao giờ là nội dung bạn đã sao chép. Khi bật Giảm chuyển động, nhân vật không xuất hiện.","c":[{"s":"sw","on":false}]},{"k":"row","t":"Nhân vật","d":"Mỗi nhân vật lấy đồ theo một cách riêng: tơ, lưỡi, tia sáng, làn khói, phép thuật hoặc tia chớp. Trỏ vào hình để thấy nó vui.","c":[{"s":"seg","o":["Nhện","Ếch","UFO","Ma","Phù thủy","Mario"],"i":0}]},{"k":"row","t":"Khi tệp rời khay","d":"Bảo vệ: nhân vật hộ tống tệp tới nơi bạn thả và chào. Tiếc nuối: nó níu lại tới khi tệp đi mất, rồi vẫy tay tạm biệt.","c":[{"s":"seg","o":["Bảo vệ","Tiếc nuối"],"i":0}]},{"k":"row","t":"Xem thử","d":"Diễn một lần sao chép về phía con trỏ, kể cả khi linh vật đang tắt.","c":[{"s":"btn","v":"Thử"}]},{"k":"row","t":"Nhắm vào đâu","d":"Vào con trỏ. Khi cho phép Trợ năng (trang Chung), nó nhắm vào đoạn chữ đang chọn ở các ứng dụng cho biết vị trí của nó.","c":[{"s":"val","v":"Vào con trỏ. Khi cho phép Trợ năng (trang Chung), nó nhắm vào đoạn chữ đang chọn ở các ứng dụng cho biết vị trí của nó."}]},{"k":"row","t":"Thêm tệp từ Finder","d":"Bấm chuột phải vào tệp trong Finder và chọn Thêm vào khay Figghost, trong mục Dịch vụ hoặc Tác vụ nhanh. Dùng được cả khi linh vật đang tắt.","c":[]}]}]},{"id":"notch","name":"Notch","sub":"Bảng mọc ra từ mép trên màn hình. Khi đóng, nó cho thấy bài đang phát và việc các tác tử lập trình đang làm; rê chuột lên thì mở ra các tab.","master":true,"secs":[{"t":"Kích thước","items":[{"k":"cards","items":[{"t":"Gọn","d":"Viên đóng hẹp hơn","on":false},{"t":"Chuẩn","d":"Vừa với từng tab","on":true},{"t":"Rộng","d":"Notch mở lớn","on":false},{"t":"Tùy chỉnh","d":"Tự đặt từng kích thước","on":false}]}]},{"t":"Hành vi","items":[{"k":"row","t":"Mở khi rê chuột","d":"Đưa con trỏ lên notch để mở. Tắt thì cần nhấp chuột.","c":[{"s":"sw","on":true}]},{"k":"row","t":"Độ trễ khi rê chuột","d":"Thời gian con trỏ dừng trên notch trước khi notch mở. Trễ lâu hơn thì notch không mở nhầm khi chuột chỉ lướt qua.","c":[{"s":"pop","o":["Ngay lập tức","100 ms","200 ms","300 ms","500 ms","800 ms"],"i":3}]},{"k":"row","t":"Mở vào","d":"Tab hiện ra khi notch mở.","c":[{"s":"pop","o":["Theo hoạt động","Tab dùng gần nhất","Clipboard","Khay","Media","Tác tử","Lịch","Day progress","Video","System"],"i":0}]},{"k":"row","t":"Phản hồi xúc giác","d":"Một cú chạm nhẹ trên trackpad Force Touch khi notch mở dưới con trỏ.","c":[{"s":"sw","on":true}]},{"k":"row","t":"Mở hoặc đóng notch","d":"Phím tắt dùng ở mọi nơi. Nhấn Delete khi đang ghi để xóa.","c":[{"s":"key","v":""}]}]},{"t":"Giao diện","items":[{"k":"row","t":"Chất liệu","d":"Liquid Glass để màn hình phía sau hiện qua và khúc xạ ở mép. Khi đóng, notch vẫn màu đen như notch phần cứng.","c":[{"s":"pop","o":["Liquid Glass","Kính trong","Kính mực","Kính màu nhấn","Đen"],"i":0}]},{"k":"row","t":"Chuyển động","d":"Cách notch chuyển động khi mở, đóng và nới rộng. Giảm chuyển động trong Cài đặt hệ thống sẽ tắt chuyển động.","c":[{"s":"seg","o":["Lò xo","Mượt","Không"],"i":0}]},{"k":"row","t":"Đổ bóng","d":"Một lớp bóng mềm dưới notch khi mở.","c":[{"s":"sw","on":true}]}]},{"t":"Màn hình","items":[{"k":"row","t":"Hiển thị trên","d":"Màn hình mà notch nằm trên đó.","c":[{"s":"pop","o":["Màn hình có notch","Màn hình chính","Màn hình có con trỏ","Built-in Retina Display","Sidecar"],"i":0}]},{"k":"row","t":"Trên màn hình không có notch","d":"Hiện một khối đen ở chỗ notch, hoặc không hiện gì cho đến khi con trỏ chạm mép trên.","c":[{"s":"seg","o":["Notch","Ẩn"],"i":0}]},{"k":"row","t":"Ngày và giờ","d":"Hiện thứ, ngày và giờ trên notch khi đóng, rút gọn theo độ rộng cho phép: ở giữa pill, hoặc ở hai tai của tai thỏ thật. Khi bật, pill luôn hiện dù mục trên đang là Ẩn.","c":[{"s":"sw","on":true}]},{"k":"row","t":"Nút trước và sau","d":"Hai nút ở hai đầu ngày giờ: chuyển bài trước hoặc sau khi đang phát nhạc, nếu không thì mở tab trước hoặc sau.","c":[{"s":"sw","on":false}]},{"k":"row","t":"Hiện khi app toàn màn hình","d":"Khi tắt, notch ẩn hẳn trong lúc app phía trước đang toàn màn hình trên màn hình của notch, và hiện lại khi app đó thoát toàn màn hình.","c":[{"s":"sw","on":true}]},{"k":"row","t":"Ẩn khi chụp và quay màn hình","d":"Notch không xuất hiện trong ảnh chụp và video quay màn hình, kể cả của chính ứng dụng này.","c":[{"s":"sw","on":false}]}]},{"t":"Hoạt động trực tiếp","items":[{"k":"row","t":"Nhạc trên notch đang đóng","d":"Khi có nội dung đang phát, ở bất kỳ ứng dụng hay trình duyệt nào, notch đang đóng hiện ảnh bìa và sóng nhạc. Đưa con trỏ lên để mở trình phát.","c":[{"s":"sw","on":true}]},{"k":"row","t":"Sóng nhạc","d":"Chạy theo âm thanh máy đang phát (macOS hỏi quyền Ghi âm hệ thống một lần; không ghi lại gì), hoặc chỉ chuyển động.","c":[{"s":"seg","o":["Theo âm thanh","Chỉ chuyển động"],"i":0}]},{"k":"row","t":"Tác tử lập trình trên notch đang đóng","d":"Khi Claude Code hoặc Codex đang làm việc, notch đang đóng cho thấy điều đó cùng mức đã dùng của hạn mức năm giờ. Câu hỏi cấp quyền cũng chờ ở đó.","c":[{"s":"sw","on":true}]}]},{"t":"Các tab","items":[{"k":"row","t":"Bật, tắt và sắp xếp các tab. Command + 1 đến 9 theo đúng thứ tự này.","d":"","c":[]},{"k":"list","rows":[{"t":"Clipboard","d":"Cùng danh sách như cửa sổ nhỏ, có tìm kiếm.","c":[{"s":"sw","on":true}]},{"t":"Khay","d":"Thả tệp vào để giữ tạm và kéo ra lại. Nhấp chuột phải vào tệp để nén hoặc đổi định dạng ảnh. Chỉ lưu đường dẫn tham chiếu.","c":[{"s":"sw","on":true}]},{"t":"Media","d":"Trước, phát và sau cho mọi thứ đang phát, kể cả trình duyệt, kèm ảnh bìa, ứng dụng nguồn và thời gian.","c":[{"s":"sw","on":true}]},{"t":"Tác tử","d":"Claude Code và Codex: lệnh đang chờ bạn, các phiên đang chạy và hạn mức còn lại.","c":[{"s":"sw","on":true}]},{"t":"Lịch","d":"Hôm nay và ngày mai, các lời nhắc đến hạn và cảnh báo có nút Tham gia trước cuộc họp. Tắt cho đến khi bạn bật ở trang Lịch.","c":[{"s":"sw","on":true}]},{"t":"Day progress","d":"","c":[{"s":"sw","on":true}]},{"t":"Video","d":"","c":[{"s":"sw","on":true}]},{"t":"Weather","d":"Chưa có trong notch: tab hiện ra khi bật tính năng của nó, ở mục Tab của notch.","c":[{"s":"sw","on":true}]},{"t":"System","d":"","c":[{"s":"sw","on":true}]},{"t":"Âm thanh","d":"Âm lượng, thiết bị phát và bộ chỉnh âm cho từng ứng dụng đang phát.","c":[{"s":"sw","on":false}]}],"empty":""}]},{"t":"Khay tệp","items":[{"k":"row","t":"Tệp trên khay","d":"","c":[{"s":"val","v":"4"}]},{"k":"row","t":"Dọn khay","d":"Chỉ xóa phần tham chiếu. Tệp của bạn không bị động tới.","c":[{"s":"btn","v":"Dọn khay"}]}]},{"t":"Âm lượng","items":[{"k":"row","t":"Chỉ báo âm lượng trong notch","d":"Thay màn hình âm lượng của hệ thống. Cần quyền Trợ năng. Shift + Option để chỉnh từng bước nhỏ.","c":[{"s":"sw","on":false}]}]},{"t":"Kiểu chỉ báo","items":[{"k":"cards","items":[{"t":"Notch","d":"Màu đen, treo dưới notch.","on":true},{"t":"Liquid Glass","d":"Cùng dáng treo, bằng Liquid Glass.","on":false},{"t":"Viên góc phải","d":"Viên kính nhỏ gọn.","on":false},{"t":"Thanh mức","d":"Mức âm lượng lấp đầy hình notch.","on":false},{"t":"Viên nổi giữa","d":"Viên kính nổi.","on":false},{"t":"Thanh dọc bên phải","d":"Thanh trượt kính mảnh, dựng đứng.","on":false},{"t":"Ô lớn giữa màn hình","d":"Loa lớn và các vạch mức.","on":false},{"t":"Vòng kính tròn","d":"Vòng kính tròn có vành tiến độ.","on":false},{"t":"Thanh cân bằng","d":"Các cột sáng dần khi to lên.","on":false},{"t":"Thanh dài","d":"Viên kính dài và mảnh.","on":false}]},{"k":"row","t":"Vị trí hiển thị","d":"Dùng cho các kiểu nổi; kiểu treo vẫn nằm dưới notch.","c":[{"s":"btn","v":"Tự động"}],"dis":1},{"k":"row","t":"Thử ngay","d":"Hiện chỉ báo ngay với kiểu và vị trí đã chọn.","c":[{"s":"btn","v":"Xem thử"}],"dis":1}]},{"t":"Lời bài hát","items":[{"k":"row","t":"Hiện lời bài hát","d":"Hiện lời bài hát trên tab Media, từng dòng theo bài đang phát. Dùng được với Music và Spotify.","c":[{"s":"sw","on":false}]},{"k":"row","t":"Tải lời bài hát trực tuyến","d":"Tra lời bài hát trên lrclib.net, một dịch vụ miễn phí. Để làm việc đó, ứng dụng gửi tên nghệ sĩ, tên bài hát, tên album và độ dài bài hát tới lrclib.net, không gửi gì khác. Lời tìm được sẽ lưu trên máy Mac này nên mỗi bài chỉ hỏi một lần; bài chưa có lời sẽ được hỏi lại sau vài ngày. Khi tắt mục này, chỉ hiện những lời đã lưu sẵn.","c":[{"s":"sw","on":false}]}]},{"t":"Biểu tượng trên thanh menu","items":[{"k":"row","t":"Ẩn biểu tượng trên thanh menu","d":"Thêm một mũi tên và một vạch ngăn vào thanh menu. Các biểu tượng nằm bên trái vạch ngăn sẽ ẩn khi bạn bấm mũi tên. Mặc định tắt.","c":[{"s":"sw","on":false}]},{"k":"row","t":"Tự ẩn lại","d":"Thời gian các biểu tượng được giữ lại sau khi bạn hiện chúng.","c":[{"s":"pop","o":["Không bao giờ","Sau 5 giây","Sau 10 giây","Sau 15 giây","Sau 30 giây","Sau 60 giây","Sau 300 giây"],"i":2}],"dis":1},{"k":"row","t":"Chỉ hiện khi bấm mũi tên","d":"Khi tắt, các biểu tượng cũng hiện khi con trỏ dừng trên mũi tên.","c":[{"s":"sw","on":true}],"dis":1},{"k":"row","t":"Lúc này","d":"","c":[{"s":"btn","v":"Ẩn ngay"}]},{"k":"row","t":"Chọn biểu tượng cần ẩn","d":"Giữ phím Command và kéo một biểu tượng sang bên trái vạch ngăn (đường kẻ mảnh) để ẩn nó, hoặc sang bên phải để giữ nó luôn hiện. Ứng dụng vừa mở đặt biểu tượng ở ngoài cùng bên trái, tức là phía bị ẩn: hãy kéo nó sang một lần. Nếu mũi tên lỡ nằm ở phía bị ẩn, mục \"Hiện các biểu tượng thanh menu đã ẩn\" trong menu Fig vẫn dùng được.","c":[]},{"k":"row","t":"Những gì không làm được","d":"Các biểu tượng không còn chỗ cạnh notch sẽ do chính macOS ẩn đi và tính năng này không hiện lại được. Trên một số phiên bản macOS, độ dài lớn nhất của vạch ngăn còn dùng được phụ thuộc vào màn hình và ứng dụng đang ở phía trước, nên Figghost đo độ dài đó và kiểm tra lại sau mỗi thay đổi; nơi nào không có độ dài nào dùng được, Figghost để mọi thứ hiện và báo tại đây. Tắt tính năng hoặc thoát Figghost sẽ gỡ mũi tên và vạch ngăn, mọi biểu tượng trở lại.","c":[]}]}]},{"id":"agents","name":"Tác tử AI","sub":"Theo dõi Claude Code và Codex ngay trên notch: trả lời yêu cầu cấp quyền, xem chúng đang làm gì và còn bao nhiêu hạn mức.","master":true,"secs":[{"t":"Kết nối","items":[{"k":"row","t":"Claude Code","d":"Thêm hook vào ~/.claude/settings.json. Các hook khác của bạn được giữ nguyên.","c":[{"s":"btn","v":"Gỡ","d":true}]},{"k":"row","t":"Codex","d":"Thêm hook vào ~/.codex/hooks.json. Codex sẽ hỏi bạn xem lại hook mới ở lần chạy đầu tiên.","c":[{"s":"btn","v":"Cài"}]},{"k":"row","t":"Pi","d":"Thêm một extension vào ~/.pi/agent/extensions/figghost.ts. Pi nạp nó ở lần khởi động tiếp theo; sau đó câu hỏi của Pi trả lời được trên notch cũng như trong terminal của nó.","c":[{"s":"btn","v":"Cài"}]},{"k":"row","t":"Antigravity","d":"Thêm một hook tên figghost vào ~/.gemini/config/hooks.json, bên cạnh hook của bạn. Công cụ dòng lệnh agy khi đó hiện các phiên của nó trên notch: đang chạy, đã xong hay bị lỗi. Nó vẫn hỏi quyền trong terminal của nó như trước.","c":[{"s":"btn","v":"Cài"}]}]},{"t":"Trả lời","items":[{"k":"row","t":"Thời gian chờ câu trả lời","d":"Một lệnh chờ chừng này trên notch. Không có câu trả lời thì tác tử hỏi trong terminal của nó như bình thường.","c":[{"s":"pop","o":["10 giây","20 giây","30 giây","60 giây","100 giây"],"i":2}]},{"k":"row","t":"Mở notch khi có câu hỏi","d":"Tắt: câu hỏi chờ trên notch đang đóng, nhấp nháy nhẹ, cho đến khi bạn đưa con trỏ lên. Bật: notch tự mở ra.","c":[{"s":"sw","on":false}]},{"k":"row","t":"Phát âm thanh","d":"Khi một lệnh cần câu trả lời hoặc tác tử làm xong.","c":[{"s":"sw","on":true}]},{"k":"row","t":"Báo trên notch khi tác tử làm xong","d":"Notch đang đóng báo xong trong vài giây, không tự mở ra.","c":[{"s":"sw","on":true}]}]},{"t":"Hạn mức sử dụng","items":[{"k":"row","t":"Hạn mức Claude Code","d":"Claude Code báo mức đã dùng của hạn mức năm giờ và hạn mức tuần vào dòng trạng thái của nó. Bật mục này thì Figghost chạy ở đó trước rồi mới đến dòng trạng thái của bạn, nên giao diện vẫn như cũ. Hạn mức Codex đọc từ nhật ký phiên của nó, không cần cài gì. Nút làm mới trên tab Tác tử còn nhờ chương trình Codex cài trên máy này báo hạn mức hiện tại: Codex tự liên hệ OpenAI như mỗi lần bạn dùng nó, còn Figghost không gửi gì và không đọc thông tin đăng nhập của Codex.","c":[{"s":"btn","v":"Bật"}]}]},{"t":"Tài khoản","items":[{"k":"row","t":"Tài khoản trong Orca","d":"Các tài khoản Claude Code và Codex bạn lưu trong Orca. Chuyển sang một tài khoản sẽ chép thông tin đăng nhập của nó cho lệnh claude (hoặc codex), sau khi giữ riêng một bản của tài khoản lệnh đang dùng để nút Khôi phục đặt lại.","c":[]},{"k":"list","rows":[{"t":"work@example.com","d":"work · Max 20x · Claude Code","c":[]},{"t":"home@example.com","d":"home · Pro · Claude Code","c":[{"s":"btn","v":"Chuyển"}]},{"t":"codex@example.com","d":"Codex","c":[{"s":"btn","v":"Chuyển"}]}],"empty":""},{"k":"row","t":"Hạn mức của từng tài khoản","d":"Nút Làm mới hỏi Anthropic hạn mức của từng tài khoản Claude bằng chính thông tin đăng nhập của nó, đọc từ Keychain; macOS hỏi bạn trước khi cho Figghost đọc. Sau đó hạn mức được hỏi lại mỗi năm phút khi trang này đang mở. Figghost không bao giờ tự gia hạn thông tin đăng nhập đã hết hạn, vì làm vậy sẽ đăng xuất Orca; con số hiện lại khi Orca hoặc Claude Code đã gia hạn.","c":[{"s":"btn","v":"Làm mới"}]},{"k":"row","t":"Khôi phục tài khoản Claude Code trước đó","d":"Đặt lại thông tin đăng nhập mà lệnh dùng trước lần chuyển gần nhất.","c":[{"s":"btn","v":"Khôi phục"}]}]},{"t":"Token và chi phí","items":[{"k":"row","t":"Đếm token và chi phí","d":"Đọc từ các bản ghi hội thoại Claude Code và Codex lưu trên máy Mac này; không gửi đi đâu. Chi phí là số tiền nếu làm cùng việc đó qua API theo bảng giá niêm yết của Anthropic. Gói đăng ký tính phí cố định nên đây không phải khoản bị trừ.","c":[{"s":"sw","on":true}]},{"k":"list","rows":[{"t":"Claude Code","d":"Hôm nay 1,24 Tr token · 3,45 US$","c":[]},{"t":"Codex","d":"Hôm nay 380 N token","c":[]}],"empty":""}]},{"t":"Cần biết","items":[{"k":"row","t":"Ứng dụng khác cũng trả lời yêu cầu cấp quyền","d":"Nếu một ứng dụng khác, như OneNotch, cũng trả lời các yêu cầu này thì cả hai cùng hỏi và câu trả lời đầu tiên được dùng. Hãy tắt một trong hai.","c":[]}]}]},{"id":"smart","name":"Chọn thông minh","sub":"Chọn văn bản ở bất kỳ đâu rồi nhấn phím tắt để xem nó được quy đổi: đơn vị, tiền tệ và giờ, cùng bản dịch của văn bản khác.","master":true,"secs":[{"t":"","items":[{"k":"row","t":"Phím tắt","d":"Dùng ở mọi ứng dụng. Enter sao chép câu trả lời đang chọn, Escape đóng cửa sổ.","c":[{"s":"key","v":"⌃⌥S"}]},{"k":"row","t":"Đọc phần đang chọn","d":"Cần quyền Trợ năng. Với ứng dụng không chia sẻ phần đang chọn, văn bản được sao chép trong giây lát: clipboard được trả lại như cũ và lịch sử không ghi lại.","c":[{"s":"btn","v":"Mở cài đặt"}]},{"k":"row","t":"Thử ngay","d":"Hiện kết quả cho \"5 km\" cạnh con trỏ, không cần chọn gì.","c":[{"s":"btn","v":"Thử ngay"}]}]},{"t":"Internet","items":[{"k":"row","t":"Dùng internet","d":"Quy đổi tiền theo tỷ giá trong ngày và dịch văn bản khác. Tỷ giá được tải từ open.er-api.com và không gửi gì về bạn hay văn bản của bạn. Khi dịch, đoạn văn bản đang chọn được gửi tới api.mymemory.translated.net. Mặc định tắt.","c":[{"s":"sw","on":true}]},{"k":"row","t":"Dịch sang","d":"Ngôn ngữ mà bản dịch hướng tới.","c":[{"s":"pop","o":["Theo ứng dụng","English","Tiếng Việt"],"i":0}]},{"k":"row","t":"Tỷ giá","d":"Cập nhật 15 thg 10, 2026","c":[{"s":"val","v":"Cập nhật 15 thg 10, 2026"}]}]},{"t":"Hiển thị gì","items":[{"k":"row","t":"Tiền tệ","d":"Số tiền được quy đổi sang các loại này. Mã ba chữ cái, cách nhau bằng dấu cách, tối đa sáu.","c":[{"s":"field","v":"USD EUR VND","ph":"USD EUR VND"}]},{"k":"row","t":"Múi giờ","d":"Một giờ như 3pm PST cũng được hiện theo múi giờ của bạn và các múi giờ này. Tên như Asia/Tokyo hoặc UTC, cách nhau bằng dấu cách, tối đa sáu.","c":[{"s":"field","v":"UTC America/New_York Europe/London Asia/Tokyo","ph":"Asia/Tokyo UTC"}]}]},{"t":"Nó hiểu những gì","items":[{"k":"row","t":"Đơn vị","d":"Chiều dài, khối lượng, thể tích, diện tích, tốc độ, nhiệt độ và dung lượng dữ liệu, giữa hệ mét và hệ Anh Mỹ.","c":[]},{"k":"row","t":"Tiền","d":"Số tiền như $100, 50 EUR hay 5tr đ, sang các loại tiền ở trên.","c":[]},{"k":"row","t":"Giờ","d":"Giờ như 3pm PST, 15:30 UTC+7 hay 9am in Tokyo.","c":[]},{"k":"row","t":"Văn bản","d":"Mọi văn bản khác sẽ được dịch khi bật internet.","c":[]}]}]},{"id":"translate","name":"Dịch","sub":"Chọn văn bản ở bất kỳ đâu rồi nhấn phím tắt: một cửa sổ kính cạnh con trỏ sẽ dịch nó sang ngôn ngữ bạn chọn.","master":true,"secs":[{"t":"","items":[{"k":"row","t":"Phím tắt","d":"Dùng ở mọi ứng dụng. Enter hoặc nhấp chuột để sao chép bản dịch, Escape đóng cửa sổ.","c":[{"s":"key","v":"⌃⌥⌘T"}]},{"k":"row","t":"Đọc phần đang chọn","d":"Cần quyền Trợ năng. Với ứng dụng không chia sẻ phần đang chọn, văn bản được sao chép trong giây lát: clipboard được trả lại như cũ và lịch sử không ghi lại.","c":[{"s":"btn","v":"Mở cài đặt"}]},{"k":"row","t":"Thử ngay","d":"Dịch một câu mẫu cạnh con trỏ, không cần chọn gì.","c":[{"s":"btn","v":"Thử ngay"}]}]},{"t":"Đầu ra","items":[{"k":"row","t":"Dịch sang","d":"Ngôn ngữ mà bản dịch hướng tới. Ngôn ngữ của văn bản được tự nhận biết. Tối đa 450 ký tự mỗi lần.","c":[{"s":"pop","o":["Theo ứng dụng","English","Tiếng Việt"],"i":0}]},{"k":"row","t":"Kiểu cửa sổ","d":"Chất liệu kính của cửa sổ bản dịch.","c":[{"s":"pop","o":["Liquid Glass","Kính trong","Kính mực","Kính màu nhấn"],"i":0}]}]}]},{"id":"capture","name":"Chụp màn hình","sub":"Vùng, cửa sổ và màn hình, chữ, trang dài, và video hoặc GIF của màn hình.","master":true,"secs":[{"t":"","items":[{"k":"row","t":"Quyền Ghi màn hình","d":"Đã cho phép.","c":[{"s":"val","v":"Cho phép..."}]}]},{"t":"Sau khi chụp","items":[{"k":"row","t":"Lưu vào thư mục","d":"Tắt thì ảnh chụp nằm trong thư mục tạm, chỉ dùng cho bảng xem nhanh.","c":[{"s":"sw","on":true}]},{"k":"row","t":"Thư mục","d":"/Users/someone/Desktop","c":[{"s":"btn","v":"Mở"}]},{"k":"row","t":"Sao chép","d":"Ảnh vào bộ nhớ tạm dạng ảnh, bản quay dạng tệp.","c":[{"s":"sw","on":true}]},{"k":"row","t":"Bảng xem nhanh","d":"Ảnh nhỏ ở góc màn hình với Sao chép, Lưu, Sửa và Ghim. Kéo ảnh vào ứng dụng khác để thả tệp vào đó.","c":[{"s":"sw","on":true}]},{"k":"row","t":"Bảng xem nhanh ở lại","d":"","c":[{"s":"sl","min":0,"max":30,"v":8,"step":"1","out":"8 giây"}]},{"k":"row","t":"Đếm ngược khi chụp hẹn giờ","d":"","c":[{"s":"sl","min":1,"max":30,"v":5,"step":"1","out":"5 giây"}]}]},{"t":"Phím tắt","items":[{"k":"row","t":"Vùng hoặc cửa sổ","d":"","c":[{"s":"key","v":"⇧⌘2"}]},{"k":"row","t":"Cửa sổ","d":"","c":[{"s":"key","v":""}]},{"k":"row","t":"Cả màn hình","d":"","c":[{"s":"key","v":""}]},{"k":"row","t":"Cả màn hình sau khi đếm ngược","d":"","c":[{"s":"key","v":""}]},{"k":"row","t":"Sao chép chữ trong một vùng","d":"","c":[{"s":"key","v":"⇧⌘1"}]},{"k":"row","t":"Chụp cuộn","d":"","c":[{"s":"key","v":""}]},{"k":"row","t":"Quay màn hình, bấm lại để dừng","d":"","c":[{"s":"key","v":""}]},{"k":"row","t":"Quay GIF, bấm lại để dừng","d":"","c":[{"s":"key","v":""}]},{"k":"row","t":"Chụp lại, cùng kiểu với lần trước","d":"","c":[{"s":"key","v":""}]},{"k":"row","t":"Mở thư mục chứa ảnh chụp","d":"","c":[{"s":"key","v":""}]}]},{"t":"Quay màn hình","items":[{"k":"row","t":"Âm thanh máy tính","d":"Âm thanh các ứng dụng phát ra, theo cài đặt của tab Âm thanh.","c":[{"s":"sw","on":false}]},{"k":"row","t":"Micrô","d":"macOS hỏi quyền ở lần đầu.","c":[{"s":"sw","on":false}]},{"k":"row","t":"Camera","d":"Một bong bóng tròn ở góc bản quay; kéo để di chuyển.","c":[{"s":"sw","on":false}]},{"k":"row","t":"Hiện cú nhấp chuột","d":"Một vòng tròn ở chỗ nhấp chuột.","c":[{"s":"sw","on":true}]},{"k":"row","t":"Hiện phím tắt đã bấm","d":"Phím tắt và các phím như Return hiện ở phía dưới. Chữ gõ thường không bao giờ hiện, nên mật khẩu không lọt vào bản quay.","c":[{"s":"sw","on":false}]}]}]},{"id":"vision","name":"Chọn màu","sub":"Trỏ vào bất kỳ điểm ảnh nào trên màn hình, xem phóng to và chép mã màu.","master":false,"secs":[{"t":"Phím tắt và dạng mã màu","items":[{"k":"row","t":"Phím tắt","d":"Bắt đầu chọn màu từ bất kỳ ứng dụng nào.","c":[{"s":"key","v":"⌃⌥⌘8"}],"dis":1},{"k":"row","t":"Dạng mã màu","d":"Dạng mã màu khi bắt đầu chọn. Nhấn Tab khi đang chọn để thử các dạng khác.","c":[{"s":"seg","o":["HEX","RGB","HSL","HSB"],"i":0}],"dis":1}]},{"t":"Ghi màn hình","items":[{"k":"row","t":"Quyền Ghi màn hình","d":"Đọc điểm ảnh của ứng dụng khác cần quyền này. Sau khi bạn cho phép, macOS có thể yêu cầu thoát và mở lại Figghost.","c":[{"s":"btn","v":"Cho phép"}]}]},{"t":"Hình ảnh","items":[{"k":"row","t":"Xóa nền","d":"Bấm chuột phải vào một ảnh trên khay tệp và chọn Xóa nền. Một tệp PNG mới có nền trong suốt được tạo cạnh tệp gốc. Cần macOS 14 trở lên.","c":[{"s":"val","v":"Có sẵn"}]}]}]},{"id":"calendar","name":"Lịch","sub":"Sự kiện, lời nhắc và báo cuộc họp trên notch.","master":false,"secs":[{"t":"Báo cuộc họp","items":[{"k":"row","t":"Báo trước cuộc họp","d":"Notch mở ra vài giây trước khi sự kiện bắt đầu một khoảng thời gian như vậy.","c":[{"s":"pop","o":["1 phút","2 phút","5 phút","10 phút","15 phút","30 phút","60 phút"],"i":2}],"dis":1},{"k":"row","t":"Phát âm thanh","d":"Một âm thanh ngắn của hệ thống cho mỗi lần báo.","c":[{"s":"sw","on":true}],"dis":1}]},{"t":"Hiển thị gì","items":[{"k":"row","t":"Gồm cả lời nhắc","d":"Lời nhắc đến hạn trong ngày mai hoặc đã quá hạn, mỗi mục có nút hoàn thành.","c":[{"s":"sw","on":true}],"dis":1},{"k":"row","t":"Gồm cả sự kiện cả ngày","d":"Ngày lễ và sinh nhật được liệt kê nhưng không bao giờ báo.","c":[{"s":"sw","on":true}],"dis":1}]},{"t":"Quyền truy cập","items":[{"k":"row","t":"Lịch","d":"Cần để đọc các sự kiện của bạn.","c":[{"s":"btn","v":"Cho phép truy cập"}]},{"k":"row","t":"Lời nhắc","d":"Cần để liệt kê các lời nhắc của bạn.","c":[{"s":"btn","v":"Cho phép truy cập"}]}]},{"t":"Lịch được dùng","items":[{"k":"custom","cls":"cal-list","v":"Hãy bật tính năng và cho phép truy cập để liệt kê các lịch của bạn.","c":[]}]},{"t":"Danh sách lời nhắc được dùng","items":[{"k":"custom","cls":"cal-list","v":"Hãy bật lời nhắc và cho phép truy cập để liệt kê các danh sách lời nhắc.","c":[]}]},{"t":"Quyền riêng tư","items":[{"k":"row","t":"Ở lại trên máy này","d":"Sự kiện và lời nhắc được đọc từ hệ thống và không gửi đi đâu. Thay đổi duy nhất của Figghost là đánh dấu hoàn thành một lời nhắc khi bạn bấm nút của nó. Liên kết cuộc họp chỉ mở cho Zoom, Google Meet, Microsoft Teams và Webex, qua https.","c":[]}]}]},{"id":"pin","name":"Luôn trên cùng","sub":"Nhấn phím tắt để cửa sổ đang ở phía trước luôn nằm trên mọi cửa sổ khác, có viền đỏ bao quanh. Nhấn lần nữa để thả ra.","master":true,"secs":[{"t":"","items":[{"k":"row","t":"Phím tắt","d":"Giữ cửa sổ đang ở phía trước trên cùng, hoặc thả cửa sổ đang được giữ. Dùng ở mọi ứng dụng. Nhấn Delete khi đang ghi phím để xóa.","c":[{"s":"key","v":"⌃⌥⌘P"}]},{"k":"row","t":"Cửa sổ trên cùng","d":"","c":[{"s":"btn","v":"Thả ra"}]}]},{"t":"Quyền truy cập","items":[{"k":"row","t":"Trợ năng","d":"Tìm cửa sổ đang ở phía trước, và đưa cửa sổ thật lên trước khi bạn bấm vào ảnh của nó.","c":[{"s":"btn","v":"Mở cài đặt"}]},{"k":"row","t":"Ghi màn hình","d":"Chụp ảnh cửa sổ đã ghim khi nó bị che. Ảnh chỉ nằm trong bộ nhớ; không có gì được lưu hay gửi đi. Sau khi bạn cho phép, macOS có thể yêu cầu thoát và mở lại Figghost.","c":[{"s":"btn","v":"Cho phép"}]}]}]},{"id":"cursor","name":"Con trỏ","sub":"Cho con trỏ chuột một diện mạo riêng: mũi tên cầu vồng, nhân vật pixel biết chớp mắt, hoặc bất kỳ ảnh hay GIF nào bạn chọn.","master":true,"secs":[{"t":"Diện mạo","items":[{"k":"row","t":"Hình","d":"Nhân vật đứng yên và chớp mắt, rồi hớn hở khi bạn trỏ vào liên kết.","c":[{"s":"val","v":"Mũi tên cầu vồngNhệnẾchUFOMaPhù thủyMarioHình của bạn"}]},{"k":"row","t":"Hình của riêng bạn","d":"GIF hoặc PNG động sẽ chạy đúng như vậy; ảnh khác đứng yên. Nền trong suốt dùng được.","c":[{"s":"btn","v":"Chọn hình"}]},{"k":"row","t":"Điểm nhấp chuột","d":"Vị trí trên hình nơi cú nhấp được tính.","c":[{"s":"seg","o":["Góc trên trái","Giữa"],"i":0}],"dis":1}]},{"t":"Kích thước và tốc độ","items":[{"k":"row","t":"Kích thước","d":"Chiều rộng của con trỏ, tính bằng point. Mũi tên của hệ thống khoảng 17.","c":[{"s":"sl","min":16,"max":96,"v":32,"step":"2","out":"32 pt"}]},{"k":"row","t":"Tốc độ","d":"Tốc độ chạy của hoạt ảnh.","c":[{"s":"sl","min":0.25,"max":3,"v":1,"step":"0.05","out":"1.0x"}]},{"k":"row","t":"Hiển thị ở đâu","d":"Trên mọi ứng dụng khác. Cửa sổ này giữ con trỏ của hệ thống khi nó ở phía trước, vì macOS chỉ cho chương trình tự vẽ con trỏ theo cách đó, nên hãy nhìn sang cửa sổ khác để thấy thay đổi.","c":[]}]}]},{"id":"musicwidget","name":"Widget nhạc","sub":"Trình phát bằng Liquid Glass nổi trên màn hình, hiện ảnh bìa, tên bài và các nút điều khiển của bất kỳ thứ gì đang phát. Kéo đến chỗ bạn thích và kéo góc để đổi kích thước.","master":false,"secs":[{"t":"Kiểu","items":[{"k":"cards","items":[{"t":"Thẻ","d":"Ảnh bìa, tên bài, thanh tiến độ và các nút.","on":true},{"t":"Ảnh bìa","d":"Ảnh bìa lớn, tên bài nằm dưới chân.","on":false},{"t":"Viên thuốc","d":"Một hàng mảnh.","on":false},{"t":"Đĩa than","d":"Đĩa quay khi đang phát.","on":false},{"t":"Tối giản","d":"Chỉ tên bài và một nút.","on":false}]}]},{"t":"Kính","items":[{"k":"row","t":"Chất liệu","d":"Màn hình nền lộ ra qua kính nhiều hay ít.","c":[{"s":"pop","o":["Liquid Glass","Kính trong","Kính tối","Kính màu nhấn"],"i":0}],"dis":1},{"k":"row","t":"Ánh sáng từ ảnh bìa","d":"Ảnh bìa mờ nhẹ tỏa sáng sau các nút và lấy màu của bài nhạc.","c":[{"s":"sw","on":true}],"dis":1},{"k":"row","t":"Độ đậm","d":"Widget đặc đến đâu.","c":[{"s":"sl","min":0.3,"max":1,"v":1,"step":"0.05","out":"100%"}]}]},{"t":"Vị trí và kích thước","items":[{"k":"row","t":"Nằm ở","d":"Nổi phía trước hay phía sau các cửa sổ của bạn.","c":[{"s":"pop","o":["Trên màn hình nền, dưới cửa sổ","Trên cửa sổ","Trên mọi thứ, cả toàn màn hình","Trên màn hình khóa"],"i":1}],"dis":1},{"k":"row","t":"Ẩn khi không phát gì","d":"Widget biến mất cho đến khi nhạc phát. Tắt thì giữ nó trên màn hình kèm một dòng ghi chú.","c":[{"s":"sw","on":true}],"dis":1},{"k":"row","t":"Chiều rộng","d":"Bạn cũng có thể kéo góc của widget.","c":[{"s":"sl","min":180,"max":700,"v":180,"step":"10","out":"Mặc định của kiểu"}]},{"k":"row","t":"Chiều cao","d":"Các kiểu mảnh không cần cao.","c":[{"s":"sl","min":56,"max":600,"v":56,"step":"10","out":"Mặc định của kiểu"}]},{"k":"row","t":"Về như ban đầu","d":"Đặt lại ở chân màn hình với kích thước của kiểu đang chọn.","c":[{"s":"btn","v":"Đặt lại vị trí và kích thước"}],"dis":1}]}]},{"id":"wheel","name":"Vòng kéo thả","sub":"Kéo tệp từ Finder, chạm một phím, rồi thả vào một ô để chuyển đổi, nén hoặc gửi chúng.","master":true,"secs":[{"t":"","items":[{"k":"row","t":"Chuyển định dạng","d":"Chuyển tệp sang định dạng khác: ảnh, video, âm thanh, PDF và tài liệu, còn tệp hay thư mục bất kỳ sang ZIP, TAR hoặc TGZ.","c":[{"s":"sw","on":true}]},{"k":"row","t":"Phím","d":"Chạm riêng phím này trong lúc kéo, hoặc chọn Phím khác rồi nhấn phím bạn muốn. Hai vòng đang bật không dùng chung một phím. Phím Option đứng riêng vẫn chỉ là kéo để sao chép, trừ khi có vòng dùng nó, còn Esc luôn kết thúc việc kéo.","c":[{"s":"seg","o":["⇧ Shift","⌘ Command","⌃ Control","⌥ Option"],"i":0},{"s":"btn","v":"Phím khác…"}]},{"k":"row","t":"Các ô","d":"Chọn những ô vòng này được phép hiện. Vòng chỉ hiện các ô phù hợp với mọi tệp bạn kéo. Ô mới ở bản sau sẽ xuất hiện ở đây ở trạng thái bật.","c":[]},{"k":"custom","cls":"wheel-body","v":"ẢnhPNGJPEGHEICTIFFAVIFGIFBMPPDFVideoMP4MOVGIFM4AÂm thanhM4AWAVAIFFFLACCAFAACPDFPNGJPEGTài liệuDOCXDOCRTFODTHTMLTXTPDFMọi tệpZIPTARTGZHiện 25 trên 25Hiện tất cả","c":[{"s":"btn","v":"Hiện tất cả"}]},{"k":"row","t":"Công cụ","d":"Làm ảnh, video và âm thanh nhỏ lại, xóa metadata, tách nền, chép chữ trong ảnh, chú thích ảnh, và gộp hoặc tách PDF.","c":[{"s":"sw","on":true}]},{"k":"row","t":"Phím","d":"Chạm riêng phím này trong lúc kéo, hoặc chọn Phím khác rồi nhấn phím bạn muốn. Hai vòng đang bật không dùng chung một phím. Phím Option đứng riêng vẫn chỉ là kéo để sao chép, trừ khi có vòng dùng nó, còn Esc luôn kết thúc việc kéo.","c":[{"s":"seg","o":["⇧ Shift","⌘ Command","⌃ Control","⌥ Option"],"i":1},{"s":"btn","v":"Phím khác…"}]},{"k":"row","t":"Các ô","d":"Chọn những ô vòng này được phép hiện. Vòng chỉ hiện các ô phù hợp với mọi tệp bạn kéo. Ô mới ở bản sau sẽ xuất hiện ở đây ở trạng thái bật.","c":[]},{"k":"custom","cls":"wheel-body","v":"ẢnhNénMột nửa kích thướcMột phần tư kích thướcXóa metadataTách nềnChép chữ từ ảnhChú thíchVideoThu nhỏ xuống 1080pThu nhỏ xuống 720pThu nhỏ xuống 540pXóa metadataÂm thanhNénPDFGộp PDFTách thành từng trangHiện 11 trên 12Hiện tất cả","c":[{"s":"btn","v":"Hiện tất cả"}]},{"k":"row","t":"Thao tác","d":"Chép đường dẫn hoặc tệp, gửi bằng AirDrop, mở Terminal tại thư mục, hiện trong Finder, hoặc đưa tệp lên khay.","c":[{"s":"sw","on":true}]},{"k":"row","t":"Phím","d":"Chạm riêng phím này trong lúc kéo, hoặc chọn Phím khác rồi nhấn phím bạn muốn. Hai vòng đang bật không dùng chung một phím. Phím Option đứng riêng vẫn chỉ là kéo để sao chép, trừ khi có vòng dùng nó, còn Esc luôn kết thúc việc kéo.","c":[{"s":"seg","o":["⇧ Shift","⌘ Command","⌃ Control","⌥ Option"],"i":2},{"s":"btn","v":"Phím khác…"}]},{"k":"row","t":"Các ô","d":"Chọn những ô vòng này được phép hiện. Vòng chỉ hiện các ô phù hợp với mọi tệp bạn kéo. Ô mới ở bản sau sẽ xuất hiện ở đây ở trạng thái bật.","c":[]},{"k":"custom","cls":"wheel-body","v":"Mọi tệpChép đường dẫnChép tệpAirDropMở Terminal tại đâyHiện trong FinderĐưa lên khayHiện 6 trên 6Hiện tất cả","c":[{"s":"btn","v":"Hiện tất cả"}]}]}]},{"id":"mole","name":"Mole","sub":"Sức khỏe của máy Mac và những gì có thể dọn. Danh sách tự hiện ra; chọn nhiều dòng rồi xóa cùng lúc.","master":null,"secs":[{"t":"Sức khỏe","items":[{"k":"custom","cls":"mole-hero","v":"--Điểm sức khỏeĐang đọcTrực tiếpLàm mới tất cả0%CPU0%Bộ nhớ0%Ổ đĩa0%Đồ họa","c":[{"s":"btn","v":"Làm mới tất cả"}]},{"k":"custom","cls":"mole-tiles","v":"CPU0%Bộ nhớỨng dụng 0 BHệ thống ghim 0 BBị nén 0 BMạng0 B/sTải lên 0 B/sTải xuống 0 B/sTải lên 0 B/sỔ đĩa0%Nhiệt và nguồnNgốn CPU nhấtKhông có gì đang chạy nặng.Ngốn bộ nhớ nhấtKhông có gì đang chạy nặng.","c":[]}]},{"t":"Bộ nhớ đệm và nhật ký","items":[{"k":"row","t":"Giải phóng dung lượng","d":"Bộ nhớ đệm của ứng dụng và trình duyệt, nhật ký, bộ nhớ đệm cho lập trình và Thùng rác. Chúng bị xóa hẳn, không vào Thùng rác; ứng dụng sẽ tự tạo lại khi cần.","c":[]},{"k":"custom","cls":"mole-toolbar","v":"Đang quét...Dọn mục đã chọn","c":[{"s":"btn","v":"Dọn mục đã chọn","d":true}]},{"k":"custom","cls":"mole-list","v":"Đang quét...","c":[]}]},{"t":"Thư mục build cũ","items":[{"k":"row","t":"Thư mục build của dự án","d":"node_modules, target, build, .venv, bin, obj và các thư mục tương tự mà công cụ dựng lại được, tìm trong các thư mục dự án thông dụng.","c":[]},{"k":"custom","cls":"mole-toolbar","v":"Đang quét...Xóa mục đã chọn","c":[{"s":"btn","v":"Xóa mục đã chọn","d":true}]},{"k":"custom","cls":"mole-list","v":"Đang quét...","c":[]}]},{"t":"Bộ cài","items":[{"k":"row","t":"Tệp cài đặt cũ","d":"Các tệp .dmg, .pkg, .iso và .xip trong Downloads, Desktop và Documents.","c":[]},{"k":"custom","cls":"mole-toolbar","v":"Đang quét...Chuyển vào Thùng rác","c":[{"s":"btn","v":"Chuyển vào Thùng rác","d":true}]},{"k":"custom","cls":"mole-list","v":"Đang quét...","c":[]}]},{"t":"Gỡ ứng dụng","items":[{"k":"row","t":"Ứng dụng cùng phần còn sót","d":"Mỗi ứng dụng và những gì nó để lại trong Library được chuyển vào Thùng rác cùng lúc nên có thể khôi phục. Hãy thoát ứng dụng trước khi gỡ.","c":[]},{"k":"custom","cls":"mole-toolbar","v":"Đang quét...Gỡ mục đã chọn","c":[{"s":"btn","v":"Gỡ mục đã chọn","d":true}]},{"k":"custom","cls":"mole-list","v":"Đang quét...","c":[]}]},{"t":"Docker","items":[{"k":"row","t":"Tài nguyên Docker","d":"Những gì Docker giữ: container cùng log, image, volume, network và build cache.","c":[]},{"k":"custom","cls":"mole-free","v":"Đang quét...","c":[]},{"k":"custom","cls":"mole-toolbar","v":"Xóa toàn bộ logDọn phần không dùngXóa build cache","c":[]}]},{"t":"Dung lượng ổ đĩa","items":[{"k":"row","t":"Cái gì chiếm chỗ","d":"Mục lớn nhất xếp trước. Mở một thư mục để xem bên trong; mục đã chọn được chuyển vào Thùng rác.","c":[]},{"k":"custom","cls":"","v":"nullLên trênThư mục nhà","c":[{"s":"btn","v":"Lên trên"},{"s":"btn","v":"Thư mục nhà"}]},{"k":"custom","cls":"mole-toolbar","v":"Đang quét...Chuyển vào Thùng rác","c":[{"s":"btn","v":"Chuyển vào Thùng rác","d":true}]},{"k":"custom","cls":"mole-list","v":"Đang quét...","c":[]}]}]},{"id":"islands","name":"Đảo trạng thái","sub":"Thông báo nhỏ hiện ra từ notch đang đóng trong chốc lát: Caps Lock, sạc, pin đầy hoặc yếu, ổ đĩa, tệp tải xong, camera hay micro đang được dùng.","master":true,"secs":[{"t":"Những thông báo nào","items":[{"k":"row","t":"Caps Lock","d":"Một thông báo mỗi lần bật hoặc tắt.","c":[{"s":"btn","v":"Xem thử"},{"s":"sw","on":true}]},{"k":"row","t":"Sạc và pin","d":"Khi cắm hoặc rút sạc, và khi pin đầy hoặc yếu.","c":[{"s":"btn","v":"Xem thử"},{"s":"sw","on":true}]},{"k":"row","t":"Ổ đĩa","d":"Khi một ổ đĩa được cắm vào hoặc tháo ra. Ổ đang cắm có thể tháo từ bảng ở thanh menu.","c":[{"s":"btn","v":"Xem thử"},{"s":"sw","on":true}]},{"k":"row","t":"Tải xong","d":"Khi một tệp trong thư mục Downloads đã ngừng lớn thêm. Chỉ xem tên và dung lượng.","c":[{"s":"btn","v":"Xem thử"},{"s":"sw","on":true}]},{"k":"row","t":"Camera","d":"Nằm trên notch khi có ứng dụng đang dùng camera. Chỉ báo là có, không nói ứng dụng nào.","c":[{"s":"btn","v":"Xem thử"},{"s":"sw","on":true}]},{"k":"row","t":"Micro","d":"Nằm trên notch khi có ứng dụng đang dùng micro. Chỉ báo là có, không nói ứng dụng nào.","c":[{"s":"btn","v":"Xem thử"},{"s":"sw","on":true}]}]},{"t":"Pin","items":[{"k":"row","t":"Đầy ở mức","d":"Báo pin đầy khi đạt mức sạc này lúc đang cắm sạc.","c":[{"s":"sl","min":80,"max":100,"v":100,"step":"1","out":"100%"}]},{"k":"row","t":"Yếu ở mức","d":"Báo pin yếu khi tụt xuống mức này lúc dùng pin.","c":[{"s":"sl","min":5,"max":30,"v":20,"step":"1","out":"20%"}]}]},{"t":"Thời gian","items":[{"k":"row","t":"Thông báo hiện bao lâu","d":"Thông báo camera và micro ở lại chừng nào còn được dùng.","c":[{"s":"sl","min":2,"max":10,"v":3.5,"step":"0.5","out":"3.5 s"}]}]}]},{"id":"utilities","name":"Tiện ích","sub":"Giữ máy luôn thức, tắt tiếng micro cho mọi ứng dụng cùng lúc, khóa bàn phím khi bạn lau nó, và tạm tắt notch.","master":true,"secs":[{"t":"Giữ thức","items":[{"k":"row","t":"Giữ máy luôn thức","d":"Không cho máy tự ngủ, chừng nào Figghost còn chạy. Đóng nắp máy vẫn làm máy ngủ.","c":[{"s":"btn","v":"Dừng"}]},{"k":"row","t":"Thời lượng khi dùng phím tắt","d":"Giữ thức bao lâu khi bắt đầu bằng phím tắt hoặc nút. Bảng ở thanh menu có đủ các mức.","c":[{"s":"pop","o":["15 phút","30 phút","1 giờ","2 giờ","4 giờ","Đến khi tôi tắt"],"i":2}]},{"k":"row","t":"Giữ cả màn hình sáng","d":"Tắt thì màn hình có thể tự tắt trong khi máy vẫn thức.","c":[{"s":"sw","on":true}]},{"k":"row","t":"Phím tắt","d":"Bắt đầu hoặc dừng. Nhấn Delete khi đang ghi phím để xóa.","c":[{"s":"key","v":""}]}]},{"t":"Micro","items":[{"k":"row","t":"Tắt tiếng micro","d":"Tắt tiếng chính micro, nên mọi ứng dụng họp đều không nghe thấy gì và không phải tìm nút nào.","c":[{"s":"btn","v":"Tắt tiếng"}]},{"k":"row","t":"Phím tắt","d":"Bắt đầu hoặc dừng. Nhấn Delete khi đang ghi phím để xóa.","c":[{"s":"key","v":"⌃⌥⌘M"}]}]},{"t":"Tạm tắt notch","items":[{"k":"row","t":"Tạm tắt notch","d":"Notch thôi mở ra khi con trỏ chạm mép trên màn hình, để bạn thuyết trình hay chơi game. Bấm vào notch, và mọi thứ cần bạn trả lời như một tác tử lập trình đang chờ, vẫn mở được nó.","c":[{"s":"btn","v":"Tạm tắt"}]},{"k":"row","t":"Thời gian tạm tắt","d":"Kéo dài bao lâu khi bắt đầu bằng phím tắt hoặc nút. Bảng ở thanh menu có đủ các mức.","c":[{"s":"pop","o":["5 phút","15 phút","30 phút","1 giờ","2 giờ","Đến khi tôi bật lại"],"i":2}]},{"k":"row","t":"Phím tắt","d":"Bắt đầu hoặc kết thúc tạm tắt. Nhấn Delete khi đang ghi phím để xóa.","c":[{"s":"key","v":""}]}]},{"t":"Khóa bàn phím","items":[{"k":"row","t":"Khóa bàn phím","d":"Mọi phím bị bỏ qua cho tới khi hết giờ, để bạn lau mà không gõ nhầm. Command và Escape mở khóa ngay. Con trỏ vẫn dùng được.","c":[{"s":"btn","v":"Khóa"}]},{"k":"row","t":"Khóa tối đa","d":"Tự mở khóa sau chừng này thời gian.","c":[{"s":"sl","min":15,"max":300,"v":60,"step":"5","out":"1 phút"}]},{"k":"row","t":"Trợ năng","d":"Cần để giữ các phím lại.","c":[{"s":"btn","v":"Mở cài đặt"}]},{"k":"row","t":"Phím tắt","d":"Bắt đầu hoặc dừng. Nhấn Delete khi đang ghi phím để xóa.","c":[{"s":"key","v":"⌃⌥⌘K"}]}]}]},{"id":"notes","name":"Ghi chú","sub":"Ghi nhanh vào một tab của notch, rồi tìm lại dưới dạng tệp văn bản thường.","master":true,"secs":[{"t":"Khi viết","items":[{"k":"row","t":"Cỡ chữ","d":"Chữ trong ô soạn thảo to cỡ nào.","c":[{"s":"pop","o":["Nhỏ","Vừa","Lớn"],"i":1}]},{"k":"row","t":"Mỗi lần mở là một ghi chú trống","d":"Tab mở ra với ghi chú trống, sẵn để ghi nhanh, thay vì ghi chú bạn viết lần trước.","c":[{"s":"sw","on":false}]}]},{"t":"Nằm ở đâu","items":[{"k":"row","t":"Thư mục ghi chú","d":"7 ghi chú. Chuyển, sao lưu hay đồng bộ thư mục như mọi thư mục khác.","c":[{"s":"btn","v":"Hiện trong Finder"}]}]}]},{"id":"launcher","name":"Mở nhanh","sub":"Ghim ứng dụng, thư mục và Shortcuts vào một tab của notch để mở bằng một lần bấm.","master":true,"secs":[{"t":"Đã ghim","items":[{"k":"row","t":"","d":"","c":[{"s":"val","v":"Ứng dụngNotesThư mụcDocumentsShortcutMorning routine"}]}]},{"t":"Ghim thêm","items":[{"k":"row","t":"Thêm","d":"Tối đa mười hai ô.","c":[{"s":"btn","v":"Thêm ứng dụng..."},{"s":"btn","v":"Thêm thư mục..."}]},{"k":"row","t":"Shortcuts","d":"Chạy một Shortcut của ứng dụng Phím tắt theo tên. Danh sách chỉ được đọc khi bạn yêu cầu.","c":[{"s":"btn","v":"Chọn một Shortcut..."},{"s":"pop","o":["Morning routine","Resize images","Send to my phone"],"i":0},{"s":"btn","v":"Ghim Shortcut này"}]},{"k":"row","t":"","d":"","c":[]}]}]},{"id":"weather","name":"Thời tiết","sub":"Xem thời tiết của các thành phố trong tab của notch, hiện tại và vài ngày tới.","master":true,"secs":[{"t":"Thành phố của bạn","items":[{"k":"row","t":"","d":"Tab mở ở thành phố đầu tiên. Chuyển qua lại bằng mũi tên trên tab hoặc phím Trái và Phải.","c":[{"s":"val","v":"1Hanoi, Vietnam2Ho Chi Minh City, Vietnam3Tokyo, Japan"}]}]},{"t":"Thêm thành phố","items":[{"k":"row","t":"Tìm thành phố","d":"Chỉ tên bạn tìm, rồi tọa độ của các thành phố bạn thêm, được gửi đi. Vị trí của máy Mac này không bao giờ được hỏi.","c":[{"s":"field","v":"","ph":"Hà Nội"},{"s":"btn","v":"Tìm"}]},{"k":"row","t":"","d":"","c":[{"s":"btn","v":"Thêm"},{"s":"btn","v":"Thêm"}]}]},{"t":"Đơn vị","items":[{"k":"row","t":"Đơn vị","d":"Độ và tốc độ gió.","c":[{"s":"pop","o":["Độ C, km/h","Độ F, mph"],"i":0}]}]},{"t":"Âm thanh","items":[{"k":"row","t":"Âm thanh thời tiết","d":"Tiếng mưa, gió và sấm nhỏ nhẹ phát phía sau tab khi tab đang mở, theo đúng thời tiết. Tắt mặc định.","c":[{"s":"sw","on":false}]}]}]},{"id":"prs","name":"Yêu cầu duyệt","sub":"Xem các yêu cầu duyệt đang chờ bạn trên GitHub và GitLab.","master":true,"secs":[{"t":"Xem ở đâu","items":[{"k":"row","t":"GitHub","d":"Pull request đang chờ bạn duyệt, qua công cụ gh.","c":[{"s":"sw","on":true}]},{"k":"row","t":"GitLab","d":"Merge request đang chờ bạn duyệt, qua công cụ glab.","c":[{"s":"sw","on":true}]},{"k":"row","t":"Kiểm tra","d":"","c":[{"s":"btn","v":"Kiểm tra"}]}]},{"t":"Danh sách","items":[{"k":"row","t":"Gồm cả bản nháp","d":"Bản nháp chưa sẵn sàng để duyệt, nên mặc định được bỏ qua.","c":[{"s":"sw","on":false}]},{"k":"row","t":"Xem lại mỗi","d":"Khi đang bật, các công cụ được hỏi chừng này thời gian một lần, để chấm trên tab luôn đúng.","c":[{"s":"pop","o":["5 phút","10 phút","30 phút","60 phút"],"i":1}]},{"k":"row","t":"","d":"Hiện có 3 yêu cầu đang chờ.","c":[{"s":"val","v":"Hiện có 3 yêu cầu đang chờ."}]}]}]},{"id":"updates","name":"Cập nhật","sub":"Xem phần mềm nào trên máy có bản mới và cập nhật ngay trên notch.","master":true,"secs":[{"t":"","items":[{"k":"row","t":"Cập nhật tất cả mỗi ngày","d":"Mỗi ngày một lần, mọi thứ trừ bản cập nhật của Apple được cập nhật mà không hỏi. Bản cập nhật của Apple cần quyền quản trị nên sẽ mở Cài đặt hệ thống khi bạn tự bấm cập nhật.","c":[{"s":"sw","on":false}]},{"k":"row","t":"Kiểm tra ngay","d":"Tìm thấy 4 bản cập nhật.","c":[{"s":"btn","v":"Kiểm tra ngay"}]}]},{"t":"Có thể cập nhật","items":[{"k":"custom","cls":"upd-toolbar","v":"Chọn tất cảCập nhật 0Cập nhật tất cả","c":[{"s":"btn","v":"Cập nhật 0","p":true},{"s":"btn","v":"Cập nhật tất cả"}]},{"k":"custom","cls":"upd-list","v":"figghostHomebrew cask2.0.9->2.0.10pnpmnpm12.9.1->12.15.0DroidCoding agent0.245.0->0.248.0SafariApple18.5","c":[]}]}]},{"id":"pomodoro","name":"Pomodoro","sub":"Làm việc theo từng phiên có nghỉ xen kẽ, và xem thời gian ngay trong notch.","master":true,"secs":[{"t":"Độ dài","items":[{"k":"row","t":"Phiên làm việc","d":"Bạn tập trung bao lâu.","c":[{"s":"pop","o":["15 phút","20 phút","25 phút","30 phút","45 phút","50 phút","60 phút"],"i":2}]},{"k":"row","t":"Nghỉ ngắn","d":"Quãng nghỉ giữa hai phiên.","c":[{"s":"pop","o":["3 phút","5 phút","10 phút","15 phút"],"i":1}]},{"k":"row","t":"Nghỉ dài","d":"Quãng nghỉ dài kết thúc một vòng.","c":[{"s":"pop","o":["10 phút","15 phút","20 phút","30 phút"],"i":1}]},{"k":"row","t":"Số phiên trong một vòng","d":"Bao nhiêu phiên làm việc thì tới lần nghỉ dài.","c":[{"s":"pop","o":["2 phiên","3 phiên","4 phiên","5 phiên","6 phiên"],"i":2}]}]},{"t":"Khi một giai đoạn kết thúc","items":[{"k":"row","t":"Tự bắt đầu giai đoạn kế tiếp","d":"Tắt thì chờ bạn bấm Bắt đầu sau mỗi giai đoạn.","c":[{"s":"sw","on":false}]},{"k":"row","t":"Phát âm thanh","d":"Khác nhau cho lúc hết phiên và lúc hết giờ nghỉ.","c":[{"s":"sw","on":true}]},{"k":"row","t":"Mở notch ở tab này","d":"Notch tự đóng lại sau vài giây nếu con trỏ không ở trên đó.","c":[{"s":"sw","on":true}]},{"k":"row","t":"Hiện đồng hồ trong notch đóng","d":"Khi một giai đoạn đang chạy, thời gian còn lại nằm cạnh phần khuyết. Bấm vào đó là mở tab này.","c":[{"s":"sw","on":true}]},{"k":"row","t":"Phím tắt","d":"Bắt đầu, tạm dừng và tiếp tục từ mọi ứng dụng. Nhấn Delete khi đang ghi phím để xóa.","c":[{"s":"key","v":""}]}]},{"t":"Đã làm được gì","items":[{"k":"row","t":"Số phiên đã xong","d":"Hôm nay 3. Liên tiếp 5 ngày. Giữ 12 ngày.","c":[{"s":"btn","v":"Xóa hết","d":true}]}]}]},{"id":"screentime","name":"Thời gian dùng","sub":"Xem ứng dụng nào chiếm thời gian của bạn hôm nay và tuần này.","master":true,"secs":[{"t":"Cách tính","items":[{"k":"row","t":"Ngừng tính khi tôi đi vắng","d":"Thời gian ngừng được tính khi bàn phím và con trỏ đứng yên chừng này.","c":[{"s":"pop","o":["1 phút","2 phút","5 phút"],"i":1}]}]},{"t":"Đã tính được gì","items":[{"k":"row","t":"Đã tính cho đến giờ","d":"Giữ 12 ngày. Hôm nay: 5 giờ 41 phút.","c":[{"s":"btn","v":"Xóa hết","d":true}]}]}]},{"id":"dayprogress","name":"Tiến độ ngày","sub":"Xem ngày đã trôi qua bao nhiêu, cùng các sự kiện hôm nay trên một đường thời gian.","master":true,"secs":[{"t":"Đường thời gian","items":[{"k":"row","t":"Ngày bắt đầu lúc","d":"Đầu bên trái của đường, nơi là 0%.","c":[{"s":"pop","o":["5h","6h","7h","8h","9h","10h"],"i":2}]},{"k":"row","t":"Ngày kết thúc lúc","d":"Đầu bên phải của đường, nơi là 100%.","c":[{"s":"pop","o":["21h","22h","23h","Nửa đêm"],"i":2}]}]},{"t":"Nhắc việc","items":[{"k":"row","t":"Đánh dấu nhắc việc trên đường","d":"Nhắc việc đến hạn hôm nay vào một giờ cụ thể được đánh dấu bằng một chấm trên đường, và những việc còn phải làm được đếm bên dưới. Cần quyền Nhắc nhở đã cấp ở mục Tab của notch, Lịch.","c":[{"s":"sw","on":true}]}]}]},{"id":"devices","name":"Thiết bị","sub":"Xem mức pin của chuột, bàn phím và tai nghe Bluetooth ngay trong một tab của notch.","master":true,"secs":[{"t":"Pin yếu","items":[{"k":"row","t":"Coi là yếu khi còn","d":"Thiết bị có mức pin bằng hoặc dưới mức này được tô màu cảnh báo và ghi chữ Pin yếu. Tai nghe nhét tai tính từng bên tai, không tính hộp sạc.","c":[{"s":"pop","o":["10%","15%","20%","30%"],"i":2}]}]}]},{"id":"displays","name":"Màn hình","sub":"Chỉnh độ sáng và độ tương phản của màn hình rời ngay trong một tab của notch, như bấm nút trên màn hình, chọn cấu hình màu cho mọi màn hình và sắp xếp vị trí các màn hình.","master":true,"secs":[{"t":"Cấu hình màu","items":[{"k":"row","t":"Chọn cấu hình màu cho từng màn hình","d":"Mọi màn hình đều có một thẻ, kể cả màn hình liền máy, với menu gồm cấu hình riêng của màn hình và các cấu hình có sẵn của macOS: Display P3, sRGB, Adobe RGB, Rec. 709, Rec. 2020 và các cấu hình khác mà Cài đặt hệ thống liệt kê ở mục Màn hình. Lựa chọn giống hệt trong đó, áp dụng cho người dùng này, và hình đổi ngay; chọn lại cấu hình riêng của màn hình để trở về như cũ.","c":[{"s":"sw","on":true}]}]},{"t":"Sắp xếp","items":[{"k":"row","t":"Sắp xếp màn hình ngay trong tab","d":"Khi cắm từ hai màn hình trở lên, tab có thêm chế độ Sắp xếp, vẽ các màn hình đúng vị trí như trong Cài đặt hệ thống. Kéo một màn hình để đổi chỗ, nó sẽ áp sát cạnh gần nhất của màn hình khác; kéo thanh trắng sang màn hình khác để đặt màn hình đó làm màn hình chính, có thanh menu và Dock. Menu của từng màn hình chọn cách dùng: màn hình chính, màn hình mở rộng, hoặc phản chiếu một màn hình khác. Thay đổi được giữ lại như khi chỉnh trong Cài đặt hệ thống.","c":[{"s":"sw","on":true}]}]},{"t":"Phím","items":[{"k":"row","t":"Phím độ sáng chỉnh màn hình rời","d":"Phím độ sáng chỉnh mọi màn hình rời cùng lúc và hiện mức theo kiểu của bảng âm lượng; giữ Shift và Option để bước nhỏ hơn. Khi màn hình liền máy đang sáng, phím vẫn dành cho nó, giữ Control khi bấm để chỉnh màn hình rời. Cần quyền Trợ năng.","c":[{"s":"sw","on":false}]}]}]},{"id":"present","name":"Trình chiếu","sub":"Chiếu một màn hình, một vùng, một cửa sổ hay một ứng dụng cho khán giả lên màn hình khác, có phóng to bám theo con trỏ.","master":true,"secs":[{"t":"","items":[{"k":"row","t":"Ghi màn hình","d":"Đã cho phép","c":[{"s":"val","v":"Cho phép"}]}]},{"t":"Chiếu gì và chiếu lên đâu","items":[{"k":"row","t":"Lựa chọn đầu tiên trong tab","d":"Màn hình thì chiếu toàn bộ; vùng thì kéo chọn trên màn hình đóng băng; cửa sổ thì chiếu riêng cửa sổ đó kể cả khi bị che; ứng dụng thì chiếu mọi cửa sổ của nó trên màn hình ấy và không gì khác.","c":[{"s":"pop","o":["Một màn hình","Một vùng","Một cửa sổ","Một ứng dụng"],"i":0}]},{"k":"row","t":"Số khung hình mỗi giây","d":"60 cho video và cuộn mượt, 30 để tiết kiệm pin khi chiếu slide.","c":[{"s":"pop","o":["30","60"],"i":1}]},{"k":"row","t":"Hiện con trỏ","d":"Con trỏ có trong hình, đúng chỗ nó đang ở trên màn hình của bạn.","c":[{"s":"sw","on":true}]},{"k":"row","t":"Viền quanh phần đang chiếu","d":"Một viền xanh mảnh trên màn hình của bạn bao quanh vùng hay màn hình khán giả đang thấy. Khán giả không thấy viền này.","c":[{"s":"sw","on":true}]}]},{"t":"Phóng to bám theo con trỏ","items":[{"k":"row","t":"Phóng to chỗ vừa bấm chuột","d":"Mỗi cú bấm phóng to hình của khán giả vào đúng chỗ đó, khung nhìn đi theo con trỏ khi nó gần tới mép, và sau một lúc yên thì trở về toàn cảnh, giống các phần mềm quay màn hình tự phóng to. Phím phóng to, thu nhỏ dùng được bất cứ lúc nào, quanh vị trí con trỏ.","c":[{"s":"sw","on":true}]},{"k":"row","t":"Mức phóng khi bấm","d":"Một cú bấm làm hình to lên bao nhiêu lần.","c":[{"s":"pop","o":["1,5x","2x","2,5x","3x","4x"],"i":1}]},{"k":"row","t":"Trở về toàn cảnh sau","d":"Số giây không bấm chuột. Gõ phím không được tính, nên khi demo trực tiếp hãy chọn lâu hơn.","c":[{"s":"pop","o":["Không tự trở về","2 giây","3 giây","5 giây","8 giây"],"i":2}]}]},{"t":"Con trỏ","items":[{"k":"row","t":"Khoanh vòng con trỏ ngay từ đầu","d":"Một vòng vàng để khán giả dễ theo dõi, như bút chỉ laser. Trong lúc chiếu vẫn bật tắt được.","c":[{"s":"sw","on":false}]},{"k":"row","t":"Hiện cú bấm chuột","d":"Một gợn sóng tại chỗ vừa bấm chuột.","c":[{"s":"sw","on":true}]},{"k":"row","t":"Cỡ đèn chiếu","d":"Đèn chiếu làm tối mọi thứ trừ một vòng tròn quanh con trỏ. Bật trong lúc chiếu, từ tab hoặc bằng phím của nó.","c":[{"s":"pop","o":["Nhỏ","Vừa","Lớn"],"i":1}]}]},{"t":"Trên notch","items":[{"k":"row","t":"Hiện thời gian trong notch đóng","d":"Trong lúc chiếu, thời gian đã chiếu nằm cạnh phần khuyết, màu xanh khi khán giả đang thấy hình trực tiếp và màu cam khi đang đứng hình hoặc bị che. Bấm vào đó là mở tab.","c":[{"s":"sw","on":true}]}]},{"t":"Phím tắt","items":[{"k":"custom","cls":"row-desc","v":"Phím bắt đầu dùng được trong mọi ứng dụng khi tính năng đang bật. Các phím còn lại chỉ có tác dụng trong lúc đang chiếu, nên lúc khác không chiếm phím nào của ứng dụng của bạn. Chữ cái theo thói quen của phần mềm trình chiếu khi có thể: B và W cho màn hình đen và trắng như PowerPoint và Keynote, Z để phóng to như ZoomIt và tính năng phóng to của macOS. Nhấn Delete khi đang ghi phím để tắt phím đó.","c":[]},{"k":"row","t":"Bắt đầu hoặc dừng","d":"Bắt đầu theo lựa chọn trong tab, hoặc dừng.","c":[{"s":"key","v":"⌃⌥P"}]},{"k":"row","t":"Phóng to","d":"Gần thêm một bậc quanh con trỏ: 1,5, 2, 2,5, 3, 4, 6 và 8 lần.","c":[{"s":"key","v":"⌃⌥Z"}]},{"k":"row","t":"Thu nhỏ","d":"Lùi lại một bậc.","c":[{"s":"key","v":"⌃⌥X"}]},{"k":"row","t":"Toàn cảnh","d":"Trở về toàn bộ hình ngay lập tức.","c":[{"s":"key","v":"⌃⌥0"}]},{"k":"row","t":"Bật tắt phóng to chỗ vừa bấm","d":"","c":[{"s":"key","v":"⌃⌥A"}]},{"k":"row","t":"Đèn chiếu","d":"Làm tối mọi thứ trừ vòng tròn quanh con trỏ.","c":[{"s":"key","v":"⌃⌥L"}]},{"k":"row","t":"Vòng con trỏ","d":"","c":[{"s":"key","v":"⌃⌥M"}]},{"k":"row","t":"Đứng hình","d":"Khán giả vẫn thấy hình cuối cùng trong lúc bạn tra cứu gì đó; bấm lần nữa để chiếu trực tiếp lại.","c":[{"s":"key","v":"⌃⌥H"}]},{"k":"row","t":"Màn hình đen","d":"Như phím B khi trình chiếu slide; bấm lần nữa để quay lại.","c":[{"s":"key","v":"⌃⌥B"}]},{"k":"row","t":"Màn hình trắng","d":"Như phím W khi trình chiếu slide.","c":[{"s":"key","v":"⌃⌥W"}]}]}]},{"id":"notifications","name":"Thông báo","sub":"Nhận thông báo của các ứng dụng ngay trên notch, hoặc để hệ thống hiện như cũ và xem lại trong một tab của notch.","master":true,"secs":[{"t":"","items":[{"k":"row","t":"Truy cập toàn bộ ổ đĩa","d":"Sẽ kiểm tra khi bật tính năng: macOS cất thông báo ở chỗ chỉ ứng dụng có quyền Truy cập toàn bộ ổ đĩa mới đọc được, và nút này mở đúng danh sách đó.","c":[{"s":"btn","v":"Mở danh sách"}]}]},{"t":"Cách nhận thông báo","items":[{"k":"row","t":"Nhận thông báo","d":"Qua hệ thống: macOS vẫn hiện banner như cũ, tab giữ danh sách. Qua notch: mỗi thông báo hiện ngay trên notch đóng, lấn cả nhạc lẫn ngày giờ, kèm icon ứng dụng, tiêu đề và nội dung.","c":[{"s":"seg","o":["Qua hệ thống","Qua notch"],"i":1}]},{"k":"row","t":"Tắt banner của macOS","d":"Để một thông báo không hiện hai lần: trong Cài đặt hệ thống, mục Thông báo, đặt kiểu thông báo của từng ứng dụng muốn nhận qua notch là Không có. Thông báo vẫn vào Trung tâm thông báo, nên vẫn lên notch. Bật Không làm phiền thì có tác dụng tương tự cho mọi ứng dụng cùng lúc.","c":[{"s":"btn","v":"Mở mục Thông báo"}]},{"k":"row","t":"Thời gian hiện trên notch","d":"Một thông báo nằm trên notch đóng bao lâu; thông báo mới hơn sẽ thế chỗ.","c":[{"s":"pop","o":["3 giây","5 giây","8 giây","12 giây"],"i":1}]},{"k":"row","t":"Hiện nội dung","d":"Tắt thì notch chỉ hiện tên ứng dụng và chữ Thông báo mới, phù hợp khi người khác nhìn thấy màn hình.","c":[{"s":"sw","on":true}]}]},{"t":"Riêng tư","items":[{"k":"row","t":"Chỉ đọc, không ghi, không gửi đi","d":"Figghost chỉ đọc kho thông báo của macOS, và chỉ khi kho thay đổi. Không ghi gì vào đó, không lưu gì xuống ổ đĩa và không gửi gì ra khỏi máy; danh sách mất khi Figghost thoát.","c":[]}]}]},{"id":"outlook","name":"Outlook","sub":"Thư mới và nhắc lịch của Outlook trong một tab của notch, kèm thẻ đọc nhanh ở giữa màn hình.","master":true,"secs":[{"t":"","items":[{"k":"row","t":"Truy cập toàn bộ ổ đĩa","d":"Sẽ kiểm tra khi bật tính năng: macOS cất thông báo ở chỗ chỉ ứng dụng có quyền Truy cập toàn bộ ổ đĩa mới đọc được.","c":[{"s":"btn","v":"Mở danh sách"}]}]},{"t":"Khi có thư mới","items":[{"k":"row","t":"Hiện trên notch","d":"Thư mới hiện trên notch đóng trong vài giây, kèm người gửi và tiêu đề.","c":[{"s":"sw","on":true}]},{"k":"row","t":"Thời gian hiện trên notch","d":"","c":[{"s":"pop","o":["3 giây","5 giây","8 giây","12 giây"],"i":1}]},{"k":"row","t":"Hiện nội dung","d":"Tắt thì notch chỉ hiện chữ Thư mới, phù hợp khi người khác nhìn thấy màn hình.","c":[{"s":"sw","on":true}]},{"k":"row","t":"Giọt nước từ notch","d":"Thư mới rơi từ notch xuống giữa màn hình như một giọt nước rồi mở thành thẻ để đọc. Bấm ra chỗ khác hoặc nhấn Escape để cất đi.","c":[{"s":"sw","on":false}]},{"k":"row","t":"Thử xem","d":"","c":[{"s":"btn","v":"Thử xem"}]},{"k":"row","t":"Nhắc lịch","d":"Nhắc họp và sự kiện Outlook gửi tới cũng được liệt kê và báo lên, ghi là Lịch.","c":[{"s":"sw","on":true}]},{"k":"row","t":"Tắt banner của Outlook","d":"Để một thư không hiện hai lần: trong Cài đặt hệ thống, mục Thông báo, Microsoft Outlook, đặt kiểu thông báo là Không có. Thông báo vẫn vào Trung tâm thông báo, nên vẫn lên tab này.","c":[{"s":"btn","v":"Mở mục Thông báo"}]}]},{"t":"Riêng tư","items":[{"k":"row","t":"Chỉ đọc, không ghi, không gửi đi","d":"Figghost chỉ đọc thông báo macOS lưu. Không ghi gì, không lưu gì xuống ổ đĩa và không gửi gì ra khỏi máy; danh sách mất khi Figghost thoát.","c":[]}]}]},{"id":"video","name":"Video (beta)","sub":"Phát một luồng trực tiếp hoặc một video trong tab của notch.","master":true,"secs":[{"t":"Nguồn","items":[{"k":"row","t":"Địa chỉ","d":"Địa chỉ https, hoặc file:// cho video trên máy Mac này. Nhấn Enter để lưu.","c":[{"s":"field","v":"https://example.com/live/stream.m3u8","ph":"https://example.com/live/stream.m3u8"}]}]}]},{"id":"system","name":"Hệ thống","sub":"Xem bộ xử lý, bộ nhớ, mạng và ổ đĩa đang làm gì, ngay trong một tab của notch.","master":true,"secs":[{"t":"Hiển thị gì","items":[{"k":"row","t":"Bộ xử lý","d":"Mức tải từng lõi, tách lõi tiết kiệm khỏi lõi hiệu năng.","c":[{"s":"sw","on":true}]},{"k":"row","t":"Bộ nhớ","d":"Phần ứng dụng giữ, phần hệ thống ghim và phần bị nén, cùng áp lực và swap.","c":[{"s":"sw","on":true}]},{"k":"row","t":"Mạng","d":"Tốc độ tải xuống và tải lên, và các lần đọc gần nhất vẽ thành một đường.","c":[{"s":"sw","on":true}]},{"k":"row","t":"Đồ họa, ổ đĩa, nhiệt, quạt và pin","d":"Một hàng số liệu nhỏ: nhiệt độ bộ xử lý tính bằng độ C, và tốc độ quạt. Quạt và pin chỉ có trên máy Mac có chúng.","c":[{"s":"sw","on":true}]}]},{"t":"Lần đọc","items":[{"k":"row","t":"Đọc bao lâu một lần","d":"Đọc dày thì bắt kịp những đợt tăng vọt, đọc thưa thì máy ít việc hơn.","c":[{"s":"pop","o":["Mỗi giây","Mỗi 2 giây","Mỗi 5 giây"],"i":0}]}]}]},{"id":"typing","name":"Gõ tiếng Việt","sub":"Gõ tiếng Việt trong mọi ứng dụng bằng Telex hoặc VNI, không cần bộ gõ nào khác. Từ tiếng Anh bạn gõ sẽ tự trở lại như cũ.","master":true,"secs":[{"t":"","items":[{"k":"row","t":"Đang gõ","d":"Phím tắt, bảng ở thanh menu và nút này chuyển qua lại giữa tiếng Việt và tiếng Anh.","c":[{"s":"btn","v":"Chuyển"}]},{"k":"row","t":"Phím tắt","d":"Chuyển qua lại giữa tiếng Việt và tiếng Anh ở mọi ứng dụng. Nhấn Delete khi đang ghi phím để xóa.","c":[{"s":"key","v":"⌃Space"}]},{"k":"row","t":"Hiện ngôn ngữ trên notch","d":"VI hoặc EN nằm sẵn trên notch khi đóng, miễn là đang gõ và chưa có việc nào khác đang diễn ra.","c":[{"s":"sw","on":true}]},{"k":"row","t":"Hiện ngôn ngữ ở thanh menu","d":"Chữ VI hoặc EN nhỏ cạnh con ma. Bấm vào để chuyển.","c":[{"s":"sw","on":true}]},{"k":"row","t":"Hiện cờ thay cho VI, EN","d":"Cờ Việt Nam hoặc cờ Mỹ thay cho chữ VI hoặc EN trên notch và ở thanh menu.","c":[{"s":"sw","on":false}]},{"k":"row","t":"Cờ tung bay khi chuyển sang tiếng Việt","d":"Lá cờ đỏ sao vàng tung bay trên notch mỗi lần chuyển sang gõ tiếng Việt.","c":[{"s":"sw","on":true}]},{"k":"row","t":"Trợ năng","d":"Cần để đọc phím và gõ dấu.","c":[{"s":"btn","v":"Mở cài đặt"}]}]},{"t":"Cách gõ","items":[{"k":"row","t":"Kiểu gõ","d":"Telex bỏ dấu bằng chữ (aa là â, s là dấu sắc); VNI bằng số (a6 là â, 1 là dấu sắc).","c":[{"s":"seg","o":["Telex","VNI"],"i":0}]},{"k":"row","t":"Đặt dấu theo quy tắc mới","d":"hoà, khoẻ, thuỷ. Tắt thì viết hòa, khỏe, thủy.","c":[{"s":"sw","on":true}]},{"k":"row","t":"Trả lại từ tiếng Anh","d":"text, with hay push gõ bằng Telex sẽ trở lại như cũ khi hết từ, thay vì tẽt, ưith hay púh.","c":[{"s":"sw","on":true}]}]},{"t":"Ứng dụng giữ nguyên phím","items":[{"k":"row","t":"Ứng dụng giữ nguyên mọi phím","d":"Gõ trong các ứng dụng này luôn giữ nguyên. iPhone Mirroring và điều khiển máy từ xa luôn được giữ nguyên, vì phím của chúng đi tới thiết bị khác.","c":[{"s":"btn","v":"Thêm ứng dụng"}]},{"k":"list","rows":[{"t":"Terminal","d":"com.apple.Terminal","c":[]}],"empty":""},{"k":"row","t":"Bộ máy gõ","d":"Dấu được đặt bằng bộ máy của Gõ Nhanh (bản quyền 2025 Gõ Nhanh Contributors, giấy phép BSD 3-Clause), Figghost dùng nguyên bản. Giấy phép của nó ở trang Giới thiệu.","c":[]}]}]},{"id":"snippets","name":"Gõ tắt","sub":"Gõ một viết tắt ngắn ở bất kỳ ứng dụng nào, nó sẽ được thay bằng đoạn văn bạn đã lưu: thư trả lời, địa chỉ, chữ ký, đoạn code.","master":true,"secs":[{"t":"","items":[{"k":"row","t":"Trợ năng","d":"Cần để đọc phím và chèn đoạn văn.","c":[{"s":"btn","v":"Mở cài đặt"}]}]},{"t":"Thêm đoạn văn","items":[{"k":"row","t":"","d":"Nên bắt đầu bằng một ký tự như ; để chữ thường không bị thay nhầm, ví dụ ;sig hoặc ;addr. Viết tắt được thay ngay khi gõ xong phím cuối.","c":[{"s":"field","v":"","ph":";sig"},{"s":"field","v":"","ph":"Nội dung mà viết tắt sẽ biến thành. Xuống dòng được giữ nguyên."},{"s":"btn","v":"Thêm đoạn văn","p":true}]}]},{"t":"Các đoạn văn của bạn","items":[{"k":"row","t":"","d":"4 dòng","c":[{"s":"val","v":";sigBest regards, / An Nguyen4 dòng;addr12 Le Loi Street, District 1, Ho Chi Minh City46 ký tự;tyThank you for your message. I will get back to you by the end of the day.73 ký tự;tyxUnreachable: ;ty is finished first.35 ký tự;ty được thay trước khi gõ xong, nên viết tắt này không bao giờ gõ đủ được.;logconsole.log('debug:', value);29 ký tự"}]}]},{"t":"Cách hoạt động","items":[{"k":"row","t":"Đoạn ngắn được gõ ra","d":"Đoạn văn một dòng ngắn được gõ vào chỗ viết tắt, từng phím, nhanh hết mức ứng dụng nhận được.","c":[]},{"k":"row","t":"Đoạn dài và có xuống dòng được dán","d":"Gõ xuống dòng nghĩa là nhấn Return, mà Return sẽ gửi tin trong ứng dụng chat. Vì vậy những đoạn này được dán: clipboard của bạn được giữ lại, đoạn văn nằm trên clipboard trong chốc lát rồi clipboard được trả về như cũ. Figghost không đưa đoạn văn vào lịch sử clipboard.","c":[]},{"k":"row","t":"Chạy với Telex và VNI","d":"Viết tắt được nhận theo các phím bạn nhấn, nên ;dd vẫn được tìm thấy dù Telex hiện nó là ;đ. Phím được đọc theo vị trí trên bàn phím Mỹ, nên viết tắt chỉ gồm chữ cái, chữ số và dấu câu của bàn phím đó.","c":[]},{"k":"row","t":"Khi nào thôi theo dõi","d":"Một cú nhấp chuột, phím mũi tên, Return, Tab, dấu cách, phím tắt có Command, Control hoặc Option, hay ứng dụng khác lên trước đều bắt đầu lại từ đầu. Backspace lùi lại một phím.","c":[]}]}]},{"id":"download","name":"Tải video","sub":"Dán link video để lưu về máy Mac. Việc tải do yt-dlp làm, công cụ bạn tự cài.","master":true,"secs":[{"t":"Công cụ","items":[{"k":"row","t":"yt-dlp","d":"Đã có, phiên bản 2026.08.19","c":[{"s":"val","v":"/opt/homebrew/bin/yt-dlp"}]},{"k":"row","t":"ffmpeg","d":"Chưa cài. Figghost tự ghép hình H.264 và tiếng AAC nên YouTube tải được tối đa 1080p. Chỉ cần ffmpeg khi muốn trên 1080p (VP9, AV1), với trang có định dạng Figghost không tự ghép được, và để chuyển nhạc sang m4a. Muốn cài, hãy chạy: brew install ffmpeg","c":[]}]},{"t":"Tải về","items":[{"k":"custom","cls":"row block","v":"Tải","c":[{"s":"field","v":"","ph":"https://..."},{"s":"btn","v":"Tải","p":true}]},{"k":"row","t":"Chất lượng","d":"Tốt nhất mà trang có, hoặc không cao hơn chiều cao bạn chọn. Chỉ lấy nhạc thì chỉ lưu phần tiếng.","c":[{"s":"pop","o":["Tốt nhất","Đến 1080p","Đến 720p","Chỉ lấy nhạc"],"i":0}]},{"k":"row","t":"Cả danh sách phát","d":"Link tới một danh sách phát thì lưu toàn bộ. Tắt thì chỉ lưu video mà link trỏ tới.","c":[{"s":"sw","on":false}]},{"k":"row","t":"Lưu vào","d":"","c":[{"s":"btn","v":"Chọn..."}]}]},{"t":"Các lượt tải","items":[{"k":"custom","cls":"download-list","v":"Me at the zooĐang ghépHủyMở trong Finderwww.facebook.comĐang chờ đến lượtHủyMở trong FinderA video that needs ffmpegVideo này cần ffmpeg: Figghost không tự ghép được định dạng của nó. Trong Terminal, chạy: brew install ffmpegHủyMở trong Finderexample.comThất bại: [generic] gone: Unable to download webpage: HTTP Error 404HủyMở trong FinderThe New Vimeo Player42% / 3.1 MB/giây / còn 0:18HủyMở trong ","c":[{"s":"btn","v":"Hủy"},{"s":"btn","v":"Hủy"},{"s":"btn","v":"Mở trong Finder"}]},{"k":"custom","cls":"download-toolbar","v":"Xóa các lượt đã xong","c":[{"s":"btn","v":"Xóa các lượt đã xong"}]}]}]},{"id":"tiling","name":"Chia cửa sổ","sub":"Đặt cửa sổ đang dùng vào một vùng của màn hình bằng phím tắt.","master":true,"secs":[{"t":"","items":[{"k":"custom","cls":"tiles","v":"Nửa trái⌃⌥←Nửa phải⌃⌥→Nửa trên⌃⌥↑Nửa dưới⌃⌥↓Góc trên trái⌃⌥UGóc trên phải⌃⌥IGóc dưới trái⌃⌥JGóc dưới phải⌃⌥KPhóng to tối đa⌃⌥↩Giữa màn hìnhChưa cóMột phần ba đầu⌃⌥DMột phần ba giữa⌃⌥FMột phần ba cuối⌃⌥GÔ 1 · trên trái⌘1Ô 2 · trên giữa⌘2Ô 3 · trên phải⌘3Ô 4 · giữa trái⌘4Ô 5 · chính giữa⌘5Ô 6 · giữa phải⌘6Ô 7 · dưới trái⌘7Ô 8 · dưới giữa⌘8Ô 9 · dưới phải⌘9","c":[{"s":"key","v":"⌃⌥←"},{"s":"key","v":"⌃⌥→"},{"s":"key","v":"⌃⌥↑"},{"s":"key","v":"⌃⌥↓"},{"s":"key","v":"⌃⌥U"},{"s":"key","v":"⌃⌥I"},{"s":"key","v":"⌃⌥J"},{"s":"key","v":"⌃⌥K"},{"s":"key","v":"⌃⌥↩"},{"s":"key","v":""},{"s":"key","v":"⌃⌥D"},{"s":"key","v":"⌃⌥F"},{"s":"key","v":"⌃⌥G"},{"s":"key","v":"⌘1"},{"s":"key","v":"⌘2"},{"s":"key","v":"⌘3"},{"s":"key","v":"⌘4"},{"s":"key","v":"⌘5"},{"s":"key","v":"⌘6"},{"s":"key","v":"⌘7"},{"s":"key","v":"⌘8"},{"s":"key","v":"⌘9"}]},{"k":"custom","cls":"","v":"Đặt lại phím tắt","c":[{"s":"btn","v":"Đặt lại phím tắt"}]}]},{"t":"Kéo lên notch","items":[{"k":"row","t":"Ghim cửa sổ bằng cách kéo lên notch","d":"Kéo cửa sổ bằng thanh tiêu đề lên mép trên màn hình. Các bố cục hiện ra dưới notch. Chỉ vào một bố cục để xem các ô của nó trên màn hình, rồi đưa xuống một ô và thả chuột để đặt cửa sổ vào đó. Thả ở chỗ khác thì không có gì thay đổi.","c":[{"s":"sw","on":true}]},{"k":"row","t":"Quyền Trợ năng","d":"Đặt cửa sổ cần quyền Trợ năng (Accessibility). Khi chưa cấp quyền, thả cửa sổ sẽ không có tác dụng.","c":[{"s":"val","v":"Đã cấpMở Cài đặt Hệ thống"}]},{"k":"row","t":"Bố cục của màn hình","d":"Chọn những bố cục hiện ra dưới notch. Mỗi màn hình có thể có danh sách riêng, các màn hình còn lại theo danh sách chung của mọi màn hình.","c":[{"s":"pop","o":["Mọi màn hình","Built-in Retina Display","DELL U2720Q"],"i":0}]},{"k":"custom","cls":"snap-body","v":"Tối đaChia đôiChia baBốn gócHai hàngRộng tráiRộng phảiTối đaChia đôiHai hàngChia baBốn gócRộng tráiRộng phải1 + 22 + 1Sáu ôĐã chọn 7Các bố cục này hiện trên mọi màn hình chưa có danh sách riêng.Theo mọi màn hìnhKhôi phục mặc định","c":[{"s":"btn","v":"Khôi phục mặc định"}]},{"k":"row","t":"Bố cục của bạn","d":"Chia màn hình thành lưới rồi gộp các phần thành ô lớn hơn. Bố cục bạn tạo có thể chọn cho bất kỳ màn hình nào ở trên.","c":[]},{"k":"custom","cls":"snap-body","v":"Chưa có bố cục riêng nào.0 trên 12Bố cục mới","c":[{"s":"btn","v":"Bố cục mới"}]}]}]},{"id":"about","name":"Giới thiệu","sub":"Một ứng dụng nhẹ cho các công cụ nhỏ của máy Mac.","master":null,"secs":[{"t":"","items":[{"k":"row","t":"Phiên bản","d":"","c":[{"s":"val","v":"0.2.0"}]},{"k":"row","t":"Kiểm tra bản mới","d":"Mỗi ngày tự hỏi GitHub xem có bản mới chưa. Bấm Kiểm tra để hỏi ngay; bản mới sẽ được tải và cài sẵn cho bạn.","c":[{"s":"btn","v":"Kiểm tra"}]},{"k":"row","t":"Tự động cập nhật","d":"Cài bản mới ngay khi tìm thấy, không hỏi trước. Nếu tắt, Figghost hỏi bạn mỗi ngày một lần. Dù cách nào, bạn cũng cần khởi động lại Figghost để dùng bản mới.","c":[{"s":"sw","on":false}]},{"k":"row","t":"Có gì mới sau khi cập nhật","d":"Mở bản giới thiệu ngắn các tính năng mới ngay lần đầu chạy bản mới. Nhiều thay đổi sẽ hiện dạng trang trượt.","c":[{"s":"btn","v":"Xem có gì mới"},{"s":"sw","on":true}]},{"k":"row","t":"Riêng tư","d":"Mọi thứ nằm trên máy Mac này. Thứ duy nhất Figghost tự hỏi qua mạng là đã có bản mới hay chưa, mỗi ngày một lần.","c":[]},{"k":"row","t":"Thư mục dữ liệu","d":"/Users/you/Library/Application Support/Figghost","c":[{"s":"btn","v":"Mở thư mục"}]}]},{"t":"Figghost đang dùng","items":[{"k":"row","t":"Figghost đang dùng","d":"Đọc mỗi hai giây khi cửa sổ này mở. Mạng tính cả các công cụ Figghost chạy như curl và gh, vì bản thân app không tự mở kết nối nào. Khung hình là của các hiệu ứng app đang vẽ: bằng 0 khi không có gì chuyển động.","c":[]},{"k":"row","t":"CPU","d":"","c":[{"s":"val","v":"3.4%"}]},{"k":"row","t":"GPU","d":"","c":[{"s":"val","v":"0.6%"}]},{"k":"row","t":"Bộ nhớ","d":"","c":[{"s":"val","v":"59.0 MB"}]},{"k":"row","t":"Mạng","d":"","c":[{"s":"val","v":"2 KB/s"}]},{"k":"row","t":"Ổ đĩa","d":"","c":[{"s":"val","v":"đọc 0 B/s, ghi 20 KB/s"}]},{"k":"row","t":"Khung hình","d":"","c":[{"s":"val","v":"0 fps"}]}]},{"t":"Giới thiệu Figghost","items":[{"k":"row","t":"Một ứng dụng nhẹ cho các công cụ nhỏ của máy Mac","d":"Cuộn chuột mượt và con trỏ của riêng bạn, lịch sử clipboard, chia cửa sổ từ notch, và một bảng mở ra từ notch với các tab cho tệp, nhạc, lịch, tác tử lập trình, thời tiết, sức khỏe hệ thống và nhiều thứ khác. Gõ tiếng Việt ở mọi ứng dụng, Chọn thông minh, Dịch, chụp màn hình, quay màn hình, chọn màu, âm thanh riêng cho từng ứng dụng và giữ một cửa sổ luôn trên cùng có thể bật khi bạn cần.","c":[]},{"k":"row","t":"Bản địa, và ở lại trên máy này","d":"Ứng dụng viết bằng Rust trên AppKit, không có trình duyệt nhúng trong chính ứng dụng; chỉ cửa sổ cài đặt này là một trang web. Nó chạy nhẹ, có tiếng Anh và tiếng Việt, và mọi thứ nó lưu đều ở lại trên máy Mac này.","c":[]}]},{"t":"Có gì ở đâu","items":[{"k":"row","t":"Mọi trang nằm ở thanh bên","d":"Thanh bên liệt kê mọi trang, chia thành năm nhóm; chấm xanh là tính năng đang bật. Nhấn một trang rồi kéo dọc thanh bên để xem lần lượt; Command-K tìm mọi cài đặt theo tên.","c":[]},{"k":"row","t":"Cài đặt chung","d":"Chung","c":[]},{"k":"row","t":"Phím tắt","d":"Phím tắt","c":[]},{"k":"row","t":"Dọn dẹp máy Mac","d":"Mole","c":[]},{"k":"row","t":"Giới thiệu","d":"Giới thiệu","c":[]},{"k":"row","t":"Notch & Đảo động","d":"Notch · Đảo trạng thái · Thông báo · Outlook · Widget nhạc","c":[]},{"k":"row","t":"Tác tử AI & PR","d":"Tác tử AI · Yêu cầu duyệt","c":[]},{"k":"row","t":"Lịch & Tập trung","d":"Lịch · Pomodoro · Tiến độ ngày · Thời gian dùng","c":[]},{"k":"row","t":"Tiện ích Notch","d":"Ghi chú · Mở nhanh · Thời tiết · Video (beta)","c":[]},{"k":"row","t":"Hệ thống & Thiết bị","d":"Hệ thống · Cập nhật · Thiết bị · Màn hình · Trình chiếu","c":[]},{"k":"row","t":"Chuột & Con trỏ","d":"Cuộn chuột · Con trỏ · Vòng kéo thả","c":[]},{"k":"row","t":"Cửa sổ & Ghim","d":"Chia cửa sổ · Luôn trên cùng","c":[]},{"k":"row","t":"Bảng tạm & Gõ chữ","d":"Clipboard · Gõ tiếng Việt · Gõ tắt","c":[]},{"k":"row","t":"Chọn nhanh & Dịch","d":"Chọn thông minh · Dịch · Tiện ích","c":[]},{"k":"row","t":"Chụp & Tải media","d":"Chụp màn hình · Chọn màu · Tải video","c":[]}]},{"t":"Vì sao có Figghost","items":[{"k":"row","t":"Lý do ra đời","d":"Cuộn mượt, lịch sử clipboard và hộp công cụ notch thường là các ứng dụng riêng lẻ: Mos, Maccy và OneNotch gợi ý tưởng cho nó, SoundSource và CleanShot X gợi ý cho phần âm thanh và chụp màn hình, còn Gõ Nhanh là bộ máy gõ tiếng Việt, dùng nguyên bản. Figghost gom chúng vào một ứng dụng với một lần xin quyền, một mục khởi động cùng máy và một cửa sổ cài đặt. Ý tưởng lấy cảm hứng từ các ứng dụng đó; mã nguồn và hình ảnh là của riêng Figghost.","c":[]},{"k":"row","t":"Các phiên bản","d":"","c":[]},{"k":"row","t":"Phiên bản 2.0.2, 22/10/2026","d":"Ngôn ngữ gõ tiếng Việt hiện trên notch và ở thanh menu, phím tắt ghi được cả khi hệ thống đang dùng, Spotlight, và dock có biểu tượng rõ hơn.","c":[]},{"k":"row","t":"Phiên bản 2.0, 22/10/2026","d":"Cửa sổ cài đặt mới trên Liquid Glass: các nhóm trang là biểu tượng trong một dock nổi có thấu kính kéo được, và ô tìm nằm ở thanh tiêu đề.","c":[]},{"k":"row","t":"Phiên bản 1.1 đến 1.9, 19 đến 22/10/2026","d":"Trả lời câu hỏi ngay trên notch, widget nhạc và thêm kiểu chỉ báo âm lượng, kiểm tra quyền, thêm mười tab notch (Hệ thống, Ghi chú, Mở nhanh, Thời tiết, Yêu cầu duyệt, Pomodoro, Thời gian dùng, Tiến độ ngày, Thiết bị và Màn hình), đảo trạng thái, tiện ích, tài khoản Orca, pi, và gõ tiếng Việt.","c":[]},{"k":"row","t":"Phiên bản 1.0, 19/10/2026","d":"Bản lớn đầu tiên: con trỏ tùy chỉnh, Luôn trên cùng, trang Phím tắt, ô tìm trong cài đặt, và cách chọn vùng chụp màn hình gọn hơn.","c":[]},{"k":"row","t":"Phiên bản 0.9, 19/10/2026","d":"Lời chào của chú ma, Dịch, Bluetooth trên notch, âm thanh 3D, và ghim cửa sổ hai bước với bố cục của riêng bạn.","c":[]},{"k":"row","t":"Phiên bản 0.8, 19/10/2026","d":"Biểu tượng ứng dụng mới và thanh bên có tên bên cạnh mỗi biểu tượng.","c":[]},{"k":"row","t":"Phiên bản 0.7, 19/10/2026","d":"Notch được thiết kế lại, và Vòng kéo thả giúp đổi định dạng tệp và chạy công cụ trên tệp ngay khi bạn đang kéo.","c":[]},{"k":"row","t":"Phiên bản 0.6, 19/10/2026","d":"Cập nhật ngay trong ứng dụng: mỗi ngày tự tìm bản mới, tải và cài, có hiện trước những gì mới.","c":[]},{"k":"row","t":"Phiên bản 0.5, 19/10/2026","d":"Mole: các công cụ kiểm tra sức khỏe, dọn dẹp và gỡ ứng dụng của máy Mac trên một trang riêng.","c":[]},{"k":"row","t":"Phiên bản 0.3 và 0.4, 16/10/2026","d":"Dựng lại mọi bề mặt trên Liquid Glass, và linh vật của clipboard.","c":[]},{"k":"row","t":"Phiên bản 0.2, 15/10/2026","d":"Âm thanh riêng cho từng ứng dụng, chụp màn hình, chụp cuộn và quay màn hình có trình chỉnh sửa, cửa sổ cài đặt, tác tử AI trên notch, Smart Select, lịch, lời bài hát, ghim cửa sổ lên notch, ẩn biểu tượng thanh menu và Copy Stack.","c":[]}]},{"t":"Giấy phép","items":[{"k":"row","t":"Giấy phép MIT","d":"Figghost là phần mềm mã nguồn mở, miễn phí, theo Giấy phép MIT, bản quyền 2026 Doanh Thai Bui. Bạn được dùng cho mọi mục đích, ở nhà hay ở nơi làm việc, sao chép, sửa đổi, chia sẻ và thậm chí bán sản phẩm bạn làm ra từ nó. Điều kiện duy nhất là thông báo bản quyền và nội dung giấy phép phải đi kèm mọi bản sao hoặc phần đáng kể của phần mềm. Phần mềm được cung cấp nguyên trạng, không bảo hành: tác giả không chịu trách nhiệm về những gì nó làm trên máy Mac của bạn.","c":[{"s":"btn","v":"Xem nội dung giấy phép"}]},{"k":"row","t":"Các giấy phép khác","d":"Phông Inter đi kèm làm phông dự phòng cho cửa sổ này, theo SIL Open Font License 1.1 (bản quyền 2020 The Inter Project Authors); nội dung giấy phép nằm ở Resources/Inter-OFL.txt trong ứng dụng, còn của Figghost ở Resources/LICENSE.txt. Patrick Hand, nét chữ tay của các tiêu đề và của chú ma, theo cùng giấy phép (Resources/PatrickHand-OFL.txt). Gõ tiếng Việt đặt dấu bằng bộ máy của Gõ Nhanh (bản quyền 2025 Gõ Nhanh Contributors), theo giấy phép BSD 3-Clause, nội dung nằm ở Resources/GoNhanh-LICENSE.txt. Biểu tượng của các trang do Figghost tự vẽ; các biểu tượng khác của giao diện là SF Symbols do macOS tự vẽ, không thuộc về Figghost. Các thư viện Rust dùng để xây dựng ứng dụng giữ giấy phép riêng của chúng.","c":[]},{"k":"row","t":"Thoát Figghost","d":"Dừng cuộn mượt, clipboard và notch cho đến khi bạn mở lại ứng dụng.","c":[{"s":"btn","v":"Thoát Figghost","d":true}]}]}]}],"licence":"MIT License\n\nCopyright (c) 2026 Doanh Thai Bui\n\nPermission is hereby granted, free of charge, to any person obtaining a copy\nof this software and associated documentation files (the \"Software\"), to deal\nin the Software without restriction, including without limitation the rights\nto use, copy, modify, merge, publish, distribute, sublicense, and/or sell\ncopies of the Software, and to permit persons to whom the Software is\nfurnished to do so, subject to the following conditions:\n\nThe above copyright notice and this permission notice shall be included in all\ncopies or substantial portions of the Software.\n\nTHE SOFTWARE IS PROVIDED \"AS IS\", WITHOUT WARRANTY OF ANY KIND, EXPRESS OR\nIMPLIED, INCLUDING BUT NOT LIMITED TO THE WARRANTIES OF MERCHANTABILITY,\nFITNESS FOR A PARTICULAR PURPOSE AND NONINFRINGEMENT. IN NO EVENT SHALL THE\nAUTHORS OR COPYRIGHT HOLDERS BE LIABLE FOR ANY CLAIM, DAMAGES OR OTHER\nLIABILITY, WHETHER IN AN ACTION OF CONTRACT, TORT OR OTHERWISE, ARISING FROM,\nOUT OF OR IN CONNECTION WITH THE SOFTWARE OR THE USE OR OTHER DEALINGS IN THE\nSOFTWARE."};
+
+const glyph = (id, cls = '') => {
+  const g = GLYPHS[id];
+  if (!g) return '';
+  const p = (d, a) => (d ? `<path d="${d}" ${a}/>` : '');
+  const line = 'fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"';
+  return `<svg class="${cls}" viewBox="0 0 24 24" aria-hidden="true">` +
+    p(g.g, 'fill="currentColor" fill-opacity=".45" fill-rule="evenodd"') + p(g.s, 'fill="currentColor"') + p(g.w, line) + p(g.k, line) + '</svg>';
+};
+const esc = (s) => String(s ?? '').replace(/&/g, '&amp;').replace(/</g, '&lt;').replace(/>/g, '&gt;').replace(/"/g, '&quot;');
+const first = (s) => String(s || '').split(/(?<=\.)\s/)[0];
+
+// ---------------------------------------------------------------- the source, and the few places it needs help
+
+const SRC = Object.fromEntries(DATA.pages.map((p) => [p.id, p]));
+// A row that shows its own description again as its value says it once.
+for (const p of DATA.pages) for (const s of p.secs) for (const i of s.items) if (i.k === 'row') i.c = i.c.filter((c) => !(c.s === 'val' && c.v === i.d));
+const sec = (pid, title) => SRC[pid].secs.find((s) => s.t === title) || { t: title, items: [] };
+const pick = (pid, title, row) => sec(pid, title).items.find((i) => i.k === 'row' && i.t === row);
+const list = (rows, empty = '') => ({ k: 'list', rows, empty });
+function patch(pid, title, fn) { const s = sec(pid, title); s.items = fn(s.items); }
+
+// Lists the real page draws with blocks of its own, written out here.
+patch('cursor', 'Diện mạo', (it) => it.map((i) => (i.t === 'Hình' ? { ...i, c: [{ s: 'pop', o: ['Mũi tên cầu vồng', 'Nhện', 'Ếch', 'UFO', 'Ma', 'Phù thủy', 'Mario', 'Hình của bạn'], i: 0 }] } : i)));
+patch('launcher', 'Đã ghim', () => [list([{ t: 'Notes', d: 'Ứng dụng' }, { t: 'Documents', d: 'Thư mục' }, { t: 'Morning routine', d: 'Shortcut' }])]);
+patch('weather', 'Thành phố của bạn', (it) => [list([{ t: 'Hanoi, Vietnam' }, { t: 'Ho Chi Minh City, Vietnam' }, { t: 'Tokyo, Japan' }]), { k: 'row', t: '', d: it[0].d, c: [] }]);
+patch('weather', 'Thêm thành phố', (it) => it.filter((i) => i.t));
+patch('snippets', 'Các đoạn văn của bạn', () => [list([
+  { t: ';sig', d: 'Best regards, / An Nguyen (4 dòng)' }, { t: ';addr', d: '12 Le Loi Street, District 1, Ho Chi Minh City' },
+  { t: ';ty', d: 'Thank you for your message. I will get back to you by the end of the day.' }, { t: ';tyx', d: 'Unreachable: ;ty is finished first.' }])]);
+patch('snippets', 'Thêm đoạn văn', (it) => [
+  { k: 'row', t: 'Viết tắt', d: it[0].d, c: [{ s: 'field', ph: ';sig' }] },
+  { k: 'row', t: 'Nội dung', d: '', c: [{ s: 'area', ph: 'Nội dung mà viết tắt sẽ biến thành. Xuống dòng được giữ nguyên.' }] },
+  { k: 'row', t: '', d: '', c: [{ s: 'btn', v: 'Thêm đoạn văn', p: true }] }]);
+patch('clipboard', 'Lịch sử', (it) => it.map((i) => (i.t === 'Hiện có trong lịch sử' ? { ...i, c: [{ s: 'val', v: '128 mục' }] } : i)));
+patch('clipboard', 'Bảng ghim', (it) => [it[0], { ...list([], 'Chưa có bảng nào.'), add: 'Thêm bảng' }]);
+patch('prs', 'Danh sách', (it) => it.map((i) => (i.t ? i : { k: 'row', t: 'Đang chờ', d: '', c: [{ s: 'val', v: '3 yêu cầu' }] })));
+patch('calendar', 'Lịch được dùng', (it) => [list([], it[0].v)]);
+patch('calendar', 'Danh sách lời nhắc được dùng', (it) => [list([], it[0].v)]);
+patch('scroll', 'Cảm giác cuộn', (it) => [
+  { k: 'row', t: 'Kiểu cuộn', d: 'Chọn sẵn ba mức, hoặc chỉnh từng thanh bên dưới.', c: [{ s: 'seg', o: ['Chính xác', 'Cân bằng', 'Mượt'], i: 1 }] },
+  ...it.filter((i) => i.k === 'row' && i.t)]);
+patch('scroll', 'Ứng dụng', (it) => it.map((i) => (i.k === 'list' ? { ...i, rows: i.rows.map((r) => ({ ...r, c: r.c.map((c, k) => ({ ...c, lb: k ? 'Đảo chiều' : 'Cuộn mượt' })) })) } : i)));
+patch('about', '', (it) => it.filter((i) => i.t !== 'Phiên bản'));
+// The page shows only one button of this row at a time.
+pick('about', '', 'Kiểm tra bản mới').c = [{ s: 'btn', v: 'Kiểm tra' }];
+
+// ---------------------------------------------------------------- pieces
+
+function ctlHtml(c, label) {
+  // More than four choices do not fit a segmented control; macOS uses a pop-up button for them.
+  if (c.s === 'seg' && c.o.length > 4 && !c.reveal) c = { ...c, s: 'pop' };
+  const lab = esc(label || '');
+  let el = '';
+  if (c.s === 'sw') el = `<button class="sw" role="switch" aria-checked="${c.key ? on[c.key] : !!c.on}" data-sw="${c.key || ''}" aria-label="${lab}"></button>`;
+  else if (c.s === 'pop') el = `<select aria-label="${lab}"${c.descs ? ` data-descs="${esc(JSON.stringify(c.descs))}"` : ''}${c.reveal ? ` data-reveal="${c.reveal}"` : ''}>${c.o.map((o, k) => `<option${k === c.i ? ' selected' : ''}>${esc(o)}</option>`).join('')}</select>`;
+  else if (c.s === 'seg') el = `<span class="seg" role="group" aria-label="${lab}"${c.reveal ? ` data-reveal="${c.reveal}"` : ''}>${c.o.map((o, k) => `<button aria-pressed="${k === c.i}">${esc(o)}</button>`).join('')}</span>`;
+  else if (c.s === 'sl') el = `<input type="range" min="${c.min}" max="${c.max}" step="${c.step || 'any'}" value="${c.v}" data-unit="${esc(/^[\d.,]/.test(c.out || '') ? c.out.replace(/^[\d.,]+/, '') : '')}" aria-label="${lab}"><span class="rv">${esc(c.out || c.v)}</span>`;
+  else if (c.s === 'key') el = `<button class="key${c.v ? '' : ' empty'}" aria-label="${lab}">${esc(c.v || 'Chưa đặt')}</button>`;
+  else if (c.s === 'btn') el = `<button class="btn${c.p ? ' pri' : ''}${c.d ? ' danger' : ''}"${c.go ? ` data-go="${c.go}"` : ''}${c.sheet ? ` data-sheet="${c.sheet}"` : ''}>${esc(c.v)}</button>`;
+  else if (c.s === 'field') el = `<input class="field${c.wide ? ' wide' : ''}" value="${esc(c.v || '')}" placeholder="${esc(c.ph || '')}" aria-label="${lab}">`;
+  else if (c.s === 'area') el = `<textarea class="field" placeholder="${esc(c.ph || '')}" aria-label="${lab}"></textarea>`;
+  else if (c.s === 'kc') el = `<span class="kc">${esc(c.v)}</span>`;
+  else if (c.s === 'val') el = `<span class="val${c.num ? ' num' : ''}">${esc(c.v)}</span>`;
+  else if (c.s === 'html') el = c.v;
+  return c.lb ? `<label>${esc(c.lb)} ${el}</label>` : el;
+}
+
+function rowHtml(r, extra = '') {
+  if (!r.t && !r.d && !(r.c || []).length) return '';
+  const ctl = (r.c || []).map((c) => ctlHtml(c, r.t || r.d)).join('');
+  const long = (r.d || '').length > 150;
+  const desc = r.d ? `<div class="sub${long ? ' clamp' : ''}">${esc(r.d)}</div>${long ? '<button class="more">Thêm</button>' : ''}` : '';
+  return `<div class="row${r.dis ? ' dis' : ''}${r.go ? ' link' : ''}"${r.go ? ` data-go="${r.go}" tabindex="0"` : ''}${r.show ? ` data-show="${r.show}" hidden` : ''}${extra}>` +
+    (r.glyph ? glyph(r.glyph, 'g') : '') + (r.ic ? `<span class="ic">${esc(r.ic)}</span>` : '') +
+    `<div class="tx">${r.t ? `<div class="lbl">${esc(r.t)}</div>` : ''}${desc}</div>` +
+    (ctl ? `<div class="ctl">${ctl}</div>` : '') + (r.go ? '<i class="chev"></i>' : '') + '</div>';
+}
+
+function listHtml(l, add) {
+  const rows = l.rows.map((r) => rowHtml({ ...r, ic: /^[a-z0-9-]+\.[a-z0-9.-]+$/i.test(r.d || '') ? r.t[0] : '' }, ' data-item aria-selected="false"')).join('');
+  const label = add || l.add;
+  return (rows || (l.empty ? `<div class="row empty"><div class="tx"><div class="sub">${esc(l.empty)}</div></div></div>` : '')) +
+    (label ? `<div class="listbar"><button class="btn" data-add>${esc(label.replace(/[.…]+$/, ''))}…</button><button class="btn" data-del disabled>Xóa</button></div>` : '');
+}
+
+const fine = (t, d) => `<p class="fine">${t ? `<b>${esc(t)}.</b> ` : ''}${esc(d)}</p>`;
+
+/** A titled group of rows. Rows that only explain go under it as small print; a section of nothing but
+ *  explanations is only small print. */
+function section(title, items, o = {}) {
+  items = items.filter((i) => !(i.k === 'row' && ((o.skipRows || []).includes(i.t) || (!i.t && !i.d && !i.c.length))));
+  const isNote = (i) => (i.k === 'row' && !i.c.length && (i.d || '').length > 50) || (i.k === 'custom' && !(i.c || []).length && i.v && i.cls !== 'pad-wrap');
+  const notes = items.filter(isNote);
+  const rest = items.filter((i) => !isNote(i) && !(i.k === 'custom' && ['canvas', 'graph-legend'].includes(i.cls)));
+  let body = '';
+  for (let k = 0; k < rest.length; k++) {
+    const i = rest[k];
+    const next = rest[k + 1];
+    if (i.k === 'row') {
+      const add = i.c.find((c) => c.s === 'btn' && /^Thêm (ứng dụng|bảng)/.test(c.v));
+      if (add && next && next.k === 'list') { body += rowHtml({ ...i, c: i.c.filter((c) => c !== add) }) + listHtml(next, add.v); k++; continue; }
+      body += rowHtml(i);
+    } else if (i.k === 'list') body += listHtml(i);
+    else if (i.k === 'cards') {
+      const at = Math.max(0, i.items.findIndex((x) => x.on));
+      body += rowHtml({ t: title, d: i.items[at].d, c: [{ s: 'pop', o: i.items.map((x) => x.t), i: at, descs: i.items.map((x) => x.d) }] });
+    } else if (i.k === 'cheats') body += i.items.map(([t, keys]) => rowHtml({ t, c: [{ s: 'kc', v: keys }] })).join('');
+    else if (i.k === 'custom' && i.cls === 'pad-wrap') body += `<div class="pad" tabindex="0" aria-label="Ô thử cuộn">${Array.from({ length: 40 }, (_, n) => `Dòng ${n + 1}`).join('<br>')}</div>`;
+    else if (i.k === 'custom' && (i.c || []).length) body += rowHtml({ t: '', c: i.c });
+  }
+  return (body ? `${title ? `<h3>${esc(title)}</h3>` : ''}<div class="grp">${body}</div>` : '') + notes.map((i) => fine(i.t === title ? '' : i.t, i.d || i.v)).join('');
+}
+
+/** Every section of a page of the real window, in its order or in `o.order`, less those skipped or sent to the
+ *  sheet. `o.t` renames sections. */
+function all(pid, o = {}) {
+  const out = (o.skip || []).concat(o.adv || []);
+  let secs = SRC[pid].secs.filter((s) => !out.includes(s.t));
+  if (o.order) secs = o.order.map((t) => secs.find((s) => s.t === t)).filter(Boolean).concat(secs.filter((s) => !o.order.includes(s.t)));
+  return secs.map((s) => section((o.t || {})[s.t] ?? s.t, s.items, o)).join('');
+}
+const advOf = (pid, o = {}) => (o.adv || []).map((t) => section(t, sec(pid, t).items, o)).join('');
+
+// ---------------------------------------------------------------- the new window: its pages
+
+const NAV = [
+  ['', ['general', 'keys']],
+  ['Notch', ['notch', 'islands', 'notifications', 'volume', 'musicwidget']],
+  ['Chuột và cửa sổ', ['scroll', 'cursor', 'wheel', 'tiling', 'pin']],
+  ['Gõ và văn bản', ['clipboard', 'typing', 'snippets', 'smart', 'translate']],
+  ['Chụp và tải', ['capture', 'vision', 'download']],
+  ['Máy Mac', ['utilities', 'menubar', 'mole']],
+];
+
+const volRow = pick('notch', 'Âm lượng', 'Chỉ báo âm lượng trong notch');
+const barRow = pick('notch', 'Biểu tượng trên thanh menu', 'Ẩn biểu tượng trên thanh menu');
+
+// A page: where it comes from (`src`), its name and line when they differ, its switch, its body and its sheet.
+const PAGES = {
+  general: { name: 'Chung', glyph: 'general', body: general },
+  keys: { src: 'keys', body: () => section('Ở mọi nơi trên máy Mac', sec('keys', 'Ở mọi nơi trên máy Mac').items.map((i) => (i.c[0]?.v === 'Mở' ? { ...i, c: [], go: i.t === 'Chụp màn hình' ? 'capture' : 'tiling' } : i))) +
+    section('Trong notch và cửa sổ clipboard', sec('keys', 'Trong notch và cửa sổ clipboard').items) + section('Phím chuẩn', sec('keys', 'Phím chuẩn').items) },
+  notch: { src: 'notch', body: notch, adv: () => section('Màn hình', [sec('notch', 'Màn hình').items, pick('notch', 'Hành vi', 'Phản hồi xúc giác'), pick('notch', 'Giao diện', 'Đổ bóng')].flat().filter((i) => !['Ngày và giờ', 'Nút trước và sau'].includes(i.t))) },
+  islands: { src: 'islands' },
+  notifications: { src: 'notifications', o: { t: { '': 'Quyền truy cập' } } },
+  volume: { name: 'Chỉ báo âm lượng', glyph: 'sound', sub: first(volRow.d), master: volRow.c[0].on,
+    body: () => section('Kiểu', sec('notch', 'Kiểu chỉ báo').items) + fine('', volRow.d.slice(first(volRow.d).length + 1)) },
+  musicwidget: { src: 'musicwidget' },
+  scroll: { src: 'scroll', o: { order: ['Cảm giác cuộn', 'Thử ngay', 'Con lăn chuột', 'Phím bổ trợ', 'Ứng dụng'] } },
+  cursor: { src: 'cursor' },
+  wheel: { src: 'wheel', body: wheel },
+  tiling: { src: 'tiling', body: tiling },
+  pin: { src: 'pin', o: { t: { '': 'Chung' } } },
+  clipboard: { src: 'clipboard', o: { skip: ['Bàn phím'], adv: ['Trợ lý AI', 'Linh vật'] } },
+  typing: { src: 'typing', o: { t: { '': 'Chung' } } },
+  snippets: { src: 'snippets', o: { t: { '': 'Quyền truy cập' } } },
+  smart: { src: 'smart', o: { t: { '': 'Chung' } } },
+  translate: { src: 'translate', o: { t: { '': 'Chung' } } },
+  capture: { src: 'capture', o: { t: { '': 'Quyền truy cập' } } },
+  vision: { src: 'vision' },
+  download: { src: 'download', body: download },
+  utilities: { src: 'utilities' },
+  menubar: { name: 'Thanh menu', glyph: 'menubar', sub: 'Thêm một mũi tên và một vạch ngăn vào thanh menu để ẩn bớt biểu tượng.', master: barRow.c[0].on,
+    body: () => section('', sec('notch', 'Biểu tượng trên thanh menu').items, { skipRows: [barRow.t] }) },
+  mole: { src: 'mole', body: mole },
+  about: { src: 'about', body: about },
+};
+
+// The tabs of the notch, in one list: the notch's own, then the ones a feature brings.
+const LIVE = sec('notch', 'Các tab').items.find((i) => i.k === 'list').rows;
+const live = (t) => LIVE.find((r) => r.t === t) || { d: '', c: [{ on: true }] };
+const TABS = [
+  { id: 'clipboard', name: 'Clipboard', go: 'clipboard', builtin: 'Clipboard' },
+  { id: 'shelf', name: 'Khay', builtin: 'Khay', body: () => section('Khay tệp', sec('notch', 'Khay tệp').items) },
+  { id: 'media', name: 'Media', builtin: 'Media', body: () => section('Lời bài hát', sec('notch', 'Lời bài hát').items) },
+  { id: 'agents', o: { adv: ['Tài khoản', 'Token và chi phí'] } },
+  { id: 'calendar' }, { id: 'dayprogress' }, { id: 'video' }, { id: 'weather' }, { id: 'system' },
+  { id: 'sound', name: 'Âm thanh', builtin: 'Âm thanh' },
+  { id: 'prs' }, { id: 'outlook', o: { t: { '': 'Quyền truy cập' } } }, { id: 'pomodoro' }, { id: 'screentime' }, { id: 'notes' },
+  { id: 'launcher' }, { id: 'updates', body: updates }, { id: 'devices' }, { id: 'displays' }, { id: 'present', o: { t: { '': 'Quyền truy cập' }, adv: ['Phím tắt'] } },
+];
+for (const tab of TABS) {
+  if (tab.builtin) { tab.sub = live(tab.builtin).d; tab.key = 't:' + tab.id; continue; }
+  tab.src = tab.id;
+  tab.key = 'f:' + tab.id;
+}
+
+const on = {};
+for (const [id, p] of Object.entries(PAGES)) {
+  const m = 'master' in p ? p.master : p.src ? SRC[p.src].master : null;
+  if (m !== null && m !== undefined) on['f:' + id] = m;
+}
+for (const tab of TABS) on[tab.key] ??= tab.builtin ? live(tab.builtin).c[0].on : SRC[tab.id].master;
+
+const nameOf = (p) => p.name || (p.src ? SRC[p.src].name : '');
+const subOf = (p) => p.sub ?? first(p.src ? SRC[p.src].sub : '');
+const glyphOf = (p, id) => p.glyph || p.src || id;
+
+function head(p, id, key) {
+  const sw = key in on ? ctlHtml({ s: 'sw', key }, nameOf(p)) : '';
+  return `<div class="grp head"><span class="tile">${glyph(glyphOf(p, id))}</span><div class="tx"><div class="lbl">${esc(nameOf(p))}</div><div class="sub">${esc(subOf(p))}</div></div>${sw}</div>`;
+}
+
+// ---------------------------------------------------------------- pages with a layout of their own
+
+function general() {
+  const appHead = `<div class="grp head"><img class="appicon" src="images/icon.png" alt=""><div class="tx"><div class="lbl">Figghost</div><div class="sub">Phiên bản 2.1.17. Bạn đang dùng bản mới nhất.</div></div>${ctlHtml({ s: 'btn', v: 'Kiểm tra cập nhật' })}</div>`;
+  const features = NAV.slice(1).map(([name, ids]) => `<h3 class="minor">${esc(name)}</h3><div class="grp">` +
+    ids.map((id) => rowHtml({ t: nameOf(PAGES[id]), glyph: glyphOf(PAGES[id], id), go: id, c: ('f:' + id) in on ? [{ s: 'sw', key: 'f:' + id }] : [] })).join('') + '</div>').join('');
+  return appHead + section('Quyền truy cập', sec('general', 'Quyền truy cập').items, { skipRows: ['Thư mục dữ liệu'] }) +
+    section('Khởi động', sec('general', 'Khởi động').items) + section('Giao diện', sec('general', 'Giao diện').items) +
+    '<h3>Tính năng</h3>' + fine('', 'Bật hoặc tắt từng tính năng. Bấm vào tên để mở trang của nó.') + features +
+    section('Dữ liệu', [pick('general', 'Quyền truy cập', 'Thư mục dữ liệu')]);
+}
+
+function notch() {
+  const size = sec('notch', 'Kích thước').items[0];
+  const custom = [['Độ rộng', 'Độ rộng của notch khi mở. Tự động là vừa với từng tab.', 480, 1000, 640],
+    ['Chiều cao', 'Chiều cao của notch khi mở.', 260, 900, 320],
+    ['Độ rộng khi đóng', 'Trên màn hình không có tai thỏ. Tai thỏ thật giữ nguyên kích thước.', 120, 400, 180],
+    ['Chiều cao khi đóng', 'Trên màn hình không có tai thỏ.', 20, 48, 32]]
+    .map(([t, d, min, max, v]) => ({ k: 'row', t, d, show: 'size', c: [{ s: 'sl', min, max, v, out: v + ' pt' }] }));
+  const tabs = TABS.map((tab) => rowHtml({ t: tab.name || SRC[tab.id].name, d: tab.sub ?? first(SRC[tab.id].sub), glyph: tab.id, go: tab.go || (tab.builtin && !tab.body ? '' : 'tab:' + tab.id), c: [{ s: 'sw', key: tab.key }] }, ' draggable="true"')).join('');
+  const it = (s, r) => pick('notch', s, r);
+  return section('Giao diện', [
+    { k: 'row', t: 'Kích thước', d: '', c: [{ s: 'seg', o: size.items.map((x) => x.t), i: Math.max(0, size.items.findIndex((x) => x.on)), reveal: 'size' }] },
+    ...custom, it('Giao diện', 'Chất liệu'), it('Giao diện', 'Chuyển động')]) +
+    section('Hành vi', sec('notch', 'Hành vi').items.filter((i) => i.t !== 'Phản hồi xúc giác')) +
+    section('Khi notch đóng', [...sec('notch', 'Hoạt động trực tiếp').items, it('Màn hình', 'Ngày và giờ'), it('Màn hình', 'Nút trước và sau')]) +
+    '<h3>Tab</h3>' + `<div class="grp" id="tabs">${tabs}</div>` + fine('', 'Kéo một hàng để đổi thứ tự. Command + 1 đến 9 theo đúng thứ tự này. Bấm vào một tab để chỉnh nó.');
+}
+
+// The cells each ring of the drag wheel may show, by kind of file.
+const RINGS = [
+  ['Ảnh: PNG JPEG HEIC TIFF AVIF GIF BMP PDF', 'Video: MP4 MOV GIF M4A', 'Âm thanh: M4A WAV AIFF FLAC CAF AAC', 'PDF: PNG JPEG', 'Tài liệu: DOCX DOC RTF ODT HTML TXT PDF', 'Mọi tệp: ZIP TAR TGZ'],
+  ['Ảnh: Nén, Một nửa kích thước, Một phần tư kích thước, Xóa metadata, Tách nền, Chép chữ từ ảnh, Chú thích', 'Video: Thu nhỏ xuống 1080p, Thu nhỏ xuống 720p, Thu nhỏ xuống 540p, Xóa metadata', 'Âm thanh: Nén', 'PDF: Gộp PDF, Tách thành từng trang'],
+  ['Mọi tệp: Chép đường dẫn, Chép tệp, AirDrop, Mở Terminal tại đây, Hiện trong Finder, Đưa lên khay'],
+];
+function wheel() {
+  const rows = sec('wheel', '').items.filter((i) => i.k === 'row');
+  return [0, 1, 2].map((n) => {
+    const [ring, keyRow, cells] = rows.slice(n * 3, n * 3 + 3);
+    const picks = RINGS[n].map((g) => {
+      const [kind, names] = g.split(': ');
+      const items = names.split(names.includes(',') ? ', ' : ' ');
+      return `<div class="pg">${esc(kind)}</div><div class="picks">${items.map((x) => `<label><input class="chk" type="checkbox" checked> ${esc(x)}</label>`).join('')}</div>`;
+    }).join('');
+    return `<h3>${esc(ring.t)}</h3><div class="grp">` + rowHtml({ ...ring, t: 'Bật vòng này' }) + rowHtml({ ...keyRow, d: n ? '' : keyRow.d }) +
+      rowHtml({ t: cells.t, d: n ? '' : cells.d }) + picks + '</div>';
+  }).join('');
+}
+
+const ZONES = {
+  'Nửa trái': [0, 0, 0.5, 1], 'Nửa phải': [0.5, 0, 0.5, 1], 'Nửa trên': [0, 0, 1, 0.5], 'Nửa dưới': [0, 0.5, 1, 0.5],
+  'Góc trên trái': [0, 0, 0.5, 0.5], 'Góc trên phải': [0.5, 0, 0.5, 0.5], 'Góc dưới trái': [0, 0.5, 0.5, 0.5], 'Góc dưới phải': [0.5, 0.5, 0.5, 0.5],
+  'Phóng to tối đa': [0, 0, 1, 1], 'Giữa màn hình': [0.2, 0.15, 0.6, 0.7],
+  'Một phần ba đầu': [0, 0, 1 / 3, 1], 'Một phần ba giữa': [1 / 3, 0, 1 / 3, 1], 'Một phần ba cuối': [2 / 3, 0, 1 / 3, 1],
+};
+const zone = ([x, y, w, h]) => `<span class="zone" aria-hidden="true"><i style="left:calc(${x * 100}% + 2px);top:calc(${y * 100}% + 2px);width:calc(${w * 100}% - 4px);height:calc(${h * 100}% - 4px)"></i></span>`;
+function tiling() {
+  const keys = { 'Nửa trái': '⌃⌥←', 'Nửa phải': '⌃⌥→', 'Nửa trên': '⌃⌥↑', 'Nửa dưới': '⌃⌥↓', 'Góc trên trái': '⌃⌥U', 'Góc trên phải': '⌃⌥I', 'Góc dưới trái': '⌃⌥J', 'Góc dưới phải': '⌃⌥K',
+    'Phóng to tối đa': '⌃⌥↩', 'Giữa màn hình': '', 'Một phần ba đầu': '⌃⌥D', 'Một phần ba giữa': '⌃⌥F', 'Một phần ba cuối': '⌃⌥G' };
+  const cell = (n) => [((n - 1) % 3) / 3, Math.floor((n - 1) / 3) / 3, 1 / 3, 1 / 3];
+  const names = ['trên trái', 'trên giữa', 'trên phải', 'giữa trái', 'chính giữa', 'giữa phải', 'dưới trái', 'dưới giữa', 'dưới phải'];
+  const row = (t, z, k) => rowHtml({ t, c: [{ s: 'html', v: zone(z) }, { s: 'key', v: k }] });
+  const group = (title, list) => `<h3>${title}</h3><div class="grp">${list.map((t) => row(t, ZONES[t], keys[t])).join('')}</div>`;
+  const drag = sec('tiling', 'Kéo lên notch').items.filter((i) => i.k === 'row' && i.c.length);
+  const layouts = ['Tối đa', 'Chia đôi', 'Hai hàng', 'Chia ba', 'Bốn góc', 'Rộng trái', 'Rộng phải', '1 + 2', '2 + 1', 'Sáu ô'];
+  return group('Nửa và góc', Object.keys(ZONES).slice(0, 10)) + group('Một phần ba', Object.keys(ZONES).slice(10)) +
+    `<h3>Lưới chín ô</h3><div class="grp">${names.map((n, k) => row(`Ô ${k + 1}, ${n}`, cell(k + 1), '⌘' + (k + 1))).join('')}</div>` +
+    `<h3>Kéo lên notch</h3><div class="grp">${drag.map((r) => rowHtml(r)).join('')}<div class="pg">Bố cục hiện dưới notch</div><div class="picks">` +
+    layouts.map((l, k) => `<label><input class="chk" type="checkbox"${k < 7 ? ' checked' : ''}> ${esc(l)}</label>`).join('') + '</div></div>' +
+    `<div class="foot">${ctlHtml({ s: 'btn', v: 'Đặt lại phím tắt' })}</div>`;
+}
+
+function download() {
+  const items = [['Me at the zoo', 'Đang ghép', 'Hủy'], ['www.facebook.com', 'Đang chờ đến lượt', 'Hủy'], ['The New Vimeo Player', '42%, 3,1 MB/giây, còn 0:18', 'Hủy', 42],
+    ['A video that needs ffmpeg', 'Video này cần ffmpeg. Trong Terminal, chạy: brew install ffmpeg', ''], ['example.com', 'Thất bại: HTTP Error 404', ''], ['Me at the zoo', 'Đã lưu', 'Mở trong Finder']];
+  const link = `<div class="row">${ctlHtml({ s: 'field', ph: 'https://...', wide: true }, 'Link video')}${ctlHtml({ s: 'btn', v: 'Tải', p: true })}</div>`;
+  const s = sec('download', 'Tải về').items.filter((i) => i.k === 'row');
+  return section('Công cụ', sec('download', 'Công cụ').items) +
+    `<h3>Tải về</h3><div class="grp">${link}${s.map((r) => rowHtml(r)).join('')}</div>` +
+    `<h3>Các lượt tải</h3><div class="grp">` + items.map(([t, d, b, pct]) => rowHtml({ t, d, c: [pct ? { s: 'html', v: `<span class="meter"><i style="width:${pct}%"></i></span>` } : null, b ? { s: 'btn', v: b } : null].filter(Boolean) })).join('') +
+    `<div class="listbar">${ctlHtml({ s: 'btn', v: 'Xóa các lượt đã xong' })}</div></div>`;
+}
+
+function updates() {
+  const items = [['figghost', 'Homebrew cask', '2.0.9 lên 2.0.10'], ['pnpm', 'npm', '12.9.1 lên 12.15.0'], ['Droid', 'Coding agent', '0.245.0 lên 0.248.0'], ['Safari', 'Apple', '18.5']];
+  return section('', sec('updates', '').items) + `<h3>Có thể cập nhật</h3><div class="grp">` +
+    items.map(([t, src, v]) => rowHtml({ t, d: src, c: [{ s: 'val', v }, { s: 'html', v: `<input class="chk" type="checkbox" checked aria-label="${esc(t)}">` }] })).join('') +
+    `<div class="listbar"><label class="grow"><input class="chk" type="checkbox" checked> Chọn tất cả</label>${ctlHtml({ s: 'btn', v: 'Cập nhật tất cả' })}${ctlHtml({ s: 'btn', v: 'Cập nhật mục đã chọn', p: true })}</div></div>`;
+}
+
+// Mole reads the Mac when it opens; the numbers here are made up for the drawing.
+const MOLE = [
+  ['clean', 'Bộ nhớ đệm và nhật ký', 'Giải phóng dung lượng', 6.2, [['Bộ nhớ đệm của Xcode (DerivedData)', '3,1 GB'], ['Thùng rác', '1,3 GB'], ['Bộ nhớ đệm của Safari', '1,2 GB'], ['Nhật ký hệ thống', '640 MB']]],
+  ['purge', 'Thư mục build cũ', 'Thư mục build của dự án', 4.8, [['~/Code/web/node_modules', '2,6 GB'], ['~/Code/figghost/target', '1,9 GB'], ['~/Code/api/.venv', '310 MB']]],
+  ['installers', 'Bộ cài', 'Tệp cài đặt cũ', 1.4, [['Figma-126.dmg', '640 MB'], ['Xcode_26.xip.part', '520 MB'], ['Zoom.pkg', '240 MB']]],
+  ['apps', 'Gỡ ứng dụng', 'Ứng dụng cùng phần còn sót', 0, []],
+  ['docker', 'Docker', 'Tài nguyên Docker', 0, []],
+  ['analyze', 'Dung lượng ổ đĩa', 'Cái gì chiếm chỗ', 0, []],
+];
+const gb = (n) => String(n).replace('.', ',') + ' GB';
+function mole() {
+  const meters = [['CPU', 18], ['Bộ nhớ', 64], ['Ổ đĩa', 71], ['Đồ họa', 9]];
+  const total = MOLE.reduce((s, m) => s + m[3], 0);
+  const health = `<h3>Sức khỏe</h3><div class="grp">${rowHtml({ t: 'Điểm sức khỏe', d: 'Tốt. Cập nhật trực tiếp khi trang này mở.', c: [{ s: 'val', v: '86 trên 100' }, { s: 'btn', v: 'Làm mới tất cả' }] })}` +
+    meters.map(([t, v]) => rowHtml({ t, c: [{ s: 'html', v: `<span class="meter"><i style="width:${v}%"></i></span>` }, { s: 'val', v: v + '%', num: true }] })).join('') + '</div>';
+  const shades = [1, 0.6, 0.3];
+  const bar = `<div class="stack">${MOLE.filter((m) => m[3]).map((m, k) => `<i style="width:${(m[3] / total) * 100}%;opacity:${shades[k]}"></i>`).join('')}</div>`;
+  const rows = MOLE.map(([id, t, , size], k) => rowHtml({ t, go: 'mole:' + id, c: [size ? { s: 'html', v: `<span class="swatch-dot" style="opacity:${shades[k]}"></span>` } : null, { s: 'val', v: size ? gb(size) : 'Quét' }].filter(Boolean) })).join('');
+  return health + `<h3>Có thể dọn</h3><div class="grp">${rowHtml({ t: 'Tổng cộng', c: [{ s: 'val', v: gb(total.toFixed(1)) }] })}${bar}${rows}</div>` +
+    fine('', 'Số trong bản vẽ là số mẫu. Mole đọc máy thật khi trang mở.');
+}
+function moleSub(m) {
+  const [, , srcTitle, , items] = m;
+  const s = SRC.mole.secs.find((x) => x.items.some((i) => i.t === srcTitle));
+  const info = s ? s.items.find((i) => i.t === srcTitle) : null;
+  const rows = items.map(([t, size]) => rowHtml({ t, c: [{ s: 'val', v: size }, { s: 'html', v: `<input class="chk" type="checkbox" checked aria-label="${esc(t)}">` }] })).join('');
+  return (info ? fine('', info.d) : '') + `<h3>${esc(srcTitle)}</h3><div class="grp">` +
+    (rows || `<div class="row empty"><div class="tx"><div class="sub">Bấm Quét để tìm.</div></div></div>`) +
+    `<div class="listbar"><label class="grow"><input class="chk" type="checkbox" checked> Chọn tất cả</label>${rows ? ctlHtml({ s: 'btn', v: 'Dọn mục đã chọn', d: true }) : ctlHtml({ s: 'btn', v: 'Quét' })}</div></div>`;
+}
+
+function about() {
+  const main = sec('about', '').items;
+  const licence = sec('about', 'Giấy phép').items;
+  return `<div class="grp head"><img class="appicon" src="images/icon.png" alt=""><div class="tx"><div class="lbl">Figghost</div><div class="sub">Phiên bản 2.1.17. ${esc(SRC.about.sub)}</div></div></div>` +
+    section('Cập nhật', main.filter((i) => i.t !== 'Thư mục dữ liệu')) +
+    section('Figghost đang dùng', sec('about', 'Figghost đang dùng').items) +
+    section('Giấy phép', [
+      { ...licence.find((i) => i.t === 'Giấy phép MIT'), c: [{ s: 'btn', v: 'Xem giấy phép', sheet: 'licence' }] },
+      { k: 'row', t: 'Các phiên bản', d: 'Figghost ra đời thế nào, và mỗi bản đã thêm gì.', c: [{ s: 'btn', v: 'Xem', sheet: 'versions' }] },
+      pick('about', '', 'Thư mục dữ liệu'),
+      licence.find((i) => i.t === 'Thoát Figghost'),
+      licence.find((i) => i.t === 'Các giấy phép khác')]);
+}
+
+// Sheets that are not a page's Nâng cao.
+const SHEETS = {
+  licence: () => ['Giấy phép MIT', `<div class="grp"><pre>${esc(DATA.licence)}</pre></div>`],
+  versions: () => ['Các phiên bản', section('', sec('about', 'Vì sao có Figghost').items.map((i) => ({ ...i, c: [] }))).replace(/<p class="fine">/g, '<p class="fine" style="font-size:12px">')],
+};
+
+// Pages under a page: the tabs of the notch, the kinds of things Mole cleans.
+const SUBS = {};
+for (const tab of TABS) {
+  if (tab.go || (tab.builtin && !tab.body)) continue;
+  SUBS['tab:' + tab.id] = { parent: 'notch', page: { ...tab, glyph: tab.id }, key: tab.key };
+}
+for (const m of MOLE) SUBS['mole:' + m[0]] = { parent: 'mole', page: { name: m[1], glyph: 'mole', sub: '', body: () => moleSub(m) }, noHead: true };
+
+// ---------------------------------------------------------------- shell
+
+const $ = (s) => document.querySelector(s);
+const win = $('#win');
+const folded = (s) => s.normalize('NFD').replace(/[̀-ͯ]/g, '').replace(/[đĐ]/g, 'd').toLowerCase();
+const trail = { list: [], at: -1 };
+let cur = '';
+
+function resolve(id) {
+  if (SUBS[id]) return { ...SUBS[id], id };
+  return { parent: id, page: PAGES[id], key: 'f:' + id, id };
+}
+const bodyOf = (p) => (p.body ? p.body() : all(p.src, p.o));
+const advHtml = (p) => (p.adv ? p.adv() : p.src && p.o && p.o.adv ? advOf(p.src, p.o) : '');
+
+function render(id) {
+  const r = resolve(id);
+  const p = r.page;
+  const adv = advHtml(p);
+  const top = r.noHead || id === 'general' || id === 'about' ? '' : head(p, id.replace(/^tab:/, ''), r.key);
+  return top + bodyOf(p) + (adv ? `<div class="foot">${ctlHtml({ s: 'btn', v: 'Nâng cao…', sheet: 'adv' })}</div>` : '');
+}
+
+// What each sidebar page says, folded, so the search finds a page by any of its rows; the notch also by its tabs.
+let index = null;
+function searchIndex() {
+  if (index) return index;
+  const text = (html) => html.replace(/<[^>]+>/g, ' ');
+  index = {};
+  for (const id of NAV.flatMap((n) => n[1]).concat('about')) {
+    let s = nameOf(PAGES[id]) + ' ' + text(render(id) + advHtml(PAGES[id]));
+    for (const [sid, sub] of Object.entries(SUBS)) if (sub.parent === id) s += ' ' + text(render(sid) + advHtml(sub.page));
+    index[id] = folded(s);
+  }
+  return index;
+}
+
+function renderNav() {
+  const q = folded($('#q').value.trim());
+  const hit = (id) => !q || q.split(/\s+/).every((w) => searchIndex()[id].includes(w));
+  const active = resolve(cur).parent;
+  const html = NAV.map(([name, ids]) => {
+    const items = ids.filter(hit);
+    if (!items.length) return '';
+    return (name ? `<div class="nh">${esc(name)}</div>` : '') + items.map((id) =>
+      `<button class="ni" data-go="${id}"${id === active ? ' aria-current="page"' : ''}>${glyph(glyphOf(PAGES[id], id))}<span>${esc(nameOf(PAGES[id]))}</span>${on['f:' + id] === false ? '<small>Tắt</small>' : ''}</button>`).join('');
+  }).join('');
+  $('#nav').innerHTML = html || '<div class="none">Không có kết quả.</div>';
+  if (active === 'about') $('.me').setAttribute('aria-current', 'page'); else $('.me').removeAttribute('aria-current');
+}
+
+function go(id, fromTrail) {
+  if (!fromTrail && trail.list[trail.at] !== id) {
+    trail.list = trail.list.slice(0, trail.at + 1).concat(id);
+    trail.at = trail.list.length - 1;
+  }
+  cur = id;
+  $('#title').textContent = nameOf(resolve(id).page);
+  $('#form').innerHTML = render(id);
+  $('#scroll').scrollTop = 0;
+  $('#back').disabled = trail.at <= 0;
+  $('#fwd').disabled = trail.at >= trail.list.length - 1;
+  renderNav();
+}
+function step(by) {
+  const at = trail.at + by;
+  if (at < 0 || at >= trail.list.length) return;
+  trail.at = at;
+  go(trail.list[at], true);
+}
+
+function openSheet(kind) {
+  let title, body;
+  if (kind === 'adv') { const p = resolve(cur).page; title = nameOf(p) + ': nâng cao'; body = advHtml(p); }
+  else [title, body] = SHEETS[kind]();
+  $('#sheet').innerHTML = `<h4 id="sheet-t">${esc(title)}</h4>${body}<div class="foot">${ctlHtml({ s: 'btn', v: 'Xong', p: true })}</div>`;
+  $('#sheet').querySelector('.foot .btn').dataset.close = '';
+  $('#scrim').classList.add('open');
+  $('#sheet').scrollTop = 0;
+  $('#sheet').querySelector('.sw, select, input, .btn')?.focus();
+}
+function closeSheet() { $('#scrim').classList.remove('open'); }
+
+let recording = null;
+function stopRecording(text) {
+  if (!recording) return;
+  if (text !== undefined) { recording.textContent = text || 'Chưa đặt'; recording.classList.toggle('empty', !text); }
+  else recording.textContent = recording.dataset.old;
+  recording.classList.remove('rec');
+  recording = null;
+}
+const KEYNAMES = { Enter: '↩', Backspace: '⌫', Delete: '⌦', Tab: '⇥', ' ': 'Space', ArrowLeft: '←', ArrowRight: '→', ArrowUp: '↑', ArrowDown: '↓' };
+
+win.addEventListener('click', (e) => {
+  const t = e.target;
+  const s = t.closest('.sw');
+  if (s) {
+    const k = s.dataset.sw;
+    const v = s.getAttribute('aria-checked') !== 'true';
+    if (!k) return s.setAttribute('aria-checked', v);
+    on[k] = v;
+    win.querySelectorAll(`.sw[data-sw="${k}"]`).forEach((x) => x.setAttribute('aria-checked', v));
+    return renderNav();
+  }
+  const segBtn = t.closest('.seg button');
+  if (segBtn) {
+    const seg = segBtn.parentNode;
+    const buttons = [...seg.querySelectorAll('button')];
+    buttons.forEach((b) => b.setAttribute('aria-pressed', b === segBtn));
+    // A choice that opens settings of its own: the last one (Tùy chỉnh) shows its rows.
+    if (seg.dataset.reveal) win.querySelectorAll(`[data-show="${seg.dataset.reveal}"]`).forEach((r) => { r.hidden = segBtn !== buttons[buttons.length - 1]; });
+    return;
+  }
+  if (t.closest('.more')) {
+    const tx = t.closest('.tx');
+    tx.classList.toggle('open');
+    t.textContent = tx.classList.contains('open') ? 'Bớt' : 'Thêm';
+    return;
+  }
+  const k = t.closest('.key');
+  if (k) {
+    if (recording === k) return stopRecording();
+    stopRecording();
+    recording = k;
+    k.dataset.old = k.textContent;
+    k.textContent = 'Nhấn phím…';
+    k.classList.add('rec');
+    return;
+  }
+  const item = t.closest('[data-item]');
+  if (item && !t.closest('select, button, input')) {
+    const grp = item.parentNode;
+    grp.querySelectorAll('[data-item]').forEach((r) => r.setAttribute('aria-selected', r === item));
+    const del = grp.querySelector('[data-del]');
+    if (del) del.disabled = false;
+    return;
+  }
+  if (t.closest('[data-add]')) {
+    const bar = t.closest('.listbar');
+    bar.parentNode.querySelector('.row.empty')?.remove();
+    bar.insertAdjacentHTML('beforebegin', rowHtml({ t: 'Mục mới' }, ' data-item aria-selected="false"'));
+    return;
+  }
+  if (t.closest('[data-del]')) {
+    const grp = t.closest('.grp');
+    grp.querySelector('[data-item][aria-selected="true"]')?.remove();
+    t.closest('[data-del]').disabled = true;
+    return;
+  }
+  const sheet = t.closest('[data-sheet]');
+  if (sheet) return openSheet(sheet.dataset.sheet);
+  if (t.closest('[data-close]') || t === $('#scrim')) return closeSheet();
+  const link = t.closest('[data-go]');
+  if (link && link.dataset.go && !t.closest('select, input')) {
+    closeSheet();
+    $('#q').value = '';
+    go(link.dataset.go);
+  }
+});
+
+win.addEventListener('input', (e) => {
+  const el = e.target;
+  if (el.type === 'range') el.nextElementSibling.textContent = el.value + el.dataset.unit;
+  if (el.id === 'q') renderNav();
+});
+win.addEventListener('change', (e) => {
+  const el = e.target;
+  if (el.dataset.descs) el.closest('.row').querySelector('.sub').textContent = JSON.parse(el.dataset.descs)[el.selectedIndex];
+});
+
+// The tabs of the notch are put in order by dragging them.
+let dragged = null;
+win.addEventListener('dragstart', (e) => { dragged = e.target.closest('#tabs .row'); if (dragged) dragged.classList.add('dragging'); });
+win.addEventListener('dragend', () => { dragged?.classList.remove('dragging'); dragged = null; });
+win.addEventListener('dragover', (e) => {
+  const over = e.target.closest('#tabs .row');
+  if (!dragged || !over || over === dragged) return;
+  e.preventDefault();
+  const r = over.getBoundingClientRect();
+  over.parentNode.insertBefore(dragged, e.clientY > r.top + r.height / 2 ? over.nextSibling : over);
+});
+
+document.addEventListener('keydown', (e) => {
+  if (recording) {
+    e.preventDefault();
+    if (e.key === 'Escape') return stopRecording();
+    if (e.key === 'Backspace' || e.key === 'Delete') return stopRecording('');
+    if (['Shift', 'Meta', 'Alt', 'Control', 'CapsLock'].includes(e.key)) return;
+    const mods = (e.ctrlKey ? '⌃' : '') + (e.altKey ? '⌥' : '') + (e.shiftKey ? '⇧' : '') + (e.metaKey ? '⌘' : '');
+    if (!mods) return;
+    const name = KEYNAMES[e.key] || (/^(Key|Digit)/.test(e.code) ? e.code.slice(-1) : e.key.toUpperCase());
+    return stopRecording(mods + name);
+  }
+  if (e.key === 'Escape') closeSheet();
+  if (e.key === 'Enter' && e.target.matches('.row[data-go]')) go(e.target.dataset.go);
+});
+
+$('#back').onclick = () => step(-1);
+$('#fwd').onclick = () => step(1);
+
+// ---------------------------------------------------------------- the controls of this document
+
+$('#theme').addEventListener('click', (e) => {
+  const b = e.target.closest('button');
+  if (!b) return;
+  $('#theme').querySelectorAll('button').forEach((x) => x.setAttribute('aria-pressed', x === b));
+  if (b.dataset.theme) document.documentElement.dataset.theme = b.dataset.theme;
+  else delete document.documentElement.dataset.theme;
+});
+
+// The accent colours of macOS, light and dark.
+const ACCENTS = [
+  ['Xanh dương', '#007aff', '#0a84ff'], ['Tím', '#953d96', '#a550a7'], ['Hồng', '#f74f9e', '#f74f9e'], ['Đỏ', '#e0383e', '#ff5257'],
+  ['Cam', '#f7821b', '#f7821b'], ['Xanh lá', '#62ba46', '#62ba46'], ['Graphite', '#8c8c8c', '#8c8c8c'],
+];
+$('#accents').innerHTML = ACCENTS.map(([name, l], i) => `<button class="swatch" style="--c:${l}" aria-label="${name}" aria-pressed="${i === 0}" data-i="${i}"></button>`).join('');
+$('#accents').addEventListener('click', (e) => {
+  const b = e.target.closest('.swatch');
+  if (!b) return;
+  const [, l, d] = ACCENTS[b.dataset.i];
+  document.documentElement.style.setProperty('--accent-l', l);
+  document.documentElement.style.setProperty('--accent-d', d);
+  $('#accents').querySelectorAll('.swatch').forEach((x) => x.setAttribute('aria-pressed', x === b));
+});
+
+// A page can be opened from the address: redesign-macos.html#notch, #tab:calendar or #mole:clean.
+const start = decodeURIComponent(location.hash.slice(1));
+go(PAGES[start] || SUBS[start] ? start : 'general');
+</script>
+</body>
+</html>

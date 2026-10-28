@@ -16,7 +16,7 @@
     'lyrics.fetch.desc': 'Tra lời bài hát trên lrclib.net, một dịch vụ miễn phí. Để làm việc đó, ứng dụng gửi tên nghệ sĩ, tên bài hát, tên album và độ dài bài hát tới lrclib.net, không gửi gì khác. Lời tìm được sẽ lưu trên máy Mac này nên mỗi bài chỉ hỏi một lần; bài chưa có lời sẽ được hỏi lại sau vài ngày. Khi tắt mục này, chỉ hiện những lời đã lưu sẵn.',
   },
   slots: {
-    notch() {
+    media() {
       return [
         sectionTitle(t('lyrics.sec')),
         card(
@@ -28,7 +28,7 @@
   selftest({ expect, go, sent, S, $ }) {
     for (const code of ['en', 'vi']) {
       setLang(code);
-      go('notch');
+      go('media');
       const root = $('#scroller');
       const find = (label) => [...root.querySelectorAll('.switch')].find((b) => b.getAttribute('aria-label') === label);
       const show = find(t('lyrics.show.title'));

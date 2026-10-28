@@ -40,17 +40,17 @@
 .mole-chart-size { color: var(--text-2); font-variant-numeric: tabular-nums; }
 .mole-item.lit { background: var(--fill); }
 
-/* The dashboard: each figure keeps its own colour everywhere it appears, after iStat Menus and CleanMyMac. */
+/* The dashboard: one colour, the accent, as the rest of the window; the parts of one whole are told apart by its
+   shades, and heat keeps the colour of a warning. */
 .page {
-  --mole-cpu: #5e5ce6; --mole-cpu-2: #bf5af2;
-  --mole-mem: #30d158; --mole-mem-2: #64d2ff;
-  --mole-net: #ff375f; --mole-net-2: #0a84ff;
-  --mole-disk: #ff9f0a; --mole-disk-2: #ffd60a;
-  --mole-gpu: #64d2ff; --mole-heat: #ff6b35;
+  --mole-cpu: var(--tint); --mole-cpu-2: color-mix(in srgb, var(--tint) 30%, transparent);
+  --mole-mem: var(--tint); --mole-mem-2: color-mix(in srgb, var(--tint) 55%, transparent);
+  --mole-net: var(--tint); --mole-net-2: color-mix(in srgb, var(--tint) 45%, transparent);
+  --mole-disk: color-mix(in srgb, var(--tint) 75%, transparent); --mole-disk-2: color-mix(in srgb, var(--tint) 30%, transparent);
+  --mole-gpu: var(--tint); --mole-heat: var(--warn);
 }
 .mole-hero { display: grid; grid-template-columns: auto 1fr auto; align-items: center; gap: 20px; padding: 18px var(--row-inset);
-  background: radial-gradient(120% 140% at 0% 0%, color-mix(in srgb, var(--mole-cpu) 16%, transparent), transparent 60%),
-    radial-gradient(120% 140% at 100% 100%, color-mix(in srgb, var(--mole-mem) 14%, transparent), transparent 60%); }
+}
 .mole-score-ring { --v: 0; --c: var(--text-2); position: relative; display: grid; place-items: center; align-content: center; width: 112px; height: 112px; border-radius: 50%;
   background: conic-gradient(from -90deg, var(--c), color-mix(in srgb, var(--c) 55%, var(--mole-cpu-2)) calc(var(--v) * 1%), var(--field) 0);
 }
@@ -80,15 +80,14 @@
 .mole-gauge.disk { --c: var(--mole-disk); } .mole-gauge.gpu { --c: var(--mole-gpu); }
 .mole-tiles { display: grid; grid-template-columns: repeat(auto-fill, minmax(220px, 1fr)); gap: 10px; padding: 12px var(--row-inset); border-top: 0.5px solid var(--stroke); }
 .mole-tile { --c: var(--accent); --c2: var(--accent-2); display: flex; flex-direction: column; gap: 6px; padding: 12px; border-radius: 12px; min-width: 0;
-  background: linear-gradient(160deg, color-mix(in srgb, var(--c) 14%, transparent), color-mix(in srgb, var(--c2) 5%, transparent));
-  border: 0.5px solid color-mix(in srgb, var(--c) 30%, transparent); }
+  background: var(--fill-2); border: 0.5px solid var(--stroke); }
 .mole-tile.cpu { --c: var(--mole-cpu); --c2: var(--mole-cpu-2); }
 .mole-tile.mem { --c: var(--mole-mem); --c2: var(--mole-mem-2); }
 .mole-tile.net { --c: var(--mole-net); --c2: var(--mole-net-2); }
 .mole-tile.disk { --c: var(--mole-disk); --c2: var(--mole-disk-2); }
 .mole-tile.heat { --c: var(--mole-heat); --c2: var(--mole-disk-2); }
 .mole-tile-head { display: flex; justify-content: space-between; align-items: baseline; gap: 8px; font-weight: 600; }
-.mole-tile-head > span { color: var(--c, var(--text)); }
+.mole-tile-head > span { color: var(--text-2); }
 .mole-tile-value { font-size: 18px; font-weight: 700; font-variant-numeric: tabular-nums; white-space: nowrap; }
 .mole-tile-sub { color: var(--text-2); font-size: var(--fs-small); min-height: 1.3em; }
 .mole-tile-sub[data-tone=warning], .mole-tile-sub[data-tone=fair], .mole-tile-sub[data-tone=serious] { color: var(--warn); }
@@ -175,3 +174,18 @@
 .mole-all { min-width: 140px; }
 .mole-docker-note { white-space: normal; }
 .mole-free:has(> .mole-docker-note:empty) { display: none; }
+
+/* Parts of one whole, in shades of the accent; bars in one flat colour; nothing glows or pulses. */
+.mole-stack .clean, .mole-legend .clean i { background: var(--tint); }
+.mole-stack .purge, .mole-legend .purge i { background: color-mix(in srgb, var(--tint) 60%, transparent); }
+.mole-stack .installers, .mole-legend .installers i { background: color-mix(in srgb, var(--tint) 30%, transparent); }
+.mole-stack .d-containers, .mole-legend .d-containers i { background: var(--tint); }
+.mole-stack .d-images, .mole-legend .d-images i { background: color-mix(in srgb, var(--tint) 75%, transparent); }
+.mole-stack .d-volumes, .mole-legend .d-volumes i { background: color-mix(in srgb, var(--tint) 55%, transparent); }
+.mole-stack .d-cache, .mole-legend .d-cache i { background: color-mix(in srgb, var(--tint) 38%, transparent); }
+.mole-stack .d-logs, .mole-legend .d-logs i { background: color-mix(in srgb, var(--tint) 22%, transparent); }
+.mole-list .mole-bar > span, .mole-top .mole-bar > span { background: var(--tint); }
+.mole-cores .e i, .mole-cores .p i { background: var(--tint); }
+.mole-cores .e i { opacity: 0.55; }
+.mole-live.on::before { box-shadow: none; animation: none; }
+.mole-dot.running { box-shadow: none; }

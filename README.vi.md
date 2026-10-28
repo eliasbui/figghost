@@ -47,7 +47,7 @@ Figghost viết bằng Rust với lớp vỏ AppKit thuần (các crate `objc2`)
 
 ## Danh sách tính năng
 
-Cửa sổ cài đặt liệt kê mọi trang ở thanh bên dưới năm tiêu đề, và danh sách này giữ đúng tên các trang đó, chia thành sáu nhóm: tên trong giao diện tiếng Việt, kèm tên tiếng Anh. Tính năng ghi "tắt mặc định" được bật ở thẻ đầu trang của chính nó, hoặc ở ô của nó trên trang Chung.
+Cửa sổ cài đặt liệt kê các trang ở thanh bên dưới sáu tiêu đề, các tab của notch ở trang Notch, và danh sách này giữ đúng tên các trang đó, chia thành sáu nhóm: tên trong giao diện tiếng Việt, kèm tên tiếng Anh. Tính năng ghi "tắt mặc định" được bật ở đầu trang của chính nó, hoặc ở hàng của nó trên trang Chung.
 
 ### Cài đặt chung (General)
 
@@ -61,7 +61,7 @@ Cửa sổ cài đặt liệt kê mọi trang ở thanh bên dưới năm tiêu 
 
 | Trang | Tiếng Anh | Chức năng |
 | --- | --- | --- |
-| Cuộn chuột | Scrolling | Cuộn bánh xe mượt với đường cong nhìn thấy được, đảo chiều chỉ cho chuột ngoài, phím bổ trợ để cuộn ngang, nhanh hơn và phóng to, cùng quy tắc riêng cho từng ứng dụng |
+| Cuộn chuột | Scrolling | Cuộn bánh xe mượt với ô để thử, đảo chiều chỉ cho chuột ngoài, phím bổ trợ để cuộn ngang, nhanh hơn và phóng to, cùng quy tắc riêng cho từng ứng dụng |
 | Con trỏ | Cursor | Mũi tên cầu vồng, nhân vật pixel hoặc ảnh, GIF bất kỳ làm con trỏ (tắt mặc định) |
 | Vòng kéo thả | Drag wheel | Một vòng quanh con trỏ khi bạn kéo tệp: đổi cỡ, nén, tách hoặc gộp PDF, chú thích, chép chữ trong ảnh, cắt chủ thể, xóa siêu dữ liệu, đổi video thành GIF |
 
@@ -123,12 +123,12 @@ Notch luôn có Clipboard, Khay tệp, Media (kèm lời bài hát), Tập trung
 
 ## Cửa sổ cài đặt
 
-Mở ứng dụng là mở cửa sổ cài đặt; đóng cửa sổ thì ứng dụng về lại thanh menu. Một thanh bên bằng kính liệt kê mọi trang dưới năm tiêu đề (Tổng quan, Notch & Đảo động, Tab của notch, Chuột & Cửa sổ, Bảng tạm & Công cụ), mỗi trang một biểu tượng riêng và một chấm xanh khi tính năng của nó đang bật: bấm một trang, hoặc bấm giữ rồi kéo dọc thanh bên, một thấu kính trong suốt sẽ đi theo ngón tay và mở trang nằm dưới nó; bấm một tiêu đề để gập nhóm đó lại. Trang nào cũng mở đầu bằng một thẻ mang màu của riêng nó, có công tắc bật tắt tính năng; thanh công cụ có nút Quay lại và Tiếp; ô tìm ở đầu thanh bên (Command-K) tìm trang theo nội dung cài đặt của nó. Trang Chung có một ô cho mỗi tính năng, như Trung tâm điều khiển: bấm vòng tròn để bật tắt, bấm tên để mở trang của nó.
+Mở ứng dụng là mở cửa sổ cài đặt; đóng cửa sổ thì ứng dụng về lại thanh menu. Thanh bên liệt kê các trang dưới sáu tiêu đề (Notch, Chuột và cửa sổ, Gõ và văn bản, Chụp và tải, Máy Mac, sau Chung và Phím tắt), mỗi trang có biểu tượng màu nhấn và chữ Tắt cạnh tính năng đang tắt; ứng dụng cùng dòng cho biết đã có quyền Trợ năng chưa nằm ở trên cùng. Các tab của notch có trang riêng, mở từ danh sách tab ở trang Notch. Trang nào cũng mở đầu bằng một hàng có biểu tượng, câu nói trang để làm gì và công tắc của tính năng; thanh công cụ có nút Quay lại và Tiếp; nhóm ít dùng nằm sau nút Nâng cao… ở cuối trang; ô tìm ở đầu thanh bên (Command-K) tìm trang theo nội dung cài đặt của nó. Trang Chung liệt kê mọi tính năng kèm công tắc, bấm tên để mở trang của nó.
 
 | | |
 | --- | --- |
-| ![Trang Chung: phần đầu và một ô bật tắt cho mỗi tính năng](docs/images/settings-general.png) | ![Trang Cuộn chuột của nhóm Chuột & Thao tác](docs/images/settings-scroll.png) |
-| ![Trang Gõ tiếng Việt: ngôn ngữ, phím tắt, công tắc notch và thanh menu](docs/images/settings-typing.png) | ![Trang Giới thiệu với phiên bản, cập nhật và danh sách có gì ở đâu](docs/images/settings-about.png) |
+| ![Trang Chung: ứng dụng, quyền truy cập và công tắc cho từng tính năng](docs/images/settings-general.png) | ![Trang Cuộn chuột của nhóm Chuột & Thao tác](docs/images/settings-scroll.png) |
+| ![Trang Gõ tiếng Việt: ngôn ngữ, phím tắt, công tắc notch và thanh menu](docs/images/settings-typing.png) | ![Trang Giới thiệu với phiên bản, cập nhật và giấy phép](docs/images/settings-about.png) |
 
 ## Điểm nổi bật
 
@@ -164,7 +164,7 @@ Bắt đầu kéo một tệp rồi chạm một phím bổ trợ: một vòng m
 
 ### Cửa sổ cài đặt theo phong cách macOS
 
-Liquid Glass, cả hai giao diện sáng tối, mọi trang trên một thanh bên bằng kính với biểu tượng riêng, và mỗi tính năng bật tắt ngay ở thẻ đầu trang của nó. Xem [Cửa sổ cài đặt](#cửa-sổ-cài-đặt).
+Vẽ như Cài đặt Hệ thống, cả hai giao diện sáng tối, một màu nhấn, mọi trang trên một thanh bên ngắn gọn, và mỗi tính năng bật tắt ngay ở đầu trang của nó. Xem [Cửa sổ cài đặt](#cửa-sổ-cài-đặt).
 
 ## Tính năng chi tiết
 
@@ -174,9 +174,9 @@ Mở ứng dụng là mở cửa sổ cài đặt; đóng cửa sổ thì ứng 
 
 ### Cuộn chuột (như Mos)
 
-Cuộn bánh xe chuột mượt, đảo chiều chỉ cho chuột ngoài, phím bổ trợ (cuộn ngang, nhanh hơn, phóng to) và quy tắc riêng cho từng ứng dụng. Đường cong vẽ trong phần cài đặt khớp với việc bộ làm mượt thực sự làm.
+Cuộn bánh xe chuột mượt, đảo chiều chỉ cho chuột ngoài, phím bổ trợ (cuộn ngang, nhanh hơn, phóng to) và quy tắc riêng cho từng ứng dụng. Một ô trong trang cài đặt cho thấy tốc độ, mức cao nhất và bước nhảy lớn nhất của mỗi lần cuộn, đúng như bộ làm mượt thực sự chạy.
 
-![Trang Cuộn chuột với đường cong, tốc độ và quy tắc theo ứng dụng](docs/images/settings-scroll.png)
+![Trang Cuộn chuột với cảm giác cuộn, ô để thử và phím bổ trợ](docs/images/settings-scroll.png)
 
 ### Lịch sử clipboard (như Maccy)
 
@@ -242,7 +242,7 @@ Tab Trình chiếu chiếu một phần màn hình của bạn cho khán giả: 
 
 ![Tab Trình chiếu trong lúc chiếu: thời gian, chiếu gì lên đâu, các công tắc và mức phóng to](docs/images/notch-present.png)
 
-![Trang Notch của phần cài đặt với các kiểu kích thước và công tắc hành vi](docs/images/settings-notch.png)
+![Trang Notch của phần cài đặt: kích thước, giao diện, hành vi và danh sách tab](docs/images/settings-notch.png)
 
 Chỉ báo âm lượng có bảy kiểu, mỗi kiểu vẽ ở ba mức:
 
@@ -438,13 +438,13 @@ Build trên Windows, với Rust cho MSVC (WebView2 có sẵn trên Windows 11; t
 
 ## Thiết kế
 
-Cửa sổ cài đặt có một thế giới riêng bên trên thế giới của hệ thống: đêm của chú ma. Diện mạo của nó theo những gì các ứng dụng đoạt giải Apple Design Award 2026 có chung, một nơi tự dựng mà mọi phần của cửa sổ đều thuộc về, với các điều khiển của nền tảng bên trong. Bầu trời phía sau trang đổi theo giờ (bình minh, ban ngày, hoàng hôn, và đêm có sao ở giao diện tối); tiêu đề, tên các mục và lời chú ma nói được viết tay bằng Patrick Hand, phông không dùng cho thứ gì khác; chú ma là người dẫn đường của mọi trang (một bong bóng nói trang để làm gì, nhảy lên và nói thêm một câu khi được bấm), là dấu hiệu cho biết ứng dụng đã có quyền cần thiết chưa (thức, hoặc ngủ với mắt nhắm, và chữ nói giống vậy) và là nhân vật của mọi danh sách trống, còn chú lớn ở phần đầu trang Chung nhìn theo con trỏ bằng mắt. Không thứ gì trong đó là dấu hiệu duy nhất của điều gì, nên nó dùng được cho người không phân biệt được màu, và mọi hoạt ảnh dừng khi bật Giảm chuyển động. [docs/design.md](docs/design.md) nói nó được làm thế nào và thêm vào ra sao.
+Cửa sổ cài đặt được vẽ như Cài đặt Hệ thống, nên đọc như một phần của macOS. Thanh bên là một tấm sáng hơn nổi trên cửa sổ: ô tìm ở trên cùng, rồi đến ứng dụng cùng dòng cho biết đã có quyền Trợ năng chưa, rồi các trang dưới sáu tiêu đề, có chữ Tắt cạnh tính năng đang tắt. Các tab của notch có trang riêng, mở từ danh sách tab duy nhất ở trang Notch (nơi bật, tắt và sắp xếp chúng) hoặc từ trang Chung. Trang nào cũng mở đầu bằng cùng một hàng: biểu tượng của trang trên màu nhấn, tên, một câu nói trang để làm gì và công tắc của tính năng. Bên dưới là các nhóm, mỗi hàng một tên, tối đa hai dòng mô tả (Thêm để đọc hết) và một điều khiển; hàng chỉ để giải thích thành chữ nhỏ dưới nhóm, còn nhóm ít dùng nằm sau nút Nâng cao… mở thành một tấm sheet. [docs/design.md](docs/design.md) ghi các quy tắc và token.
 
-![Trang Chung ở giao diện tối vào ban đêm, với chú ma cạnh tiêu đề trang và ở phần đầu](docs/images/ghost-world-general-dark.png)
+![Trang Chung: ứng dụng, quyền truy cập, khởi động và công tắc cho từng tính năng](docs/images/settings-general.png)
 
-![Trang Chung ở giao diện sáng ban ngày](docs/images/ghost-world-general-light.png)
+![Trang Notch ở giao diện tối: kích thước, giao diện, hành vi và danh sách tab](docs/images/settings-notch-dark.png)
 
-Bản thân cửa sổ là một cửa sổ macOS trên Liquid Glass. Một thanh bên bằng kính nổi liệt kê mọi trang dưới năm tiêu đề, mỗi trang một biểu tượng riêng là các lớp kính trắng trên ô bo góc mang hai màu của trang, với một thấu kính đi theo cú bấm và kéo; ô tìm nằm ở đầu thanh bên; thanh công cụ làm mờ phần nội dung cuộn bên dưới; nội dung là các thẻ kính mờ có viền sáng từ góc trên trái, mỗi hàng một nhãn và điều khiển của nó, và trang nào cũng mở đầu bằng một thẻ mang màu của riêng nó. Các điều khiển theo hệ thống: chúng lấy màu nhấn mà người dùng chọn trong Cài đặt Hệ thống, một trạng thái lấy màu hệ thống của riêng nó (xanh lá khi thứ gì đó bật hoặc được cấp), nút và nút bật xuống là hình viên thuốc cao 28 điểm (26 khi nhỏ), công tắc có núm hình viên thuốc giãn ra khi nhấn giữ, phím tắt hiện mỗi phím thành một nắp phím riêng, tiêu đề mục 13 pt đậm vừa, và mọi biểu tượng khác, trong cửa sổ này và trong bảng thanh menu, là SF Symbol do hệ thống vẽ. Trong notch, chữ màu trắng ở ba mức trên nền đen, mức mờ nhất vẫn đạt 5,3:1; một trang chỉ hiện gợi ý phím khi notch đang có bàn phím, và trên màn hình có khuyết camera thì phần đầu nằm cạnh khuyết khi vừa, nên hình khối mở ra không có dải trống ngang phía trên. Chỉ thứ người dùng chạm vào mới chuyển động, ngắn gọn để phản hồi và bằng lò xo cho thứ di chuyển. Độ tương phản được đo chứ không đoán: chữ ít nhất 4,5:1 và viền của điều khiển đang tắt ít nhất 3:1 trên những nền tệ nhất, ở cả hai giao diện. Mọi hiệu ứng đều có phương án dự phòng cho Giảm độ trong suốt, Tăng độ tương phản và Giảm chuyển động, tiêu điểm luôn nhìn thấy, mọi điều khiển đều có tên, và cả cửa sổ dùng được bằng bàn phím. Mọi token là biến CSS ở đầu `crates/app-ui/web/app.css`.
+Chỉ một màu mang nghĩa: màu nhấn người dùng chọn trong Cài đặt Hệ thống. Trang đang mở, biểu tượng, công tắc và thanh trượt lấy màu đó; trạng thái được nói bằng chữ với màu hệ thống của nó (xanh lá khi đã cấp hoặc đã xong, cam khi còn cần làm), và không thứ gì khác có màu. Các bán kính đồng tâm (cửa sổ 26, thanh bên 18, nhóm 12, biểu tượng trang 9, mục thanh bên 8, điều khiển tròn cao 24 điểm), chữ là SF Pro, phím tắt hiện mỗi phím thành một nắp phím riêng, và mọi biểu tượng khác, trong cửa sổ này và trong bảng thanh menu, là SF Symbol do hệ thống vẽ hoặc một glyph một màu. Trong notch, chữ màu trắng ở ba mức trên nền đen, mức mờ nhất vẫn đạt 5,3:1; một trang chỉ hiện gợi ý phím khi notch đang có bàn phím, và trên màn hình có khuyết camera thì phần đầu nằm cạnh khuyết khi vừa, nên hình khối mở ra không có dải trống ngang phía trên. Chỉ điều khiển chuyển động, ngắn gọn, và không gì chuyển động khi bật Giảm chuyển động. Độ tương phản được đo: chữ màu xám và màu trạng thái của cửa sổ đạt ít nhất 4,5:1 ở cả hai giao diện, còn chữ trên màu nhấn là cặp màu của chính hệ thống. Tăng độ tương phản cho các nhóm, thanh bên và công tắc đang tắt một đường viền rõ, tiêu điểm luôn nhìn thấy, mọi điều khiển đều có tên, và cả cửa sổ dùng được bằng bàn phím. Mọi token là biến CSS trong `crates/app-ui/web/app.css`.
 
 ## Cấu hình
 
@@ -458,7 +458,7 @@ Ngoài lần xem bản mới mỗi ngày (một yêu cầu tới api.github.com 
 
 ## Lựa chọn công nghệ
 
-Lớp vỏ dùng AppKit qua `objc2`, không dùng GPUI hay Tauri. Ô tìm kiếm phải nhận được kiểu gõ Telex và VNI, điều `NSSearchField` xử lý sẵn. Panel không kích hoạt, theo dõi chuột và vòng đời ứng dụng đã được kiểm chứng trong kho này, và bộ nhớ nhàn rỗi vẫn thấp. Cửa sổ cài đặt là một WKWebView vì một màn hình cài đặt có đồ thị trực tiếp, hiệu ứng kính và hai ngôn ngữ làm và tinh chỉnh nhanh hơn nhiều dưới dạng một trang, và trang chỉ là một máy khách mỏng: mọi quy tắc nằm trong mã Rust có kiểm thử. SQLite là thư viện của hệ thống (với FTS5 và bộ tách trigram), không phải bản đóng kèm.
+Lớp vỏ dùng AppKit qua `objc2`, không dùng GPUI hay Tauri. Ô tìm kiếm phải nhận được kiểu gõ Telex và VNI, điều `NSSearchField` xử lý sẵn. Panel không kích hoạt, theo dõi chuột và vòng đời ứng dụng đã được kiểm chứng trong kho này, và bộ nhớ nhàn rỗi vẫn thấp. Cửa sổ cài đặt là một WKWebView vì một màn hình cài đặt có số đo trực tiếp và hai ngôn ngữ làm và tinh chỉnh nhanh hơn nhiều dưới dạng một trang, và trang chỉ là một máy khách mỏng: mọi quy tắc nằm trong mã Rust có kiểm thử. SQLite là thư viện của hệ thống (với FTS5 và bộ tách trigram), không phải bản đóng kèm.
 
 ## Bước tiếp theo
 
@@ -475,8 +475,7 @@ Cấu trúc kho, các chương trình trong `crates/*/examples` dùng để ki�
 
 MIT, xem [LICENSE](LICENSE).
 
-Cửa sổ cài đặt dùng SF Pro, phông của chính hệ thống, nên đọc như phần còn lại của macOS. Inter được đóng kèm làm phông dự phòng cho máy không có nó, và Patrick Hand cho nét chữ tay của tiêu đề, tên mục và lời chú ma, cả hai theo SIL Open Font License 1.1: xem
-[crates/app-ui/assets/Inter-OFL.txt](crates/app-ui/assets/Inter-OFL.txt) và
-[crates/app-ui/assets/PatrickHand-OFL.txt](crates/app-ui/assets/PatrickHand-OFL.txt).
+Cửa sổ cài đặt dùng SF Pro, phông của chính hệ thống, nên đọc như phần còn lại của macOS. Inter được đóng kèm làm phông dự phòng cho máy không có nó, theo SIL Open Font License 1.1: xem
+[crates/app-ui/assets/Inter-OFL.txt](crates/app-ui/assets/Inter-OFL.txt).
 
 Gõ tiếng Việt đặt dấu bằng bộ máy Telex và VNI của [Gõ Nhanh](https://github.com/khaphanspace/gonhanh.org) (crate `gonhanh-core`, dùng nguyên bản), bản quyền 2025 Gõ Nhanh Contributors, theo giấy phép BSD 3-Clause: xem [crates/app-ui/assets/GoNhanh-LICENSE.txt](crates/app-ui/assets/GoNhanh-LICENSE.txt), tệp này cũng đi kèm trong ứng dụng. Figghost không do tác giả của Gõ Nhanh làm ra hay bảo trợ.

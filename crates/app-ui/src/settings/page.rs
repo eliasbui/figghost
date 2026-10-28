@@ -305,19 +305,6 @@ const FONTS: &[(&[u8], &str)] = &[
     ),
 ];
 
-/// Patrick Hand, the hand-written face of the titles, the section names and what the ghost says: the same two
-/// subsets of one regular weight, bundled under the SIL Open Font License (`assets/PatrickHand-OFL.txt`).
-const HAND_FONTS: &[(&[u8], &str)] = &[
-    (
-        include_bytes!("../../assets/PatrickHand-latin.woff2"),
-        "U+0000-00FF,U+0131,U+0152-0153,U+02BB-02BC,U+02C6,U+02DA,U+02DC,U+0304,U+0308,U+0329,U+2000-206F,U+20AC,U+2122,U+2191,U+2193,U+2212,U+2215,U+FEFF,U+FFFD",
-    ),
-    (
-        include_bytes!("../../assets/PatrickHand-vietnamese.woff2"),
-        "U+0102-0103,U+0110-0111,U+0128-0129,U+0168-0169,U+01A0-01A1,U+01AF-01B0,U+0300-0301,U+0303-0304,U+0308-0309,U+0323,U+0329,U+1EA0-1EF9,U+20AB",
-    ),
-];
-
 /// The `@font-face` rules of one family, with the fonts themselves inline. The ranges are the ones the subsets
 /// were cut for, so a character outside them (a key symbol such as `⌥`) comes from the system font instead.
 fn faces(family: &str, weight: &str, fonts: &[(&[u8], &str)]) -> String {
@@ -334,7 +321,7 @@ fn faces(family: &str, weight: &str, fonts: &[(&[u8], &str)]) -> String {
 }
 
 fn font_faces() -> String {
-    faces("Inter", "100 900", FONTS) + &faces("Patrick Hand", "400", HAND_FONTS)
+    faces("Inter", "100 900", FONTS)
 }
 
 /// `window.__symbols` (name to a white PNG) and `window.__appIcon`, drawn by the system since the page may

@@ -29,10 +29,8 @@ cp "$TARGET/release/libfigghost_nowplaying.dylib" "$APP/Contents/Frameworks/"
 # Drawn by the make_icon example in macos-sys: cargo run -p macos-sys --example make_icon -- X.iconset,
 # then iconutil -c icns X.iconset -o crates/app-ui/assets/Figghost.icns
 cp "$ROOT/crates/app-ui/assets/Figghost.icns" "$APP/Contents/Resources/Figghost.icns"
-# Inter, the font of the settings page, is inside the executable; its licence travels with the app. So does that of
-# Patrick Hand, the hand-written face of its titles.
+# Inter, the font of the settings page, is inside the executable; its licence travels with the app.
 cp "$ROOT/crates/app-ui/assets/Inter-OFL.txt" "$APP/Contents/Resources/Inter-OFL.txt"
-cp "$ROOT/crates/app-ui/assets/PatrickHand-OFL.txt" "$APP/Contents/Resources/PatrickHand-OFL.txt"
 # Vietnamese typing puts its marks with the engine of Gõ Nhanh, whose BSD 3-Clause licence asks every copy of the
 # program to carry its notice.
 cp "$ROOT/crates/app-ui/assets/GoNhanh-LICENSE.txt" "$APP/Contents/Resources/GoNhanh-LICENSE.txt"
