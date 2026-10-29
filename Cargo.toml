@@ -48,6 +48,9 @@ core-netmerge = { path = "crates/core-netmerge" }
 # It is not on crates.io, so it is pinned to the last commit that changed it.
 gonhanh-core = { git = "https://github.com/khaphanspace/gonhanh.org", rev = "7ae856713adec91694c50d6ee38290b64b48bb3f" }
 objc2-event-kit = "0.3"
+# Speech to text for Dictation: the recognizer of macOS, fed from the microphone by an audio engine.
+objc2-speech = "0.3"
+objc2-avf-audio = "0.3"
 
 [profile.release]
 lto = "thin"

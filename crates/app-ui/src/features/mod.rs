@@ -22,6 +22,7 @@ use std::{
 };
 
 pub mod breaks;
+pub mod dictation;
 pub mod browser;
 pub mod calendar;
 pub mod capture;
@@ -291,6 +292,7 @@ pub struct Features {
     pub islands: Option<Rc<islands::Feature>>,
     pub utilities: Option<Rc<utilities::Feature>>,
     pub breaks: Option<Rc<breaks::Feature>>,
+    pub dictation: Option<Rc<dictation::Feature>>,
     pub browser: Option<Rc<browser::Feature>>,
     pub notes: Option<Rc<notes::Feature>>,
     pub launcher: Option<Rc<launcher::Feature>>,
@@ -339,6 +341,7 @@ impl Features {
             islands: islands::attach(env),
             utilities: utilities::attach(env),
             breaks: breaks::attach(env),
+            dictation: dictation::attach(env),
             browser: None,
             notes: notes::attach(env),
             launcher: launcher::attach(env),
@@ -424,6 +427,9 @@ impl Features {
         }
         if let Some(f) = &self.utilities {
             out.insert("utilities", f.runtime());
+        }
+        if let Some(f) = &self.dictation {
+            out.insert("dictation", f.runtime());
         }
         if let Some(f) = &self.breaks {
             out.insert("breaks", f.runtime());
@@ -559,6 +565,10 @@ impl Features {
                 .breaks
                 .as_ref()
                 .map_or(Ok(()), |f| f.configure(&config.breaks)),
+            "dictation" => self
+                .dictation
+                .as_ref()
+                .map_or(Ok(()), |f| f.configure(&config.dictation)),
             "browser" => self
                 .browser
                 .as_ref()
@@ -683,6 +693,9 @@ impl Features {
         if let Some(f) = &self.breaks {
             f.suspend_hotkeys();
         }
+        if let Some(f) = &self.dictation {
+            f.suspend_hotkeys();
+        }
         if let Some(f) = &self.pomodoro {
             f.suspend_hotkeys();
         }
@@ -736,6 +749,9 @@ impl Features {
         }
         if let Some(f) = &self.breaks {
             f.resume_hotkeys(&config.breaks);
+        }
+        if let Some(f) = &self.dictation {
+            f.resume_hotkeys(&config.dictation);
         }
         if let Some(f) = &self.pomodoro {
             f.resume_hotkeys(&config.pomodoro);
@@ -851,6 +867,11 @@ impl Features {
             return Some(result);
         }
         if let Some(f) = &self.pomodoro
+            && let Some(result) = f.action(name)
+        {
+            return Some(result);
+        }
+        if let Some(f) = &self.dictation
             && let Some(result) = f.action(name)
         {
             return Some(result);
@@ -1082,6 +1103,10 @@ pub fn state(
         pomodoro::settings::state(&config.pomodoro, runtime.get("pomodoro").unwrap_or(&none)),
     );
     root.insert(
+        "dictation".into(),
+        dictation::settings::state(&config.dictation, runtime.get("dictation").unwrap_or(&none)),
+    );
+    root.insert(
         "screentime".into(),
         screentime::settings::state(
             &config.screentime,
@@ -1197,6 +1222,8 @@ pub fn set(config: &mut Config, path: &str, value: &Value) -> Option<Result<&'st
         }
         "pomodoro" => pomodoro::settings::set(&mut config.pomodoro, rest, value)
             .map(|r| r.map(|()| "pomodoro")),
+        "dictation" => dictation::settings::set(&mut config.dictation, rest, value)
+            .map(|r| r.map(|()| "dictation")),
         "screentime" => screentime::settings::set(&mut config.screentime, rest, value)
             .map(|r| r.map(|()| "screentime")),
         "system" => {
@@ -1252,6 +1279,7 @@ pub fn shortcut_owner(target: &str) -> Option<&'static str> {
         "pomodoro",
         "present",
         "typing",
+        "dictation",
     ]
     .into_iter()
     .find(|id| *id == head)
@@ -1277,6 +1305,7 @@ pub fn shortcuts(config: &Config) -> Vec<(String, String)> {
     all.extend(pomodoro::settings::shortcuts(&config.pomodoro));
     all.extend(present::settings::shortcuts(&config.present));
     all.extend(typing::settings::shortcuts(&config.typing));
+    all.extend(dictation::settings::shortcuts(&config.dictation));
     all
 }
 
@@ -1322,6 +1351,8 @@ pub fn set_shortcut(
             .map(|r| r.map(|()| "present")),
         "typing" => typing::settings::set_shortcut(&mut config.typing, target, value)
             .map(|r| r.map(|()| "typing")),
+        "dictation" => dictation::settings::set_shortcut(&mut config.dictation, target, value)
+            .map(|r| r.map(|()| "dictation")),
         _ => None,
     }
 }

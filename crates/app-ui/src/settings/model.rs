@@ -1657,6 +1657,7 @@ mod tests {
             "islands",
             "utilities",
             "breaks",
+            "dictation",
             "browser",
             "notes",
             "launcher",

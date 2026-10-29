@@ -46,7 +46,7 @@ const KEYSTROKE_GAP_SECONDS: f64 = 0.03;
 /// holds the keyboard again, or `then(false)` if that does not happen in time. A fixed delay is not enough:
 /// macOS needs a variable time, often longer than 100 ms, to give the key window back, and a keystroke sent
 /// earlier is lost.
-fn when_focus_returns(previous_pid: Option<i32>, then: impl FnOnce(bool) + 'static) {
+pub(crate) fn when_focus_returns(previous_pid: Option<i32>, then: impl FnOnce(bool) + 'static) {
     let ours = std::process::id() as i32;
     let started = Instant::now();
     app::wait_until(

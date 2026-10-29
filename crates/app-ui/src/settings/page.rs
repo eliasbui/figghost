@@ -28,6 +28,7 @@ const FEATURE_SCRIPTS: &[&str] = &[
     include_str!("../../web/features/islands.js"),
     include_str!("../../web/features/utilities.js"),
     include_str!("../../web/features/breaks.js"),
+    include_str!("../../web/features/dictation.js"),
     include_str!("../../web/features/browser.js"),
     include_str!("../../web/features/notes.js"),
     include_str!("../../web/features/launcher.js"),
@@ -69,6 +70,7 @@ const FEATURE_STYLES: &[&str] = &[
     include_str!("../../web/features/browser.css"),
     include_str!("../../web/features/weather.css"),
     include_str!("../../web/features/launcher.css"),
+    include_str!("../../web/features/dictation.css"),
     include_str!("../../web/features/prs.css"),
     include_str!("../../web/features/updates.css"),
     include_str!("../../web/features/snippets.css"),
@@ -137,6 +139,10 @@ const FEATURE_FIXTURES: &[(&str, &str)] = &[
     (
         "breaks",
         include_str!("../../web/features/breaks.fixture.json"),
+    ),
+    (
+        "dictation",
+        include_str!("../../web/features/dictation.fixture.json"),
     ),
     (
         "browser",
@@ -262,6 +268,7 @@ const SYMBOLS: &[&str] = &[
     "magnifyingglass",
     "text.magnifyingglass",
     "character.bubble",
+    "mic",
     "character.bubble.fill",
     "pin",
     "pin.fill",

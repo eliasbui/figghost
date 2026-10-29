@@ -485,6 +485,8 @@ pub struct Config {
     #[serde(deserialize_with = "lenient_section")]
     pub pomodoro: crate::features::pomodoro::Config,
     #[serde(deserialize_with = "lenient_section")]
+    pub dictation: crate::features::dictation::Config,
+    #[serde(deserialize_with = "lenient_section")]
     pub screentime: crate::features::screentime::Config,
     #[serde(deserialize_with = "lenient_section")]
     pub dayprogress: crate::features::dayprogress::Config,
@@ -558,6 +560,7 @@ impl Default for Config {
             prs: crate::features::prs::Config::default(),
             updates: crate::features::updates::Config::default(),
             pomodoro: crate::features::pomodoro::Config::default(),
+            dictation: crate::features::dictation::Config::default(),
             screentime: crate::features::screentime::Config::default(),
             dayprogress: crate::features::dayprogress::Config::default(),
             devices: crate::features::devices::Config::default(),
@@ -625,6 +628,7 @@ impl Config {
                 cfg.weather = cfg.weather.sanitized();
                 cfg.prs = cfg.prs.sanitized();
                 cfg.pomodoro = cfg.pomodoro.sanitized();
+                cfg.dictation = cfg.dictation.sanitized();
                 cfg.screentime = cfg.screentime.sanitized();
                 cfg.dayprogress = cfg.dayprogress.sanitized();
                 cfg.devices = cfg.devices.sanitized();

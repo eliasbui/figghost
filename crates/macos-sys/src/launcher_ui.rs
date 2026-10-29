@@ -5,7 +5,7 @@
 use crate::{
     app::{self, Timer},
     button::{Look, TouchButton},
-    notch::{Material, Page, glass_tint, vibrancy_of},
+    notch::Page,
     panel::{FigPanel, Key},
     style::Tone,
     widgets::{ActionTarget, draw_page_note},
@@ -15,16 +15,14 @@ use block2::RcBlock;
 use objc2::{
     DefinedClass, MainThreadMarker, MainThreadOnly, define_class, msg_send,
     rc::Retained,
-    runtime::{AnyClass, AnyObject, ProtocolObject},
+    runtime::{AnyObject, ProtocolObject},
     sel,
 };
 /// The event a tile's menu is popped up with, named in `LauncherCallbacks`.
 pub use objc2_app_kit::NSEvent;
 use objc2_app_kit::{
-    NSApplicationDidChangeScreenParametersNotification, NSAutoresizingMaskOptions, NSColor,
-    NSEventPhase, NSFloatingWindowLevel, NSGlassEffectView, NSMenu, NSMenuItem, NSScreen, NSView,
-    NSVisualEffectBlendingMode, NSVisualEffectState, NSVisualEffectView,
-    NSWindowCollectionBehavior,
+    NSApplicationDidChangeScreenParametersNotification, NSAutoresizingMaskOptions, NSEventPhase,
+    NSFloatingWindowLevel, NSMenu, NSMenuItem, NSScreen, NSView, NSWindowCollectionBehavior,
 };
 use objc2_foundation::{
     NSNotification, NSNotificationCenter, NSObjectProtocol, NSPoint, NSRect, NSSize, NSString,
@@ -605,62 +603,14 @@ impl DockPanel {
         self.panel.isVisible()
     }
 
-    /// Puts the glass behind the tiles. Under Increase Contrast or Reduce Transparency the desktop must not show
-    /// through, so the dock is an opaque dark shape; before macOS 26 there is no Liquid Glass and a dark vibrancy
-    /// material stands in.
+    /// Puts the glass behind the tiles, again only when Increase Contrast or Reduce Transparency changed.
     fn dress(&self) {
         let options = display_options();
         let solid = options.reduce_transparency || options.increase_contrast;
-        if self.solid.replace(Some(solid)) == Some(solid) {
-            return;
+        if self.solid.replace(Some(solid)) != Some(solid) {
+            self.panel
+                .set_glass_content(self.mtm, &self.view.root, DOCK_RADIUS);
         }
-        let size = NSRect::new(NSPoint::ZERO, self.panel.frame().size);
-        let sizable = NSAutoresizingMaskOptions::ViewWidthSizable
-            | NSAutoresizingMaskOptions::ViewHeightSizable;
-        self.view.root.removeFromSuperview();
-        let glass = glass_tint(Material::Glass)
-            .filter(|_| !solid && AnyClass::get(c"NSGlassEffectView").is_some());
-        if let Some((look, tint)) = glass {
-            let glass = NSGlassEffectView::initWithFrame(self.mtm.alloc(), size);
-            glass.setStyle(look);
-            glass.setTintColor(Some(&tint));
-            glass.setCornerRadius(DOCK_RADIUS);
-            glass.setAutoresizingMask(sizable);
-            self.view.root.setFrame(size);
-            glass.setContentView(Some(&self.view.root));
-            self.panel.setContentView(Some(&glass));
-            return;
-        }
-        let base: Retained<NSView> = if solid {
-            let plain = NSView::initWithFrame(self.mtm.alloc(), size);
-            plain.setWantsLayer(true);
-            if let Some(layer) = plain.layer() {
-                let fill = NSColor::colorWithSRGBRed_green_blue_alpha(0.11, 0.11, 0.13, 1.0);
-                // SAFETY: plain property setter on the view's backing layer.
-                unsafe {
-                    let _: () = msg_send![&*layer, setBackgroundColor: &*fill.CGColor()];
-                }
-            }
-            plain
-        } else {
-            let effect = NSVisualEffectView::initWithFrame(self.mtm.alloc(), size);
-            effect.setMaterial(vibrancy_of(Material::Glass));
-            effect.setBlendingMode(NSVisualEffectBlendingMode::BehindWindow);
-            effect.setState(NSVisualEffectState::Active);
-            effect.setWantsLayer(true);
-            Retained::into_super(effect)
-        };
-        if let Some(layer) = base.layer() {
-            // SAFETY: plain property setters on the view's backing layer.
-            unsafe {
-                let _: () = msg_send![&*layer, setCornerRadius: DOCK_RADIUS];
-                let _: () = msg_send![&*layer, setMasksToBounds: true];
-            }
-        }
-        base.setAutoresizingMask(sizable);
-        self.view.root.setFrame(size);
-        base.addSubview(&self.view.root);
-        self.panel.setContentView(Some(&base));
     }
 
     /// Shows `display` at `edge` of the screen called `screen` (the main screen when there is none of that name, or

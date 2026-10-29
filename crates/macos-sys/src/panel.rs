@@ -1,14 +1,20 @@
 //! Borderless, transparent, non-activating panel shared by the notch and the cursor popup.
 
+use crate::{
+    notch::{Material, glass_tint, vibrancy_of},
+    workspace::display_options,
+};
 use objc2::{
-    DefinedClass, MainThreadMarker, MainThreadOnly, define_class, msg_send, rc::Retained, sel,
+    DefinedClass, MainThreadMarker, MainThreadOnly, define_class, msg_send, rc::Retained,
+    runtime::AnyClass, sel,
 };
 use objc2_app_kit::{
-    NSAppearance, NSAppearanceCustomization, NSAppearanceNameDarkAqua, NSBackingStoreType, NSColor,
-    NSEvent, NSEventModifierFlags, NSEventType, NSMainMenuWindowLevel, NSPanel,
-    NSWindowAnimationBehavior, NSWindowCollectionBehavior, NSWindowStyleMask,
+    NSAppearance, NSAppearanceCustomization, NSAppearanceNameDarkAqua, NSAutoresizingMaskOptions,
+    NSBackingStoreType, NSColor, NSEvent, NSEventModifierFlags, NSEventType, NSGlassEffectView,
+    NSMainMenuWindowLevel, NSPanel, NSView, NSVisualEffectBlendingMode, NSVisualEffectState,
+    NSVisualEffectView, NSWindowAnimationBehavior, NSWindowCollectionBehavior, NSWindowStyleMask,
 };
-use objc2_foundation::{NSObjectProtocol, NSRect};
+use objc2_foundation::{NSObjectProtocol, NSPoint, NSRect};
 use std::{
     cell::{Cell, RefCell},
     rc::Rc,
@@ -296,6 +302,63 @@ impl FigPanel {
         let dark = unsafe { NSAppearance::appearanceNamed(NSAppearanceNameDarkAqua) };
         panel.setAppearance(dark.as_deref());
         panel
+    }
+
+    /// Puts `content` over the whole panel on Liquid Glass with the notch's tint and corners of `radius`, as every
+    /// panel over other apps is. Under Increase Contrast or Reduce Transparency the desktop must not show through, so
+    /// it sits on an opaque dark shape; before macOS 26 there is no Liquid Glass and a dark vibrancy material stands
+    /// in. Returns whether it is the opaque shape, which is what changes when those settings do.
+    pub fn set_glass_content(&self, mtm: MainThreadMarker, content: &NSView, radius: f64) -> bool {
+        let options = display_options();
+        let solid = options.reduce_transparency || options.increase_contrast;
+        let size = NSRect::new(NSPoint::ZERO, self.frame().size);
+        let sizable = NSAutoresizingMaskOptions::ViewWidthSizable
+            | NSAutoresizingMaskOptions::ViewHeightSizable;
+        content.removeFromSuperview();
+        content.setFrame(size);
+        content.setAutoresizingMask(sizable);
+        let glass = glass_tint(Material::Glass)
+            .filter(|_| !solid && AnyClass::get(c"NSGlassEffectView").is_some());
+        if let Some((look, tint)) = glass {
+            let glass = NSGlassEffectView::initWithFrame(mtm.alloc(), size);
+            glass.setStyle(look);
+            glass.setTintColor(Some(&tint));
+            glass.setCornerRadius(radius);
+            glass.setAutoresizingMask(sizable);
+            glass.setContentView(Some(content));
+            self.setContentView(Some(&glass));
+            return false;
+        }
+        let base: Retained<NSView> = if solid {
+            let plain = NSView::initWithFrame(mtm.alloc(), size);
+            plain.setWantsLayer(true);
+            if let Some(layer) = plain.layer() {
+                let fill = NSColor::colorWithSRGBRed_green_blue_alpha(0.11, 0.11, 0.13, 1.0);
+                // SAFETY: plain property setter on the view's backing layer.
+                unsafe {
+                    let _: () = msg_send![&*layer, setBackgroundColor: &*fill.CGColor()];
+                }
+            }
+            plain
+        } else {
+            let effect = NSVisualEffectView::initWithFrame(mtm.alloc(), size);
+            effect.setMaterial(vibrancy_of(Material::Glass));
+            effect.setBlendingMode(NSVisualEffectBlendingMode::BehindWindow);
+            effect.setState(NSVisualEffectState::Active);
+            effect.setWantsLayer(true);
+            Retained::into_super(effect)
+        };
+        if let Some(layer) = base.layer() {
+            // SAFETY: plain property setters on the view's backing layer.
+            unsafe {
+                let _: () = msg_send![&*layer, setCornerRadius: radius];
+                let _: () = msg_send![&*layer, setMasksToBounds: true];
+            }
+        }
+        base.setAutoresizingMask(sizable);
+        base.addSubview(content);
+        self.setContentView(Some(&base));
+        solid
     }
 
     /// The handler returns true when it consumed the key.

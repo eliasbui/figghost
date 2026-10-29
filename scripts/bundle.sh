@@ -58,7 +58,8 @@ cat > "$APP/Contents/Info.plist" <<'PLIST'
     <key>NSHighResolutionCapable</key><true/>
     <key>NSAudioCaptureUsageDescription</key><string>Figghost changes the volume, output and sound of each app, and records the computer's audio in screen recordings when asked to.</string>
     <key>NSBluetoothAlwaysUsageDescription</key><string>Figghost shows in the notch when a Bluetooth device connects or disconnects.</string>
-    <key>NSMicrophoneUsageDescription</key><string>Figghost records the microphone in screen recordings when you turn it on.</string>
+    <key>NSMicrophoneUsageDescription</key><string>Figghost records the microphone in screen recordings when you turn it on, and listens to it while the Dictation panel is open.</string>
+    <key>NSSpeechRecognitionUsageDescription</key><string>Figghost turns what you say into text while the Dictation panel is open. English and Vietnamese are recognized on this Mac unless you allow Apple's servers in Settings.</string>
     <key>NSCameraUsageDescription</key><string>Figghost shows the camera in screen recordings when you turn it on.</string>
     <key>NSAppleEventsUsageDescription</key><string>Figghost reads the current track from Music and Spotify to show it in the notch, reads the address of the tab in front of your browser when you copy its link or count time by site, and asks System Events to switch the dark appearance when you do.</string>
     <key>NSCalendarsUsageDescription</key><string>Figghost reads your calendar events to show today and tomorrow on the notch and to warn you before a meeting. Nothing leaves this Mac.</string>

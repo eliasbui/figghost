@@ -1,0 +1,16 @@
+{
+  "enabled": true,
+  "shortcut": "ctrl+opt+v",
+  "language": "auto",
+  "on_device": true,
+  "silence_seconds": 3,
+  "sound": true,
+  "listening": false,
+  "speech": "ask",
+  "microphone": false,
+  "accessibility": true,
+  "models": {
+    "vi": { "available": true, "on_device": true },
+    "en": { "available": true, "on_device": true }
+  }
+}
