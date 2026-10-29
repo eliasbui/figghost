@@ -5,10 +5,12 @@
 
 use core_smart::net::{self, NetError};
 use serde_json::Value;
+use std::process::{Command, Stdio};
 
 const LATEST: &str = "https://api.github.com/repos/eliasbui/figghost/releases/latest";
 /// The same releases as a feed, which is not counted against the API's sixty calls an hour for a Mac that is not
-/// signed in; it has no assets, so a release read from it is downloaded by hand.
+/// signed in; it has no assets, so the zip of a newer release read from it is found by its name (`asset_by_name`).
+/// Many Macs behind one address, as in an office, use up those sixty calls between them.
 const FEED: &str = "https://github.com/eliasbui/figghost/releases.atom";
 /// Every address taken from the answer, for a person or for curl, has to be under this one.
 const RELEASES: &str = "https://github.com/eliasbui/figghost/releases/";
@@ -46,13 +48,58 @@ pub fn latest() -> Result<Release, String> {
         NetError::Status => "GitHub has no release to show".to_owned(),
         other => format!("{other:?}"),
     });
-    match api.and_then(|body| parse(&body)) {
-        Ok(release) => Ok(release),
+    let mut release = match api.and_then(|body| parse(&body)) {
+        Ok(release) => release,
         Err(e) => net::get(FEED, &[], SECONDS)
             .ok()
             .and_then(|feed| parse_feed(&feed))
-            .ok_or(e),
+            .ok_or(e)?,
+    };
+    // A release read from the feed, or one whose zip the API did not list yet, can still be installed when its zip is
+    // there under its usual name; only a newer one is looked for, so an up-to-date app asks nothing more.
+    if release.asset.is_none() && newer(&release.version, env!("CARGO_PKG_VERSION")) {
+        release.asset = asset_by_name(&release.version);
     }
+    Ok(release)
+}
+
+/// The zip of a release by the name the release script gives it, with its size asked of the download itself, which
+/// is not counted against the API's limit. There is no checksum this way; the size, and the version and signature of
+/// the app inside, are still checked before it is installed.
+fn asset_by_name(version: &str) -> Option<Asset> {
+    if !is_version(version) {
+        return None;
+    }
+    let url = format!("{RELEASES}download/v{version}/Figghost-{version}.zip");
+    let out = Command::new("/usr/bin/curl")
+        .args(["--silent", "--fail", "--location", "--head"])
+        .args(["--proto", "=https", "--proto-redir", "=https"])
+        .args(["--max-time", &SECONDS.to_string()])
+        .arg(&url)
+        .stdin(Stdio::null())
+        .stderr(Stdio::null())
+        .output()
+        .ok()
+        .filter(|out| out.status.success())?;
+    let size = last_length(&String::from_utf8_lossy(&out.stdout))?;
+    Some(Asset {
+        url,
+        size,
+        sha256: None,
+    })
+}
+
+/// The length the last response of a chain of redirects gives: the headers of each hop come one after the other, and
+/// only the last is the file's.
+fn last_length(headers: &str) -> Option<u64> {
+    let last = headers
+        .rsplit_once("HTTP/")
+        .map_or(headers, |(_, last)| last);
+    last.lines()
+        .filter_map(|line| line.split_once(':'))
+        .find(|(name, _)| name.trim().eq_ignore_ascii_case("content-length"))
+        .and_then(|(_, value)| value.trim().parse().ok())
+        .filter(|size| *size > 0)
 }
 
 /// The newest entry of the releases feed: its version from the link to its tag, and its notes, whose list items
@@ -235,6 +282,37 @@ pub fn newer(latest: &str, current: &str) -> bool {
 #[cfg(test)]
 mod tests {
     use super::*;
+
+    #[test]
+    fn the_size_of_a_download_is_that_of_the_last_hop_of_its_redirects() {
+        let chain = "HTTP/2 302 \r\nlocation: https://release-assets.example/x\r\ncontent-length: 0\r\n\r\n\
+                     HTTP/2 200 \r\nContent-Type: application/octet-stream\r\nContent-Length: 8189114\r\n\r\n";
+        assert_eq!(last_length(chain), Some(8_189_114));
+        assert_eq!(
+            last_length("HTTP/2 200\r\ncontent-length: 12\r\n"),
+            Some(12)
+        );
+        assert_eq!(
+            last_length("HTTP/2 302\r\ncontent-length: 0\r\n"),
+            None,
+            "an empty answer is no file"
+        );
+        assert_eq!(last_length("HTTP/2 200\r\nserver: x\r\n"), None);
+        assert_eq!(last_length(""), None);
+    }
+
+    #[test]
+    #[ignore = "asks github.com"]
+    fn a_published_release_is_found_by_its_name() {
+        let asset = asset_by_name("2.2.2").expect("the zip of 2.2.2");
+        assert_eq!(
+            asset.url,
+            "https://github.com/eliasbui/figghost/releases/download/v2.2.2/Figghost-2.2.2.zip"
+        );
+        assert!(asset.size > 1_000_000);
+        assert!(asset_by_name("0.0.1").is_none(), "no such release");
+        assert!(asset_by_name("1.0;rm").is_none());
+    }
 
     /// The answer for 0.5.0, as GitHub gave it, cut down to the fields that matter.
     const ANSWER: &str = r#"{
@@ -434,9 +512,9 @@ mod tests {
             "{} is not a three number version",
             release.version
         );
-        // Read from the feed while the API's limit is reached, the release has no assets.
+        // Read from the feed while the API's limit is reached, a release no newer than this build has no assets.
         let Some(asset) = release.asset else {
-            println!("read from the feed, which has no assets");
+            println!("read from the feed, which has no assets, and not newer than this build");
             return;
         };
         println!("zip: {} bytes, sha256 {:?}", asset.size, asset.sha256);
