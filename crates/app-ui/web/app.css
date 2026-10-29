@@ -790,9 +790,6 @@ html.increase-contrast {
   --text-3: var(--text);
   --boundary: var(--text);
 }
-html.increase-contrast .pico {
-  box-shadow: inset 0 0 0 1px rgba(0, 0, 0, 0.45);
-}
 html.reduce-motion *,
 html.reduce-motion *::before,
 html.reduce-motion *::after {
@@ -981,23 +978,12 @@ html.reduce-motion *::after {
 html.inactive .nav-item[aria-current="page"], html.inactive .me[aria-current="page"] { background: var(--selection-idle); color: var(--text); }
 html.inactive .me[aria-current="page"] .me-status, html.inactive .nav-item[aria-current="page"] .nav-off { color: var(--text-2); }
 
-/* PAGE ICONS: the glyph of a page in white on a squircle of the accent, lit from above as the system's own icons
-   are: lighter at the top, a fine highlight on the upper edge, a hairline, and a shadow half a point deep. */
-.pico {
-  display: inline-grid;
-  flex: none;
-  place-items: center;
-  width: 20px;
-  height: 20px;
-  border-radius: 5.5px;
-  color: #ffffff;
-  background: linear-gradient(180deg, color-mix(in srgb, var(--tint) 80%, #ffffff), var(--tint) 55%, color-mix(in srgb, var(--tint) 90%, #000000));
-  box-shadow: inset 0 0.5px 0 rgba(255, 255, 255, 0.4), inset 0 0 0 0.5px rgba(0, 0, 0, 0.12), 0 0.5px 1px rgba(0, 0, 0, 0.18);
-}
-.pico svg { width: 14px; height: 14px; filter: drop-shadow(0 0.5px 0.5px rgba(0, 0, 0, 0.2)); }
-.pico .glyph { width: 13px; height: 13px; }
-/* On the selected row the tile keeps a white edge, so it does not melt into the accent around it. */
-.nav-item[aria-current="page"] .pico, .result[aria-selected="true"] .pico { box-shadow: 0 0 0 1px rgba(255, 255, 255, 0.6), 0 0.5px 1px rgba(0, 0, 0, 0.18); }
+/* PAGE ICONS: the SF Symbol of a page in the accent, as a Finder sidebar draws its items; white on a selected row. At
+   the top of a page it sits white on a squircle of the accent, lit from above as the system's own icons are. */
+.pico { display: inline-grid; flex: none; place-items: center; width: 20px; height: 20px; color: var(--tint); }
+.pico .glyph { width: 16px; height: 16px; }
+.nav-item[aria-current="page"] .pico, .me[aria-current="page"] .pico, .result[aria-selected="true"] .pico { color: #ffffff; }
+html.inactive .nav-item[aria-current="page"] .pico { color: var(--tint); }
 
 /* MAIN: a toolbar with the history and the name of the page, then the page. */
 #main { position: relative; display: flex; flex-direction: column; min-width: 0; min-height: 0; }
@@ -1052,8 +1038,14 @@ html.glass #sidebar, html.glass .nav-buttons, html.glass .top-search:not(:focus-
 .page-hero + .card { margin-top: 10px; }
 .page-hero .row-text { flex: 1; min-width: 0; }
 .page-hero .row-title { font-weight: 600; }
-.head-icon { width: 38px; height: 38px; border-radius: 9px; box-shadow: inset 0 0.5px 0 rgba(255, 255, 255, 0.4), inset 0 0 0 0.5px rgba(0, 0, 0, 0.12), 0 1px 2.5px rgba(0, 0, 0, 0.2); }
-.head-icon svg { width: 24px; height: 24px; filter: drop-shadow(0 0.5px 1px rgba(0, 0, 0, 0.22)); }
+.head-icon {
+  width: 38px;
+  height: 38px;
+  border-radius: 9px;
+  color: #ffffff;
+  background: linear-gradient(180deg, color-mix(in srgb, var(--tint) 80%, #ffffff), var(--tint) 55%, color-mix(in srgb, var(--tint) 90%, #000000));
+  box-shadow: inset 0 0.5px 0 rgba(255, 255, 255, 0.4), inset 0 0 0 0.5px rgba(0, 0, 0, 0.12), 0 1px 2.5px rgba(0, 0, 0, 0.2);
+}
 .head-icon .glyph { width: 22px; height: 22px; }
 .head-app { flex: none; width: 40px; height: 40px; }
 
@@ -1132,7 +1124,7 @@ input[type="range"] { width: 160px; }
 .found { box-shadow: inset 0 0 0 2px var(--tint); border-radius: 8px; transition: box-shadow 0.4s var(--ease-out); }
 
 html.increase-contrast .card, html.increase-contrast .page-hero, html.increase-contrast #sidebar, html.increase-contrast .sheet { box-shadow: 0 0 0 1px var(--stroke); }
-html.increase-contrast .pico { background: var(--tint); box-shadow: inset 0 0 0 1px rgba(0, 0, 0, 0.45); }
+html.increase-contrast .head-icon { background: var(--tint); box-shadow: inset 0 0 0 1px rgba(0, 0, 0, 0.45); }
 html.increase-contrast .switch:not([aria-checked="true"]) { box-shadow: inset 0 0 0 1px var(--boundary); }
 
 /* STYLE CARDS: the looks of the volume indicator and the music widget, each with a small picture. */

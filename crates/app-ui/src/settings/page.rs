@@ -216,6 +216,28 @@ const FEATURE_FIXTURES: &[(&str, &str)] = &[
 /// The SF Symbols the page draws (app.js `icon()`): page icons and button glyphs. The page's self-test fails
 /// for an icon whose name is missing here.
 const SYMBOLS: &[&str] = &[
+    // The pages' own icons (PAGE_SYMBOLS in app.js), the ones no control uses too.
+    "gearshape",
+    "command",
+    "info.circle",
+    "capsule",
+    "bell.badge",
+    "speaker.wave.2",
+    "computermouse",
+    "chart.pie",
+    "rectangle.split.2x1",
+    "list.clipboard",
+    "safari",
+    "eye",
+    "menubar.rectangle",
+    "terminal",
+    "envelope",
+    "sun.horizon",
+    "square.grid.2x2",
+    "cloud.sun",
+    "play.rectangle",
+    "shippingbox",
+    "tray",
     "gearshape.fill",
     "gearshape.2.fill",
     "wand.and.stars",

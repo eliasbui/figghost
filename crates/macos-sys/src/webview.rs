@@ -19,12 +19,10 @@ use objc2_app_kit::{
     NSWindow, NSWindowDelegate, NSWindowOrderingMode, NSWindowStyleMask, NSWindowTitleVisibility,
     NSWorkspace,
 };
-use objc2_core_graphics::{CGColor, CGMutablePath};
 use objc2_foundation::{
     NSDictionary, NSError, NSNotification, NSNumber, NSObject, NSObjectProtocol, NSPoint, NSRect,
     NSSize, NSString, NSURL,
 };
-use objc2_quartz_core::{CAShapeLayer, kCAFillRuleEvenOdd};
 use objc2_web_kit::{
     WKNavigationAction, WKNavigationActionPolicy, WKNavigationDelegate, WKNavigationType,
     WKScriptMessage, WKScriptMessageHandler, WKSnapshotConfiguration, WKUserContentController,
@@ -348,18 +346,16 @@ fn glass_background(
     (Retained::into_super(effect), None)
 }
 
-/// The window's own background and the panes of glass on it, once the page has asked for them.
+/// The root the web view moved to and the panes of glass on it, once the page has asked for them.
 #[derive(Default)]
 struct GlassBed {
-    canvas: RefCell<Option<Retained<NSView>>>,
+    root: RefCell<Option<Retained<NSView>>>,
     panes: RefCell<Vec<Retained<NSGlassEffectView>>>,
 }
 
-/// Lays the system's Liquid Glass under the page where the page asks for it with
-/// `webkit.messageHandlers.glass.postMessage('{"canvas":[r,g,b],"panes":[[x,y,width,height,radius,see],...]}')`, in
-/// points from the top left, channels 0 to 255. From the first message on the window paints the page's background
-/// itself, so the glass sits between it and the page, which leaves those places clear. A pane with `see` set cuts
-/// through the background and shows what is behind the window, as a macOS 26 sidebar does; the others sit on it.
+/// Lays panes of the system's Liquid Glass between the window's own glass and the page, where the page asks for them
+/// with `webkit.messageHandlers.glass.postMessage('{"panes":[[x,y,width,height,radius],...]}')`, in points from the
+/// top left. The page leaves those places clear, and the window's glass shows wherever the page draws nothing.
 fn lay_glass(
     mtm: MainThreadMarker,
     window: &NSWindow,
@@ -371,7 +367,7 @@ fn lay_glass(
         return;
     };
     let num = |v: &serde_json::Value| v.as_f64().unwrap_or(0.0);
-    let panes: Vec<[f64; 6]> = message["panes"]
+    let panes: Vec<[f64; 5]> = message["panes"]
         .as_array()
         .map(|list| {
             list.iter()
@@ -379,76 +375,40 @@ fn lay_glass(
                 .collect()
         })
         .unwrap_or_default();
-    let mut slot = bed.canvas.borrow_mut();
-    let canvas = slot.get_or_insert_with(|| {
-        // The web view leaves the full-window glass for a plain root: background, panes, then the page. The glass
-        // held it with constraints, so it goes back to its autoresizing mask, or Auto Layout shrinks it to nothing.
+    let mut slot = bed.root.borrow_mut();
+    let root = slot.get_or_insert_with(|| {
+        // The web view leaves the inside of the window's glass for a plain root over it, so panes fit in between.
+        // The glass held it with constraints, so it goes back to its autoresizing mask, or Auto Layout shrinks it to
+        // nothing.
         let old = window.contentView();
         let bounds = old.as_ref().map_or(web.frame(), |v| v.bounds());
-        if let Some(glass) = old
-            .as_ref()
-            .and_then(|v| v.downcast_ref::<NSGlassEffectView>())
-        {
-            glass.setContentView(None);
-        }
         let root = NSView::initWithFrame(mtm.alloc(), bounds);
-        let canvas = NSView::initWithFrame(mtm.alloc(), bounds);
-        for view in [&root, &canvas] {
-            view.setAutoresizingMask(
+        if let Some(old) = &old {
+            if let Some(glass) = old.downcast_ref::<NSGlassEffectView>() {
+                glass.setContentView(None);
+                // The window's own colour, light or dark with it, half through, so the page's groups sit on glass of
+                // the window's tone rather than on whatever is behind it.
+                glass.setTintColor(Some(
+                    &NSColor::windowBackgroundColor().colorWithAlphaComponent(0.6),
+                ));
+            }
+            window.setContentView(Some(&root));
+            old.setFrame(root.bounds());
+            old.setAutoresizingMask(
                 NSAutoresizingMaskOptions::ViewWidthSizable
                     | NSAutoresizingMaskOptions::ViewHeightSizable,
             );
+            root.addSubview(old);
+        } else {
+            window.setContentView(Some(&root));
         }
-        canvas.setWantsLayer(true);
-        root.addSubview(&canvas);
         root.addSubview(web);
-        window.setContentView(Some(&root));
         web.setTranslatesAutoresizingMaskIntoConstraints(true);
         web.setFrame(root.bounds());
         window.makeFirstResponder(Some(web));
-        canvas
+        root
     });
-    // SAFETY: a plain read on the main thread of a view this window keeps in its hierarchy.
-    let Some(root) = (unsafe { canvas.superview() }) else {
-        return;
-    };
     let size = root.bounds().size;
-    let rect = |p: &[f64; 6]| {
-        NSRect::new(
-            NSPoint::new(p[0], size.height - p[1] - p[3]),
-            NSSize::new(p[2], p[3]),
-        )
-    };
-    // CGPathAddRoundedRect refuses a corner wider than half a side.
-    let radius = |p: &[f64; 6]| p[4].min(p[2] / 2.0).min(p[3] / 2.0).max(0.0);
-    if let Some(layer) = canvas.layer() {
-        let c = &message["canvas"];
-        layer.setBackgroundColor(Some(&CGColor::new_srgb(
-            num(&c[0]) / 255.0,
-            num(&c[1]) / 255.0,
-            num(&c[2]) / 255.0,
-            1.0,
-        )));
-        // The outer edge runs far past the window, so a window grown before the page answers is not cut off.
-        let path = CGMutablePath::new();
-        let outer = NSRect::new(NSPoint::ZERO, NSSize::new(20_000.0, 20_000.0));
-        // SAFETY: a fresh path and plain rectangles with corners that fit; a null transform is allowed.
-        unsafe {
-            CGMutablePath::add_rect(Some(&path), std::ptr::null(), outer);
-            for p in panes.iter().filter(|p| p[5] != 0.0) {
-                let r = radius(p);
-                CGMutablePath::add_rounded_rect(Some(&path), std::ptr::null(), rect(p), r, r);
-            }
-        }
-        let mask = CAShapeLayer::layer();
-        mask.setFrame(outer);
-        mask.setPath(Some(&path));
-        // SAFETY: an extern static of Core Animation, a process-lifetime constant; the mask is a fresh layer.
-        unsafe {
-            mask.setFillRule(kCAFillRuleEvenOdd);
-            layer.setMask(Some(&mask));
-        }
-    }
     let mut pool = bed.panes.borrow_mut();
     while pool.len() > panes.len() {
         if let Some(pane) = pool.pop() {
@@ -462,8 +422,11 @@ fn lay_glass(
         pool.push(pane);
     }
     for (pane, p) in pool.iter().zip(&panes) {
-        pane.setFrame(rect(p));
-        pane.setCornerRadius(radius(p));
+        pane.setFrame(NSRect::new(
+            NSPoint::new(p[0], size.height - p[1] - p[3]),
+            NSSize::new(p[2], p[3]),
+        ));
+        pane.setCornerRadius(p[4].min(p[2] / 2.0).min(p[3] / 2.0).max(0.0));
         // Until the page answers a resize: a tall pane stretches, the others keep to the top, and to the right
         // edge when they are on its half.
         let mut mask = if p[3] > size.height / 2.0 {
@@ -647,7 +610,7 @@ impl WebWindow {
         }
         host.view.setFrame(background.bounds());
 
-        // macOS 26: the page may ask for the system's glass under the places it leaves clear (`lay_glass`).
+        // macOS 26: the page may ask for panes of the system's glass under the places it leaves clear (`lay_glass`).
         if AnyClass::get(c"NSGlassEffectView").is_some() {
             let (window_ref, web_ref) = (
                 Weak::from_retained(&window),

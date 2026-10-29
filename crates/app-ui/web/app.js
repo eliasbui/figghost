@@ -37,8 +37,9 @@ const SYMBOL_ALIASES = {
   'character.bubble': 'character.bubble.fill',
 };
 const missingSymbols = new Set();
-function icon(name, cls) {
-  const src = (window.__symbols || {})[SYMBOL_ALIASES[name] || name];
+/** An SF Symbol; `exact` keeps the name as it is instead of taking the filled one a button uses. */
+function icon(name, cls, exact) {
+  const src = (window.__symbols || {})[(!exact && SYMBOL_ALIASES[name]) || name];
   if (!src) missingSymbols.add(name);
   return h('span', { class: 'glyph' + (cls ? ' ' + cls : ''), 'aria-hidden': 'true', style: src ? `--glyph:url("${src}")` : 'visibility:hidden' });
 }
@@ -820,110 +821,28 @@ function pill(textFn, goodFn) {
 
 // -- page icons -----------------------------------------------------
 
-// The icon of each page, drawn like the system's glass icons on a 24 grid: g is a translucent layer (even-odd, so a
-// circle inside it cuts a hole), s a solid one, w white strokes and k strokes in the page's deep colour over s.
-const GLYPHS = (() => {
-  const f = (n) => +n.toFixed(2);
-  const R = (x, y, w, hh, r) => {
-    r = Math.min(r, w / 2, hh / 2);
-    return `M${f(x + r)} ${f(y)}h${f(w - 2 * r)}a${r} ${r} 0 0 1 ${r} ${r}v${f(hh - 2 * r)}a${r} ${r} 0 0 1 ${-r} ${r}` +
-      `h${f(2 * r - w)}a${r} ${r} 0 0 1 ${-r} ${-r}v${f(2 * r - hh)}a${r} ${r} 0 0 1 ${r} ${-r}z`;
-  };
-  const C = (cx, cy, r) => `M${f(cx - r)} ${cy}a${r} ${r} 0 1 0 ${f(2 * r)} 0a${r} ${r} 0 1 0 ${f(-2 * r)} 0z`;
-  const star = (cx, cy, r) => `M${cx} ${f(cy - r)}Q${cx} ${cy} ${f(cx + r)} ${cy}Q${cx} ${cy} ${cx} ${f(cy + r)}` +
-    `Q${cx} ${cy} ${f(cx - r)} ${cy}Q${cx} ${cy} ${cx} ${f(cy - r)}z`;
-  const gear = (cx, cy, ro, ri, n) => {
-    let d = '';
-    for (let k = 0; k < n * 4; k++) {
-      const a = (k / (n * 4)) * Math.PI * 2 - Math.PI / 2;
-      const r = k % 4 === 1 || k % 4 === 2 ? ro : ri;
-      d += (k ? 'L' : 'M') + f(cx + r * Math.cos(a)) + ' ' + f(cy + r * Math.sin(a));
-    }
-    return d + 'z';
-  };
-  return {
-    general: { g: gear(12, 12, 10.2, 7.8, 8) + C(12, 12, 3.6), s: C(12, 12, 1.8) },
-    keys: { g: R(1.5, 5.5, 21, 13, 3.8), s: R(4.6, 8.6, 2.6, 2.6, 0.8) + R(8.6, 8.6, 2.6, 2.6, 0.8) + R(12.6, 8.6, 2.6, 2.6, 0.8) + R(16.6, 8.6, 2.6, 2.6, 0.8) + R(7, 13.2, 10, 2.4, 1.2) },
-    mole: { g: C(12, 12, 10), s: star(11, 13, 6.2) + star(17.6, 6.2, 2.6) },
-    about: { g: C(12, 12, 10), s: C(12, 7.2, 1.6) + R(10.7, 10.2, 2.6, 7.8, 1.3) },
-    notch: { g: R(1.5, 4, 21, 16, 4), s: 'M7.5 4h9v1.4a2.4 2.4 0 0 1-2.4 2.4h-4.2A2.4 2.4 0 0 1 7.5 5.4z' + R(5, 16.2, 14, 1.8, 0.9) },
-    islands: { g: R(2, 8, 20, 8, 4), s: C(17.8, 12, 2) + R(5.8, 11, 7.5, 2, 1) },
-    outlook: { g: R(2, 5, 20, 14, 3), w: 'M3.6 7.2 12 13l8.4-5.8' },
-    notifications: { g: 'M11 3.2a6.3 6.3 0 0 0-6.3 6.3v3.9l-1.6 3c-.4.7.1 1.6.9 1.6h14.1c.8 0 1.3-.9.9-1.6l-1.6-3V9.5A6.3 6.3 0 0 0 11 3.2z', s: C(11, 20, 2.2) + C(18.2, 5.6, 3.2) },
-    musicwidget: { g: R(2.5, 2.5, 19, 19, 5.5), s: C(9.5, 16, 2.6) + R(11, 6.5, 1.8, 9.5, 0.9) + 'M11 6.5l5.5-1.6v3.1L11 9.6z' },
-    agents: { g: R(1.5, 3.5, 21, 17, 4.5), w: 'M6.5 9.5l3.5 3-3.5 3', s: R(12, 14, 5.5, 2, 1) },
-    prs: { s: C(6.5, 5.5, 2.7) + C(6.5, 18.5, 2.7) + C(17.5, 18.5, 2.7), w: 'M6.5 8.2v7.6M17.5 15.8V10a3 3 0 0 0-3-3h-2.5M13.8 4.8L11.6 7l2.2 2.2' },
-    calendar: {
-      g: R(2.5, 4, 19, 17.5, 4.5),
-      s: 'M2.5 10.2V8.5a4.5 4.5 0 0 1 4.5-4.5h10a4.5 4.5 0 0 1 4.5 4.5v1.7z' + R(6.6, 2, 2.2, 4.6, 1.1) + R(15.2, 2, 2.2, 4.6, 1.1) +
-        C(8, 14, 1.3) + C(12, 14, 1.3) + C(16, 14, 1.3) + C(8, 17.6, 1.3) + C(12, 17.6, 1.3),
-    },
-    pomodoro: { g: C(12, 13.5, 8.5), s: 'M12 13.5V7.5a6 6 0 0 1 5.2 3z' + R(10.5, 2, 3, 3, 1.2) },
-    dayprogress: { g: R(2, 17.6, 20, 3.4, 1.7), s: 'M5.5 16a6.5 6.5 0 0 1 13 0z', w: 'M12 3.5v2.5M4.6 7.6l1.7 1.7M19.4 7.6l-1.7 1.7' },
-    screentime: {
-      g: 'M6 2.5h12v2.5c0 3-2.6 4.8-4.4 7 1.8 2.2 4.4 4 4.4 7v2.5H6V19c0-3 2.6-4.8 4.4-7C8.6 9.8 6 8 6 5z',
-      s: 'M8.6 19.2c0-1.9 1.9-3.3 3.4-4.3 1.5 1 3.4 2.4 3.4 4.3zM9.2 6.4h5.6c-.6 1.1-1.6 2-2.8 2.9-1.2-.9-2.2-1.8-2.8-2.9z',
-    },
-    notes: { g: R(3.5, 2.5, 17, 19, 4.5), s: R(7, 7.5, 10, 2, 1) + R(7, 11, 10, 2, 1) + R(7, 14.5, 6, 2, 1) },
-    launcher: { g: R(2.5, 2.5, 8.6, 8.6, 2.8) + R(12.9, 2.5, 8.6, 8.6, 2.8) + R(2.5, 12.9, 8.6, 8.6, 2.8), s: R(12.9, 12.9, 8.6, 8.6, 2.8) },
-    weather: { g: C(15, 8.5, 5), s: 'M7.5 20.5a4.5 4.5 0 0 1-.9-8.9a6 6 0 0 1 11.3 1.6a3.7 3.7 0 0 1-.4 7.3z' },
-    video: { g: R(1.5, 4.5, 21, 15, 4.5), s: 'M9.8 8.6l6 3.4-6 3.4z' },
-    system: { g: R(4.5, 4.5, 15, 15, 3.8), s: R(8.5, 8.5, 7, 7, 1.8), w: 'M9 2v2.5M15 2v2.5M9 19.5V22M15 19.5V22M2 9h2.5M2 15h2.5M19.5 9H22M19.5 15H22' },
-    updates: { g: C(12, 12, 10), s: 'M10.6 5.5h2.8v6.3h3L12 16.6l-4.4-4.8h3z' },
-    devices: { s: R(2.5, 12.5, 5, 8, 2.2) + R(16.5, 12.5, 5, 8, 2.2), w: 'M4.5 13v-1a7.5 7.5 0 0 1 15 0v1' },
-    displays: { g: R(1.5, 3.5, 21, 14, 3.8), s: R(8, 19.5, 8, 2, 1) + C(12, 10.5, 2.4), w: 'M12 17.5v2M12 5.4v.8M12 14.8v.8M7.2 10.5h.8M16 10.5h.8' },
-    present: { g: R(1.5, 2.5, 15, 11, 3.2), s: R(6.5, 9.5, 16, 12, 3.4), k: 'M12.6 12.6l5.2 2.9-5.2 2.9z' },
-    scroll: { g: R(5.5, 2, 13, 20, 6.5), s: R(10.8, 5.5, 2.4, 5, 1.2) },
-    cursor: { g: C(15.5, 8.5, 6), s: 'M5.5 3.2v15.6l4.1-3.8 2.7 5.8 2.6-1.2-2.7-5.7 5.6-.2z' },
-    wheel: { g: C(12, 12, 10) + C(12, 12, 4.2), s: 'M12 2a10 10 0 0 1 9.5 6.9l-5.5 1.8A4.2 4.2 0 0 0 12 7.8z' },
-    tiling: { g: R(1.5, 3.5, 21, 17, 4.5), s: R(3.8, 5.8, 7.6, 12.4, 2.4) },
-    pin: { g: R(1.5, 9, 21, 12.5, 4), s: 'M9 2.5h6l-.8 5 2.8 2.8V12H7v-1.7l2.8-2.8z', w: 'M12 12v6' },
-    clipboard: { g: R(3.5, 3.5, 17, 19, 4.5), s: R(8, 1.8, 8, 4.4, 1.6) + R(7, 11, 10, 2, 1) + R(7, 14.8, 7, 2, 1) },
-    typing: { g: R(1.5, 5, 21, 15.5, 4.5), w: 'M8 18l4-9.5 4 9.5M9.4 14.6h5.2M10.3 5.9a1.7 1.7 0 0 0 3.4 0' },
-    snippets: {
-      g: R(1.5, 5, 21, 14, 4.5), s: C(12, 12, 1.2),
-      w: 'M9 8.5c-1.4 0-2 .6-2 1.8v.5c0 .7-.4 1.2-1.2 1.2.8 0 1.2.5 1.2 1.2v.5c0 1.2.6 1.8 2 1.8M15 8.5c1.4 0 2 .6 2 1.8v.5c0 .7.4 1.2 1.2 1.2-.8 0-1.2.5-1.2 1.2v.5c0 1.2-.6 1.8-2 1.8',
-    },
-    smart: { g: R(2, 11, 20, 8, 3.5), s: star(9, 9.5, 6.5) + star(18, 5, 3) },
-    translate: {
-      g: 'M4.5 2.5h9a3 3 0 0 1 3 3v5a3 3 0 0 1-3 3H8.5l-3.5 2.8V13.5h-.5a3 3 0 0 1-3-3v-5a3 3 0 0 1 3-3z',
-      s: 'M11 9.5h8.5a3 3 0 0 1 3 3v5a3 3 0 0 1-3 3H19v2.8l-3.5-2.8H11a3 3 0 0 1-3-3v-5a3 3 0 0 1 3-3z',
-      w: 'M4.8 6h5.4M7.5 4.6V6M5.5 10c1.4-.8 2.4-2 2.8-4', k: 'M12.6 18.6l2.6-6.4 2.6 6.4M13.6 16.4h3.2',
-    },
-    utilities: { g: 'M3.5 9h13v6a5 5 0 0 1-5 5h-3a5 5 0 0 1-5-5z', s: R(5.5, 21, 9, 1.8, 0.9), w: 'M16.5 11h1.2a2.6 2.6 0 0 1 0 5.2h-1.4M8 3c-.9.9.9 1.8 0 3.2M12 3c-.9.9.9 1.8 0 3.2' },
-    browser: { g: C(12, 12, 10), s: 'M15.8 8.2l-2.6 5-5 2.6 2.6-5z', w: 'M12 2v2.4M12 19.6V22M2 12h2.4M19.6 12H22' },
-    breaks: { g: 'M1.5 12c2.6-4.6 6.2-7 10.5-7s7.9 2.4 10.5 7c-2.6 4.6-6.2 7-10.5 7S4.1 16.6 1.5 12z', s: C(12, 12, 4) },
-    capture: { g: R(6, 6, 12, 12, 3.2), s: C(12, 12, 3), w: 'M2.5 8V5.5a3 3 0 0 1 3-3H8M16 2.5h2.5a3 3 0 0 1 3 3V8M21.5 16v2.5a3 3 0 0 1-3 3H16M8 21.5H5.5a3 3 0 0 1-3-3V16' },
-    vision: { g: C(7.5, 16.5, 5.5), s: 'M15.2 3.3a2.6 2.6 0 0 1 3.7 0l1.8 1.8a2.6 2.6 0 0 1 0 3.7l-2.2 2.2-5.5-5.5z', w: 'M14 7.8L6.8 15v2.2H9l7.2-7.2' },
-    download: { g: R(2.5, 13.5, 19, 8, 3.5), s: 'M10.4 2.5h3.2v7.3h3.4L12 15.3 7 9.8h3.4z' },
-  };
-})();
-// The pages this window adds around the features: the volume indicator, the menu bar, the shelf, what plays.
-Object.assign(GLYPHS, {
-  volume: { s: 'M3 9h3.5L11 5v14l-4.5-4H3z', w: 'M14.5 9a4 4 0 0 1 0 6M17 6.5a7.5 7.5 0 0 1 0 11' },
-  sound: { s: 'M3 9h3.5L11 5v14l-4.5-4H3z', w: 'M14.5 9a4 4 0 0 1 0 6M17 6.5a7.5 7.5 0 0 1 0 11' },
-  menubar: { g: 'M2 6a3 3 0 0 1 3-3h14a3 3 0 0 1 3 3v12a3 3 0 0 1-3 3H5a3 3 0 0 1-3-3z', s: 'M2 6a3 3 0 0 1 3-3h14a3 3 0 0 1 3 3v2H2z' },
-  shelf: { g: 'M3 13h5l1.5 2.5h5L16 13h5v5.5a2.5 2.5 0 0 1-2.5 2.5h-13A2.5 2.5 0 0 1 3 18.5z', w: 'M5 13l2-8h10l2 8' },
-  media: { g: 'M2 12a10 10 0 1 0 20 0a10 10 0 1 0-20 0z', s: 'M10 8.3l6 3.7-6 3.7z' },
-});
+// The SF Symbol of each page, all in the system's outline style and none used twice, so they read as one set: in the
+// accent beside the page's name, white on the accent at the top of its page.
+const PAGE_SYMBOLS = {
+  general: 'gearshape', keys: 'command', about: 'info.circle',
+  notch: 'rectangle.topthird.inset.filled', islands: 'capsule', notifications: 'bell.badge', volume: 'speaker.wave.2',
+  sound: 'speaker.wave.2', musicwidget: 'music.quarternote.3',
+  scroll: 'computermouse', cursor: 'cursorarrow.rays', wheel: 'chart.pie', tiling: 'rectangle.split.2x1', pin: 'pin',
+  clipboard: 'list.clipboard', typing: 'keyboard', snippets: 'text.cursor', smart: 'text.magnifyingglass',
+  translate: 'character.bubble',
+  capture: 'camera.viewfinder', vision: 'eyedropper.halffull', download: 'arrow.down.circle', browser: 'safari',
+  utilities: 'slider.horizontal.3', breaks: 'eye', menubar: 'menubar.rectangle', mole: 'wand.and.stars',
+  agents: 'terminal', prs: 'arrow.triangle.pull', calendar: 'calendar', outlook: 'envelope', pomodoro: 'timer',
+  dayprogress: 'sun.horizon', screentime: 'hourglass', notes: 'note.text', launcher: 'square.grid.2x2',
+  weather: 'cloud.sun', video: 'play.rectangle', system: 'cpu', updates: 'shippingbox', devices: 'airpodspro',
+  displays: 'display', present: 'rectangle.on.rectangle', shelf: 'tray', media: 'music.note',
+};
 
-function glyphSvg(id) {
-  const g = GLYPHS[id];
-  const path = (d, attrs) => (d ? `<path d="${d}" ${attrs}/>` : '');
-  const round = 'stroke-linecap="round" stroke-linejoin="round"';
-  return '<svg viewBox="0 0 24 24" focusable="false">' +
-    path(g.g, 'fill="currentColor" fill-opacity=".45" fill-rule="evenodd"') + path(g.s, 'fill="currentColor"') +
-    path(g.w, `fill="none" stroke="currentColor" stroke-width="2" ${round}`) +
-    path(g.k, `fill="none" stroke="currentColor" stroke-width="1.8" ${round}`) + '</svg>';
-}
-
-/** The icon of a page: its glyph in one colour, the accent's in the sidebar and white on the accent at the top of its
- *  page, or its SF Symbol for a page with no glyph. */
+/** The icon of a page: its symbol in the accent beside its name, white on the accent at the top of its page. */
 function pageIcon(id, cls) {
-  const el = h('span', { class: 'pico' + (cls ? ' ' + cls : ''), 'aria-hidden': 'true' });
-  if (GLYPHS[id]) el.innerHTML = glyphSvg(id);
-  else el.append(icon((PAGES.find((p) => p.id === id) || {}).icon || 'gearshape.fill'));
-  return el;
+  const page = PAGES.find((p) => p.id === id);
+  return h('span', { class: 'pico' + (cls ? ' ' + cls : ''), 'aria-hidden': 'true' },
+    icon(PAGE_SYMBOLS[id] || (page && page.icon) || 'gearshape', '', true));
 }
 
 /** The setting that turns a page's feature on and off, or null for a page that is not a feature. */
@@ -1307,7 +1226,7 @@ function tabRow(page) {
   const target = PAGES.some((p) => p.id === page.id) ? page.id : null;
   const open = target && h('button', { class: 'btn icon tab-open', 'aria-label': t('tab.open', { tab: title }), title: t('tab.open', { tab: title }), onclick: () => openPage(target) }, icon('chevron.right'));
   const line = row(title, desc, [h('span', { class: 'tab-order' }, up, down), toggle, open].filter(Boolean));
-  if (GLYPHS[page.id]) line.prepend(pageIcon(page.id));
+  if (PAGE_SYMBOLS[page.id]) line.prepend(pageIcon(page.id));
   return line;
 }
 
@@ -2263,32 +2182,28 @@ function buildShell() {
   $('#root').replaceChildren(
     h('div', { id: 'app' },
       h('div', { class: 'dragzone', 'data-drag': '' }),
-      h('aside', { id: 'sidebar', 'data-glass': 'see' }, meBlock(), h('nav', { id: 'nav', 'aria-label': 'Figghost' }, ...renderNavItems())),
+      h('aside', { id: 'sidebar', 'data-glass': '' }, meBlock(), h('nav', { id: 'nav', 'aria-label': 'Figghost' }, ...renderNavItems())),
       main),
     h('div', { id: 'toast', 'aria-live': 'polite' }),
     h('div', { id: 'modal' }));
   placeGlass();
 }
 
-/** Liquid Glass on macOS 26: the window paints the background and lays the system's own glass under every
-    `[data-glass]` (the sidebar, and the toolbar's capsules), where the page leaves it clear. The sidebar shows what is
-    behind the window, as a Mac sidebar does (`data-glass="see"`); the capsules sit on the background. Without the
-    window's glass (an older system, a preview, Reduce transparency) the page paints them itself. */
+/** Liquid Glass on macOS 26: the whole window is the system's glass, and every `[data-glass]` (the sidebar and the
+    toolbar's capsules) a pane of it laid under the page, which leaves those places clear. Without the window's glass
+    (an older system, a preview, Reduce transparency) the page paints them itself. */
 function placeGlass() {
   const port = window.webkit && window.webkit.messageHandlers && window.webkit.messageHandlers.glass;
   const on = !!port && !document.documentElement.classList.contains('reduce-transparency');
   document.documentElement.classList.toggle('glass', on);
   if (!port) return;
-  const hex = getComputedStyle(document.documentElement).getPropertyValue('--canvas').trim();
-  const canvas = /^#[0-9a-f]{6}$/i.test(hex) ? [1, 3, 5].map((i) => parseInt(hex.slice(i, i + 2), 16)) : [0, 0, 0];
   const panes = !on ? [] : [...document.querySelectorAll('[data-glass]')]
     .map((el) => [el.getBoundingClientRect(), el])
     .filter(([r]) => r.width && r.height)
-    .map(([r, el]) => [r.left, r.top, r.width, r.height, parseFloat(getComputedStyle(el).borderTopLeftRadius) || 0, el.dataset.glass === 'see' ? 1 : 0]);
-  port.postMessage(JSON.stringify({ canvas, panes }));
+    .map(([r, el]) => [r.left, r.top, r.width, r.height, parseFloat(getComputedStyle(el).borderTopLeftRadius) || 0]);
+  port.postMessage(JSON.stringify({ panes }));
 }
 window.addEventListener('resize', placeGlass);
-matchMedia('(prefers-color-scheme: dark)').addEventListener('change', placeGlass);
 
 // The pages seen, for the toolbar's back and forward.
 const trail = { list: [], at: -1 };
