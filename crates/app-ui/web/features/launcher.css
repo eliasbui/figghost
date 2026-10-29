@@ -8,3 +8,4 @@
 .launcher-add { display: flex; flex-wrap: wrap; gap: 8px; align-items: center; width: 100%; }
 .launcher-add select.pick { max-width: 260px; }
 .launcher-status { min-height: 1.2em; }
+.launcher-add .text-field { flex: 1 1 200px; min-width: 160px; }

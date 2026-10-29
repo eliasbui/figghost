@@ -1,11 +1,31 @@
 {
   "enabled": true,
-  "items": [
-    { "kind": "app", "name": "Notes" },
-    { "kind": "folder", "name": "Documents" },
-    { "kind": "shortcut", "name": "Morning routine" }
+  "groups": [
+    {
+      "name": "",
+      "items": [
+        { "kind": "app", "name": "Notes" },
+        { "kind": "folder", "name": "Documents" },
+        { "kind": "shortcut", "name": "Morning routine" }
+      ],
+      "full": false
+    },
+    {
+      "name": "Web",
+      "items": [
+        { "kind": "url", "name": "github.com" },
+        { "kind": "file", "name": "Plan.pdf" }
+      ],
+      "full": false
+    }
   ],
-  "full": false,
+  "groups_full": false,
+  "dock": false,
+  "dock_edge": "left",
+  "dock_display": "",
+  "dock_group": 0,
+  "dock_autohide": true,
+  "screens": ["Built-in Retina Display", "Studio Display"],
   "listing": false,
   "shortcuts": ["Morning routine", "Resize images", "Send to my phone"],
   "problem": ""

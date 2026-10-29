@@ -44,8 +44,65 @@ impl Language {
 
     pub fn launcher_pick_folder(self) -> &'static str {
         match self {
-            Language::English => "Choose a folder to pin to the notch",
-            Language::Vietnamese => "Chọn một thư mục để ghim lên notch",
+            Language::English => "Choose a folder to pin to the Launcher",
+            Language::Vietnamese => "Chọn một thư mục để ghim vào Mở nhanh",
+        }
+    }
+
+    pub fn launcher_pick_file(self) -> &'static str {
+        match self {
+            Language::English => "Choose a file to pin to the Launcher",
+            Language::Vietnamese => "Chọn một tệp để ghim vào Mở nhanh",
+        }
+    }
+
+    /// The name of a group that was not given one.
+    pub fn launcher_group(self, number: usize) -> String {
+        match self {
+            Language::English => format!("Group {number}"),
+            Language::Vietnamese => format!("Nhóm {number}"),
+        }
+    }
+
+    pub fn launcher_open(self) -> &'static str {
+        match self {
+            Language::English => "Open",
+            Language::Vietnamese => "Mở",
+        }
+    }
+
+    pub fn launcher_open_in_finder(self) -> &'static str {
+        match self {
+            Language::English => "Open in Finder",
+            Language::Vietnamese => "Mở trong Finder",
+        }
+    }
+
+    pub fn launcher_reveal(self) -> &'static str {
+        match self {
+            Language::English => "Show in Finder",
+            Language::Vietnamese => "Hiện trong Finder",
+        }
+    }
+
+    pub fn launcher_folder_empty(self) -> &'static str {
+        match self {
+            Language::English => "The folder is empty",
+            Language::Vietnamese => "Thư mục trống",
+        }
+    }
+
+    pub fn launcher_folder_gone(self) -> &'static str {
+        match self {
+            Language::English => "The folder is not there any more",
+            Language::Vietnamese => "Thư mục không còn ở đó",
+        }
+    }
+
+    pub fn launcher_folder_more(self) -> &'static str {
+        match self {
+            Language::English => "See the rest in Finder",
+            Language::Vietnamese => "Xem phần còn lại trong Finder",
         }
     }
 }

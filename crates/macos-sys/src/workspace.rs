@@ -250,6 +250,20 @@ pub fn pick_folder(mtm: MainThreadMarker, prompt: &str) -> Option<PathBuf> {
     Some(PathBuf::from(url.path()?.to_string()))
 }
 
+/// Lets the user choose a file. Blocks until the dialog closes; `None` if cancelled.
+pub fn pick_file(mtm: MainThreadMarker, prompt: &str) -> Option<PathBuf> {
+    let panel = NSOpenPanel::openPanel(mtm);
+    panel.setCanChooseFiles(true);
+    panel.setCanChooseDirectories(false);
+    panel.setAllowsMultipleSelection(false);
+    panel.setMessage(Some(&NSString::from_str(prompt)));
+    if panel.runModal() != NSModalResponseOK {
+        return None;
+    }
+    let url = panel.URLs().firstObject()?;
+    Some(PathBuf::from(url.path()?.to_string()))
+}
+
 /// The icon the Finder shows for a file or folder, `points` square.
 pub fn icon_of(path: &Path, points: f64) -> Retained<NSImage> {
     let icon =

@@ -1,9 +1,12 @@
 #!/bin/sh
 # Starts the real program on a private instance with the Launcher tab pinned to an app, a folder, a Shortcut and
-# two pins that cannot work (an app that is not installed, a folder that is not there), opens the notch on the tab
-# and checks, through its trace, that the tab is drawn with every pin and the program neither dies nor panics, and
-# that with the feature off nothing is drawn. Nothing is pressed, so nothing is launched. The notch is placed outside
-# every screen and the settings window stays closed. Nothing of the real settings is touched.
+# two pins that cannot work (an app that is not installed, a folder that is not there), written the way files were
+# before there were groups, opens the notch on the tab and checks, through its trace, that the tab is drawn with every
+# pin and the program neither dies nor panics, and that with the feature off nothing is drawn. Then it starts it with
+# groups, a file, a website and the dock on: the dock is put at its edge with the tiles of its group, hidden until the
+# pointer comes when asked, and the dock off puts nothing on the screen. Nothing is pressed, so nothing is launched.
+# The notch is placed outside every screen and the settings window stays closed. Nothing of the real settings is
+# touched.
 #
 # Usage: scripts/check-launcher.sh [program]    (default: target/debug/app-ui)
 set -eu
@@ -68,5 +71,28 @@ stop
 run '{ "enabled": true }' empty
 sleep 5
 if grep -q "launcher: showing" "$WORK/empty.log"; then fail "an empty tab drew tiles"; else pass "an empty tab draws no tiles and says nothing is pinned"; fi
+if grep -q "launcher: the dock" "$WORK/empty.log"; then fail "the dock came while it is off"; else pass "the dock stays away while it is off"; fi
+stop
+
+SETS='[
+  { "name": "", "items": [ { "kind": "app", "target": "com.apple.finder" }, { "kind": "folder", "target": "/Users" } ] },
+  { "name": "Web", "items": [
+    { "kind": "url", "target": "https://github.com" },
+    { "kind": "url", "target": "mailto:me@example.com" },
+    { "kind": "file", "target": "/etc/hosts" },
+    { "kind": "url", "target": "javascript:alert(1)" }
+  ] }
+]'
+run "{ \"enabled\": true, \"groups\": $SETS, \"dock\": true, \"dock_edge\": \"right\", \"dock_group\": 1, \"dock_autohide\": false }" dock
+sleep 6
+if grep -q "launcher: showing 2 tiles" "$WORK/dock.log"; then pass "the tab shows the first group"; else fail "the tab did not show the first group"; grep launcher "$WORK/dock.log" || true; fi
+if grep -q "launcher: the dock shows 3 tiles at the Right edge$" "$WORK/dock.log"; then pass "the dock shows the three good pins of its group at its edge and drops the bad address"; else fail "the dock was not shown"; grep launcher "$WORK/dock.log" || true; fi
+if kill -0 "$PID" 2>/dev/null; then pass "the program is still running with the dock"; else fail "the program died with the dock"; fi
+stop
+
+run "{ \"enabled\": false, \"groups\": $SETS, \"dock\": true }" hidden
+sleep 5
+if grep -q "launcher: the dock shows 2 tiles at the Left edge, hidden until the pointer comes" "$WORK/hidden.log"; then pass "a dock that hides waits for the pointer, with the tab off"; else fail "the hidden dock was not set up"; grep launcher "$WORK/hidden.log" || true; fi
+if grep -q "panicked" "$WORK/dock.log" "$WORK/hidden.log"; then fail "the program panicked"; grep -h "panicked" -A 3 "$WORK/dock.log" "$WORK/hidden.log"; fi
 stop
 exit "$FAILED"

@@ -4,8 +4,9 @@
 
 use macos_sys::{
     MainThreadMarker, app,
-    launcher_ui::{LauncherDisplay, LauncherView, PAGE_SIZE, Tile, TileIcon},
+    launcher_ui::{LauncherCallbacks, LauncherDisplay, LauncherView, PAGE_SIZE, Tile, TileIcon},
     notch::{Notch, NotchGeometry},
+    panel::Key,
     style::Tone,
     ui::AppCallbacks,
 };
@@ -40,16 +41,28 @@ fn main() {
             view.set_rows(Vec::new(), "")
         }));
         let pressed: Rc<RefCell<Vec<usize>>> = Rc::default();
-        let log = Rc::clone(&pressed);
+        let chosen: Rc<RefCell<Vec<usize>>> = Rc::default();
+        let (log, picks) = (Rc::clone(&pressed), Rc::clone(&chosen));
         let view = LauncherView::new(
             mtm,
             notch.page_area(PAGE_SIZE.width, PAGE_SIZE.height),
-            move |i| log.borrow_mut().push(i),
+            LauncherCallbacks {
+                on_open: Box::new(move |i| log.borrow_mut().push(i)),
+                on_menu: Box::new(|_, _| {}),
+                on_group: Box::new(move |g| picks.borrow_mut().push(g)),
+            },
         );
         let index = notch.page_count();
         let page = view.page("Launcher".into(), || {}, || {});
         let root: Retained<NSView> = page.root.clone();
-        notch.add_page(page);
+        let on_key = Rc::new(page.on_key);
+        notch.add_page(macos_sys::notch::Page {
+            on_key: Box::new({
+                let on_key = Rc::clone(&on_key);
+                move |key| on_key(key)
+            }),
+            ..page
+        });
         let (shot, shown) = (Rc::clone(&notch), Rc::clone(&view));
         app::after(0.4, move || {
             let apps = vec![
@@ -78,37 +91,48 @@ fn main() {
                 ),
                 app_tile("Downloads", "/Users/Shared"),
             ]);
+            let groups: Vec<String> = ["Nhóm 1", "Work", "Web", "A group with a long name"]
+                .map(String::from)
+                .into();
+            let web = vec![
+                tile("github.com", TileIcon::Symbol("globe", Tone::Blue)),
+                tile(
+                    "me@example.com",
+                    TileIcon::Symbol("envelope.fill", Tone::Blue),
+                ),
+                app_tile("hosts", "/etc/hosts"),
+            ];
+            let empty = Some((
+                "Nothing pinned yet".to_owned(),
+                "Add apps, folders and Shortcuts in Settings, under Notch tabs, Launcher."
+                    .to_owned(),
+            ));
+            let scene = |tiles: Vec<Tile>, groups: &[String], group: usize| LauncherDisplay {
+                tiles,
+                note: None,
+                groups: groups.to_vec(),
+                group,
+            };
             let scenes = vec![
-                (
-                    "six",
-                    LauncherDisplay {
-                        tiles: apps.clone(),
-                        note: None,
-                    },
-                ),
-                (
-                    "twelve",
-                    LauncherDisplay {
-                        tiles: many,
-                        note: None,
-                    },
-                ),
-                (
-                    "three",
-                    LauncherDisplay {
-                        tiles: apps[..3].to_vec(),
-                        note: None,
-                    },
-                ),
+                ("six", scene(apps.clone(), &[], 0)),
+                ("twelve", scene(many.clone(), &[], 0)),
+                ("three", scene(apps[..3].to_vec(), &[], 0)),
                 (
                     "empty",
                     LauncherDisplay {
-                        tiles: Vec::new(),
-                        note: Some((
-                            "Nothing pinned yet".into(),
-                            "Add apps, folders and Shortcuts in Settings, under Notch tabs, Launcher."
-                                .into(),
-                        )),
+                        note: empty.clone(),
+                        ..LauncherDisplay::default()
+                    },
+                ),
+                ("groups-twelve", scene(many, &groups, 0)),
+                ("groups-web", scene(web, &groups[..3], 2)),
+                (
+                    "groups-empty",
+                    LauncherDisplay {
+                        note: empty,
+                        groups: groups[..2].to_vec(),
+                        group: 1,
+                        ..LauncherDisplay::default()
                     },
                 ),
             ];
@@ -122,6 +146,27 @@ fn main() {
             assert!(pressed_ok, "the tile took the press");
             assert_eq!(*pressed.borrow(), [2], "the third tile is number 2");
             println!("ok      a press on a tile says which tile it was");
+            // The arrow keys and the chips of the strip choose a group; there is no group before the first.
+            shown.show(&scenes[5].1);
+            assert!(!on_key(Key::Right), "there is no group after the last");
+            assert!(!on_key(Key::Up), "other keys are left to the notch");
+            assert!(on_key(Key::Left));
+            shown.show(&scenes[4].1);
+            assert!(!on_key(Key::Left), "there is no group before the first");
+            assert!(on_key(Key::Right));
+            let chips: Vec<Retained<NSView>> = root
+                .subviews()
+                .iter()
+                .filter(|v| !v.isHidden() && v.frame().size.height < 40.0)
+                .collect();
+            assert_eq!(chips.len(), 4, "a chip for each group");
+            // SAFETY: as above.
+            let pressed_ok: bool = unsafe { msg_send![&*chips[3], accessibilityPerformPress] };
+            assert!(pressed_ok);
+            assert_eq!(*chosen.borrow(), [1, 1, 3], "the groups chosen, in order");
+            shown.show(&scenes[0].1);
+            assert!(!on_key(Key::Right), "one group has no other to go to");
+            println!("ok      the arrow keys and the strip choose a group");
             for (name, display) in scenes {
                 shown.show(&display);
                 let png = shot.snapshot_png(index).expect("the page");
