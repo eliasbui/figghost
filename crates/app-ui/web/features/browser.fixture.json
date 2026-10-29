@@ -1,0 +1,15 @@
+{
+  "enabled": true,
+  "block": true,
+  "sites": "youtube.com\nfacebook.com\ntiktok.com\ninstagram.com\nx.com\nreddit.com",
+  "download": true,
+  "browsers": [
+    { "id": "chrome", "name": "Google Chrome", "found": true, "installed": true },
+    { "id": "edge", "name": "Microsoft Edge", "found": true, "installed": false },
+    { "id": "brave", "name": "Brave", "found": false, "installed": false }
+  ],
+  "connected": true,
+  "blocking": false,
+  "folder": "/Users/me/Library/Application Support/Figghost/browser-extension",
+  "extension_id": "gaolignoeegofacmdaebpionmopdfpfn"
+}

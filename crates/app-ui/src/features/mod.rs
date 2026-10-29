@@ -21,6 +21,8 @@ use std::{
     time::{Duration, Instant},
 };
 
+pub mod breaks;
+pub mod browser;
 pub mod calendar;
 pub mod capture;
 pub mod cursor;
@@ -288,6 +290,8 @@ pub struct Features {
     pub musicwidget: Option<Rc<musicwidget::Feature>>,
     pub islands: Option<Rc<islands::Feature>>,
     pub utilities: Option<Rc<utilities::Feature>>,
+    pub breaks: Option<Rc<breaks::Feature>>,
+    pub browser: Option<Rc<browser::Feature>>,
     pub notes: Option<Rc<notes::Feature>>,
     pub launcher: Option<Rc<launcher::Feature>>,
     pub weather: Option<Rc<weather::Feature>>,
@@ -316,7 +320,7 @@ impl Features {
         let capture = capture::attach(env);
         // Snippets are typed through the keyboard that Vietnamese typing owns.
         let typing = typing::attach(env);
-        let features = Self {
+        let mut features = Self {
             smart: smart::attach(env),
             wheel: wheel::attach(env, capture.as_ref()),
             capture,
@@ -334,6 +338,8 @@ impl Features {
             musicwidget: musicwidget::attach(env),
             islands: islands::attach(env),
             utilities: utilities::attach(env),
+            breaks: breaks::attach(env),
+            browser: None,
             notes: notes::attach(env),
             launcher: launcher::attach(env),
             weather: weather::attach(env),
@@ -354,6 +360,9 @@ impl Features {
             download: download::attach(env),
             notch: env.notch.map(Rc::downgrade),
         };
+        // The browser blocks while a Pomodoro work stage runs and hands addresses to the download.
+        features.browser =
+            browser::attach(env, features.pomodoro.as_ref(), features.download.as_ref());
         if let Some(notch) = env.notch {
             for id in OPT_IN_TABS {
                 notch.set_page_dormant(id, tab_waits(id, env.config));
@@ -415,6 +424,12 @@ impl Features {
         }
         if let Some(f) = &self.utilities {
             out.insert("utilities", f.runtime());
+        }
+        if let Some(f) = &self.breaks {
+            out.insert("breaks", f.runtime());
+        }
+        if let Some(f) = &self.browser {
+            out.insert("browser", f.runtime());
         }
         if let Some(f) = &self.notes {
             out.insert("notes", f.runtime());
@@ -540,6 +555,14 @@ impl Features {
                 .utilities
                 .as_ref()
                 .map_or(Ok(()), |f| f.configure(&config.utilities)),
+            "breaks" => self
+                .breaks
+                .as_ref()
+                .map_or(Ok(()), |f| f.configure(&config.breaks)),
+            "browser" => self
+                .browser
+                .as_ref()
+                .map_or(Ok(()), |f| f.configure(&config.browser)),
             "notes" => self
                 .notes
                 .as_ref()
@@ -657,6 +680,9 @@ impl Features {
         if let Some(f) = &self.utilities {
             f.suspend_hotkeys();
         }
+        if let Some(f) = &self.breaks {
+            f.suspend_hotkeys();
+        }
         if let Some(f) = &self.pomodoro {
             f.suspend_hotkeys();
         }
@@ -707,6 +733,9 @@ impl Features {
         }
         if let Some(f) = &self.utilities {
             f.resume_hotkeys(&config.utilities);
+        }
+        if let Some(f) = &self.breaks {
+            f.resume_hotkeys(&config.breaks);
         }
         if let Some(f) = &self.pomodoro {
             f.resume_hotkeys(&config.pomodoro);
@@ -793,6 +822,16 @@ impl Features {
         }
         if let Some(f) = &self.utilities
             && let Some(result) = f.action(name, &mut config.utilities)
+        {
+            return Some(result);
+        }
+        if let Some(f) = &self.breaks
+            && let Some(result) = f.action(name)
+        {
+            return Some(result);
+        }
+        if let Some(f) = &self.browser
+            && let Some(result) = f.action(name)
         {
             return Some(result);
         }
@@ -917,6 +956,9 @@ impl Features {
         if let Some(f) = &self.utilities {
             entries.extend(utilities::Feature::menu_entries(f));
         }
+        if let Some(f) = &self.breaks {
+            entries.extend(breaks::Feature::menu_entries(f));
+        }
         if let Some(f) = &self.pomodoro {
             entries.extend(pomodoro::Feature::menu_entries(f));
         }
@@ -1006,6 +1048,14 @@ pub fn state(
     root.insert(
         "utilities".into(),
         utilities::settings::state(&config.utilities, runtime.get("utilities").unwrap_or(&none)),
+    );
+    root.insert(
+        "breaks".into(),
+        breaks::settings::state(&config.breaks, runtime.get("breaks").unwrap_or(&none)),
+    );
+    root.insert(
+        "browser".into(),
+        browser::settings::state(&config.browser, runtime.get("browser").unwrap_or(&none)),
     );
     root.insert(
         "notes".into(),
@@ -1127,6 +1177,12 @@ pub fn set(config: &mut Config, path: &str, value: &Value) -> Option<Result<&'st
         }
         "utilities" => utilities::settings::set(&mut config.utilities, rest, value)
             .map(|r| r.map(|()| "utilities")),
+        "breaks" => {
+            breaks::settings::set(&mut config.breaks, rest, value).map(|r| r.map(|()| "breaks"))
+        }
+        "browser" => {
+            browser::settings::set(&mut config.browser, rest, value).map(|r| r.map(|()| "browser"))
+        }
         "notes" => {
             notes::settings::set(&mut config.notes, rest, value).map(|r| r.map(|()| "notes"))
         }
@@ -1192,6 +1248,7 @@ pub fn shortcut_owner(target: &str) -> Option<&'static str> {
         "translate",
         "pin",
         "utilities",
+        "breaks",
         "pomodoro",
         "present",
         "typing",
@@ -1216,6 +1273,7 @@ pub fn shortcuts(config: &Config) -> Vec<(String, String)> {
     all.extend(translate::settings::shortcuts(&config.translate));
     all.extend(pin::settings::shortcuts(&config.pin));
     all.extend(utilities::settings::shortcuts(&config.utilities));
+    all.extend(breaks::settings::shortcuts(&config.breaks));
     all.extend(pomodoro::settings::shortcuts(&config.pomodoro));
     all.extend(present::settings::shortcuts(&config.present));
     all.extend(typing::settings::shortcuts(&config.typing));
@@ -1256,6 +1314,8 @@ pub fn set_shortcut(
         }
         "utilities" => utilities::settings::set_shortcut(&mut config.utilities, target, value)
             .map(|r| r.map(|()| "utilities")),
+        "breaks" => breaks::settings::set_shortcut(&mut config.breaks, target, value)
+            .map(|r| r.map(|()| "breaks")),
         "pomodoro" => pomodoro::settings::set_shortcut(&mut config.pomodoro, target, value)
             .map(|r| r.map(|()| "pomodoro")),
         "present" => present::settings::set_shortcut(&mut config.present, target, value)

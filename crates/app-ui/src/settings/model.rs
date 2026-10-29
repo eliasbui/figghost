@@ -1091,6 +1091,11 @@ mod tests {
             "updates",
             json!({ "list": [{ "key": "Npm:pnpm", "name": "pnpm", "source": "npm", "current": "1", "latest": "2" }] }),
         );
+        // The browsers are only listed by the running feature, which looks for their folders.
+        e.runtime.insert(
+            "browser",
+            json!({ "browsers": [{ "id": "chrome", "name": "Google Chrome", "found": true, "installed": false }] }),
+        );
         // The list of downloads is only there while something was downloaded in this run.
         e.runtime.insert(
             "download",
@@ -1648,6 +1653,8 @@ mod tests {
             "musicwidget",
             "islands",
             "utilities",
+            "breaks",
+            "browser",
             "notes",
             "launcher",
             "weather",

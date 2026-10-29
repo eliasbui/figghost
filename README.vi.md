@@ -107,7 +107,9 @@ Notch luôn có Clipboard, Khay tệp, Media (kèm lời bài hát), Tập trung
 | Chụp màn hình | Capture | Chụp màn hình, chụp cuộn, quay màn hình ra MP4 hoặc GIF, trình chỉnh sửa và nhận dạng chữ tiếng Việt, tiếng Anh (tắt mặc định) |
 | Chọn màu | Colour picker | Kính lúp trên màn hình đóng băng, chép màu dạng HEX, RGB, HSL hoặc HSB (tắt mặc định) |
 | Tải video | Video download | Dán link, yt-dlp do bạn tự cài sẽ lưu video vào Downloads, tiến độ hiện trên notch đóng (tắt mặc định) |
+| Trình duyệt | Browser | Extension cho Chrome, Edge, Brave, Vivaldi và Arc, chặn các trang bạn liệt kê trong phiên làm việc Pomodoro và gửi video sang Tải video (tắt mặc định) |
 | Tiện ích | Utilities | Giữ máy thức, tắt tiếng micro cho mọi ứng dụng, khóa bàn phím khi lau, tạm ẩn notch, chuyển giao diện tối, ẩn biểu tượng màn hình nền, sao chép liên kết của tab trình duyệt (tắt mặc định) |
+| Nghỉ mắt | Breaks | Cho mắt nghỉ một lát sau một quãng dùng máy, chờ khi đang họp hoặc có ứng dụng toàn màn hình, kèm nhắc chớp mắt và ngồi thẳng (tắt mặc định) |
 
 ### Cửa sổ & Phím tắt (Window & Keys)
 
@@ -355,6 +357,14 @@ Thư mới và nhắc lịch của app Outlook, trong tab Outlook của notch, m
 Giữ máy thức từ 15 phút đến 4 giờ hoặc cho tới khi bạn dừng, tắt tiếng chính micro để mọi ứng dụng không nghe thấy gì (nó được bật lại khi Figghost thoát, vì không có gì khác trên máy có công tắc cho việc này), khóa bàn phím trong lúc bạn lau (Command và Escape mở khóa ngay, và nó tự mở khóa sau thời gian bạn đặt), và tạm ẩn notch từ 5 phút đến 2 giờ hoặc cho tới khi bạn đánh thức, để nó không mở khi con trỏ chạm mép trên màn hình lúc bạn trình chiếu hoặc chơi game (một cú nhấp vào nó, hoặc một tác tử lập trình đang chờ câu trả lời, vẫn mở được). Nó cũng chuyển cả máy giữa giao diện tối và sáng, ẩn tệp trên màn hình nền để màn hình gọn khi chia sẻ (Finder khởi động lại để nhận thay đổi), và sao chép liên kết của tab phía trước trong Safari hoặc trình duyệt Chromium dưới dạng liên kết Markdown, chỉ địa chỉ, hoặc tiêu đề và địa chỉ (Control-Option-Command-L). Mỗi thứ có chỗ ở bảng thanh menu (một công tắc cho giữ máy thức và một cho tạm ẩn notch, bắt đầu theo độ dài bạn chọn ở trang này; danh sách độ dài nằm ở menu), một phím tắt dùng ở mọi ứng dụng và một thông báo trên notch (tắt mặc định).
 
 ![Trang Tiện ích bằng tiếng Việt](docs/images/settings-utilities-vi.png)
+
+### Trình duyệt
+
+Figghost Companion, một extension cho Chrome, Edge, Brave, Vivaldi và Arc, chỉ nói chuyện với Figghost trên máy này qua native messaging. Khi một phiên làm việc của Pomodoro đang chạy, các trang bạn liệt kê (mỗi dòng một trang; sẵn có youtube.com, facebook.com, tiktok.com, instagram.com, x.com và reddit.com) cùng tên miền con của chúng không mở được; hết phiên là mở lại, và khi Figghost không chạy thì không chặn gì. Nút của extension, và menu chuột phải trên trang hoặc liên kết, gửi địa chỉ sang Tải video. Cài đặt gồm hai bước ở trang Trình duyệt: Mở thư mục ghi extension vào `browser-extension` trong thư mục dữ liệu, để nạp ở trang tiện ích mở rộng của trình duyệt với Developer mode bật và Load unpacked; Nối ghi một tệp nhỏ vào thư mục của trình duyệt đó, ghi Figghost là cầu nối của extension, và Gỡ xóa nó đi. Extension không đọc trang nào, không xin quyền vào trang nào và chặn bằng luật của chính trình duyệt; cầu nối nghe trên một socket trong thư mục dữ liệu mà chỉ bạn mở được. Chưa hỗ trợ Safari và Firefox (tắt mặc định).
+
+### Nghỉ mắt
+
+Sau 20 phút dùng máy (hoặc 30, 45, 60), nghỉ 20 giây (hoặc một phút, năm phút) để nhìn ra xa, theo quy tắc 20-20-20. Notch báo trước mười giây; rồi mọi màn hình được làm mờ, ở giữa là một thẻ Liquid Glass đếm ngược với hai nút Bỏ qua và Để 5 phút nữa (Escape là bỏ qua), hoặc khi tắt Che màn hình thì chỉ báo trên notch. Chỉ thời gian dùng máy mới được tính: bàn phím và con trỏ đứng yên năm phút, hoặc cả một lần nghỉ nếu lâu hơn, thì bắt đầu đếm lại. Giờ nghỉ chờ khi camera hoặc micro đang được dùng, hoặc khi ứng dụng phía trước đang toàn màn hình, và đến ngay khi xong. Giữa các lần nghỉ có thể được nhắc chớp mắt và ngồi thẳng; một phím tắt và bảng ở thanh menu cho nghỉ ngay. Không giữ gì trên đĩa và không cần quyền (tắt mặc định).
 
 ### Và còn lại
 

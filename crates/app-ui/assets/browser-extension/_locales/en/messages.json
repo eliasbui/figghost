@@ -1,0 +1,7 @@
+{
+  "name": { "message": "Figghost Companion" },
+  "description": { "message": "Blocks distracting sites while a Pomodoro work session runs in Figghost, and sends a video to Figghost to download." },
+  "action": { "message": "Download this page with Figghost" },
+  "downloadLink": { "message": "Download this link with Figghost" },
+  "downloadPage": { "message": "Download this page with Figghost" }
+}

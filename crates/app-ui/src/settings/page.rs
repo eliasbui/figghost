@@ -27,6 +27,8 @@ const FEATURE_SCRIPTS: &[&str] = &[
     include_str!("../../web/features/mole.js"),
     include_str!("../../web/features/islands.js"),
     include_str!("../../web/features/utilities.js"),
+    include_str!("../../web/features/breaks.js"),
+    include_str!("../../web/features/browser.js"),
     include_str!("../../web/features/notes.js"),
     include_str!("../../web/features/launcher.js"),
     include_str!("../../web/features/weather.js"),
@@ -64,6 +66,7 @@ const FEATURE_STYLES: &[&str] = &[
     include_str!("../../web/features/mole.css"),
     include_str!("../../web/features/islands.css"),
     include_str!("../../web/features/utilities.css"),
+    include_str!("../../web/features/browser.css"),
     include_str!("../../web/features/weather.css"),
     include_str!("../../web/features/launcher.css"),
     include_str!("../../web/features/prs.css"),
@@ -130,6 +133,14 @@ const FEATURE_FIXTURES: &[(&str, &str)] = &[
     (
         "utilities",
         include_str!("../../web/features/utilities.fixture.json"),
+    ),
+    (
+        "breaks",
+        include_str!("../../web/features/breaks.fixture.json"),
+    ),
+    (
+        "browser",
+        include_str!("../../web/features/browser.fixture.json"),
     ),
     (
         "notes",

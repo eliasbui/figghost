@@ -250,7 +250,7 @@ impl Feature {
     }
 
     /// Queues a link. The reasons it may not be are faults the page words.
-    fn submit(&self, url: &str) -> Result<u64, Fault> {
+    pub(crate) fn submit(&self, url: &str) -> Result<u64, Fault> {
         let config = self.config.borrow().clone();
         if !config.enabled {
             return Err(Fault::new("download_off", ""));

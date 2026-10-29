@@ -1,0 +1,14 @@
+{
+  "enabled": true,
+  "work_minutes": 20,
+  "break_seconds": 20,
+  "cover": true,
+  "sound": true,
+  "blink_minutes": 0,
+  "posture_minutes": 30,
+  "hold_meetings": true,
+  "hold_full_screen": true,
+  "shortcut": "",
+  "until": 734,
+  "breaking": false
+}

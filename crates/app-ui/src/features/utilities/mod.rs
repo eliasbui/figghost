@@ -6,7 +6,8 @@
 //! input device itself, so no app has a button to find. The keyboard lock swallows keys in an event tap, which
 //! needs Accessibility, and always has three ways out: Command and Escape, the length chosen, and quitting. The
 //! appearance and the link go through AppleScript (`macos_sys::desktop`, `macos_sys::browser`), off the main thread,
-//! and macOS asks once whether Figghost may control System Events or that browser.
+//! and macOS asks once whether Figghost may control System Events or that browser. Desktop icons that Figghost hid are
+//! shown again when the feature is switched off; a file in the data directory remembers that it hid them.
 
 use super::{AttachEnv, islands};
 use crate::{
@@ -32,6 +33,8 @@ use serde::{Deserialize, Serialize};
 use serde_json::{Value, json};
 use std::{
     cell::{Cell, RefCell},
+    fs,
+    path::PathBuf,
     rc::{Rc, Weak},
     thread,
     time::{Duration, Instant},
@@ -47,6 +50,8 @@ const SLOT_LOCK: &str = "util-lock";
 const SLOT_SNOOZE: &str = "util-snooze";
 const SLOT_LOOK: &str = "util-look";
 const SLOT_LINK: &str = "util-link";
+/// In the data directory while the desktop icons are hidden by Figghost.
+const ICONS_HIDDEN: &str = "desktop-icons-hidden";
 const PRIORITY_MIC: u8 = 28;
 const PRIORITY_AWAKE: u8 = 22;
 const PRIORITY_LOCK: u8 = 29;
@@ -156,6 +161,7 @@ struct Snoozing {
 
 pub struct Feature {
     mtm: MainThreadMarker,
+    home: PathBuf,
     notch: Option<Weak<Notch>>,
     config: RefCell<Config>,
     awake: RefCell<Option<Session>>,
@@ -186,6 +192,7 @@ pub fn attach(env: &AttachEnv) -> Option<Rc<Feature>> {
     let config = env.config.utilities.clone().sanitized();
     let feature = Rc::new_cyclic(|me| Feature {
         mtm: env.mtm,
+        home: env.home.to_path_buf(),
         notch: env.notch.map(Rc::downgrade),
         config: RefCell::new(config.clone()),
         awake: RefCell::default(),
@@ -205,6 +212,9 @@ pub fn attach(env: &AttachEnv) -> Option<Rc<Feature>> {
         );
     }
     FEATURE.with(|slot| *slot.borrow_mut() = Rc::downgrade(&feature));
+    if !config.enabled {
+        feature.restore_icons();
+    }
     Some(feature)
 }
 
@@ -218,6 +228,7 @@ impl Feature {
             self.stop_awake(false);
             self.unlock(false);
             self.stop_snooze(false);
+            self.restore_icons();
             return Ok(());
         }
         self.register_hotkeys(&config)
@@ -715,9 +726,30 @@ impl Feature {
         });
     }
 
+    /// Shows the desktop icons again if Figghost hid them, for a feature that is switched off.
+    fn restore_icons(&self) {
+        let marker = self.home.join(ICONS_HIDDEN);
+        if !marker.exists() {
+            return;
+        }
+        thread::spawn(move || {
+            if desktop::icons_shown() || desktop::show_icons(true) {
+                let _ = fs::remove_file(&marker);
+            }
+        });
+    }
+
     /// Says on the notch what the appearance or the desktop now is, or that it could not be changed.
     fn looked(&self, done: bool, on: bool, appearance: bool) {
         let language = self.language();
+        if done && !appearance {
+            let marker = self.home.join(ICONS_HIDDEN);
+            let _ = if on {
+                fs::remove_file(&marker)
+            } else {
+                fs::write(&marker, "")
+            };
+        }
         let (symbol, title) = match (done, appearance, on) {
             (false, true, _) => {
                 return self.tell(

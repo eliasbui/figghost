@@ -107,7 +107,9 @@ The notch always has Clipboard, Shelf, Media (with lyrics), Focus and Sound; the
 | Capture | Chụp màn hình | Screenshots, scrolling capture, recordings as MP4 or GIF, an editor and text recognition in Vietnamese and English (off by default) |
 | Colour picker | Chọn màu | A loupe on a frozen screen that copies HEX, RGB, HSL or HSB (off by default) |
 | Video download | Tải video | Paste a link and yt-dlp, which you install yourself, saves the video to Downloads with the progress on the closed notch (off by default) |
+| Browser | Trình duyệt | An extension for Chrome, Edge, Brave, Vivaldi and Arc that blocks the sites you list during Pomodoro work and sends a video to Video download (off by default) |
 | Utilities | Tiện ích | Keep the Mac awake, mute the microphone for every app, lock the keyboard while you clean it, snooze the notch, switch the dark appearance, hide the desktop icons, copy the link of a browser tab (off by default) |
+| Breaks | Nghỉ mắt | A short break for the eyes after a while at the Mac, held back during meetings and full-screen apps, with reminders to blink and to sit up (off by default) |
 
 ### Cửa sổ & Phím tắt (Window & Keys)
 
@@ -357,6 +359,14 @@ The new mail and the calendar reminders of the Outlook app, on an Outlook tab of
 Keep the Mac awake for 15 minutes to 4 hours or until you stop it, mute the microphone itself so every app hears nothing (it is unmuted when Figghost quits, since nothing else on the Mac has a switch for it), lock the keyboard while you wipe it (Command and Escape unlock it at once, and it unlocks by itself after the time you set), and snooze the notch for 5 minutes to 2 hours or until you wake it, so that it does not open when the pointer reaches the top of the screen while you present or play (a click on it, and a coding agent that waits for an answer, still open it). It also switches the whole Mac between the dark and the light appearance, hides the files on the desktop for a clean screen to share (the Finder starts again to take it), and copies the link of the tab in front of Safari or a Chromium browser as a Markdown link, the address alone, or the title and the address (Control-Option-Command-L). Each has a place in the menu bar panel (one switch for keeping awake and one for snoozing, which start the length chosen on this page; the lists of lengths are in the menu), a shortcut that works in any app and a notice on the notch (off by default).
 
 ![The Utilities page in Vietnamese](docs/images/settings-utilities-vi.png)
+
+### Browser
+
+Figghost Companion, an extension for Chrome, Edge, Brave, Vivaldi and Arc, talks only to Figghost on this Mac through native messaging. While a Pomodoro work stage runs, the sites you list (one a line; youtube.com, facebook.com, tiktok.com, instagram.com, x.com and reddit.com to start with) and their subdomains do not open; they open again when the stage ends, and nothing is blocked while Figghost is not running. Its button, and the menu of a page or a link, send the address to Video download. Setting it up is two steps on the Browser page: Show the folder writes the extension to `browser-extension` in the data directory, to load in the browser's page of extensions with Developer mode on and Load unpacked; Connect writes a small file into that browser's folder that names Figghost as the extension's bridge, and Remove takes it away. The extension reads no page, asks for no access to any site and blocks with the browser's own rules; the bridge listens on a socket in the data directory that only you can open. Safari and Firefox are not supported (off by default).
+
+### Breaks
+
+After 20 minutes at the Mac (or 30, 45, 60), a break of 20 seconds (or a minute, or five) to look into the distance, as the 20-20-20 rule has it. The notch says ten seconds before; then every display is blurred with a card of Liquid Glass in the middle that counts down and has Skip and In 5 minutes (Escape skips), or, with Cover the screens off, the break shows on the notch alone. Only time at the Mac counts: keyboard and pointer still for five minutes, or for a whole break if that is longer, start the count again. A break waits while a camera or a microphone is in use, or while the app in front is full screen, and comes as soon as that is over. Reminders to blink and to sit up can come between breaks, and a shortcut and the menu bar panel start a break now. Nothing is kept on disk and no permission is needed (off by default).
 
 ### And the rest
 

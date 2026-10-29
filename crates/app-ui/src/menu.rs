@@ -91,6 +91,7 @@ pub mod symbols {
         KEYBOARD = "keyboard.fill",
         DARK = "circle.lefthalf.filled",
         DESKTOP = "desktopcomputer",
+        BREAK = "eye",
         TYPING = "waveform.and.mic",
     }
 }

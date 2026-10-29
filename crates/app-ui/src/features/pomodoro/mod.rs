@@ -310,6 +310,14 @@ impl Feature {
         self.machine.borrow().snapshot(now_ms())
     }
 
+    /// Whether a work stage runs now, for what keeps the person to their work, such as the sites the browser blocks.
+    pub fn is_working(&self) -> bool {
+        let machine = self.machine.borrow();
+        self.config.borrow().enabled
+            && machine.is_running()
+            && machine.cycle().stage() == Stage::Work
+    }
+
     // -- the buttons -------------------------------------------------------------------------------------------
 
     /// Starts a stage, pauses one that runs, resumes one that is paused.

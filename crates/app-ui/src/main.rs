@@ -50,6 +50,11 @@ fn main() {
     // The coding agents start the app this way for each hook event and for the status line: no window, no
     // AppKit, and nothing that can get in their way.
     let args: Vec<String> = std::env::args().collect();
+    // A browser starts the app this way for the Figghost Companion extension: native messaging on standard input and
+    // output, no window and no AppKit.
+    if let Some(origin) = args.get(1).filter(|a| a.starts_with("chrome-extension://")) {
+        std::process::exit(features::browser::host::run(&home, origin));
+    }
     if let Some(at) = args.iter().position(|a| a == "--figghost-hook") {
         std::process::exit(agents::run_hook_cli(
             &home,

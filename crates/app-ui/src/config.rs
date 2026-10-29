@@ -469,6 +469,10 @@ pub struct Config {
     #[serde(deserialize_with = "lenient_section")]
     pub utilities: crate::features::utilities::Config,
     #[serde(deserialize_with = "lenient_section")]
+    pub breaks: crate::features::breaks::Config,
+    #[serde(deserialize_with = "lenient_section")]
+    pub browser: crate::features::browser::Config,
+    #[serde(deserialize_with = "lenient_section")]
     pub notes: crate::features::notes::Config,
     #[serde(deserialize_with = "lenient_section")]
     pub launcher: crate::features::launcher::Config,
@@ -546,6 +550,8 @@ impl Default for Config {
             musicwidget: crate::features::musicwidget::Config::default(),
             islands: crate::features::islands::Config::default(),
             utilities: crate::features::utilities::Config::default(),
+            breaks: crate::features::breaks::Config::default(),
+            browser: crate::features::browser::Config::default(),
             notes: crate::features::notes::Config::default(),
             launcher: crate::features::launcher::Config::default(),
             weather: crate::features::weather::Config::default(),
@@ -612,6 +618,8 @@ impl Config {
                 cfg.capture = cfg.capture.sanitized();
                 cfg.islands = cfg.islands.sanitized();
                 cfg.utilities = cfg.utilities.sanitized();
+                cfg.breaks = cfg.breaks.sanitized();
+                cfg.browser = cfg.browser.sanitized();
                 cfg.notes = cfg.notes.sanitized();
                 cfg.launcher = cfg.launcher.sanitized();
                 cfg.weather = cfg.weather.sanitized();

@@ -1,0 +1,16 @@
+{
+  "manifest_version": 3,
+  "name": "__MSG_name__",
+  "description": "__MSG_description__",
+  "version": "1.0.0",
+  "default_locale": "en",
+  "key": "MIIBIjANBgkqhkiG9w0BAQEFAAOCAQ8AMIIBCgKCAQEApRw2SjCdhshfN86GXZye8OoCq2FZWfLBA9uAjMRtRTUUSDeoSJheBdQygsZnqqGhY5euKpowtH0Ibth+wBoN/szyC1nAHddTZ2DY/JGhPeTMepdTt8dbPVdL5HGf0H2kE4Kc2xh7Gg3RvI9WOMX+AeC/vPvSeY0QgLJpqT6ehMzC8dDMySfcx/h0b8BKlI1xkDIg3Dr+jZDEYnpbfwq/Lysp7wGwDoQIQ7dM9L6MyTpJ9K+9odsBx/YleOpgOkHItDgddcTl7Kab5u98lGDLmsBNxpBX1BLVRvpJ8NSGsx30gMcq5REYpLAZihtE+xMLfWP9sCE0EXLrJsaepcUo1wIDAQAB",
+  "minimum_chrome_version": "120",
+  "background": { "service_worker": "background.js" },
+  "action": {
+    "default_title": "__MSG_action__",
+    "default_icon": { "16": "icon16.png", "48": "icon48.png", "128": "icon128.png" }
+  },
+  "icons": { "16": "icon16.png", "48": "icon48.png", "128": "icon128.png" },
+  "permissions": ["nativeMessaging", "declarativeNetRequest", "contextMenus", "alarms", "activeTab"]
+}

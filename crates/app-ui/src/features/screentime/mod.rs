@@ -201,10 +201,7 @@ impl Feature {
         match (was, now) {
             (false, true) => self.start(),
             (true, false) => self.stop(),
-            (true, true) if sites == (true, false) => {
-                self.save();
-                self.sites.borrow_mut().clear();
-            }
+            (true, true) if sites == (true, false) => self.forget_sites(),
             (true, true) if sites == (false, true) => self.load_sites(),
             _ => {}
         }
@@ -272,6 +269,17 @@ impl Feature {
         self.sites.borrow_mut().clear();
         self.groups.borrow_mut().clear();
         trace::log("screentime: stopped");
+    }
+
+    /// Counting by site was switched off: what was counted by site is forgotten, in memory and on disk.
+    fn forget_sites(&self) {
+        self.sites.borrow_mut().clear();
+        self.sites_dirty.set(false);
+        if let Err(e) = fs::remove_file(&self.sites_file)
+            && e.kind() != io::ErrorKind::NotFound
+        {
+            eprintln!("screentime: cannot remove the sites: {e}");
+        }
     }
 
     fn load_sites(&self) {

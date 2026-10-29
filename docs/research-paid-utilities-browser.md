@@ -101,6 +101,9 @@ Kết luận của nhóm này: nhiều việc không cần extension. Đọc tab
    Phần đọc tab dùng chung nằm ở `macos-sys/src/browser.rs`. Bỏ tự nén ảnh sao chép: tính năng này đổi thứ người dùng dán mà họ không thấy, móc ghi clipboard (`set_on_copied`) đã do mascot dùng, và nén theo yêu cầu đã có ở Shelf và Drag wheel.
 2. Lô B, giao diện mới: đọc chính tả (Wispr Flow), nhắc nghỉ mắt (LookAway), thanh hành động khi bôi đen (PopClip), nút phụ của chuột (Mac Mouse Fix), bộ chọn trình duyệt (Choosy, làm cùng deeplink 2.5.0), bố cục cửa sổ (Moom), quy tắc thư mục (Hazel).
 3. Lô C, extension Figghost Companion cho Chromium và Firefox: nút tải video, chặn trang web trong phiên Pomodoro, điều khiển tốc độ và tua video từ tab Media, công cụ MCP `browser_tab`.
+   Trạng thái ngày 29/10/2026:
+   - Lô B: đã làm nhắc nghỉ mắt (trang Nghỉ mắt). Đọc chính tả mới làm thử: tiếng Việt thuần nhận dạng tốt với giọng tổng hợp, câu trộn tiếng Anh thì sai; còn chờ thử giọng thật.
+   - Lô C: đã làm phần đầu cho Chrome, Edge, Brave, Vivaldi và Arc (trang Trình duyệt): cầu nối native messaging, chặn trang trong phiên làm việc Pomodoro, nút và menu tải video. Còn lại: điều khiển video, công cụ MCP, Firefox.
 4. Sau: nhãn bàn phím cho phần tử (Homerow), chuyển cửa sổ có ảnh (Witch), làm tối nền (HazeOver), gương camera (Hand Mirror).
 
 ## 6. Không làm, và lý do

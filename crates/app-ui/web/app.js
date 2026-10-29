@@ -891,6 +891,8 @@ const GLYPHS = (() => {
       w: 'M4.8 6h5.4M7.5 4.6V6M5.5 10c1.4-.8 2.4-2 2.8-4', k: 'M12.6 18.6l2.6-6.4 2.6 6.4M13.6 16.4h3.2',
     },
     utilities: { g: 'M3.5 9h13v6a5 5 0 0 1-5 5h-3a5 5 0 0 1-5-5z', s: R(5.5, 21, 9, 1.8, 0.9), w: 'M16.5 11h1.2a2.6 2.6 0 0 1 0 5.2h-1.4M8 3c-.9.9.9 1.8 0 3.2M12 3c-.9.9.9 1.8 0 3.2' },
+    browser: { g: C(12, 12, 10), s: 'M15.8 8.2l-2.6 5-5 2.6 2.6-5z', w: 'M12 2v2.4M12 19.6V22M2 12h2.4M19.6 12H22' },
+    breaks: { g: 'M1.5 12c2.6-4.6 6.2-7 10.5-7s7.9 2.4 10.5 7c-2.6 4.6-6.2 7-10.5 7S4.1 16.6 1.5 12z', s: C(12, 12, 4) },
     capture: { g: R(6, 6, 12, 12, 3.2), s: C(12, 12, 3), w: 'M2.5 8V5.5a3 3 0 0 1 3-3H8M16 2.5h2.5a3 3 0 0 1 3 3V8M21.5 16v2.5a3 3 0 0 1-3 3H16M8 21.5H5.5a3 3 0 0 1-3-3V16' },
     vision: { g: C(7.5, 16.5, 5.5), s: 'M15.2 3.3a2.6 2.6 0 0 1 3.7 0l1.8 1.8a2.6 2.6 0 0 1 0 3.7l-2.2 2.2-5.5-5.5z', w: 'M14 7.8L6.8 15v2.2H9l7.2-7.2' },
     download: { g: R(2.5, 13.5, 19, 8, 3.5), s: 'M10.4 2.5h3.2v7.3h3.4L12 15.3 7 9.8h3.4z' },
@@ -1928,8 +1930,8 @@ const NAV = [
   { sec: 'notch', pages: ['notch', 'islands', 'notifications', 'volume', 'musicwidget'] },
   { sec: 'mouse', pages: ['scroll', 'cursor', 'wheel', 'tiling', 'pin'] },
   { sec: 'text', pages: ['clipboard', 'typing', 'snippets', 'smart', 'translate'] },
-  { sec: 'capture', pages: ['capture', 'vision', 'download'] },
-  { sec: 'mac', pages: ['utilities', 'menubar', 'mole'] },
+  { sec: 'capture', pages: ['capture', 'vision', 'download', 'browser'] },
+  { sec: 'mac', pages: ['utilities', 'breaks', 'menubar', 'mole'] },
 ];
 const TAB_PAGES = ['agents', 'prs', 'calendar', 'outlook', 'pomodoro', 'dayprogress', 'screentime', 'notes', 'launcher', 'weather', 'video', 'system', 'updates', 'devices', 'displays', 'present', 'shelf', 'media'];
 /** The page the sidebar marks while `id` is open: itself, or the Notch page for the page of one of its tabs. */

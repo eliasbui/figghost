@@ -44,8 +44,9 @@ use objc2_app_kit::{
 use objc2_core_foundation::CGPoint;
 use objc2_core_graphics::CGColor;
 use objc2_foundation::{
-    NSArray, NSData, NSDate, NSDateFormatter, NSDictionary, NSNotification, NSNotificationCenter, NSNumber, NSObject,
-    NSObjectProtocol, NSPoint, NSRect, NSRunLoop, NSRunLoopCommonModes, NSSize, NSString,
+    NSArray, NSData, NSDate, NSDateFormatter, NSDictionary, NSNotification, NSNotificationCenter,
+    NSNumber, NSObject, NSObjectProtocol, NSPoint, NSRect, NSRunLoop, NSRunLoopCommonModes, NSSize,
+    NSString,
 };
 use objc2_quartz_core::{
     CABasicAnimation, CACornerMask, CACurrentMediaTime, CADisplayLink, CAGradientLayer, CALayer,
@@ -2171,13 +2172,14 @@ impl Inner {
         };
         let live = self.current_activity();
         let urgent = live.as_ref().is_some_and(|a| a.priority >= URGENT);
-        let idle = clock_on && match self.shape.get() {
-            Shape::Rest => !hardware,
-            // A pill keeps the date and time in the middle while something is live, unless it is urgent; a hardware
-            // notch has the camera there.
-            Shape::Compact { .. } => !urgent && (!hardware || live.is_none()),
-            Shape::Open => false,
-        };
+        let idle = clock_on
+            && match self.shape.get() {
+                Shape::Rest => !hardware,
+                // A pill keeps the date and time in the middle while something is live, unless it is urgent; a hardware
+                // notch has the camera there.
+                Shape::Compact { .. } => !urgent && (!hardware || live.is_none()),
+                Shape::Open => false,
+            };
         let wanted = idle && self.flight.get().is_none() && self.shows();
         self.rest_bar.setHidden(!wanted);
         self.rest_bar.ivars().steps.set(steps_on);
@@ -2214,7 +2216,10 @@ impl Inner {
         iv.gap.set(gap);
         let room = self.rest_bar.room();
         let (text, right) = if gap > 0.0 {
-            (rest_text(&["HH:mm"], room), rest_text(&REST_DATE_PATTERNS, room))
+            (
+                rest_text(&["HH:mm"], room),
+                rest_text(&REST_DATE_PATTERNS, room),
+            )
         } else {
             (rest_text(&REST_PATTERNS, room), String::new())
         };
@@ -2288,10 +2293,12 @@ impl Inner {
                 }
             }
             // The middle of a hardware notch is the camera, so the time and the date go in the ears beside it.
-            None if self.geometry.get().hardware && self.style.borrow().rest_clock => Shape::Compact {
-                ear: REST_EAR,
-                drop: 0.0,
-            },
+            None if self.geometry.get().hardware && self.style.borrow().rest_clock => {
+                Shape::Compact {
+                    ear: REST_EAR,
+                    drop: 0.0,
+                }
+            }
             None => Shape::Rest,
         }
     }
@@ -2944,6 +2951,32 @@ pub fn full_screen_on(windows: &[Listed], front: i32, own: i32, screen: Frame) -
             let to_bottom = f.y >= screen.y - 1.0 && near(f.y + f.h, screen.y + screen.h);
             w.alpha > 0.0 && across(&f) && (whole || (parked_title && to_bottom))
         })
+}
+
+/// Whether the app in front is full screen on any screen, as the notch tells it for its own screen: for a reminder that
+/// should wait while a film, a game or a presentation fills the screen.
+pub fn front_is_full_screen(mtm: MainThreadMarker) -> bool {
+    let Some(front) = NSWorkspace::sharedWorkspace().frontmostApplication() else {
+        return false;
+    };
+    let screens = NSScreen::screens(mtm);
+    let primary = screens.firstObject().map_or(0.0, |s| s.frame().size.height);
+    let windows = pin_ui::on_screen_windows();
+    screens.iter().any(|s| {
+        let f = s.frame();
+        let screen = Frame {
+            x: f.origin.x,
+            y: primary - (f.origin.y + f.size.height),
+            w: f.size.width,
+            h: f.size.height,
+        };
+        full_screen_on(
+            &windows,
+            front.processIdentifier(),
+            std::process::id() as i32,
+            screen,
+        )
+    })
 }
 
 /// Edges are inclusive: a pointer pushed against the top of the screen sits exactly on the boundary.

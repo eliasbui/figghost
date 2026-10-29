@@ -29,8 +29,17 @@ use std::path::{Path, PathBuf};
 /// A unix socket path must fit in 104 bytes on macOS; a long data directory falls back to a short name in the
 /// temporary directory, derived from the same text so the hook and the app always agree.
 pub fn socket_path(home: &Path) -> PathBuf {
+    short_socket(home, "agents.sock", "figghost")
+}
+
+/// The socket of another part of the app, `<name>.sock` in the data directory, with the same way out of a long one.
+pub fn named_socket(home: &Path, name: &str) -> PathBuf {
+    short_socket(home, &format!("{name}.sock"), &format!("figghost-{name}"))
+}
+
+fn short_socket(home: &Path, file: &str, prefix: &str) -> PathBuf {
     const LIMIT: usize = 100;
-    let direct = home.join("agents.sock");
+    let direct = home.join(file);
     if direct.as_os_str().len() <= LIMIT {
         return direct;
     }
@@ -38,7 +47,7 @@ pub fn socket_path(home: &Path) -> PathBuf {
     for byte in home.as_os_str().as_encoded_bytes() {
         hash = (hash ^ u64::from(*byte)).wrapping_mul(0x100_0000_01b3);
     }
-    std::env::temp_dir().join(format!("figghost-{hash:016x}.sock"))
+    std::env::temp_dir().join(format!("{prefix}-{hash:016x}.sock"))
 }
 
 #[cfg(test)]
@@ -52,6 +61,23 @@ mod tests {
             path,
             Path::new("/Users/me/Library/Application Support/Figghost/agents.sock")
         );
+    }
+
+    #[test]
+    fn another_socket_has_its_own_name_inside_the_home_or_elsewhere() {
+        let home = Path::new("/Users/me/Library/Application Support/Figghost");
+        assert_eq!(named_socket(home, "browser"), home.join("browser.sock"));
+        let long = PathBuf::from(format!("/tmp/{}", "x".repeat(120)));
+        let browser = named_socket(&long, "browser");
+        assert_ne!(browser, socket_path(&long));
+        assert!(
+            browser
+                .file_name()
+                .unwrap()
+                .to_string_lossy()
+                .starts_with("figghost-browser-")
+        );
+        assert_eq!(browser, named_socket(&long, "browser"));
     }
 
     #[test]

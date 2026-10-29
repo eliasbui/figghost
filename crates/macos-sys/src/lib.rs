@@ -8,6 +8,7 @@ pub mod audio_tap;
 pub mod awake;
 pub mod ax;
 pub mod bluetooth;
+pub mod break_ui;
 pub mod browser;
 pub mod button;
 pub mod calendar_ui;
