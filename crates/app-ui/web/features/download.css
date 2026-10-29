@@ -22,3 +22,13 @@
 .download-tools .btn[hidden], .download-folder .btn[hidden] { display: none; }
 .download-toolbar { display: flex; justify-content: flex-end; padding: 8px var(--row-inset); border-top: 0.5px solid var(--stroke); }
 .download-item .empty, .download-list .empty { padding: 14px var(--row-inset); }
+.download-links { display: flex; flex-direction: column; border-top: 0.5px solid var(--stroke); }
+.download-links[hidden] { display: none; }
+.download-net { display: flex; align-items: center; justify-content: space-between; gap: 10px; padding: 7px var(--row-inset); }
+.download-net + .download-net, .download-net + .download-net-note { border-top: 0.5px solid var(--stroke); }
+.download-net-name { overflow: hidden; text-overflow: ellipsis; white-space: nowrap; }
+.download-net-tag { margin-left: 6px; padding: 1px 6px; border-radius: 999px; background: var(--field); color: var(--text-2); font-size: var(--fs-small); }
+.download-net-state { flex: none; color: var(--text-2); font-size: var(--fs-small); font-variant-numeric: tabular-nums; }
+.download-net[data-state="up"] .download-net-state { color: var(--good); }
+.download-net[data-state="down"] .download-net-state { color: var(--warn); }
+.download-net-note { padding: 8px var(--row-inset); color: var(--text-2); font-size: var(--fs-small); }

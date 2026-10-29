@@ -3,6 +3,7 @@
   "folder": "",
   "quality": "best",
   "playlist": false,
+  "net_merge": true,
   "folder_path": "/Users/you/Downloads",
   "ytdlp": "/opt/homebrew/bin/yt-dlp",
   "ytdlp_version": "2026.08.19",
@@ -15,5 +16,11 @@
     { "id": 5, "url": "https://www.facebook.com/watch/?v=1", "title": "", "status": "queued", "percent": null, "speed": null, "eta": null, "error": "", "needs_ffmpeg": false },
     { "id": 6, "url": "https://www.youtube.com/watch?v=jNQXAC9IVRw", "title": "Me at the zoo", "status": "joining", "percent": 100, "speed": null, "eta": null, "error": "", "needs_ffmpeg": false }
   ],
-  "picked": { "seq": 0, "path": "" }
+  "picked": { "seq": 0, "path": "" },
+  "net_links": [
+    { "name": "en0", "label": "Ethernet", "state": "up", "primary": true, "connections": 4, "speed": 11800000 },
+    { "name": "en1", "label": "Wi-Fi", "state": "up", "primary": false, "connections": 4, "speed": 12300000 },
+    { "name": "en8", "label": "iPhone USB", "state": "checking", "primary": false, "connections": 0, "speed": 0 }
+  ],
+  "net_paused": false
 }

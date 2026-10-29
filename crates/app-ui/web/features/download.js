@@ -19,6 +19,14 @@
     'download.quality.best': 'Best', 'download.quality.1080': 'Up to 1080p', 'download.quality.720': 'Up to 720p', 'download.quality.audio': 'Music only',
     'download.playlist.title': 'Whole playlist', 'download.playlist.desc': 'A link to a playlist saves all of it. Off saves only the video the link points at.',
     'download.folder.title': 'Save to', 'download.folder.choose': 'Choose...', 'download.folder.reset': 'Use Downloads',
+    'sec.download.net': 'net-merge',
+    'download.net.title': 'Use every connection at once',
+    'download.net.desc': 'Fetches a video in pieces over several connections at once and spreads them over the connections of the Mac (Wi-Fi, Ethernet, a phone on USB with Personal Hotspot on), as net-merge does, so their speeds add up. No administrator password is needed and only the downloads of Figghost take part. The first connection of a download to each site takes the usual connection of the Mac, a connection that fails with a site is kept away from it for a while, and while a VPN carries everything nothing is merged.',
+    'download.net.none': 'No connection was found.',
+    'download.net.one': 'One connection: a video still comes in several pieces at once. Plug in a phone by USB with Personal Hotspot on, or an Ethernet cable, to add another.',
+    'download.net.paused': 'A VPN carries all traffic, so nothing is merged: downloads go through it as before.',
+    'download.net.st.idle': 'Ready', 'download.net.st.checking': 'Checking...', 'download.net.st.up': 'Working', 'download.net.st.down': 'No internet',
+    'download.net.primary': 'usual', 'download.net.busy': '{n} connections, {speed}/s',
     'sec.download.list': 'Downloads',
     'download.list.empty': 'Nothing downloaded yet. Paste a link above.',
     'download.clear': 'Clear finished',
@@ -46,6 +54,14 @@
     'download.quality.best': 'Tốt nhất', 'download.quality.1080': 'Đến 1080p', 'download.quality.720': 'Đến 720p', 'download.quality.audio': 'Chỉ lấy nhạc',
     'download.playlist.title': 'Cả danh sách phát', 'download.playlist.desc': 'Link tới một danh sách phát thì lưu toàn bộ. Tắt thì chỉ lưu video mà link trỏ tới.',
     'download.folder.title': 'Lưu vào', 'download.folder.choose': 'Chọn...', 'download.folder.reset': 'Dùng Downloads',
+    'sec.download.net': 'net-merge',
+    'download.net.title': 'Dùng mọi kết nối cùng lúc',
+    'download.net.desc': 'Tải video thành nhiều phần qua nhiều kết nối cùng lúc và chia chúng ra các đường mạng của Mac (Wi-Fi, Ethernet, điện thoại cắm USB bật Điểm truy cập cá nhân), như net-merge, để tốc độ cộng lại. Không cần mật khẩu quản trị và chỉ các lượt tải của Figghost tham gia. Kết nối đầu tiên của một lượt tải tới mỗi trang đi đường mạng thường dùng của Mac, đường nào làm hỏng kết nối với một trang thì tránh trang đó một thời gian, và khi VPN đang chở toàn bộ lưu lượng thì không gộp gì.',
+    'download.net.none': 'Không tìm thấy kết nối nào.',
+    'download.net.one': 'Chỉ có một kết nối: video vẫn được tải nhiều phần cùng lúc. Cắm điện thoại qua USB và bật Điểm truy cập cá nhân, hoặc cắm cáp Ethernet, để thêm một đường.',
+    'download.net.paused': 'VPN đang chở toàn bộ lưu lượng nên không gộp gì: lượt tải đi qua VPN như trước.',
+    'download.net.st.idle': 'Sẵn sàng', 'download.net.st.checking': 'Đang kiểm tra...', 'download.net.st.up': 'Đang chạy', 'download.net.st.down': 'Không có internet',
+    'download.net.primary': 'mặc định', 'download.net.busy': '{n} kết nối, {speed}/giây',
     'sec.download.list': 'Các lượt tải',
     'download.list.empty': 'Chưa tải gì. Hãy dán link ở trên.',
     'download.clear': 'Xóa các lượt đã xong',
@@ -117,6 +133,21 @@
     const folderRow = row(t('download.folder.title'), null, h('div', { class: 'download-folder' }, where, reset, choose), { when: on });
     folderRow.querySelector('.row-text').after(h('div', { class: 'download-gap' }));
 
+    // net-merge: the links and what each carries, from the proxy while a download runs ---------------
+    const nets = h('div', { class: 'download-links' });
+    reg(() => {
+      const d = dl();
+      const links = d.net_links || [];
+      nets.hidden = !(on() && d.net_merge);
+      const note = d.net_paused ? t('download.net.paused') : !links.length ? t('download.net.none') : links.length === 1 ? t('download.net.one') : '';
+      nets.replaceChildren(
+        ...links.map((l) => h('div', { class: 'download-net', 'data-state': l.state },
+          h('span', { class: 'download-net-name' }, l.label === l.name ? l.label : l.label + ' (' + l.name + ')',
+            l.primary ? h('span', { class: 'download-net-tag', text: t('download.net.primary') }) : null),
+          h('span', { class: 'download-net-state', text: l.connections ? t('download.net.busy', { n: l.connections, speed: bytes(l.speed) }) : t('download.net.st.' + l.state) }))),
+        ...(note ? [h('div', { class: 'download-net-note', role: 'status', text: note })] : []));
+    });
+
     // The list ------------------------------------------------------
     const box = h('div', { class: 'download-list' });
     const empty = h('div', { class: 'empty', role: 'status', text: t('download.list.empty') });
@@ -173,6 +204,8 @@
         selectRow({ path: 'download.quality', title: t('download.quality.title'), desc: t('download.quality.desc'), options: qualities, when: on }),
         toggleRow('download.playlist', t('download.playlist.title'), t('download.playlist.desc'), { when: on }),
         folderRow),
+      sectionTitle(t('sec.download.net')),
+      card(toggleRow('download.net_merge', t('download.net.title'), t('download.net.desc'), { when: on }), nets),
       sectionTitle(t('sec.download.list')),
       card(box, h('div', { class: 'download-toolbar' }, clear)),
     ];
@@ -185,7 +218,7 @@
     go('download');
     const page = document.querySelector('#scroller');
     const btn = (label) => [...page.querySelectorAll('.btn')].find((b) => b.textContent === label);
-    expect(page.querySelectorAll('.switch').length === 2, 'download: one switch for the feature and one for playlists');
+    expect(page.querySelectorAll('.switch').length === 3, 'download: one switch for the feature, one for playlists and one for net-merge');
     expect(page.textContent.includes(t('download.ytdlp.found', { version: '2026.08.19' })), 'download: the version of yt-dlp is shown');
     expect(page.textContent.includes('brew install ffmpeg'), 'download: a missing ffmpeg says what it costs and how to install it');
     sent.length = 0;
@@ -254,6 +287,29 @@
     S.download.folder = '/Users/me/Movies'; runSyncs();
     btn(t('download.folder.reset')).click();
     expect(S.download.folder === '', 'download: Use Downloads clears the folder');
+
+    // net-merge: its switch, the links with the usual one marked, what a busy link carries, and the notes.
+    const nets = page.querySelector('.download-links');
+    const netSwitch = page.querySelector('.switch[data-path="download.net_merge"]');
+    sent.length = 0;
+    netSwitch.click();
+    expect(sent.some((m) => m.t === 'set' && m.path === 'download.net_merge' && m.value === false), 'download: the net-merge switch sends its setting: ' + JSON.stringify(sent));
+    expect(nets.hidden, 'download: the links are hidden while net-merge is off');
+    netSwitch.click();
+    expect(!nets.hidden, 'download: the links show while net-merge is on');
+    const netRows = [...nets.querySelectorAll('.download-net')];
+    expect(netRows.length === 3, 'download: a row for each link: ' + netRows.length);
+    expect(netRows[0].textContent.includes('Ethernet (en0)') && netRows[0].textContent.includes(t('download.net.primary')), 'download: the usual link is marked: ' + netRows[0].textContent);
+    expect(!netRows[1].textContent.includes(t('download.net.primary')), 'download: only the usual link is marked');
+    expect(netRows[1].textContent.includes(t('download.net.busy', { n: 4, speed: '11.7 MB' })), 'download: a busy link says what it carries: ' + netRows[1].textContent);
+    expect(netRows[2].textContent.includes(t('download.net.st.checking')), 'download: an idle link says its state');
+    expect(!nets.querySelector('.download-net-note') && !nets.textContent.includes('null'), 'download: two links or more need no note: ' + nets.textContent);
+    const links = S.download.net_links;
+    S.download.net_links = links.slice(0, 1); runSyncs();
+    expect(nets.textContent.includes(t('download.net.one')), 'download: one link says how to add another');
+    S.download.net_paused = true; runSyncs();
+    expect(nets.textContent.includes(t('download.net.paused')), 'download: a VPN that carries everything is said');
+    S.download.net_paused = false; S.download.net_links = links; runSyncs();
 
     // Without yt-dlp nothing can be started and the page says how to get it.
     const was = S.download.ytdlp;

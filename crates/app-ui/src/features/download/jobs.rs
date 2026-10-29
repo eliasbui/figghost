@@ -79,6 +79,8 @@ pub struct Request {
     pub quality: Quality,
     pub playlist: bool,
     pub ffmpeg: Option<PathBuf>,
+    /// net-merge: the proxy URL yt-dlp goes through.
+    pub proxy: Option<String>,
 }
 
 impl Request {
@@ -357,6 +359,7 @@ fn fetch(shared: &Arc<Mutex<Inner>>, id: u64, request: &Request, temp: &Path) ->
         quality: request.quality,
         playlist: request.playlist,
         ffmpeg: request.ffmpeg.as_deref(),
+        proxy: request.proxy.as_deref(),
     });
     let search = match std::env::var("PATH") {
         Ok(own) if !own.is_empty() => format!("{SEARCH_PATH}:{own}"),
@@ -606,6 +609,7 @@ esac
             quality: Quality::Best,
             playlist: false,
             ffmpeg: None,
+            proxy: None,
         }
     }
 
@@ -917,7 +921,8 @@ esac
     /// The one real download: `cargo test -p app-ui real_download -- --ignored --nocapture`, with `FIGGHOST_TEST_URL` to try
     /// another link than the first video of YouTube and `FIGGHOST_TEST_QUALITY` (`best`, `1080`, `720`, `audio`) for
     /// another quality than the best, and `FIGGHOST_TEST_KEEP` for a path to copy the file to before the folder goes. It
-    /// uses the yt-dlp that is installed and a folder of its own.
+    /// uses the yt-dlp that is installed and a folder of its own. `FIGGHOST_TEST_NET_MERGE` sends it through net-merge and
+    /// prints what each link of this Mac carried.
     #[test]
     #[ignore = "needs the network and an installed yt-dlp"]
     fn real_download_saves_a_video_with_the_installed_yt_dlp() {
@@ -935,6 +940,10 @@ esac
         let mut asked = request(&program, &dir.0, &url);
         asked.ffmpeg = ffmpeg.clone();
         asked.quality = quality;
+        let merge = std::env::var_os("FIGGHOST_TEST_NET_MERGE")
+            .map(|_| core_netmerge::Merge::start().expect("the proxy starts"));
+        asked.proxy = merge.as_ref().map(|m| m.proxy_url("socks5h", "real"));
+        let started = std::time::Instant::now();
         let id = engine.submit(asked);
         let mut best = 0.0_f64;
         let job = loop {
@@ -947,9 +956,20 @@ esac
         };
         println!("ffmpeg: {ffmpeg:?}");
         println!(
-            "result: {:?} {:?} best percent {best}",
-            job.status, job.error
+            "result: {:?} {:?} best percent {best} in {:.1} s",
+            job.status,
+            job.error,
+            started.elapsed().as_secs_f64()
         );
+        for link in merge.iter().flat_map(|m| m.stats().links) {
+            println!(
+                "net-merge: {} ({}) {}: {:.1} MB",
+                link.label,
+                link.name,
+                link.state,
+                link.received as f64 / 1e6
+            );
+        }
         println!("title: {:?} file: {:?}", job.title, job.file);
         assert_eq!(job.status, Status::Done, "{job:?}");
         let file = job.file.expect("the file is named");

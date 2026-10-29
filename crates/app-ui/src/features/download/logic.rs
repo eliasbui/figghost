@@ -25,6 +25,8 @@ const PROGRESS_TEMPLATE: &str = "download:FGDL|%(progress.status)s|%(progress.do
 /// The name of a file: the title cut to a length that no file system refuses, and the id of the video, so that two
 /// videos of one title never take the same name.
 const OUTPUT_TEMPLATE: &str = "%(title).200B [%(id)s].%(ext)s";
+/// With net-merge, how many pieces of a video come at once.
+pub const NET_PIECES: &str = "8";
 
 #[derive(Debug, Clone, Copy, PartialEq, Eq)]
 pub enum Quality {
@@ -126,6 +128,8 @@ pub struct Plan<'a> {
     pub quality: Quality,
     pub playlist: bool,
     pub ffmpeg: Option<&'a Path>,
+    /// net-merge: the proxy of `core-netmerge`, which spreads the connections over the Mac's links.
+    pub proxy: Option<&'a str>,
 }
 
 /// The arguments for yt-dlp. The link is the last one and stands after `--`, so that it can never be read as an option;
@@ -159,7 +163,11 @@ pub fn build_args(plan: &Plan) -> Vec<String> {
     args.push("-P".into());
     args.push(format!("temp:{}", plan.temp.display()));
     args.push("-f".into());
-    args.push(format_selector(plan.quality, plan.ffmpeg.is_some()));
+    args.push(format_selector(
+        plan.quality,
+        plan.ffmpeg.is_some(),
+        plan.proxy.is_some(),
+    ));
     match (plan.quality, plan.ffmpeg) {
         (Quality::Audio, Some(_)) => {
             args.extend(["-x", "--audio-format", "m4a"].map(str::to_owned));
@@ -171,6 +179,20 @@ pub fn build_args(plan: &Plan) -> Vec<String> {
         args.push("--ffmpeg-location".into());
         args.push(ffmpeg.display().to_string());
     }
+    if let Some(proxy) = plan.proxy {
+        // A video in pieces (DASH, HLS, and YouTube's files cut into pieces of 10 MiB by `dashy`) comes several pieces at
+        // a time, each on a connection the proxy gives to one of the links; a piece that cannot be had fails the
+        // download rather than leave a hole in the video.
+        args.extend(["--proxy", proxy, "--concurrent-fragments", NET_PIECES].map(str::to_owned));
+        args.extend(
+            [
+                "--extractor-args",
+                "youtube:formats=dashy",
+                "--abort-on-unavailable-fragments",
+            ]
+            .map(str::to_owned),
+        );
+    }
     args.push("--".into());
     args.push(plan.url.to_owned());
     args
@@ -179,18 +201,26 @@ pub fn build_args(plan: &Plan) -> Vec<String> {
 /// The `-f` of yt-dlp. With ffmpeg the best video and the best audio are fetched apart and joined by it. Without it the
 /// choice is a picture that AVFoundation can join to a sound without encoding (H.264 in mp4 and AAC in m4a, the two apart,
 /// which is all that YouTube now offers), then a file that already has both, an mp4 if there is one.
-fn format_selector(quality: Quality, ffmpeg: bool) -> String {
+///
+/// In `pieces` YouTube's own files rank below its HLS ones, which are MPEG-TS that AVFoundation cannot join: without
+/// ffmpeg those are left out, so that the files chosen are the ones that would have been chosen whole.
+fn format_selector(quality: Quality, ffmpeg: bool, pieces: bool) -> String {
     let cap = quality
         .height()
         .map(|h| format!("[height<=?{h}]"))
         .unwrap_or_default();
+    let joinable = if pieces && !ffmpeg {
+        "[protocol!*=m3u8]"
+    } else {
+        ""
+    };
     match (quality, ffmpeg) {
         (Quality::Audio, true) => "ba/b".into(),
-        (Quality::Audio, false) => "ba[ext=m4a]/ba/b".into(),
+        (Quality::Audio, false) => format!("ba[ext=m4a]{joinable}/ba/b"),
         (_, true) => format!("bv*{cap}+ba/b{cap}"),
-        (_, false) => {
-            format!("bv*[vcodec^=avc1][ext=mp4]{cap}+ba[ext=m4a]/b{cap}[ext=mp4]/b{cap}")
-        }
+        (_, false) => format!(
+            "bv*[vcodec^=avc1][ext=mp4]{joinable}{cap}+ba[ext=m4a]{joinable}/b{cap}[ext=mp4]/b{cap}"
+        ),
     }
 }
 
@@ -447,6 +477,7 @@ mod tests {
             quality,
             playlist,
             ffmpeg,
+            proxy: None,
         }
     }
 
@@ -547,6 +578,52 @@ mod tests {
                     !alone.iter().any(|a| a == flag),
                     "{q:?} without ffmpeg has {flag}"
                 );
+            }
+        }
+    }
+
+    #[test]
+    fn with_net_merge_the_video_comes_in_pieces_through_the_proxy_and_without_it_as_before() {
+        let proxy = "socks5h://dl1:secret@127.0.0.1:50000";
+        for quality in Quality::ALL {
+            let mut asked = plan(quality, false, None);
+            asked.proxy = Some(proxy);
+            let args = build_args(&asked);
+            assert_eq!(after(&args, "--proxy").as_deref(), Some(proxy));
+            assert_eq!(
+                after(&args, "--concurrent-fragments").as_deref(),
+                Some(NET_PIECES)
+            );
+            assert_eq!(
+                after(&args, "--extractor-args").as_deref(),
+                Some("youtube:formats=dashy")
+            );
+            assert!(args.iter().any(|a| a == "--abort-on-unavailable-fragments"));
+            assert!(
+                after(&args, "-f").unwrap().contains("[protocol!*=m3u8]"),
+                "{quality:?} without ffmpeg leaves out what it cannot join"
+            );
+            asked.ffmpeg = Some(Path::new("/opt/homebrew/bin/ffmpeg"));
+            assert!(
+                !after(&build_args(&asked), "-f")
+                    .unwrap()
+                    .contains("protocol"),
+                "{quality:?} with ffmpeg joins anything"
+            );
+            let n = args.len();
+            assert_eq!(
+                args[n - 2..],
+                ["--".to_owned(), "https://example.com/v".to_owned()],
+                "the link is still last"
+            );
+            let plain = build_args(&plan(quality, false, None));
+            for flag in [
+                "--proxy",
+                "--concurrent-fragments",
+                "--extractor-args",
+                "--abort-on-unavailable-fragments",
+            ] {
+                assert!(!plain.iter().any(|a| a == flag), "{quality:?} has {flag}");
             }
         }
     }

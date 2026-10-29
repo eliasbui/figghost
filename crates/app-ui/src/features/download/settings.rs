@@ -22,6 +22,7 @@ pub fn state(config: &Config, runtime: &Value) -> Value {
         "folder": config.folder,
         "quality": config.quality,
         "playlist": config.playlist,
+        "net_merge": config.net_merge,
         "folder_path": text("folder_path"),
         "ytdlp": text("ytdlp"),
         "ytdlp_version": text("ytdlp_version"),
@@ -32,6 +33,8 @@ pub fn state(config: &Config, runtime: &Value) -> Value {
             .filter(|p| p.is_object())
             .cloned()
             .unwrap_or_else(|| json!({ "seq": 0, "path": "" })),
+        "net_links": runtime.get("net_links").filter(|l| l.is_array()).cloned().unwrap_or_else(|| json!([])),
+        "net_paused": runtime.get("net_paused").and_then(Value::as_bool).unwrap_or(false),
     })
 }
 
@@ -43,6 +46,7 @@ pub fn set(config: &mut Config, path: &str, value: &Value) -> Option<Result<(), 
     Some(match path {
         "enabled" => switch(&mut config.enabled),
         "playlist" => switch(&mut config.playlist),
+        "net_merge" => switch(&mut config.net_merge),
         "quality" => value
             .as_str()
             .and_then(Quality::parse)
@@ -89,6 +93,11 @@ mod tests {
         assert_eq!(s["ytdlp"], json!(""));
         assert_eq!(s["jobs"], json!([]));
         assert_eq!(s["picked"], json!({ "seq": 0, "path": "" }));
+        assert_eq!(s["net_merge"], json!(false));
+        assert_eq!(
+            (s["net_links"].clone(), s["net_paused"].clone()),
+            (json!([]), json!(false))
+        );
         let runtime = json!({
             "ytdlp": "/opt/homebrew/bin/yt-dlp",
             "ytdlp_version": "2026.08.19",
@@ -96,21 +105,27 @@ mod tests {
             "folder_path": "/Users/x/Downloads",
             "jobs": [{ "id": 1 }],
             "picked": { "seq": 2, "path": "/Users/x/Movies" },
+            "net_links": [{ "name": "en0" }],
+            "net_paused": true,
         });
         let s = state(&Config::default(), &runtime);
+        assert_eq!(s["net_links"], json!([{ "name": "en0" }]));
+        assert_eq!(s["net_paused"], json!(true));
         assert_eq!(s["ytdlp_version"], json!("2026.08.19"));
         assert_eq!(s["folder_path"], json!("/Users/x/Downloads"));
         assert_eq!(s["jobs"], json!([{ "id": 1 }]));
         assert_eq!(s["picked"]["seq"], json!(2));
-        let odd = json!({ "ytdlp": 5, "jobs": "none", "picked": [] });
+        let odd = json!({ "ytdlp": 5, "jobs": "none", "picked": [], "net_links": {}, "net_paused": "yes" });
         let s = state(&Config::default(), &odd);
         assert_eq!(
             (
                 s["ytdlp"].clone(),
                 s["jobs"].clone(),
-                s["picked"]["seq"].clone()
+                s["picked"]["seq"].clone(),
+                s["net_links"].clone(),
+                s["net_paused"].clone()
             ),
-            (json!(""), json!([]), json!(0)),
+            (json!(""), json!([]), json!(0), json!([]), json!(false)),
             "a runtime of the wrong shape says nothing"
         );
         let hostile = Config {
@@ -128,7 +143,7 @@ mod tests {
     #[test]
     fn the_switches_the_quality_and_the_folder_are_validated() {
         let mut config = Config::default();
-        for path in ["enabled", "playlist"] {
+        for path in ["enabled", "playlist", "net_merge"] {
             for bad in [json!("yes"), json!(null), json!(1)] {
                 assert!(
                     set(&mut config, path, &bad).unwrap().is_err(),
@@ -138,6 +153,7 @@ mod tests {
         }
         assert!(set(&mut config, "enabled", &json!(true)).unwrap().is_ok() && config.enabled);
         assert!(set(&mut config, "playlist", &json!(true)).unwrap().is_ok() && config.playlist);
+        assert!(set(&mut config, "net_merge", &json!(true)).unwrap().is_ok() && config.net_merge);
         for q in Quality::ALL {
             assert!(
                 set(&mut config, "quality", &json!(q.key()))

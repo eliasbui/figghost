@@ -5,6 +5,9 @@
 //! and ffmpeg the same way when there is one. The tool is run with fixed arguments and no shell, with the link last and
 //! after `--`, so that a link can never be read as an option. Only http and https links are accepted. Nothing is written
 //! to disk but the video, and the list of downloads is kept in memory only.
+//!
+//! With net-merge on, yt-dlp goes through the proxy of `core-netmerge` on 127.0.0.1, which spreads its connections over
+//! the Mac's links (Wi-Fi, Ethernet, a phone on USB); the proxy runs from the first download until the last one ends.
 
 use super::{AttachEnv, run_bounded_with};
 use crate::{i18n, settings::model::Fault, trace};
@@ -57,6 +60,8 @@ pub struct Config {
     pub quality: String,
     /// A link to a playlist downloads all of it, not only the video it points at.
     pub playlist: bool,
+    /// net-merge: a video comes in pieces over several connections at once, spread over every link of the Mac.
+    pub net_merge: bool,
 }
 
 impl Default for Config {
@@ -66,6 +71,7 @@ impl Default for Config {
             folder: String::new(),
             quality: Quality::Best.key().to_owned(),
             playlist: false,
+            net_merge: false,
         }
     }
 }
@@ -113,6 +119,11 @@ pub struct Feature {
     seen: Cell<u64>,
     /// The folder the last panel was used to choose, and the number of the choice, which the page takes over.
     picked: RefCell<(u64, String)>,
+    /// net-merge: the proxy yt-dlp goes through, there from the first download with the switch on until the last one
+    /// ends.
+    merge: RefCell<Option<core_netmerge::Merge>>,
+    /// Numbers the downloads for the proxy, which sends the first connection of each to a site by the Mac's own link.
+    merged: Cell<u64>,
     me: Weak<Feature>,
 }
 
@@ -132,6 +143,8 @@ pub fn attach(env: &AttachEnv) -> Option<Rc<Feature>> {
         shown: RefCell::default(),
         seen: Cell::new(0),
         picked: RefCell::default(),
+        merge: RefCell::default(),
+        merged: Cell::new(0),
         me: me.clone(),
     });
     // The app quitting does not run the threads to their end, and what yt-dlp started would be left running.
@@ -177,6 +190,9 @@ impl Feature {
             trace::log("download: timer off");
             timer.take();
         }
+        if !wanted && self.merge.borrow_mut().take().is_some() {
+            trace::log("download: net-merge off");
+        }
     }
 
     /// Stops what runs and takes everything off the notch.
@@ -184,6 +200,7 @@ impl Feature {
         self.timer.borrow_mut().take();
         self.engine.stop_all();
         self.engine.clear_finished();
+        self.merge.borrow_mut().take();
         self.shown.borrow_mut().clear();
         if let Some(notch) = self.notch.as_ref().and_then(Weak::upgrade) {
             notch.set_activity(RUNNING_SLOT, None);
@@ -235,6 +252,16 @@ impl Feature {
         let path =
             |p: Option<PathBuf>| p.map_or(String::new(), |p| p.to_string_lossy().into_owned());
         let (seq, chosen) = self.picked.borrow().clone();
+        let config = self.config.borrow();
+        // The links are looked at only for a page that shows them: with the switch on.
+        let net = if config.enabled && config.net_merge {
+            self.merge
+                .borrow()
+                .as_ref()
+                .map_or_else(core_netmerge::idle_stats, core_netmerge::Merge::stats)
+        } else {
+            core_netmerge::Stats::default()
+        };
         json!({
             "ytdlp": path(ytdlp),
             "ytdlp_version": version,
@@ -242,7 +269,30 @@ impl Feature {
             "folder_path": self.folder().to_string_lossy(),
             "jobs": self.engine.snapshot().iter().map(job_json).collect::<Vec<_>>(),
             "picked": { "seq": seq, "path": chosen },
+            "net_links": net.links.iter().map(link_json).collect::<Vec<_>>(),
+            "net_paused": net.paused && !net.links.is_empty(),
         })
+    }
+
+    /// The proxy for one more download, started for the first one; `None` when it cannot start, and the download
+    /// then goes as without net-merge.
+    fn proxy(&self) -> Option<String> {
+        let mut merge = self.merge.borrow_mut();
+        if merge.is_none() {
+            match core_netmerge::Merge::start() {
+                Ok(started) => {
+                    trace::log("download: net-merge on");
+                    *merge = Some(started);
+                }
+                Err(e) => {
+                    eprintln!("download: net-merge did not start: {e}");
+                    return None;
+                }
+            }
+        }
+        self.merged.set(self.merged.get() + 1);
+        let job = format!("dl{}", self.merged.get());
+        merge.as_ref().map(|m| m.proxy_url("socks5h", &job))
     }
 
     fn folder(&self) -> PathBuf {
@@ -262,6 +312,7 @@ impl Feature {
             return Err(Fault::new("download_missing", ""));
         };
         trace::log("download: queued");
+        let proxy = if config.net_merge { self.proxy() } else { None };
         let id = self.engine.submit(Request {
             program,
             url: url.to_owned(),
@@ -269,6 +320,7 @@ impl Feature {
             quality: config.quality(),
             playlist: config.playlist,
             ffmpeg,
+            proxy,
         });
         self.sync();
         Ok(id)
@@ -433,6 +485,18 @@ fn reveal(job: &Job) {
     }
 }
 
+/// One link of net-merge as the page shows it.
+fn link_json(link: &core_netmerge::LinkStats) -> Value {
+    json!({
+        "name": link.name,
+        "label": link.label,
+        "state": link.state,
+        "primary": link.primary,
+        "connections": link.connections,
+        "speed": link.speed,
+    })
+}
+
 fn job_json(job: &Job) -> Value {
     json!({
         "id": job.id,
@@ -458,6 +522,7 @@ mod tests {
         assert_eq!(config.folder, "");
         assert_eq!(config.quality, "best");
         assert!(!config.playlist);
+        assert!(!config.net_merge, "net-merge waits to be asked for");
     }
 
     #[test]
@@ -467,11 +532,15 @@ mod tests {
             folder: "  relative/path ".into(),
             quality: "4k".into(),
             playlist: true,
+            net_merge: true,
         }
         .sanitized();
         assert_eq!(odd.quality, "best");
         assert_eq!(odd.folder, "", "a folder that is not absolute is Downloads");
-        assert!(odd.enabled && odd.playlist, "what is right is kept");
+        assert!(
+            odd.enabled && odd.playlist && odd.net_merge,
+            "what is right is kept"
+        );
         let kept = Config {
             folder: " /Volumes/Backup/Videos ".into(),
             quality: "720".into(),
@@ -487,6 +556,10 @@ mod tests {
         assert_eq!(
             parsed.quality, "best",
             "a key that is missing is the default"
+        );
+        assert!(
+            !parsed.net_merge,
+            "a file from before net-merge leaves it off"
         );
     }
 
@@ -569,6 +642,29 @@ mod tests {
             keys(&fixture["jobs"][0]),
             keys(&json),
             "the fixture shows a download with the keys of a real one"
+        );
+        let link = link_json(&core_netmerge::LinkStats {
+            name: "en0".into(),
+            label: "Ethernet".into(),
+            ip: std::net::Ipv4Addr::new(10, 0, 0, 2),
+            state: "up",
+            primary: true,
+            connections: 3,
+            speed: 2_500_000,
+            received: 9,
+        });
+        assert_eq!(
+            (link["label"].clone(), link["connections"].clone()),
+            (json!("Ethernet"), json!(3))
+        );
+        assert!(
+            link.get("ip").is_none(),
+            "the page is not told the addresses"
+        );
+        assert_eq!(
+            keys(&fixture["net_links"][0]),
+            keys(&link),
+            "the fixture shows a link with the keys of a real one"
         );
     }
 }

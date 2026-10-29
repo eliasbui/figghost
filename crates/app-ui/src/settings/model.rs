@@ -1096,11 +1096,14 @@ mod tests {
             "browser",
             json!({ "browsers": [{ "id": "chrome", "name": "Google Chrome", "found": true, "installed": false }] }),
         );
-        // The list of downloads is only there while something was downloaded in this run.
+        // The list of downloads is only there while something was downloaded in this run, and the links of net-merge
+        // only while it is on.
         e.runtime.insert(
             "download",
             json!({ "jobs": [{ "id": 1, "url": "", "title": "", "status": "done", "percent": 100.0,
-                "speed": null, "eta": null, "error": "", "needs_ffmpeg": false }] }),
+                "speed": null, "eta": null, "error": "", "needs_ffmpeg": false }],
+                "net_links": [{ "name": "en0", "label": "Ethernet", "state": "up", "primary": true,
+                "connections": 1, "speed": 1 }] }),
         );
         config.weather.places = vec![crate::features::weather::logic::Place {
             name: "Hanoi".into(),

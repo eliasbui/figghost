@@ -34,6 +34,9 @@ cp "$ROOT/crates/app-ui/assets/Inter-OFL.txt" "$APP/Contents/Resources/Inter-OFL
 # Vietnamese typing puts its marks with the engine of Gõ Nhanh, whose BSD 3-Clause licence asks every copy of the
 # program to carry its notice.
 cp "$ROOT/crates/app-ui/assets/GoNhanh-LICENSE.txt" "$APP/Contents/Resources/GoNhanh-LICENSE.txt"
+# net-merge of Video download is the scheduler of net-merge written again, whose MIT License asks every copy to carry
+# its notice.
+cp "$ROOT/crates/app-ui/assets/net-merge-LICENSE.txt" "$APP/Contents/Resources/net-merge-LICENSE.txt"
 # The licence of Figghost itself travels with the app, as the MIT License asks of every copy.
 cp "$ROOT/LICENSE" "$APP/Contents/Resources/LICENSE.txt"
 
