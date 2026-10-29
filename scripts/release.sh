@@ -25,12 +25,13 @@ echo "$VERSION" | grep -Eq '^[0-9]+\.[0-9]+\.[0-9]+$' || fail "a version is thre
 [ -z "$(git status --porcelain)" ] || fail "the working tree has changes; commit them first"
 git rev-parse -q --verify "refs/tags/v$VERSION" >/dev/null && fail "v$VERSION is already tagged"
 gh auth status >/dev/null 2>&1 || fail "log in first: gh auth login"
+docker info >/dev/null 2>&1 || fail "start Docker first; it builds the Windows and Linux beta"
 CURRENT=$(sed -n '/^\[workspace.package\]/,/^\[/s/^version = "\(.*\)"/\1/p' Cargo.toml)
 PREVIOUS=$(git describe --tags --abbrev=0 2>/dev/null || true)
 
 echo "release $VERSION (Cargo.toml has $CURRENT, last tag ${PREVIOUS:-none})"
 echo "  build Figghost.app in a temporary folder (dist is left alone) and zip it, tag v$VERSION, push main and the tag to $REPO,"
-echo "  create the GitHub release with the zip, and update Casks/figghost.rb in $TAP"
+echo "  build the Windows and Linux beta (Docker), create the GitHub release with the zips, and update Casks/figghost.rb in $TAP"
 if [ "${DRY_RUN:-}" = 1 ]; then
     echo "dry run: stopping before any change"
     exit 0
@@ -49,7 +50,8 @@ PY
     git commit -q -m "Release $VERSION" Cargo.toml Cargo.lock
 fi
 
-# The app is built in a temporary folder and only the zip is kept for the upload, so dist is never touched.
+# The app is built in a temporary folder and only the zip is kept for the upload, so dist is never touched
+# except dist/desktop, which package-desktop.sh rewrites.
 WORK=$(mktemp -d)
 trap 'rm -rf "$WORK"' EXIT
 ZIP="$WORK/Figghost-$VERSION.zip"
@@ -57,6 +59,8 @@ scripts/bundle.sh "$WORK/build"
 ditto -c -k --sequesterRsrc --keepParent "$WORK/build/Figghost.app" "$ZIP"
 SHA=$(shasum -a 256 "$ZIP" | cut -d ' ' -f 1)
 echo "zip: $ZIP $SHA"
+# The Windows and Linux beta goes to dist/desktop; install.ps1 downloads the Windows zip from the release.
+scripts/package-desktop.sh
 
 git tag -a "v$VERSION" -m "Figghost $VERSION"
 git push -q origin main "v$VERSION"
@@ -84,7 +88,7 @@ git push -q origin main "v$VERSION"
     echo "The app is signed ad hoc and not notarized; the cask removes the quarantine flag after installing it."
     echo "Accessibility access stays granted through updates, because the signature names the app instead of one build; the update from a version that was signed per build asks for it once more."
 } >"$WORK/notes.md"
-gh release create "v$VERSION" "$ZIP" --repo "$REPO" --title "Figghost $VERSION" --notes-file "$WORK/notes.md"
+gh release create "v$VERSION" "$ZIP" dist/desktop/* --repo "$REPO" --title "Figghost $VERSION" --notes-file "$WORK/notes.md"
 
 gh repo clone "$TAP" "$WORK/tap" -- -q
 sed -i '' -e "s/^  version \".*\"/  version \"$VERSION\"/" -e "s/^  sha256 \".*\"/  sha256 \"$SHA\"/" "$WORK/tap/Casks/figghost.rb"

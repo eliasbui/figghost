@@ -52,6 +52,10 @@ docker run --rm \
     echo "DLLs the program loads:"; x86_64-w64-mingw32-objdump -p /target/x86_64-pc-windows-gnu/release/figghost.exe | sed -n "s/.*DLL Name: //p" | sort | tr "\n" " "; echo
     name=figghost-'"$VERSION"'-windows-x86_64
     mkdir -p /tmp/$name && cp /target/x86_64-pc-windows-gnu/release/figghost.exe LICENSE /tmp/$name/
+    # The GNU build links WebView2Loader.dll dynamically, so it has to sit next to figghost.exe.
+    loader=$(find /target/x86_64-pc-windows-gnu/release/build -path "*/out/x64/WebView2Loader.dll" | head -n 1)
+    [ -n "$loader" ] || { echo "WebView2Loader.dll not found" >&2; exit 1; }
+    cp "$loader" /tmp/$name/
     cd /tmp && zip -qr /out/$name.zip $name
   '
 ls -l "$OUT"
