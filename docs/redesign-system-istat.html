@@ -1,0 +1,614 @@
+<!doctype html>
+<html lang="vi">
+<head>
+<meta charset="utf-8">
+<meta name="viewport" content="width=device-width, initial-scale=1">
+<title>Figghost: số liệu hệ thống kiểu iStat</title>
+<style>
+/* Page tokens follow redesign-macos.html. The panels over other apps are dark glass in both themes, like the notch. */
+:root {
+  color-scheme: light;
+  --font: -apple-system, BlinkMacSystemFont, "SF Pro Text", "Helvetica Neue", sans-serif;
+  --accent: #007aff;
+  --good: #248a3d;
+  --warn: #c93400;
+  --page: #fbfbfd;
+  --text: #1d1d1f;
+  --text-2: #6e6e73;
+  --line: rgba(0, 0, 0, 0.1);
+  --grp: #ffffff;
+  --win: #efeff2;
+  --ctl: #ffffff;
+  --ctl-edge: rgba(0, 0, 0, 0.14);
+  --track: rgba(0, 0, 0, 0.13);
+  /* Glass, always dark: the notch's black tint over whatever is behind. */
+  --g-accent: #0a84ff;
+  --g-red: #ff6961;
+  --g-good: #30d158;
+  --g-warn: #ff9f0a;
+  --g-text: rgba(255, 255, 255, 0.94);
+  --g-text-2: rgba(255, 255, 255, 0.58);
+  --g-text-3: rgba(255, 255, 255, 0.34);
+  --g-line: rgba(255, 255, 255, 0.1);
+  --g-card: rgba(255, 255, 255, 0.06);
+  --wall-light: linear-gradient(160deg, #9fb7d3 0%, #c9c3d8 45%, #e8cdb9 100%);
+  --wall-dark: linear-gradient(160deg, #1d2a44 0%, #3a2d4d 55%, #4a2e2a 100%);
+}
+@media (prefers-color-scheme: dark) {
+  :root:not([data-theme="light"]) {
+    color-scheme: dark;
+    --accent: #0a84ff; --good: #30d158; --warn: #ff9f0a;
+    --page: #111113; --text: #f5f5f7; --text-2: #98989d; --line: rgba(255, 255, 255, 0.12);
+    --grp: #2b2b2e; --win: #1c1c1e; --ctl: #3a3a3c; --ctl-edge: rgba(255, 255, 255, 0.14); --track: rgba(255, 255, 255, 0.16);
+  }
+}
+:root[data-theme="dark"] {
+  color-scheme: dark;
+  --accent: #0a84ff; --good: #30d158; --warn: #ff9f0a;
+  --page: #111113; --text: #f5f5f7; --text-2: #98989d; --line: rgba(255, 255, 255, 0.12);
+  --grp: #2b2b2e; --win: #1c1c1e; --ctl: #3a3a3c; --ctl-edge: rgba(255, 255, 255, 0.14); --track: rgba(255, 255, 255, 0.16);
+}
+
+* { box-sizing: border-box; }
+body { margin: 0; background: var(--page); color: var(--text); font: 14px/1.5 var(--font); -webkit-font-smoothing: antialiased; }
+main { max-width: 1100px; margin: 0 auto; padding: 40px 16px 80px; }
+h1 { font-size: 30px; line-height: 1.15; margin: 0 0 8px; letter-spacing: -0.02em; }
+h2 { font-size: 20px; margin: 56px 0 6px; letter-spacing: -0.01em; }
+h3 { font-size: 14px; margin: 26px 0 8px; color: var(--text-2); font-weight: 600; }
+p { margin: 0 0 10px; max-width: 760px; color: var(--text-2); }
+p b, li b { color: var(--text); }
+a { color: var(--accent); }
+.num { font-variant-numeric: tabular-nums; }
+.cap { font-size: 12px; color: var(--text-2); margin-top: 8px; }
+
+/* Desktop scenes */
+.wall { border-radius: 14px; overflow: hidden; position: relative; }
+.wall.light { background: var(--wall-light); }
+.wall.dark { background: var(--wall-dark); }
+.scene-label { font-size: 12px; font-weight: 600; color: var(--text-2); margin: 18px 0 6px; }
+
+/* The menu bar of a Mac with a notch: 32 points tall, the notch in the middle. */
+.mb { height: 32px; display: flex; align-items: center; justify-content: space-between; padding: 0 12px; font-size: 13px; position: relative; color: var(--mb-fg); }
+.light .mb { --mb-fg: #000; background: rgba(255, 255, 255, 0.28); }
+.dark .mb { --mb-fg: #fff; background: rgba(0, 0, 0, 0.22); }
+.mb .apps { display: flex; gap: 16px; white-space: nowrap; }
+.mb .apps b { font-weight: 700; }
+.mb .notch { position: absolute; left: 50%; top: 0; width: 190px; height: 32px; margin-left: -95px; background: #000; border-radius: 0 0 12px 12px; }
+.mb .right { display: flex; align-items: center; gap: 2px; white-space: nowrap; }
+.mb .clock { margin-left: 10px; font-variant-numeric: tabular-nums; }
+.sys { display: inline-flex; align-items: center; justify-content: center; width: 26px; height: 22px; }
+.sys svg { fill: currentColor; }
+
+/* One cell of figures in the menu bar. Widths are fixed so that a figure changing every second moves nothing. */
+.cell { display: inline-flex; align-items: center; justify-content: center; height: 22px; padding: 0 3px; border-radius: 5px; }
+.cell.open { background: rgba(127, 127, 127, 0.3); }
+.cell.text { font-size: 13px; font-variant-numeric: tabular-nums; }
+.cell.stack { flex-direction: column; line-height: 1; width: 32px; }
+.cell.stack span { font-size: 7.5px; font-weight: 600; letter-spacing: 0.04em; opacity: 0.85; }
+.cell.stack b { font-size: 11px; font-weight: 600; font-variant-numeric: tabular-nums; margin-top: 2px; }
+.cell.net { flex-direction: column; align-items: flex-end; line-height: 1; width: 64px; white-space: nowrap; font-size: 9.5px; font-weight: 600; font-variant-numeric: tabular-nums; }
+.cell.net div { display: flex; align-items: center; gap: 3px; }
+.cell.net div + div { margin-top: 2px; }
+.cell svg { overflow: visible; }
+.mono { fill: currentColor; }
+.mono-soft { fill: currentColor; opacity: 0.3; }
+.mono-line { fill: none; stroke: currentColor; stroke-width: 1.2; }
+.mono-area { fill: currentColor; opacity: 0.28; }
+.tint-a { fill: var(--g-accent); }
+.tint-a2 { fill: color-mix(in srgb, var(--g-accent) 55%, white); }
+.tint-r { fill: var(--g-red); }
+.tint-line { fill: none; stroke: var(--g-accent); stroke-width: 1.2; }
+.tint-area { fill: var(--g-accent); opacity: 0.35; }
+
+/* Gallery of the four kinds */
+.kinds { display: grid; grid-template-columns: repeat(5, minmax(0, 1fr)); gap: 10px; }
+.kind { border-radius: 12px; overflow: hidden; border: 0.5px solid var(--line); background: var(--grp); }
+.kind .wall { border-radius: 0; height: 64px; display: flex; flex-direction: column; justify-content: center; align-items: center; gap: 6px; }
+.kind .wall .strip { height: 26px; display: flex; align-items: center; padding: 0 8px; border-radius: 6px; }
+.kind .wall.light .strip { color: #000; background: rgba(255, 255, 255, 0.35); }
+.kind .wall.dark .strip { color: #fff; background: rgba(0, 0, 0, 0.3); }
+.kind .about { padding: 10px 12px 12px; font-size: 12px; color: var(--text-2); }
+.kind .about b { display: block; color: var(--text); font-size: 13px; }
+
+/* Glass panels */
+.glass { width: 320px; border-radius: 16px; background: rgba(18, 18, 20, 0.62); backdrop-filter: blur(28px) saturate(1.7); -webkit-backdrop-filter: blur(28px) saturate(1.7); box-shadow: inset 0 0.5px 0 rgba(255, 255, 255, 0.22), 0 0 0 0.5px rgba(255, 255, 255, 0.12), 0 22px 50px rgba(0, 0, 0, 0.45); color: var(--g-text); padding: 14px 16px 10px; font-size: 12px; }
+.glass .head { display: flex; justify-content: space-between; align-items: baseline; }
+.glass .label { font-size: 10px; font-weight: 700; letter-spacing: 0.06em; color: var(--g-text-2); }
+.glass .sub { color: var(--g-text-2); font-size: 11px; }
+.glass .big { font-size: 30px; font-weight: 600; letter-spacing: -0.02em; font-variant-numeric: tabular-nums; line-height: 1.1; }
+.glass .big small { font-size: 14px; font-weight: 500; color: var(--g-text-2); letter-spacing: 0; }
+.glass .keys { display: flex; gap: 12px; margin: 2px 0 8px; color: var(--g-text-2); font-variant-numeric: tabular-nums; }
+.glass .keys i { display: inline-block; width: 8px; height: 8px; border-radius: 2px; margin-right: 5px; vertical-align: -0.5px; }
+.seg { display: flex; background: rgba(255, 255, 255, 0.08); border-radius: 7px; padding: 2px; margin: 6px 0 8px; }
+.seg span { flex: 1; text-align: center; font-size: 11px; padding: 2px 0; border-radius: 5px; color: var(--g-text-2); }
+.seg span.on { background: rgba(255, 255, 255, 0.18); color: var(--g-text); font-weight: 600; }
+.graph { display: block; width: 100%; height: auto; }
+.graph .axis { stroke: var(--g-line); stroke-width: 1; }
+.graph .grid { stroke: rgba(255, 255, 255, 0.06); stroke-width: 1; }
+.sec { border-top: 0.5px solid var(--g-line); margin-top: 10px; padding-top: 8px; }
+.sec .label { display: block; margin-bottom: 4px; }
+.row { display: flex; justify-content: space-between; align-items: center; height: 22px; font-variant-numeric: tabular-nums; }
+.row > span:first-child { color: var(--g-text-2); }
+.row.app > span:first-child { color: var(--g-text); display: flex; align-items: center; gap: 8px; }
+.ico { width: 16px; height: 16px; border-radius: 4px; display: inline-flex; align-items: center; justify-content: center; font-size: 9px; font-weight: 700; color: rgba(255, 255, 255, 0.85); background: rgba(255, 255, 255, 0.16); }
+.row.act { color: var(--g-text); border-radius: 6px; margin: 0 -8px; padding: 0 8px; }
+.row.act:hover { background: var(--g-accent); }
+.row.act > span:first-child { color: var(--g-text); }
+.cores { display: flex; gap: 14px; align-items: flex-end; }
+.cores .grp { flex: 1; }
+.cores .grp .sub { margin-top: 3px; }
+.ring-row { display: flex; gap: 14px; align-items: center; margin: 4px 0; }
+.ring-row .legend { flex: 1; }
+.dot { display: inline-block; width: 8px; height: 8px; border-radius: 2px; margin-right: 6px; }
+.scene { padding-bottom: 28px; }
+.scene .drop { display: flex; justify-content: flex-end; padding: 6px 150px 0 0; }
+.panels { display: flex; gap: 18px; justify-content: center; flex-wrap: wrap; padding: 26px 16px; }
+.panels figure { margin: 0; }
+.panels figcaption { color: rgba(255, 255, 255, 0.8); font-size: 12px; margin-top: 8px; text-align: center; }
+
+/* The notch, open on the System tab */
+.notch-pair { display: grid; grid-template-columns: 1fr 1fr; gap: 16px; align-items: start; }
+.notch-pair img { width: 100%; height: auto; display: block; border-radius: 0 0 22px 22px; }
+.nt { background: #000; border-radius: 0 0 26px 26px; padding: 12px 18px 18px; color: var(--g-text); font-size: 12px; display: flex; flex-direction: column; }
+.nt .top { display: flex; justify-content: space-between; margin-bottom: 10px; }
+.nt .pill { height: 22px; border-radius: 11px; background: rgba(255, 255, 255, 0.1); }
+.nt .tabs { display: flex; gap: 4px; }
+.nt .tabs .pill { width: 26px; }
+.nt .tabs .pill.on { background: rgba(255, 255, 255, 0.85); }
+.nt .big3 { display: grid; grid-template-columns: repeat(3, 1fr); gap: 8px; flex: 1.9; }
+.nt .small5 { display: grid; grid-template-columns: repeat(5, 1fr); gap: 8px; flex: 1; margin-top: 8px; }
+.nt .card { background: var(--g-card); border: 0.5px solid var(--g-line); border-radius: 12px; padding: 7px 9px; min-width: 0; display: flex; flex-direction: column; }
+.nt .label { font-size: 8.5px; font-weight: 700; letter-spacing: 0.06em; color: var(--g-text-2); }
+.nt .v { font-size: 21px; font-weight: 600; font-variant-numeric: tabular-nums; line-height: 1.15; }
+.nt .v small { font-size: 11px; color: var(--g-text-2); font-weight: 500; }
+.nt .v2 { font-size: 14px; font-weight: 600; font-variant-numeric: tabular-nums; line-height: 1.2; }
+.nt .d { font-size: 9px; color: var(--g-text-2); white-space: nowrap; overflow: hidden; text-overflow: ellipsis; }
+.nt .bar { height: 4px; border-radius: 2px; background: rgba(255, 255, 255, 0.12); overflow: hidden; display: flex; margin: 4px 0 3px; }
+.nt .bar i { display: block; height: 100%; }
+.nt .card svg { flex: 1; width: 100%; min-height: 0; }
+.nt .legend { font-size: 9px; color: var(--g-text-2); font-variant-numeric: tabular-nums; }
+
+/* Settings sketch, solid System Settings form (docs/design.md) */
+.win { background: var(--win); border-radius: 12px; border: 0.5px solid var(--line); padding: 22px; max-width: 620px; }
+.win h4 { margin: 0 0 6px 4px; font-size: 13px; }
+.group { background: var(--grp); border-radius: 10px; border: 0.5px solid var(--line); margin-bottom: 18px; }
+.group .r { display: flex; align-items: center; gap: 10px; min-height: 40px; padding: 6px 12px; font-size: 13px; }
+.group .r + .r { border-top: 0.5px solid var(--line); }
+.group .r .t { flex: 1; }
+.group .r .t small { display: block; color: var(--text-2); font-size: 11px; }
+.handle { width: 10px; display: flex; flex-direction: column; gap: 2px; opacity: 0.35; }
+.handle i { display: block; height: 1.5px; background: currentColor; border-radius: 1px; }
+.pop { border: 0.5px solid var(--ctl-edge); background: var(--ctl); border-radius: 6px; padding: 2px 22px 2px 8px; font-size: 12px; position: relative; min-width: 96px; }
+.pop::after { content: ""; position: absolute; right: 8px; top: 50%; width: 5px; height: 5px; border-right: 1.5px solid var(--text-2); border-bottom: 1.5px solid var(--text-2); transform: translateY(-70%) rotate(45deg); }
+.sw { width: 32px; height: 19px; border-radius: 10px; background: var(--track); position: relative; flex: none; }
+.sw::after { content: ""; position: absolute; top: 2px; left: 2px; width: 15px; height: 15px; border-radius: 50%; background: #fff; box-shadow: 0 1px 2px rgba(0, 0, 0, 0.3); }
+.sw.on { background: var(--accent); }
+.sw.on::after { left: 15px; }
+.preview { justify-content: center; padding: 10px 12px; }
+.preview .wall { padding: 0; width: 100%; }
+.preview .mb { justify-content: flex-end; }
+
+table { border-collapse: collapse; width: 100%; max-width: 900px; font-size: 13px; }
+td, th { text-align: left; padding: 7px 10px; border-bottom: 0.5px solid var(--line); vertical-align: top; }
+th { color: var(--text-2); font-weight: 600; }
+
+@media (max-width: 900px) {
+  .kinds { grid-template-columns: repeat(2, minmax(0, 1fr)); }
+  .notch-pair { grid-template-columns: 1fr; }
+  .scene .drop { justify-content: center; padding-right: 0; }
+  .mb .apps span:not(:first-child) { display: none; }
+  .mb .notch { display: none; }
+}
+</style>
+</head>
+<body>
+<main>
+
+<h1>Số liệu hệ thống kiểu iStat</h1>
+<p>Bản vẽ đề xuất cho số liệu trên thanh menu, menu thả xuống và tab System của notch, theo cách trình bày của iStat Menus 7. Lý do và phạm vi ở <a href="research-istat-menus-7.md">research-istat-menus-7.md</a>. Số liệu trong bản vẽ là số mẫu.</p>
+<p>Ba ý chính: <b>thanh menu đơn sắc, hai dòng, bề rộng cố định</b>; <b>bấm vào số liệu mở một bảng kính ngay dưới nó</b>; <b>chỉ màu nhấn và đỏ</b>, không còn năm màu.</p>
+
+<h2>1. Thanh menu</h2>
+<p>Hôm nay Figghost đặt một dòng chữ. Đề xuất vẽ mỗi số liệu thành một ô template, theo màu chữ của thanh menu, gộp chung một mục như hôm nay hoặc tách riêng từng mục.</p>
+
+<div class="scene-label">Hôm nay</div>
+<div class="wall light">
+  <div class="mb">
+    <div class="apps"><b>Finder</b><span>Tệp</span><span>Sửa</span><span>Xem</span><span>Đi</span><span>Cửa sổ</span></div>
+    <div class="notch"></div>
+    <div class="right">
+      <span class="cell text">CPU 23%&nbsp;&nbsp;RAM 79%&nbsp;&nbsp;NET 52.1 MB/s</span>
+      <span class="sys" data-sys="wifi"></span><span class="sys" data-sys="battery"></span><span class="sys" data-sys="cc"></span>
+      <span class="clock">Th 4&nbsp;&nbsp;14:32</span>
+    </div>
+  </div>
+  <div style="height:22px"></div>
+</div>
+<div class="cap">Ba số liệu tốn khoảng 230 điểm. Kiểu hai dòng bên dưới đặt năm số liệu vào khoảng 200 điểm, quan trọng trên máy có notch, nơi bên phải notch hết chỗ trước.</div>
+
+<div class="scene-label">Đề xuất, gộp một mục, đơn sắc</div>
+<div class="wall light">
+  <div class="mb">
+    <div class="apps"><b>Finder</b><span>Tệp</span><span>Sửa</span><span>Xem</span><span>Đi</span><span>Cửa sổ</span></div>
+    <div class="notch"></div>
+    <div class="right">
+      <span class="cell stack"><span>CPU</span><b>23%</b></span>
+      <span class="cell"><svg data-cores="0.62,0.4,0.71,0.3|0.92,0.35,0.88,0.41,0.77,0.3" width="40" height="16"></svg></span>
+      <span class="cell stack"><span>RAM</span><b>79%</b></span>
+      <span class="cell net" data-net="3.9 MB/s|48.2 MB/s"></span>
+      <span class="cell stack"><span>NHIỆT</span><b>62°</b></span>
+      <span class="sys" data-sys="wifi"></span><span class="sys" data-sys="battery"></span><span class="sys" data-sys="cc"></span>
+      <span class="clock">Th 4&nbsp;&nbsp;14:32</span>
+    </div>
+  </div>
+  <div style="height:22px"></div>
+</div>
+
+<div class="scene-label">Đề xuất, nền tối, đồ thị có màu</div>
+<div class="wall dark">
+  <div class="mb">
+    <div class="apps"><b>Xcode</b><span>Tệp</span><span>Sửa</span><span>Xem</span><span>Tìm</span><span>Sản phẩm</span></div>
+    <div class="notch"></div>
+    <div class="right">
+      <span class="cell"><svg data-spark="7" data-tint width="30" height="16"></svg></span>
+      <span class="cell stack"><span>CPU</span><b>23%</b></span>
+      <span class="cell"><svg data-cores="0.62,0.4,0.71,0.3|0.92,0.35,0.88,0.41,0.77,0.3" data-tint width="40" height="16"></svg></span>
+      <span class="cell stack"><span>RAM</span><b>79%</b></span>
+      <span class="cell net" data-net="3.9 MB/s|48.2 MB/s"></span>
+      <span class="sys" data-sys="wifi"></span><span class="sys" data-sys="battery"></span><span class="sys" data-sys="cc"></span>
+      <span class="clock">Th 4&nbsp;&nbsp;14:32</span>
+    </div>
+  </div>
+  <div style="height:22px"></div>
+</div>
+<div class="cap">Đồ thị có màu dùng màu nhấn; một nhân trên 85% chuyển đỏ. Chữ luôn theo màu thanh menu.</div>
+
+<h3>Năm kiểu của một ô</h3>
+<div class="kinds">
+  <div class="kind">
+    <div class="wall light"><div class="strip"><span class="cell text">23%</span></div></div>
+    <div class="about"><b>Chữ</b>Như hôm nay, không nhãn. Khoảng 34 điểm.</div>
+  </div>
+  <div class="kind">
+    <div class="wall light"><div class="strip"><span class="cell stack"><span>CPU</span><b>23%</b></span></div></div>
+    <div class="about"><b>Hai dòng</b>Nhãn 7,5 điểm trên giá trị 11 điểm. 32 điểm.</div>
+  </div>
+  <div class="kind">
+    <div class="wall dark"><div class="strip"><span class="cell"><svg data-spark="3" width="30" height="16"></svg></span></div></div>
+    <div class="about"><b>Đồ thị</b>30 lần đọc gần nhất. 30 điểm.</div>
+  </div>
+  <div class="kind">
+    <div class="wall dark"><div class="strip"><span class="cell"><svg data-cores="0.62,0.4,0.71,0.3|0.92,0.35,0.88,0.41,0.77,0.3" width="40" height="16"></svg></span></div></div>
+    <div class="about"><b>Cột nhân</b>Một vạch mỗi nhân, khe giữa nhóm tiết kiệm và hiệu năng. Chỉ CPU.</div>
+  </div>
+  <div class="kind">
+    <div class="wall light"><div class="strip"><span class="cell net" data-net="3.9 MB/s|48.2 MB/s"></span></div></div>
+    <div class="about"><b>Tải lên, tải về</b>Hai dòng có mũi tên. Chỉ Mạng. 62 điểm.</div>
+  </div>
+</div>
+
+<h2>2. Menu thả xuống</h2>
+<p>Bấm một ô mở một bảng kính ngay dưới nó, cùng kính với notch. Từ trên xuống: số lớn, đồ thị với khoảng thời gian, các khối có tiêu đề chữ hoa nhỏ và số căn phải, cuối là app dùng nhiều nhất. Esc hoặc bấm ra ngoài thì đóng.</p>
+
+<div class="wall dark scene">
+  <div class="mb">
+    <div class="apps"><b>Xcode</b><span>Tệp</span><span>Sửa</span><span>Xem</span><span>Tìm</span><span>Sản phẩm</span></div>
+    <div class="notch"></div>
+    <div class="right">
+      <span class="cell stack open"><span>CPU</span><b>23%</b></span>
+      <span class="cell"><svg data-cores="0.62,0.4,0.71,0.3|0.92,0.35,0.88,0.41,0.77,0.3" width="40" height="16"></svg></span>
+      <span class="cell stack"><span>RAM</span><b>79%</b></span>
+      <span class="cell net" data-net="3.9 MB/s|48.2 MB/s"></span>
+      <span class="sys" data-sys="wifi"></span><span class="sys" data-sys="battery"></span><span class="sys" data-sys="cc"></span>
+      <span class="clock">Th 4&nbsp;&nbsp;14:32</span>
+    </div>
+  </div>
+  <div class="drop">
+    <div class="glass">
+      <div class="head"><span class="label">CPU</span><span class="sub">Apple M4, 10 nhân</span></div>
+      <div class="big">23<small>%</small></div>
+      <div class="keys"><span><i style="background:var(--g-accent)"></i>Người dùng 15%</span><span><i style="background:var(--g-red)"></i>Hệ thống 8%</span></div>
+      <div class="seg"><span>1 phút</span><span class="on">1 giờ</span><span>1 ngày</span></div>
+      <svg class="graph" id="cpu-graph" viewBox="0 0 288 72"></svg>
+      <div class="sec">
+        <span class="label">NHÂN</span>
+        <div class="cores">
+          <div class="grp"><svg class="graph" data-corebars="0.62,0.4,0.71,0.3" data-soft viewBox="0 0 110 34"></svg><div class="sub">Tiết kiệm</div></div>
+          <div class="grp" style="flex:1.5"><svg class="graph" data-corebars="0.92,0.35,0.88,0.41,0.77,0.3" viewBox="0 0 165 34"></svg><div class="sub">Hiệu năng</div></div>
+        </div>
+      </div>
+      <div class="sec">
+        <span class="label">TẢI TRUNG BÌNH</span>
+        <div class="row"><span>1, 5, 15 phút</span><span>2,41&nbsp;&nbsp;2,10&nbsp;&nbsp;1,87</span></div>
+        <div class="row"><span>Thời gian chạy</span><span>3 ngày 4 giờ</span></div>
+      </div>
+      <div class="sec">
+        <span class="label">DÙNG NHIỀU NHẤT</span>
+        <div class="row app"><span><i class="ico">X</i>Xcode</span><span>38,2%</span></div>
+        <div class="row app"><span><i class="ico">S</i>Safari</span><span>12,4%</span></div>
+        <div class="row app"><span><i class="ico">F</i>Figma</span><span>8,1%</span></div>
+        <div class="row app"><span><i class="ico">T</i>Microsoft Teams</span><span>5,6%</span></div>
+        <div class="row app"><span><i class="ico">T</i>Terminal</span><span>3,2%</span></div>
+      </div>
+      <div class="sec">
+        <div class="row act"><span>Mở tab System trên notch</span><span></span></div>
+        <div class="row act"><span>Mở Giám sát hoạt động</span><span></span></div>
+      </div>
+    </div>
+  </div>
+</div>
+
+<div class="wall dark" style="margin-top:16px">
+  <div class="panels">
+    <figure>
+      <div class="glass">
+        <div class="head"><span class="label">BỘ NHỚ</span><span class="sub">Áp lực: <span style="color:var(--g-good)">Bình thường</span></span></div>
+        <div class="big">12,7 <small>GB / 16 GB</small></div>
+        <div class="ring-row">
+          <svg id="mem-ring" width="78" height="78" viewBox="0 0 78 78"></svg>
+          <div class="legend">
+            <div class="row"><span><i class="dot" style="background:var(--g-accent)"></i>App</span><span>3,9 GB</span></div>
+            <div class="row"><span><i class="dot" style="background:color-mix(in srgb,var(--g-accent) 60%,white)"></i>Wired</span><span>2,8 GB</span></div>
+            <div class="row"><span><i class="dot" style="background:color-mix(in srgb,var(--g-accent) 30%,white)"></i>Đã nén</span><span>6,1 GB</span></div>
+          </div>
+        </div>
+        <div class="seg"><span class="on">1 phút</span><span>1 giờ</span><span>1 ngày</span></div>
+        <svg class="graph" id="mem-graph" viewBox="0 0 288 44"></svg>
+        <div class="sec">
+          <span class="label">SWAP</span>
+          <div class="row"><span>Đã dùng</span><span>5,3 GB trong 6 GB</span></div>
+        </div>
+        <div class="sec">
+          <span class="label">DÙNG NHIỀU NHẤT</span>
+          <div class="row app"><span><i class="ico">X</i>Xcode</span><span>4,1 GB</span></div>
+          <div class="row app"><span><i class="ico">S</i>Safari</span><span>2,3 GB</span></div>
+          <div class="row app"><span><i class="ico">T</i>Microsoft Teams</span><span>1,2 GB</span></div>
+          <div class="row app"><span><i class="ico">F</i>Figma</span><span>980 MB</span></div>
+          <div class="row app"><span><i class="ico">F</i>Figghost</span><span>26 MB</span></div>
+        </div>
+      </div>
+      <figcaption>Bộ nhớ: vòng tròn ba sắc độ màu nhấn, trạng thái bằng chữ</figcaption>
+    </figure>
+    <figure>
+      <div class="glass">
+        <div class="head"><span class="label">MẠNG</span><span class="sub">Wi-Fi</span></div>
+        <div style="display:flex;gap:22px">
+          <div><div class="sub">Tải về</div><div class="big" style="font-size:24px">48,2 <small>MB/s</small></div></div>
+          <div><div class="sub">Tải lên</div><div class="big" style="font-size:24px">3,9 <small>MB/s</small></div></div>
+        </div>
+        <div class="seg"><span class="on">1 phút</span><span>1 giờ</span><span>1 ngày</span></div>
+        <svg class="graph" id="net-graph" viewBox="0 0 288 84"></svg>
+        <div class="keys" style="margin-top:4px"><span><i style="background:var(--g-accent)"></i>Tải về, trên trục</span><span><i style="background:var(--g-red)"></i>Tải lên, dưới trục</span></div>
+        <div class="sec">
+          <span class="label">WI-FI</span>
+          <div class="row"><span>Mạng</span><span>Nha-5G</span></div>
+          <div class="row"><span>Tốc độ liên kết</span><span>1 201 Mb/s</span></div>
+          <div class="row"><span>IP nội bộ</span><span>192.168.1.24</span></div>
+          <div class="row"><span>Đã nhận, đã gửi</span><span>4,2 GB, 610 MB</span></div>
+        </div>
+        <div class="sec">
+          <span class="label">ETHERNET</span>
+          <div class="row"><span>Trạng thái</span><span>Chưa cắm</span></div>
+        </div>
+        <div class="sec">
+          <div class="row"><span>IP công cộng</span><span style="color:var(--g-text-3)">Bật trong Cài đặt</span></div>
+        </div>
+      </div>
+      <figcaption>Mạng: đồ thị đối xứng, IP công cộng tắt sẵn</figcaption>
+    </figure>
+  </div>
+</div>
+
+<h2>3. Tab System trên notch</h2>
+<p>Giữ bố cục ba thẻ lớn và năm thẻ nhỏ. Đổi màu: CPU một màu nhấn, nhân tiết kiệm là sắc nhạt, đỏ khi quá 85%; bộ nhớ ba sắc độ màu nhấn; mạng đối xứng. Tiêu đề chữ hoa nhỏ, số chữ số đều.</p>
+<div class="notch-pair">
+  <figure style="margin:0">
+    <img src="images/notch-system.png" alt="Tab System hôm nay: cột nhân xanh, cam, đỏ; bộ nhớ xanh, cam, tím; mạng xanh và lục">
+    <div class="cap">Hôm nay: năm màu cho các phần khác nhau.</div>
+  </figure>
+  <figure style="margin:0">
+    <div class="nt">
+      <div class="top"><span class="pill" style="width:44px"></span><span class="tabs"><span class="pill"></span><span class="pill on"></span></span></div>
+      <div class="big3">
+        <div class="card">
+          <span class="label">CPU</span>
+          <span class="v">84<small>%</small></span>
+          <svg id="nt-cores" viewBox="0 0 180 60" preserveAspectRatio="none"></svg>
+          <span class="legend" style="display:flex;justify-content:space-around">Tiết kiệm<span>Hiệu năng</span></span>
+        </div>
+        <div class="card">
+          <span class="label">BỘ NHỚ <span style="float:right;color:var(--g-warn);letter-spacing:0">Cảnh báo</span></span>
+          <span class="v">12,7 <small>GB / 16 GB</small></span>
+          <div class="bar"><i style="width:24%;background:var(--g-accent)"></i><i style="width:18%;background:color-mix(in srgb,var(--g-accent) 60%,white)"></i><i style="width:38%;background:color-mix(in srgb,var(--g-accent) 30%,white)"></i></div>
+          <span class="legend">App 3,9 GB&nbsp;&nbsp;Wired 2,8 GB</span>
+          <span class="legend">Đã nén 6,1 GB&nbsp;&nbsp;Swap 5,3 GB</span>
+        </div>
+        <div class="card">
+          <span class="label">MẠNG</span>
+          <span class="v2"><small class="legend">Về&nbsp;</small>48,2 MB/s</span><span class="v2"><small class="legend">Lên&nbsp;</small>3,9 MB/s</span>
+          <svg id="nt-net" viewBox="0 0 180 60" preserveAspectRatio="none"></svg>
+        </div>
+      </div>
+      <div class="small5">
+        <div class="card"><span class="label">GPU</span><span class="v2">64%</span><div class="bar"><i style="width:64%;background:var(--g-accent)"></i></div><span class="d">Apple M4</span></div>
+        <div class="card"><span class="label">Ổ KHỞI ĐỘNG</span><span class="v2">227 GB</span><div class="bar"><i style="width:51%;background:var(--g-accent)"></i></div><span class="d">trống, 460 GB</span></div>
+        <div class="card"><span class="label">NHIỆT</span><span class="v2">86 °C</span><div class="bar"><i style="width:86%;background:var(--g-accent)"></i></div><span class="d">Bình thường</span></div>
+        <div class="card"><span class="label">QUẠT</span><span class="v2">3120 rpm</span><div class="bar"><i style="width:64%;background:var(--g-accent)"></i></div><span class="d">tối đa 4900 rpm</span></div>
+        <div class="card"><span class="label">PIN</span><span class="v2">92%</span><div class="bar"><i style="width:92%;background:var(--g-accent)"></i></div><span class="d">212 lần sạc</span></div>
+      </div>
+    </div>
+    <div class="cap">Đề xuất: màu nhấn và đỏ, mạng đối xứng.</div>
+  </figure>
+</div>
+
+<h2>4. Trang Cài đặt</h2>
+<p>Trang System thêm nhóm Thanh menu, vẽ như System Settings theo <a href="design.md">design.md</a>. Bản xem trước ở đầu nhóm vẽ đúng như trên thanh menu; kéo một dòng để đổi thứ tự. Nhóm Menu (khoảng mặc định, số app, IP công cộng) nằm sau Nâng cao…</p>
+<div class="win">
+  <h4>Thanh menu</h4>
+  <div class="group">
+    <div class="r preview">
+      <div class="wall light"><div class="mb">
+        <div class="right">
+          <span class="cell stack"><span>CPU</span><b>23%</b></span>
+          <span class="cell stack"><span>RAM</span><b>79%</b></span>
+          <span class="cell net" data-net="3.9 MB/s|48.2 MB/s"></span>
+          <span class="cell stack"><span>NHIỆT</span><b>62°</b></span>
+        </div>
+      </div></div>
+    </div>
+    <div class="r"><span class="handle"><i></i><i></i><i></i></span><span class="t">CPU</span><span class="pop">Hai dòng</span><span class="sw on"></span></div>
+    <div class="r"><span class="handle"><i></i><i></i><i></i></span><span class="t">Bộ nhớ</span><span class="pop">Hai dòng</span><span class="sw on"></span></div>
+    <div class="r"><span class="handle"><i></i><i></i><i></i></span><span class="t">Mạng</span><span class="pop">Tải lên, tải về</span><span class="sw on"></span></div>
+    <div class="r"><span class="handle"><i></i><i></i><i></i></span><span class="t">Nhiệt CPU</span><span class="pop">Hai dòng</span><span class="sw on"></span></div>
+    <div class="r"><span class="handle"><i></i><i></i><i></i></span><span class="t">GPU</span><span class="pop">Chữ</span><span class="sw"></span></div>
+    <div class="r"><span class="handle"><i></i><i></i><i></i></span><span class="t">Ổ khởi động</span><span class="pop">Chữ</span><span class="sw"></span></div>
+  </div>
+  <div class="group">
+    <div class="r"><span class="t">Gộp thành một mục<small>Tắt thì mỗi số liệu một mục, Command-kéo để đổi chỗ.</small></span><span class="sw on"></span></div>
+    <div class="r"><span class="t">Đồ thị có màu<small>Đồ thị và cột nhân theo màu nhấn, đỏ khi quá 85%.</small></span><span class="sw"></span></div>
+    <div class="r"><span class="t">Bấm vào số liệu</span><span class="pop">Mở menu</span></div>
+  </div>
+</div>
+
+<h2>5. Lấy gì, bỏ gì</h2>
+<table>
+  <tr><th>Của iStat Menus 7</th><th>Trong Figghost</th></tr>
+  <tr><td>Kiểu hai dòng, đồ thị, cột nhân trên thanh menu; bề rộng cố định</td><td>Lấy, bước 1</td></tr>
+  <tr><td>Mục gộp và mục tách</td><td>Lấy, mặc định gộp như hôm nay</td></tr>
+  <tr><td>Menu thả xuống có đồ thị, khối, app dùng nhiều nhất</td><td>Lấy, bước 2, bằng kính của notch</td></tr>
+  <tr><td>Hai màu chính, theme theo màu nhấn của macOS</td><td>Lấy: màu nhấn và đỏ</td></tr>
+  <tr><td>Băng cuộn theme nhiều màu, màu nền menu tự chọn</td><td>Bỏ, trái quy tắc một màu</td></tr>
+  <tr><td>Điều khiển quạt</td><td>Bỏ: cần helper root ghi SMC</td></tr>
+  <tr><td>Băng thông và đọc ghi ổ theo app, S.M.A.R.T.</td><td>Bỏ: cần framework riêng tư</td></tr>
+  <tr><td>Quy tắc thông báo, đồng hồ thế giới, Thiên văn</td><td>Để sau</td></tr>
+</table>
+
+</main>
+<script>
+// Sample figures drawn from a fixed seed, so every load of the page looks the same.
+const rng = seed => () => (seed = (seed * 16807) % 2147483647) / 2147483647;
+function walk(n, seed, lo, hi, step) {
+  const r = rng(seed * 7919 + 1);
+  let v = (lo + hi) / 2;
+  return Array.from({ length: n }, () => (v = Math.min(hi, Math.max(lo, v + (r() - 0.5) * step))));
+}
+const pts = (vals, w, h, y0, dir) => vals.map((v, i) => `${i ? "L" : "M"}${(i * w / (vals.length - 1)).toFixed(1)},${(y0 - dir * v * h).toFixed(1)}`).join("");
+const area = (vals, w, h, y0, dir) => `${pts(vals, w, h, y0, dir)}L${w},${y0}L0,${y0}Z`;
+const NS = "http://www.w3.org/2000/svg";
+const el = (svg, html) => { svg.insertAdjacentHTML("beforeend", html); };
+
+// Menu bar: a sparkline cell.
+document.querySelectorAll("svg[data-spark]").forEach(svg => {
+  const vals = walk(30, +svg.dataset.spark, 0.1, 0.9, 0.35);
+  const tint = svg.hasAttribute("data-tint");
+  el(svg, `<path class="${tint ? "tint-area" : "mono-area"}" d="${area(vals, 30, 15, 16, 1)}"/><path class="${tint ? "tint-line" : "mono-line"}" d="${pts(vals, 30, 15, 16, 1)}"/>`);
+});
+
+// Menu bar: a bar for each core, the frugal ones first, a gap between the two kinds.
+document.querySelectorAll("svg[data-cores]").forEach(svg => {
+  const tint = svg.hasAttribute("data-tint");
+  const [slow, fast] = svg.dataset.cores.split("|").map(s => s.split(",").map(Number));
+  let x = 0, out = "";
+  const bar = (v, soft) => {
+    const h = Math.max(1.5, v * 16);
+    out += `<rect class="mono-soft" x="${x}" y="0" width="2.4" height="16" rx="0.6" style="opacity:.18"/>`;
+    const cls = tint ? (v > 0.85 ? "tint-r" : soft ? "tint-a2" : "tint-a") : "mono";
+    out += `<rect class="${cls}" x="${x}" y="${16 - h}" width="2.4" height="${h}" rx="0.6"/>`;
+    x += 3.6;
+  };
+  slow.forEach(v => bar(v, true));
+  x += 2.4;
+  fast.forEach(v => bar(v, false));
+  svg.setAttribute("width", x - 1.2);
+  svg.setAttribute("viewBox", `0 0 ${x - 1.2} 16`);
+  el(svg, out);
+});
+
+// Menu bar: up and down on two lines, with small drawn arrows.
+const arrow = up => `<svg width="7" height="8" viewBox="0 0 7 8"><path class="mono" d="${up ? "M3.5 0L7 4H4.5V8H2.5V4H0Z" : "M3.5 8L7 4H4.5V0H2.5V4H0Z"}"/></svg>`;
+document.querySelectorAll("[data-net]").forEach(cell => {
+  const [up, down] = cell.dataset.net.split("|");
+  cell.innerHTML = `<div>${arrow(true)}<span>${up}</span></div><div>${arrow(false)}<span>${down}</span></div>`;
+});
+
+// System items of the menu bar, drawn plainly so that the figures are what the eye goes to.
+const SYS = {
+  wifi: `<svg width="16" height="12" viewBox="0 0 16 12"><path d="M8 12l2.2-2.6a3.4 3.4 0 0 0-4.4 0zM3.6 6.8l1.3 1.5a4.9 4.9 0 0 1 6.2 0l1.3-1.5a6.9 6.9 0 0 0-8.8 0zM1.3 4.1l1.3 1.5a8.4 8.4 0 0 1 10.8 0l1.3-1.5A10.4 10.4 0 0 0 1.3 4.1z"/></svg>`,
+  battery: `<svg width="24" height="11" viewBox="0 0 24 11"><rect x="0.5" y="0.5" width="20" height="10" rx="3" fill="none" stroke="currentColor" opacity=".45"/><rect x="2" y="2" width="15" height="7" rx="1.6"/><rect x="21.6" y="3.5" width="1.6" height="4" rx="0.8" opacity=".45"/></svg>`,
+  cc: `<svg width="16" height="12" viewBox="0 0 16 12"><rect x="0" y="0.5" width="16" height="4.6" rx="2.3" opacity=".9"/><rect x="0" y="6.9" width="16" height="4.6" rx="2.3" opacity=".9"/></svg>`,
+};
+document.querySelectorAll("[data-sys]").forEach(s => { s.innerHTML = SYS[s.dataset.sys]; });
+
+// CPU panel: system at the bottom in red, the user's share stacked on it in the accent.
+(() => {
+  const svg = document.getElementById("cpu-graph");
+  const sys = walk(90, 11, 0.04, 0.16, 0.05);
+  const user = walk(90, 12, 0.08, 0.5, 0.14);
+  const top = user.map((u, i) => u + sys[i]);
+  let grid = "";
+  [18, 36, 54].forEach(y => { grid += `<line class="grid" x1="0" x2="288" y1="${y}" y2="${y}"/>`; });
+  el(svg, `${grid}<path d="${area(top, 288, 72, 72, 1)}" style="fill:var(--g-accent);opacity:.55"/><path d="${pts(top, 288, 72, 72, 1)}" style="fill:none;stroke:var(--g-accent);stroke-width:1.4"/><path d="${area(sys, 288, 72, 72, 1)}" style="fill:var(--g-red);opacity:.85"/><line class="axis" x1="0" x2="288" y1="71.5" y2="71.5"/>`);
+})();
+
+// CPU panel: the cores, one bar each, red above 85%.
+document.querySelectorAll("svg[data-corebars]").forEach(svg => {
+  const vals = svg.dataset.corebars.split(",").map(Number);
+  const soft = svg.hasAttribute("data-soft");
+  const step = 27.5, w = 20;
+  vals.forEach((v, i) => {
+    const x = i * step + 2;
+    const fill = v > 0.85 ? "var(--g-red)" : soft ? "color-mix(in srgb,var(--g-accent) 55%,white)" : "var(--g-accent)";
+    el(svg, `<rect x="${x}" y="0" width="${w}" height="34" rx="4" style="fill:rgba(255,255,255,.08)"/><rect x="${x}" y="${34 - v * 34}" width="${w}" height="${v * 34}" rx="4" style="fill:${fill}"/>`);
+  });
+});
+
+// Memory panel: a ring of app, wired and compressed over the free part.
+(() => {
+  const svg = document.getElementById("mem-ring");
+  const r = 31, c = 2 * Math.PI * r;
+  const parts = [[0.244, "var(--g-accent)"], [0.175, "color-mix(in srgb,var(--g-accent) 60%,white)"], [0.381, "color-mix(in srgb,var(--g-accent) 30%,white)"]];
+  let at = 0, out = `<circle cx="39" cy="39" r="${r}" fill="none" stroke="rgba(255,255,255,.1)" stroke-width="10"/>`;
+  parts.forEach(([share, color]) => {
+    out += `<circle cx="39" cy="39" r="${r}" fill="none" style="stroke:${color}" stroke-width="10" stroke-dasharray="${share * c - 1.5} ${c}" stroke-dashoffset="${-at * c}" transform="rotate(-90 39 39)"/>`;
+    at += share;
+  });
+  out += `<text x="39" y="43" text-anchor="middle" style="fill:var(--g-text);font:600 13px var(--font);font-variant-numeric:tabular-nums">79%</text>`;
+  el(svg, out);
+})();
+
+// Memory panel: how much is in use over the last minute.
+(() => {
+  const svg = document.getElementById("mem-graph");
+  const vals = walk(60, 21, 0.72, 0.84, 0.03);
+  el(svg, `<path d="${area(vals, 288, 44, 44, 1)}" style="fill:var(--g-accent);opacity:.4"/><path d="${pts(vals, 288, 44, 44, 1)}" style="fill:none;stroke:var(--g-accent);stroke-width:1.4"/><line class="axis" x1="0" x2="288" y1="43.5" y2="43.5"/>`);
+})();
+
+// Network: received above the axis, sent below it, in one frame.
+function mirrored(svg, w, h, seed) {
+  const mid = h * 0.62;
+  const down = walk(60, seed, 0.05, 0.95, 0.4);
+  const up = walk(60, seed + 1, 0.02, 0.35, 0.18);
+  el(svg, `<path d="${area(down, w, mid - 2, mid, 1)}" style="fill:var(--g-accent);opacity:.5"/><path d="${pts(down, w, mid - 2, mid, 1)}" style="fill:none;stroke:var(--g-accent);stroke-width:1.3"/><path d="${area(up, w, h - mid - 1, mid, -1)}" style="fill:var(--g-red);opacity:.5"/><path d="${pts(up, w, h - mid - 1, mid, -1)}" style="fill:none;stroke:var(--g-red);stroke-width:1.3"/><line class="axis" x1="0" x2="${w}" y1="${mid}" y2="${mid}" style="stroke:rgba(255,255,255,.25)"/>`);
+}
+mirrored(document.getElementById("net-graph"), 288, 84, 31);
+mirrored(document.getElementById("nt-net"), 180, 60, 41);
+
+// Notch: the cores of the System tab.
+(() => {
+  const svg = document.getElementById("nt-cores");
+  const slow = [0.82, 0.74, 0.9, 0.66], fast = [0.95, 0.58, 0.88, 0.91, 0.62, 0.79];
+  const w = 11, step = 15.5;
+  let x = 4, out = "";
+  const bar = (v, soft) => {
+    const fill = v > 0.85 ? "var(--g-red)" : soft ? "color-mix(in srgb,var(--g-accent) 55%,white)" : "var(--g-accent)";
+    out += `<rect x="${x}" y="2" width="${w}" height="58" rx="5" style="fill:rgba(255,255,255,.08)"/><rect x="${x}" y="${60 - v * 58}" width="${w}" height="${v * 58}" rx="5" style="fill:${fill}"/>`;
+    x += step;
+  };
+  slow.forEach(v => bar(v, true));
+  x += 8;
+  fast.forEach(v => bar(v, false));
+  el(svg, out);
+})();
+</script>
+</body>
+</html>

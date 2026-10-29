@@ -7,5 +7,16 @@
   "details": true,
   "bar_processor": true,
   "bar_memory": false,
-  "bar_network": true
+  "bar_network": true,
+  "bar_gpu": false,
+  "bar_heat": true,
+  "bar_disk": false,
+  "bar_processor_kind": "stacked",
+  "bar_memory_kind": "stacked",
+  "bar_network_kind": "stacked",
+  "bar_gpu_kind": "text",
+  "bar_heat_kind": "stacked",
+  "bar_disk_kind": "text",
+  "bar_combined": true,
+  "bar_color": false
 }

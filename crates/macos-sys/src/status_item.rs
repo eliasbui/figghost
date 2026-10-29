@@ -571,6 +571,16 @@ impl TextItem {
         }
     }
 
+    /// Shows `image` in place of the text. Assistive technology cannot read a picture, so `description` says what
+    /// it shows.
+    pub fn set_image(&self, image: &NSImage, description: &str) {
+        if let Some(button) = self.item.button(self.mtm) {
+            button.setTitle(&NSString::new());
+            button.setImage(Some(image));
+            button.setAccessibilityLabel(Some(&NSString::from_str(description)));
+        }
+    }
+
     /// Draws every digit the same width, so that a figure that changes every second does not move the items beside it.
     pub fn even_digits(&self) {
         if let Some(button) = self.item.button(self.mtm) {

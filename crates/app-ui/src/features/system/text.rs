@@ -15,11 +15,11 @@ impl Language {
         "CPU"
     }
 
-    /// The short names of the figures in the menu bar: processor, memory, network.
-    pub fn system_bar_labels(self) -> [&'static str; 3] {
+    /// The short names of the figures in the menu bar, in the order of `logic::Figure`.
+    pub fn system_bar_labels(self) -> [&'static str; 6] {
         match self {
-            Language::English => ["CPU", "Mem", "Net"],
-            Language::Vietnamese => ["CPU", "RAM", "Mạng"],
+            Language::English => ["CPU", "Mem", "Net", "GPU", "Temp", "Disk"],
+            Language::Vietnamese => ["CPU", "RAM", "Mạng", "GPU", "Nhiệt", "Ổ đĩa"],
         }
     }
 

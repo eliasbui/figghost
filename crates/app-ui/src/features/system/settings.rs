@@ -1,7 +1,10 @@
 //! This feature's part of the settings model: the JSON the page renders and the changes it may make.
 //! Pure data with no AppKit, so every rule is covered by plain unit tests.
 
-use super::{Config, SECONDS};
+use super::{
+    Config, SECONDS,
+    logic::{Figure, Kind},
+};
 use crate::settings::model::Fault;
 use serde_json::{Value, json};
 
@@ -19,6 +22,17 @@ pub fn state(config: &Config) -> Value {
         "bar_processor": config.bar_processor,
         "bar_memory": config.bar_memory,
         "bar_network": config.bar_network,
+        "bar_gpu": config.bar_gpu,
+        "bar_heat": config.bar_heat,
+        "bar_disk": config.bar_disk,
+        "bar_processor_kind": config.bar_processor_kind,
+        "bar_memory_kind": config.bar_memory_kind,
+        "bar_network_kind": config.bar_network_kind,
+        "bar_gpu_kind": config.bar_gpu_kind,
+        "bar_heat_kind": config.bar_heat_kind,
+        "bar_disk_kind": config.bar_disk_kind,
+        "bar_combined": config.bar_combined,
+        "bar_color": config.bar_color,
     })
 }
 
@@ -27,6 +41,15 @@ pub fn state(config: &Config) -> Value {
 pub fn set(config: &mut Config, path: &str, value: &Value) -> Option<Result<(), Fault>> {
     let bad = || Fault::new("invalid_value", path);
     let switch = |slot: &mut bool| value.as_bool().map(|on| *slot = on).ok_or_else(bad);
+    // Only a kind the figure can be drawn as: the cores are the processor's alone. A file reads a name it does not
+    // know as the default, but the page must send one of the names exactly.
+    let kind = |slot: &mut Kind, figure: Figure| {
+        serde_json::from_value::<Kind>(value.clone())
+            .ok()
+            .filter(|k| k.fits(figure) && json!(k) == *value)
+            .map(|k| *slot = k)
+            .ok_or_else(bad)
+    };
     Some(match path {
         "enabled" => switch(&mut config.enabled),
         "processor" => switch(&mut config.processor),
@@ -36,6 +59,17 @@ pub fn set(config: &mut Config, path: &str, value: &Value) -> Option<Result<(), 
         "bar_processor" => switch(&mut config.bar_processor),
         "bar_memory" => switch(&mut config.bar_memory),
         "bar_network" => switch(&mut config.bar_network),
+        "bar_gpu" => switch(&mut config.bar_gpu),
+        "bar_heat" => switch(&mut config.bar_heat),
+        "bar_disk" => switch(&mut config.bar_disk),
+        "bar_combined" => switch(&mut config.bar_combined),
+        "bar_color" => switch(&mut config.bar_color),
+        "bar_processor_kind" => kind(&mut config.bar_processor_kind, Figure::Processor),
+        "bar_memory_kind" => kind(&mut config.bar_memory_kind, Figure::Memory),
+        "bar_network_kind" => kind(&mut config.bar_network_kind, Figure::Network),
+        "bar_gpu_kind" => kind(&mut config.bar_gpu_kind, Figure::Gpu),
+        "bar_heat_kind" => kind(&mut config.bar_heat_kind, Figure::Heat),
+        "bar_disk_kind" => kind(&mut config.bar_disk_kind, Figure::Disk),
         "seconds" => value
             .as_u64()
             .and_then(|n| u32::try_from(n).ok())
@@ -88,6 +122,11 @@ mod tests {
             "bar_processor",
             "bar_memory",
             "bar_network",
+            "bar_gpu",
+            "bar_heat",
+            "bar_disk",
+            "bar_combined",
+            "bar_color",
         ] {
             assert!(
                 set(&mut config, path, &json!("yes")).unwrap().is_err(),
@@ -116,6 +155,54 @@ mod tests {
                 && config.bar_memory
         );
         assert!(set(&mut config, "nonsense", &json!(1)).is_none());
+    }
+
+    #[test]
+    fn a_figure_takes_only_a_kind_it_can_be_drawn_as() {
+        let mut config = Config::default();
+        assert_eq!(state(&config)["bar_processor_kind"], json!("stacked"));
+        assert!(
+            set(&mut config, "bar_processor_kind", &json!("cores"))
+                .unwrap()
+                .is_ok()
+        );
+        assert_eq!(config.bar_processor_kind, Kind::Cores);
+        assert_eq!(state(&config)["bar_processor_kind"], json!("cores"));
+        for path in [
+            "bar_memory_kind",
+            "bar_network_kind",
+            "bar_gpu_kind",
+            "bar_heat_kind",
+            "bar_disk_kind",
+        ] {
+            assert!(
+                set(&mut config, path, &json!("cores")).unwrap().is_err(),
+                "{path}"
+            );
+            assert!(
+                set(&mut config, path, &json!("graph")).unwrap().is_ok(),
+                "{path}"
+            );
+        }
+        for bad in [json!("Cores"), json!(1), json!(null), json!(["text"])] {
+            assert!(
+                set(&mut config, "bar_disk_kind", &bad).unwrap().is_err(),
+                "{bad}"
+            );
+        }
+        assert_eq!(
+            config.bar_disk_kind,
+            Kind::Graph,
+            "a refused kind changes nothing"
+        );
+        // A file that asks for the cores of the network gets the default kind.
+        let hostile: Config =
+            serde_json::from_value(json!({ "bar_network_kind": "cores" })).unwrap();
+        assert_eq!(hostile.sanitized().bar_network_kind, Kind::Stacked);
+        // A kind of a later version is read as the default instead of making the whole file unreadable, but the
+        // page cannot ask for it.
+        let later: Config = serde_json::from_value(json!({ "bar_gpu_kind": "pie" })).unwrap();
+        assert_eq!(later.bar_gpu_kind, Kind::Stacked);
     }
 
     #[test]

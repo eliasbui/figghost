@@ -1,10 +1,13 @@
 //! The arithmetic of the System tab: loads from counters, rates from byte counts, and how a figure is said. Plain
 //! data in and out, so that tests can drive it with pretend readings.
 
+use crate::features::islands::logic::human_size;
 use macos_sys::{
     sensors::Fan,
     sysinfo::{Interface, Memory},
+    system_bar::Cell,
 };
+use serde::{Deserialize, Serialize};
 use std::collections::VecDeque;
 
 /// How busy one core was between two readings of its ticks (user, system, idle, nice), 0 to 1. The counters are 32
@@ -139,23 +142,148 @@ pub fn percent_text(fraction: f64) -> String {
     format!("{:.0}%", (fraction * 100.0).clamp(0.0, 100.0))
 }
 
-/// The figures of the menu bar, each with its label when it is chosen: `CPU 12%  Mem 61%  Net 1.2 MB/s`. The load
-/// and the memory are fractions, the network is bytes a second down and up together.
-pub fn bar_text(
-    labels: [&str; 3],
-    load: Option<f64>,
-    memory: Option<f64>,
-    network: Option<f64>,
-) -> String {
-    [
-        (labels[0], load.map(percent_text)),
-        (labels[1], memory.map(percent_text)),
-        (labels[2], network.map(rate_text)),
-    ]
-    .into_iter()
-    .filter_map(|(label, value)| Some(format!("{label} {}", value?)))
-    .collect::<Vec<_>>()
-    .join("  ")
+/// A line of the network never rises above this much until traffic does, so that a quiet network stays low.
+pub const NETWORK_FLOOR: f64 = 100_000.0;
+/// What a cell says when this Mac does not tell the figure.
+const MISSING: &str = "–";
+/// The widest value of each figure, which sets the width of its cell.
+const WIDEST_PERCENT: &str = "100%";
+const WIDEST_RATE: &str = "88.8 MB/s";
+const WIDEST_HEAT: &str = "100°";
+const WIDEST_SIZE: &str = "88.8 GB";
+
+/// A figure that can stay in the menu bar, in the order the page lists them and `system_bar_labels` names them.
+#[derive(Debug, Clone, Copy, PartialEq, Eq)]
+pub enum Figure {
+    Processor,
+    Memory,
+    Network,
+    Gpu,
+    Heat,
+    Disk,
+}
+
+/// How a figure is drawn in the menu bar. For the network, `Stacked` is what is sent over what is received. A kind
+/// this version does not know (from a later one) is read as `Stacked`, so that it cannot make the whole file unreadable.
+#[derive(Debug, Clone, Copy, PartialEq, Eq, Default, Serialize, Deserialize)]
+#[serde(rename_all = "snake_case")]
+pub enum Kind {
+    Text,
+    Graph,
+    Cores,
+    // Last, as serde requires of the variant that takes what is not known.
+    #[default]
+    #[serde(other)]
+    Stacked,
+}
+
+impl Kind {
+    /// Only the processor has cores to draw.
+    pub fn fits(self, figure: Figure) -> bool {
+        self != Kind::Cores || figure == Figure::Processor
+    }
+}
+
+/// What was read for the menu bar. A figure that is not chosen, or that this Mac does not tell, is empty.
+#[derive(Debug, Clone, Default)]
+pub struct BarReading {
+    pub loads: Vec<f64>,
+    /// How many of `loads` are frugal cores, first.
+    pub slow: usize,
+    /// The share of the memory in use, 0 to 1.
+    pub memory: Option<f64>,
+    /// Bytes a second received and sent.
+    pub rates: (f64, f64),
+    /// How busy the graphics processor is, 0 to 1.
+    pub gpu: Option<f64>,
+    pub celsius: Option<f64>,
+    /// Bytes free and in all on the startup disk.
+    pub disk: Option<(u64, u64)>,
+}
+
+impl BarReading {
+    /// The figure as a point of its graph: 0 to 1, except the network in bytes a second, which is scaled against
+    /// its own recent readings when drawn.
+    pub fn level(&self, figure: Figure) -> f64 {
+        match figure {
+            Figure::Processor => overall(&self.loads),
+            Figure::Memory => self.memory.unwrap_or(0.0),
+            Figure::Network => self.rates.0 + self.rates.1,
+            Figure::Gpu => self.gpu.unwrap_or(0.0),
+            Figure::Heat => self.celsius.map_or(0.0, |c| c / 100.0),
+            Figure::Disk => self
+                .disk
+                .filter(|(_, total)| *total > 0)
+                .map_or(0.0, |(free, total)| 1.0 - free as f64 / total as f64),
+        }
+    }
+
+    /// The figure as words, with the widest it can say.
+    fn value(&self, figure: Figure) -> (String, &'static str) {
+        let or_missing = |value: Option<String>| value.unwrap_or_else(|| MISSING.to_owned());
+        match figure {
+            Figure::Processor => (percent_text(overall(&self.loads)), WIDEST_PERCENT),
+            Figure::Memory => (or_missing(self.memory.map(percent_text)), WIDEST_PERCENT),
+            Figure::Network => (rate_text(self.rates.0 + self.rates.1), WIDEST_RATE),
+            Figure::Gpu => (or_missing(self.gpu.map(percent_text)), WIDEST_PERCENT),
+            Figure::Heat => (
+                or_missing(self.celsius.map(|c| format!("{:.0}°", c.max(0.0)))),
+                WIDEST_HEAT,
+            ),
+            Figure::Disk => (
+                or_missing(self.disk.map(|(free, _)| human_size(free))),
+                WIDEST_SIZE,
+            ),
+        }
+    }
+}
+
+/// The cell of one figure in the menu bar. `history` is the figure's last levels, oldest first.
+pub fn bar_cell(
+    labels: [&str; 6],
+    figure: Figure,
+    kind: Kind,
+    reading: &BarReading,
+    history: &[f64],
+) -> Cell {
+    let label = labels[figure as usize];
+    let (value, widest) = reading.value(figure);
+    match kind {
+        Kind::Text => Cell::Text {
+            label: label.to_owned(),
+            value,
+            widest: widest.to_owned(),
+        },
+        Kind::Stacked if figure == Figure::Network => Cell::Rates {
+            up: rate_text(reading.rates.1),
+            down: rate_text(reading.rates.0),
+            widest: widest.to_owned(),
+        },
+        Kind::Graph if figure == Figure::Network => Cell::Graph {
+            history: scaled(history, NETWORK_FLOOR),
+        },
+        Kind::Graph => Cell::Graph {
+            history: history.iter().map(|v| v.clamp(0.0, 1.0)).collect(),
+        },
+        Kind::Cores if figure == Figure::Processor => Cell::Cores {
+            loads: reading.loads.clone(),
+            slow: reading.slow,
+        },
+        Kind::Stacked | Kind::Cores => Cell::Stacked {
+            label: label.to_uppercase(),
+            value,
+            widest: widest.to_owned(),
+        },
+    }
+}
+
+/// The figures as words, for assistive technology, which cannot read the picture: `CPU 12%, Mem 61%`.
+pub fn describe(labels: [&str; 6], figures: &[(Figure, Kind)], reading: &BarReading) -> String {
+    figures
+        .iter()
+        .map(|&(figure, _)| format!("{} {}", labels[figure as usize], reading.value(figure).0))
+        .collect::<Vec<_>>()
+        .join(", ")
 }
 
 /// The fan card: the fastest fan, as a share of the fastest it can turn. `None` for a Mac without fans.
@@ -346,18 +474,145 @@ mod tests {
         assert_eq!(super::shares(&Memory { total: 0, ..memory }), [0.0; 3]);
     }
 
+    const LABELS: [&str; 6] = ["CPU", "RAM", "Mạng", "GPU", "Nhiệt", "Ổ đĩa"];
+
+    fn busy() -> BarReading {
+        BarReading {
+            loads: vec![0.2, 0.4, 0.9, 0.5],
+            slow: 2,
+            memory: Some(0.61),
+            rates: (1_234_000.0, 80_000.0),
+            gpu: Some(0.07),
+            celsius: Some(62.4),
+            disk: Some((227_000_000_000, 460_000_000_000)),
+        }
+    }
+
     #[test]
-    fn the_menu_bar_says_only_the_figures_chosen_each_with_its_label() {
-        let labels = ["CPU", "RAM", "Mạng"];
+    fn each_kind_draws_its_own_cell() {
+        let r = busy();
         assert_eq!(
-            bar_text(labels, Some(0.123), Some(0.61), Some(1_234_000.0)),
-            "CPU 12%  RAM 61%  Mạng 1.2 MB/s"
+            bar_cell(LABELS, Figure::Processor, Kind::Text, &r, &[]),
+            Cell::Text {
+                label: "CPU".into(),
+                value: "50%".into(),
+                widest: "100%".into()
+            }
         );
-        assert_eq!(bar_text(labels, None, Some(0.5), None), "RAM 50%");
         assert_eq!(
-            bar_text(labels, Some(1.7), None, Some(-3.0)),
-            "CPU 100%  Mạng 0 B/s"
+            bar_cell(LABELS, Figure::Heat, Kind::Stacked, &r, &[]),
+            Cell::Stacked {
+                label: "NHIỆT".into(),
+                value: "62°".into(),
+                widest: "100°".into()
+            }
         );
-        assert_eq!(bar_text(labels, None, None, None), "");
+        assert_eq!(
+            bar_cell(LABELS, Figure::Network, Kind::Stacked, &r, &[]),
+            Cell::Rates {
+                up: "80 KB/s".into(),
+                down: "1.2 MB/s".into(),
+                widest: "88.8 MB/s".into()
+            }
+        );
+        assert_eq!(
+            bar_cell(LABELS, Figure::Processor, Kind::Cores, &r, &[]),
+            Cell::Cores {
+                loads: vec![0.2, 0.4, 0.9, 0.5],
+                slow: 2
+            }
+        );
+        assert_eq!(
+            bar_cell(LABELS, Figure::Disk, Kind::Text, &r, &[]),
+            Cell::Text {
+                label: "Ổ đĩa".into(),
+                value: "227 GB".into(),
+                widest: "88.8 GB".into()
+            }
+        );
+        // A file that asks for the cores of something else still gets a figure.
+        assert!(matches!(
+            bar_cell(LABELS, Figure::Memory, Kind::Cores, &r, &[]),
+            Cell::Stacked { .. }
+        ));
+        assert!(Kind::Cores.fits(Figure::Processor) && !Kind::Cores.fits(Figure::Disk));
+        assert!(Kind::Graph.fits(Figure::Network));
+    }
+
+    #[test]
+    fn a_graph_holds_its_readings_to_the_picture() {
+        let r = busy();
+        assert_eq!(
+            bar_cell(LABELS, Figure::Memory, Kind::Graph, &r, &[0.5, 1.4, -1.0]),
+            Cell::Graph {
+                history: vec![0.5, 1.0, 0.0]
+            }
+        );
+        // The network against its busiest reading, or against the floor while it is quiet.
+        assert_eq!(
+            bar_cell(
+                LABELS,
+                Figure::Network,
+                Kind::Graph,
+                &r,
+                &[1_000.0, 400_000.0, 200_000.0]
+            ),
+            Cell::Graph {
+                history: vec![0.0025, 1.0, 0.5]
+            }
+        );
+        assert_eq!(r.level(Figure::Network), 1_314_000.0);
+        assert_eq!(r.level(Figure::Processor), 0.5);
+        assert!((r.level(Figure::Disk) - 0.5065).abs() < 1e-3);
+        assert!((r.level(Figure::Heat) - 0.624).abs() < 1e-9);
+    }
+
+    #[test]
+    fn what_this_mac_does_not_tell_is_a_dash_and_no_point() {
+        let r = BarReading::default();
+        for figure in [Figure::Memory, Figure::Gpu, Figure::Heat, Figure::Disk] {
+            assert_eq!(r.value(figure).0, "–", "{figure:?}");
+            assert_eq!(r.level(figure), 0.0, "{figure:?}");
+        }
+        assert_eq!(r.value(Figure::Processor).0, "0%");
+        assert_eq!(r.value(Figure::Network).0, "0 B/s");
+    }
+
+    #[test]
+    fn no_value_is_wider_than_the_widest_its_cell_is_made_for() {
+        // Digits keep one width, so counting characters is enough; the units are among the widest letters.
+        let mut rate = 1.0;
+        while rate < MOST_PLAUSIBLE {
+            assert!(
+                rate_text(rate).chars().count() <= WIDEST_RATE.chars().count(),
+                "{rate}"
+            );
+            rate *= 1.37;
+        }
+        for share in [0.0, 0.5, 1.0, 7.0] {
+            assert!(percent_text(share).len() <= WIDEST_PERCENT.len());
+        }
+        let mut bytes = 1u64;
+        while bytes < 100_000_000_000_000 {
+            assert!(
+                human_size(bytes).chars().count() <= WIDEST_SIZE.chars().count(),
+                "{bytes}"
+            );
+            bytes = bytes * 3 + 7;
+        }
+    }
+
+    #[test]
+    fn the_description_names_each_figure_chosen() {
+        let figures = [
+            (Figure::Processor, Kind::Cores),
+            (Figure::Network, Kind::Stacked),
+            (Figure::Heat, Kind::Graph),
+        ];
+        assert_eq!(
+            describe(LABELS, &figures, &busy()),
+            "CPU 50%, Mạng 1.3 MB/s, Nhiệt 62°"
+        );
+        assert_eq!(describe(LABELS, &[], &busy()), "");
     }
 }

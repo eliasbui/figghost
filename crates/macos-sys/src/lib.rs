@@ -80,6 +80,7 @@ pub mod style;
 pub mod switcher;
 pub mod synth;
 pub mod sysinfo;
+pub mod system_bar;
 pub mod system_keys;
 pub mod system_ui;
 pub mod timezone;

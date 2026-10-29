@@ -3,8 +3,9 @@
 //! nothing is read while the tab is not showing: the readings start when the tab opens and stop when it closes,
 //! so an idle app does no work for it.
 //!
-//! The exception is the figures the person chooses to keep in the menu bar (processor, memory, network, each off until
-//! chosen): those are read at the same pace for as long as one of them is chosen, and a click on them opens the tab.
+//! The exception is the figures the person chooses to keep in the menu bar (processor, memory, network, graphics, heat
+//! and the startup disk, each off until chosen, each drawn as text, a label over its value, a graph or the cores): those
+//! are read at the same pace for as long as one of them is chosen, and a click on them opens the tab.
 //!
 //! Nothing here needs a permission. The counters come from the kernel and from the power and disk services, and
 //! none of them says what any app is doing.
@@ -23,6 +24,7 @@ use macos_sys::{
     status_item::TextItem,
     style::Tone,
     sysinfo::{self, Interface, Pressure, Thermal},
+    system_bar,
     system_ui::{
         CpuDisplay, HISTORY, MemoryDisplay, NetworkDisplay, Note, PAGE_SIZE, Stat, SystemDisplay,
         SystemView,
@@ -32,8 +34,11 @@ use serde::{Deserialize, Serialize};
 use std::{
     cell::{Cell, RefCell},
     rc::{Rc, Weak},
+    slice,
     time::Instant,
 };
+
+use logic::{Figure, Kind};
 
 pub(crate) mod logic;
 pub mod settings;
@@ -44,8 +49,6 @@ pub const SECONDS: [u32; 3] = [1, 2, 5];
 /// The first reading after the tab opens is followed this soon by another, so that the figures that are
 /// differences do not wait a whole interval to appear.
 const FIRST_SECONDS: f64 = 0.4;
-/// A line of the network never rises above this much until traffic does, so that a quiet network stays low.
-const NETWORK_FLOOR: f64 = 100_000.0;
 
 #[derive(Debug, Clone, PartialEq, Serialize, Deserialize)]
 #[serde(default)]
@@ -62,6 +65,20 @@ pub struct Config {
     pub bar_processor: bool,
     pub bar_memory: bool,
     pub bar_network: bool,
+    pub bar_gpu: bool,
+    pub bar_heat: bool,
+    pub bar_disk: bool,
+    /// How each figure is drawn in the menu bar.
+    pub bar_processor_kind: Kind,
+    pub bar_memory_kind: Kind,
+    pub bar_network_kind: Kind,
+    pub bar_gpu_kind: Kind,
+    pub bar_heat_kind: Kind,
+    pub bar_disk_kind: Kind,
+    /// One item of the menu bar for all the figures, or one for each, which Command-drag can move apart.
+    pub bar_combined: bool,
+    /// Graphs and cores in the accent instead of the colour of the menu bar's text.
+    pub bar_color: bool,
 }
 
 impl Default for Config {
@@ -76,6 +93,17 @@ impl Default for Config {
             bar_processor: false,
             bar_memory: false,
             bar_network: false,
+            bar_gpu: false,
+            bar_heat: false,
+            bar_disk: false,
+            bar_processor_kind: Kind::default(),
+            bar_memory_kind: Kind::default(),
+            bar_network_kind: Kind::default(),
+            bar_gpu_kind: Kind::default(),
+            bar_heat_kind: Kind::default(),
+            bar_disk_kind: Kind::default(),
+            bar_combined: true,
+            bar_color: false,
         }
     }
 }
@@ -86,15 +114,61 @@ impl Config {
         if !SECONDS.contains(&self.seconds) {
             self.seconds = Self::default().seconds;
         }
+        for (figure, kind) in self.bar_kinds() {
+            if !kind.fits(figure) {
+                *kind = Kind::default();
+            }
+        }
         self
+    }
+
+    fn bar_kinds(&mut self) -> [(Figure, &mut Kind); 6] {
+        [
+            (Figure::Processor, &mut self.bar_processor_kind),
+            (Figure::Memory, &mut self.bar_memory_kind),
+            (Figure::Network, &mut self.bar_network_kind),
+            (Figure::Gpu, &mut self.bar_gpu_kind),
+            (Figure::Heat, &mut self.bar_heat_kind),
+            (Figure::Disk, &mut self.bar_disk_kind),
+        ]
+    }
+
+    /// The figures chosen for the menu bar, in the order they stand there, each with how it is drawn.
+    pub fn bar_figures(&self) -> Vec<(Figure, Kind)> {
+        [
+            (
+                Figure::Processor,
+                self.bar_processor,
+                self.bar_processor_kind,
+            ),
+            (Figure::Memory, self.bar_memory, self.bar_memory_kind),
+            (Figure::Network, self.bar_network, self.bar_network_kind),
+            (Figure::Gpu, self.bar_gpu, self.bar_gpu_kind),
+            (Figure::Heat, self.bar_heat, self.bar_heat_kind),
+            (Figure::Disk, self.bar_disk, self.bar_disk_kind),
+        ]
+        .into_iter()
+        .filter(|(_, on, _)| *on)
+        .map(|(figure, _, kind)| (figure, kind))
+        .collect()
+    }
+
+    /// How many items the figures take in the menu bar: none while the feature is off.
+    fn bar_items(&self) -> usize {
+        let figures = if self.enabled {
+            self.bar_figures().len()
+        } else {
+            0
+        };
+        if self.bar_combined {
+            figures.min(1)
+        } else {
+            figures
+        }
     }
 
     fn shows_anything(&self) -> bool {
         self.processor || self.memory || self.network || self.details
-    }
-
-    fn shows_in_menu_bar(&self) -> bool {
-        self.enabled && (self.bar_processor || self.bar_memory || self.bar_network)
     }
 }
 
@@ -118,7 +192,10 @@ pub struct Feature {
     /// Bumped whenever the readings start over; a delayed reading that finds another number does nothing.
     epoch: Cell<u64>,
     /// The figures in the menu bar, with their own readings so that the tab opening and closing does not touch them.
-    bar: RefCell<Option<TextItem>>,
+    /// One item for all of them, or one for each in the order of `Config::bar_figures`.
+    bar: RefCell<Vec<TextItem>>,
+    /// The last levels of each figure, for a graph, in the order of `Figure`.
+    bar_history: RefCell<[logic::History; 6]>,
     bar_ticker: RefCell<Option<app::Timer>>,
     bar_last: RefCell<Option<Reading>>,
     me: Weak<Feature>,
@@ -140,6 +217,7 @@ pub fn attach(env: &AttachEnv) -> Option<Rc<Feature>> {
         showing: Cell::new(false),
         epoch: Cell::new(0),
         bar: RefCell::default(),
+        bar_history: RefCell::default(),
         bar_ticker: RefCell::default(),
         bar_last: RefCell::default(),
         me: me.clone(),
@@ -179,23 +257,26 @@ impl Feature {
     fn place_bar(&self) {
         self.bar_ticker.borrow_mut().take();
         self.bar_last.borrow_mut().take();
+        self.bar_history
+            .borrow_mut()
+            .iter_mut()
+            .for_each(logic::History::clear);
         let config = self.config.borrow().clone();
-        if !config.shows_in_menu_bar() {
-            if self.bar.borrow_mut().take().is_some() {
-                trace::log("system: menu bar figures removed");
-            }
-            return;
-        }
-        if self.bar.borrow().is_none() {
-            let weak = self.me.clone();
-            let item = TextItem::new(self.mtm, i18n::current().system_tab(), "", move || {
-                if let Some(f) = weak.upgrade() {
-                    f.open_tab();
-                }
+        let wanted = config.bar_items();
+        if self.bar.borrow().len() != wanted {
+            let mut items = self.bar.borrow_mut();
+            items.clear();
+            // A new item goes to the left of those already there, so the last figure is placed first.
+            items.extend((0..wanted).map(|_| self.bar_item()));
+            items.reverse();
+            trace::log(&if wanted == 0 {
+                "system: menu bar figures removed".to_owned()
+            } else {
+                format!("system: menu bar figures placed in {wanted} items")
             });
-            item.even_digits();
-            *self.bar.borrow_mut() = Some(item);
-            trace::log("system: menu bar figures placed");
+        }
+        if wanted == 0 {
+            return;
         }
         self.read_bar();
         let weak = self.me.clone();
@@ -212,47 +293,94 @@ impl Feature {
         }));
     }
 
-    /// Reads only the figures the menu bar shows and writes them there.
+    fn bar_item(&self) -> TextItem {
+        let weak = self.me.clone();
+        TextItem::new(self.mtm, i18n::current().system_tab(), "", move || {
+            if let Some(f) = weak.upgrade() {
+                f.open_tab();
+            }
+        })
+    }
+
+    /// Reads only the figures the menu bar shows and draws them there.
     fn read_bar(&self) {
         let config = self.config.borrow().clone();
-        let Some(bar) = &*self.bar.borrow() else {
+        let items = self.bar.borrow();
+        if items.is_empty() {
             return;
-        };
+        }
+        let figures = config.bar_figures();
+        let chosen = |figure: Figure| figures.iter().any(|(f, _)| *f == figure);
         let now = Reading {
             at: Instant::now(),
-            ticks: if config.bar_processor {
+            ticks: if chosen(Figure::Processor) {
                 sysinfo::cpu_ticks().unwrap_or_default()
             } else {
                 Vec::new()
             },
-            interfaces: if config.bar_network {
+            interfaces: if chosen(Figure::Network) {
                 sysinfo::interfaces()
             } else {
                 Vec::new()
             },
         };
-        let (load, rate) = match self.bar_last.borrow().as_ref() {
+        let (loads, rates) = match self.bar_last.borrow().as_ref() {
             Some(before) => {
                 let seconds = now.at.duration_since(before.at).as_secs_f64();
-                let (down, up) = logic::rates(&before.interfaces, &now.interfaces, seconds);
                 (
-                    logic::overall(&logic::core_loads(&before.ticks, &now.ticks)),
-                    down + up,
+                    logic::core_loads(&before.ticks, &now.ticks),
+                    logic::rates(&before.interfaces, &now.interfaces, seconds),
                 )
             }
-            None => (0.0, 0.0),
+            None => (vec![0.0; now.ticks.len()], (0.0, 0.0)),
         };
-        let memory = sysinfo::memory()
-            .filter(|m| config.bar_memory && m.total > 0)
-            .map(|m| m.used() as f64 / m.total as f64);
+        let reading = logic::BarReading {
+            slow: if chosen(Figure::Processor) {
+                sysinfo::core_kinds().map_or(0, |(slow, _)| slow)
+            } else {
+                0
+            },
+            loads,
+            memory: chosen(Figure::Memory)
+                .then(sysinfo::memory)
+                .flatten()
+                .filter(|m| m.total > 0)
+                .map(|m| m.used() as f64 / m.total as f64),
+            rates,
+            gpu: chosen(Figure::Gpu)
+                .then(sysinfo::gpu_percent)
+                .flatten()
+                .map(|p| f64::from(p) / 100.0),
+            celsius: chosen(Figure::Heat)
+                .then(sensors::processor_celsius)
+                .flatten(),
+            disk: chosen(Figure::Disk).then(sysinfo::disk).flatten(),
+        };
         *self.bar_last.borrow_mut() = Some(now);
         trace::log("system: menu bar read");
-        bar.set_text(&logic::bar_text(
-            i18n::current().system_bar_labels(),
-            config.bar_processor.then_some(load),
-            memory,
-            config.bar_network.then_some(rate),
-        ));
+        let labels = i18n::current().system_bar_labels();
+        let mut history = self.bar_history.borrow_mut();
+        let cells: Vec<system_bar::Cell> = figures
+            .iter()
+            .map(|&(figure, kind)| {
+                let line = &mut history[figure as usize];
+                line.push(reading.level(figure), system_bar::GRAPH_POINTS);
+                logic::bar_cell(labels, figure, kind, &reading, &line.values())
+            })
+            .collect();
+        if config.bar_combined {
+            items[0].set_image(
+                &system_bar::image(&cells, config.bar_color),
+                &logic::describe(labels, &figures, &reading),
+            );
+        } else {
+            for ((item, cell), figure) in items.iter().zip(&cells).zip(&figures) {
+                item.set_image(
+                    &system_bar::image(slice::from_ref(cell), config.bar_color),
+                    &logic::describe(labels, slice::from_ref(figure), &reading),
+                );
+            }
+        }
     }
 
     /// Opens the notch on this tab, for a click on the figures in the menu bar.
@@ -378,8 +506,8 @@ fn display(
         title: language.system_network().to_owned(),
         down: logic::rate_text(down),
         up: logic::rate_text(up),
-        down_history: logic::scaled(down_history, NETWORK_FLOOR),
-        up_history: logic::scaled(up_history, NETWORK_FLOOR),
+        down_history: logic::scaled(down_history, logic::NETWORK_FLOOR),
+        up_history: logic::scaled(up_history, logic::NETWORK_FLOOR),
     });
     SystemDisplay {
         cpu,
