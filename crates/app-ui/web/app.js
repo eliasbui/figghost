@@ -2119,7 +2119,7 @@ function navSearch() {
     });
   }
   return h('div', { class: 'search' },
-    h('label', { class: 'top-search' }, icon('magnifyingglass'), input, h('kbd', { 'aria-hidden': 'true', text: '⌘K' })),
+    h('label', { class: 'top-search', 'data-glass': '' }, icon('magnifyingglass'), input, h('kbd', { 'aria-hidden': 'true', text: '⌘K' })),
     box);
 }
 
@@ -2254,19 +2254,41 @@ function buildShell() {
   document.documentElement.lang = lang;
   const main = h('main', { id: 'main' },
     h('header', { class: 'toolbar' },
-      h('div', { class: 'nav-buttons' },
+      h('div', { class: 'nav-buttons', 'data-glass': '' },
         h('button', { id: 'back', 'aria-label': t('nav.back'), onclick: () => step(-1) }, icon('chevron.left')),
         h('button', { id: 'forward', 'aria-label': t('nav.forward'), onclick: () => step(1) }, icon('chevron.right'))),
-      h('h1', { class: 'toolbar-title', id: 'title' })),
+      h('h1', { class: 'toolbar-title', id: 'title' }),
+      navSearch()),
     h('div', { id: 'scroller' }));
   $('#root').replaceChildren(
     h('div', { id: 'app' },
       h('div', { class: 'dragzone', 'data-drag': '' }),
-      h('aside', { id: 'sidebar' }, navSearch(), meBlock(), h('nav', { id: 'nav', 'aria-label': 'Figghost' }, ...renderNavItems())),
+      h('aside', { id: 'sidebar', 'data-glass': 'see' }, meBlock(), h('nav', { id: 'nav', 'aria-label': 'Figghost' }, ...renderNavItems())),
       main),
     h('div', { id: 'toast', 'aria-live': 'polite' }),
     h('div', { id: 'modal' }));
+  placeGlass();
 }
+
+/** Liquid Glass on macOS 26: the window paints the background and lays the system's own glass under every
+    `[data-glass]` (the sidebar, and the toolbar's capsules), where the page leaves it clear. The sidebar shows what is
+    behind the window, as a Mac sidebar does (`data-glass="see"`); the capsules sit on the background. Without the
+    window's glass (an older system, a preview, Reduce transparency) the page paints them itself. */
+function placeGlass() {
+  const port = window.webkit && window.webkit.messageHandlers && window.webkit.messageHandlers.glass;
+  const on = !!port && !document.documentElement.classList.contains('reduce-transparency');
+  document.documentElement.classList.toggle('glass', on);
+  if (!port) return;
+  const hex = getComputedStyle(document.documentElement).getPropertyValue('--canvas').trim();
+  const canvas = /^#[0-9a-f]{6}$/i.test(hex) ? [1, 3, 5].map((i) => parseInt(hex.slice(i, i + 2), 16)) : [0, 0, 0];
+  const panes = !on ? [] : [...document.querySelectorAll('[data-glass]')]
+    .map((el) => [el.getBoundingClientRect(), el])
+    .filter(([r]) => r.width && r.height)
+    .map(([r, el]) => [r.left, r.top, r.width, r.height, parseFloat(getComputedStyle(el).borderTopLeftRadius) || 0, el.dataset.glass === 'see' ? 1 : 0]);
+  port.postMessage(JSON.stringify({ canvas, panes }));
+}
+window.addEventListener('resize', placeGlass);
+matchMedia('(prefers-color-scheme: dark)').addEventListener('change', placeGlass);
 
 // The pages seen, for the toolbar's back and forward.
 const trail = { list: [], at: -1 };
@@ -2332,6 +2354,7 @@ function applyDisplay() {
   list.toggle('reduce-transparency', !!S.env.reduce_transparency);
   list.toggle('reduce-motion', !!S.env.reduce_motion);
   list.toggle('increase-contrast', !!S.env.increase_contrast);
+  if ($('#sidebar')) placeGlass();
 }
 
 function onState(next) {

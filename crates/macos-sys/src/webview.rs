@@ -16,12 +16,15 @@ use objc2_app_kit::{
     NSBitmapImageRep, NSColor, NSEvent, NSEventMask, NSEventType, NSGlassEffectView,
     NSGlassEffectViewStyle, NSImage, NSPanel, NSScreen, NSStatusWindowLevel, NSView,
     NSVisualEffectBlendingMode, NSVisualEffectMaterial, NSVisualEffectState, NSVisualEffectView,
-    NSWindow, NSWindowDelegate, NSWindowStyleMask, NSWindowTitleVisibility, NSWorkspace,
+    NSWindow, NSWindowDelegate, NSWindowOrderingMode, NSWindowStyleMask, NSWindowTitleVisibility,
+    NSWorkspace,
 };
+use objc2_core_graphics::{CGColor, CGMutablePath};
 use objc2_foundation::{
     NSDictionary, NSError, NSNotification, NSNumber, NSObject, NSObjectProtocol, NSPoint, NSRect,
     NSSize, NSString, NSURL,
 };
+use objc2_quartz_core::{CAShapeLayer, kCAFillRuleEvenOdd};
 use objc2_web_kit::{
     WKNavigationAction, WKNavigationActionPolicy, WKNavigationDelegate, WKNavigationType,
     WKScriptMessage, WKScriptMessageHandler, WKSnapshotConfiguration, WKUserContentController,
@@ -345,6 +348,136 @@ fn glass_background(
     (Retained::into_super(effect), None)
 }
 
+/// The window's own background and the panes of glass on it, once the page has asked for them.
+#[derive(Default)]
+struct GlassBed {
+    canvas: RefCell<Option<Retained<NSView>>>,
+    panes: RefCell<Vec<Retained<NSGlassEffectView>>>,
+}
+
+/// Lays the system's Liquid Glass under the page where the page asks for it with
+/// `webkit.messageHandlers.glass.postMessage('{"canvas":[r,g,b],"panes":[[x,y,width,height,radius,see],...]}')`, in
+/// points from the top left, channels 0 to 255. From the first message on the window paints the page's background
+/// itself, so the glass sits between it and the page, which leaves those places clear. A pane with `see` set cuts
+/// through the background and shows what is behind the window, as a macOS 26 sidebar does; the others sit on it.
+fn lay_glass(
+    mtm: MainThreadMarker,
+    window: &NSWindow,
+    web: &WKWebView,
+    bed: &GlassBed,
+    text: &str,
+) {
+    let Ok(message) = serde_json::from_str::<serde_json::Value>(text) else {
+        return;
+    };
+    let num = |v: &serde_json::Value| v.as_f64().unwrap_or(0.0);
+    let panes: Vec<[f64; 6]> = message["panes"]
+        .as_array()
+        .map(|list| {
+            list.iter()
+                .map(|p| std::array::from_fn(|i| num(&p[i])))
+                .collect()
+        })
+        .unwrap_or_default();
+    let mut slot = bed.canvas.borrow_mut();
+    let canvas = slot.get_or_insert_with(|| {
+        // The web view leaves the full-window glass for a plain root: background, panes, then the page. The glass
+        // held it with constraints, so it goes back to its autoresizing mask, or Auto Layout shrinks it to nothing.
+        let old = window.contentView();
+        let bounds = old.as_ref().map_or(web.frame(), |v| v.bounds());
+        if let Some(glass) = old
+            .as_ref()
+            .and_then(|v| v.downcast_ref::<NSGlassEffectView>())
+        {
+            glass.setContentView(None);
+        }
+        let root = NSView::initWithFrame(mtm.alloc(), bounds);
+        let canvas = NSView::initWithFrame(mtm.alloc(), bounds);
+        for view in [&root, &canvas] {
+            view.setAutoresizingMask(
+                NSAutoresizingMaskOptions::ViewWidthSizable
+                    | NSAutoresizingMaskOptions::ViewHeightSizable,
+            );
+        }
+        canvas.setWantsLayer(true);
+        root.addSubview(&canvas);
+        root.addSubview(web);
+        window.setContentView(Some(&root));
+        web.setTranslatesAutoresizingMaskIntoConstraints(true);
+        web.setFrame(root.bounds());
+        window.makeFirstResponder(Some(web));
+        canvas
+    });
+    // SAFETY: a plain read on the main thread of a view this window keeps in its hierarchy.
+    let Some(root) = (unsafe { canvas.superview() }) else {
+        return;
+    };
+    let size = root.bounds().size;
+    let rect = |p: &[f64; 6]| {
+        NSRect::new(
+            NSPoint::new(p[0], size.height - p[1] - p[3]),
+            NSSize::new(p[2], p[3]),
+        )
+    };
+    // CGPathAddRoundedRect refuses a corner wider than half a side.
+    let radius = |p: &[f64; 6]| p[4].min(p[2] / 2.0).min(p[3] / 2.0).max(0.0);
+    if let Some(layer) = canvas.layer() {
+        let c = &message["canvas"];
+        layer.setBackgroundColor(Some(&CGColor::new_srgb(
+            num(&c[0]) / 255.0,
+            num(&c[1]) / 255.0,
+            num(&c[2]) / 255.0,
+            1.0,
+        )));
+        // The outer edge runs far past the window, so a window grown before the page answers is not cut off.
+        let path = CGMutablePath::new();
+        let outer = NSRect::new(NSPoint::ZERO, NSSize::new(20_000.0, 20_000.0));
+        // SAFETY: a fresh path and plain rectangles with corners that fit; a null transform is allowed.
+        unsafe {
+            CGMutablePath::add_rect(Some(&path), std::ptr::null(), outer);
+            for p in panes.iter().filter(|p| p[5] != 0.0) {
+                let r = radius(p);
+                CGMutablePath::add_rounded_rect(Some(&path), std::ptr::null(), rect(p), r, r);
+            }
+        }
+        let mask = CAShapeLayer::layer();
+        mask.setFrame(outer);
+        mask.setPath(Some(&path));
+        // SAFETY: an extern static of Core Animation, a process-lifetime constant; the mask is a fresh layer.
+        unsafe {
+            mask.setFillRule(kCAFillRuleEvenOdd);
+            layer.setMask(Some(&mask));
+        }
+    }
+    let mut pool = bed.panes.borrow_mut();
+    while pool.len() > panes.len() {
+        if let Some(pane) = pool.pop() {
+            pane.removeFromSuperview();
+        }
+    }
+    while pool.len() < panes.len() {
+        let pane = NSGlassEffectView::initWithFrame(mtm.alloc(), NSRect::ZERO);
+        pane.setStyle(NSGlassEffectViewStyle::Regular);
+        root.addSubview_positioned_relativeTo(&pane, NSWindowOrderingMode::Below, Some(&**web));
+        pool.push(pane);
+    }
+    for (pane, p) in pool.iter().zip(&panes) {
+        pane.setFrame(rect(p));
+        pane.setCornerRadius(radius(p));
+        // Until the page answers a resize: a tall pane stretches, the others keep to the top, and to the right
+        // edge when they are on its half.
+        let mut mask = if p[3] > size.height / 2.0 {
+            NSAutoresizingMaskOptions::ViewHeightSizable
+        } else {
+            NSAutoresizingMaskOptions::ViewMinYMargin
+        };
+        if p[0] + p[2] / 2.0 > size.width / 2.0 {
+            mask |= NSAutoresizingMaskOptions::ViewMinXMargin;
+        }
+        pane.setAutoresizingMask(mask);
+    }
+}
+
 /// A web view in a window nobody can see (fully transparent, click-through), for checks and snapshots.
 pub struct HiddenStage {
     pub host: WebHost,
@@ -513,6 +646,30 @@ impl WebWindow {
             None => background.addSubview(&host.view),
         }
         host.view.setFrame(background.bounds());
+
+        // macOS 26: the page may ask for the system's glass under the places it leaves clear (`lay_glass`).
+        if AnyClass::get(c"NSGlassEffectView").is_some() {
+            let (window_ref, web_ref) = (
+                Weak::from_retained(&window),
+                Weak::from_retained(&host.view),
+            );
+            let bed = GlassBed::default();
+            let handler = ScriptHandler::new(mtm, move |text| {
+                if let (Some(window), Some(web)) = (window_ref.load(), web_ref.load()) {
+                    lay_glass(mtm, &window, &web, &bed, &text);
+                }
+            });
+            // SAFETY: plain calls on the controller of the web view this window created; `detach` removes it.
+            unsafe {
+                host.view
+                    .configuration()
+                    .userContentController()
+                    .addScriptMessageHandler_name(
+                        ProtocolObject::from_ref(&*handler),
+                        &NSString::from_str("glass"),
+                    );
+            }
+        }
 
         let delegate = WindowDelegate::new(mtm, on_close);
         window.setDelegate(Some(ProtocolObject::from_ref(&*delegate)));

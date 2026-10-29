@@ -21,10 +21,11 @@ Until 2.1.17 the window was "the ghost's world": a sky that followed the hour, h
 
 - `crates/app-ui/web/app.css`: the base part (the system's metrics and the plain controls) and the "macOS forms" layer on top of it, each with its tokens at its top.
 - `crates/app-ui/web/app.js`: `NAV`, `TAB_PAGES` and `ADVANCED`; `pageHead`, `tidy`, `featureList`, `meBlock` and `renderNavItems`; the glyphs of the pages in `GLYPHS`.
+- Liquid Glass, as the HIG keeps it, only in the navigation layer: on macOS 26 the window paints the background and lays the system's own glass (`lay_glass` in `crates/macos-sys/src/webview.rs`) under every `[data-glass]` the page reports (`placeGlass` in `app.js`): the sidebar, which sees through to what is behind the window, and the toolbar's capsules (back and forward, the search). The page leaves those places clear; on an older system, in a preview or under Reduce transparency it paints them itself.
 
 ## Looking at it
 
-`settings_preview snap <page> out.png [--dark] [--lang vi] [--size 1000x700] [--eval "script"]` draws any page (`--eval "document.querySelector('.page-foot .btn').click()"` opens its sheet), and `settings_preview selftest` runs the page's own checks.
+`settings_preview snap <page> out.png [--dark] [--lang vi] [--size 1000x700] [--eval "script"]` draws any page (`--eval "document.querySelector('.page-foot .btn').click()"` opens its sheet), and `settings_preview selftest` runs the page's own checks. Neither draws the glass, which only exists on screen: `settings_window <page> out.png [--dark] [--size 1000x700]` opens the real window over a picture and captures the two.
 
 ## Adding a page
 

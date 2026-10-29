@@ -866,7 +866,7 @@ html.reduce-motion *::after {
 }
 .dragzone { position: absolute; top: 0; left: 0; right: 0; height: var(--titlebar); z-index: 5; }
 
-/* SIDEBAR: a pane floating on the window, with the search, the app and the pages. */
+/* SIDEBAR: a pane floating on the window, with the app and the pages. */
 #sidebar {
   position: relative;
   z-index: 10;
@@ -880,7 +880,8 @@ html.reduce-motion *::after {
   box-shadow: 0 0 0 0.5px var(--side-edge), var(--side-shadow);
 }
 
-.search { position: relative; z-index: 25; margin-bottom: 8px; }
+/* The search, a capsule at the right of the toolbar as in Finder. */
+.search { position: relative; flex: none; width: 210px; margin-left: auto; pointer-events: auto; }
 .top-search {
   display: flex;
   align-items: center;
@@ -888,7 +889,8 @@ html.reduce-motion *::after {
   height: 28px;
   padding: 0 10px;
   border-radius: 14px;
-  background: var(--well);
+  background: var(--control);
+  box-shadow: 0 0.5px 1px rgba(0, 0, 0, 0.08), inset 0 0 0 0.5px var(--control-edge);
   color: var(--text-2);
   cursor: text;
 }
@@ -903,7 +905,7 @@ html.reduce-motion *::after {
 #search-results {
   position: absolute;
   top: calc(100% + 6px);
-  left: 0;
+  right: 0;
   width: 300px;
   display: flex;
   flex-direction: column;
@@ -1012,6 +1014,11 @@ html.inactive .me[aria-current="page"] .me-status, html.inactive .nav-item[aria-
 .nav-buttons button:disabled { color: var(--text-3); }
 .nav-buttons .glyph { width: 12px; height: 12px; }
 .toolbar-title { margin: 0; overflow: hidden; font-size: 15px; font-weight: 600; text-overflow: ellipsis; white-space: nowrap; }
+
+/* LIQUID GLASS (macOS 26, `placeGlass`): the window paints the background and lays the system's own glass under the
+   sidebar and the toolbar's capsules, so the page leaves them clear and draws no edge of its own. */
+html.glass #app, html.glass #sidebar, html.glass .nav-buttons, html.glass .top-search { background: transparent; }
+html.glass #sidebar, html.glass .nav-buttons, html.glass .top-search:not(:focus-within) { box-shadow: none; }
 #scroller { padding: 4px max(28px, calc((100% - 600px) / 2)) 28px; }
 .page { gap: 0; }
 
