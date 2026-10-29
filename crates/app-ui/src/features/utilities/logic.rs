@@ -26,6 +26,44 @@ pub fn snooze_minutes(minutes: u32) -> u32 {
     }
 }
 
+/// The ways the link of a tab can be copied; the first is the default.
+pub const LINK_FORMATS: [&str; 3] = ["markdown", "url", "title_url"];
+
+/// Held to the formats that are offered; anything else is Markdown.
+pub fn link_format(format: &str) -> &'static str {
+    LINK_FORMATS
+        .into_iter()
+        .find(|known| *known == format)
+        .unwrap_or(LINK_FORMATS[0])
+}
+
+/// The link of a tab as it is copied: `[title](address)`, the address alone, or the title and the address on two lines.
+/// In Markdown the brackets of a title are escaped and the spaces and parentheses of an address are written as `%`
+/// codes, so the whole stays one link; a tab with no title is named by its address.
+pub fn link_text(format: &str, title: &str, url: &str) -> String {
+    let title = title.trim();
+    match link_format(format) {
+        "url" => url.to_owned(),
+        "title_url" if title.is_empty() => url.to_owned(),
+        "title_url" => format!("{title}\n{url}"),
+        _ => {
+            let name = if title.is_empty() { url } else { title };
+            let mut escaped = String::with_capacity(name.len());
+            for c in name.chars() {
+                if matches!(c, '\\' | '[' | ']') {
+                    escaped.push('\\');
+                }
+                escaped.push(c);
+            }
+            let address = url
+                .replace(' ', "%20")
+                .replace('(', "%28")
+                .replace(')', "%29");
+            format!("[{escaped}]({address})")
+        }
+    }
+}
+
 /// Seconds as a clock: `0:42`, `4:05`, `1:02:09`.
 pub fn clock(seconds: u64) -> String {
     let (h, m, s) = (seconds / 3600, seconds % 3600 / 60, seconds % 60);
@@ -73,6 +111,31 @@ mod tests {
         }
         assert_eq!(snooze_minutes(7), 30);
         assert_eq!(snooze_minutes(u32::MAX), 30);
+    }
+
+    #[test]
+    fn a_link_is_written_in_the_format_chosen_and_stays_one_link_in_markdown() {
+        let url = "https://example.com/a";
+        assert_eq!(
+            link_text("markdown", "An example", url),
+            "[An example](https://example.com/a)"
+        );
+        assert_eq!(link_text("url", "An example", url), url);
+        assert_eq!(
+            link_text("title_url", " An example ", url),
+            "An example\nhttps://example.com/a"
+        );
+        assert_eq!(link_text("title_url", "", url), url);
+        assert_eq!(
+            link_text("nonsense", "", url),
+            "[https://example.com/a](https://example.com/a)"
+        );
+        assert_eq!(
+            link_text("markdown", "[Draft] a\\b", "https://w.org/A (b)"),
+            "[\\[Draft\\] a\\\\b](https://w.org/A%20%28b%29)"
+        );
+        assert_eq!(link_format("url"), "url");
+        assert_eq!(link_format("HTML"), "markdown");
     }
 
     #[test]

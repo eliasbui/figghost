@@ -89,6 +89,8 @@ pub mod symbols {
         PRESENT = "rectangle.on.rectangle",
         MIC_MUTE = "mic.slash.fill",
         KEYBOARD = "keyboard.fill",
+        DARK = "circle.lefthalf.filled",
+        DESKTOP = "desktopcomputer",
         TYPING = "waveform.and.mic",
     }
 }

@@ -571,6 +571,17 @@ impl TextItem {
         }
     }
 
+    /// Draws every digit the same width, so that a figure that changes every second does not move the items beside it.
+    pub fn even_digits(&self) {
+        if let Some(button) = self.item.button(self.mtm) {
+            let size = objc2_app_kit::NSFont::menuBarFontOfSize(0.0).pointSize();
+            button.setFont(Some(&crate::style::digits(
+                size,
+                crate::style::Weight::Regular,
+            )));
+        }
+    }
+
     /// Shows frame `frame` of the pixel art `sheet` (a row of square frames, as `mascot::Sheet` reads) in place of
     /// the text, until `set_text` brings the text back.
     pub fn set_sprite(&self, sheet: &'static [u8], frame: usize) {

@@ -63,6 +63,23 @@ AFTER=$(count 'read$' "$WORK/on.log")
 sleep 4
 if [ "$(count 'read$' "$WORK/on.log")" -eq "$AFTER" ]; then pass "nothing is read while the tab is closed"; else fail "it kept reading after the tab closed"; fi
 if kill -0 "$PID" 2>/dev/null; then pass "the program is still running"; else fail "the program died"; fi
-if grep -q "panicked" "$WORK/on.log" "$WORK/off.log"; then fail "the program panicked"; grep -h "panicked" -A 3 "$WORK/on.log" "$WORK/off.log"; fi
+stop
+
+# Figures in the menu bar: read all along, also before the tab opens and after it closes, while the tab itself reads only
+# while it shows. Chosen with the feature off, they are not placed at all.
+run '{ "enabled": false, "bar_processor": true }' baroff
+sleep 3
+if [ "$(count 'menu bar' "$WORK/baroff.log")" -eq 0 ]; then pass "an off feature puts nothing in the menu bar"; else fail "an off feature put figures in the menu bar"; fi
+stop
+run '{ "enabled": true, "seconds": 1, "bar_processor": true, "bar_network": true }' bar
+sleep 9
+if [ "$(count 'menu bar figures placed' "$WORK/bar.log")" -eq 1 ]; then pass "the figures are placed in the menu bar once"; else fail "the figures were not placed once"; fi
+if [ "$(count 'reading stops' "$WORK/bar.log")" -ge 1 ]; then pass "the tab opened and closed beside them"; else fail "the tab did not close"; fi
+BAR=$(count 'menu bar read' "$WORK/bar.log")
+TAB=$(count 'read$' "$WORK/bar.log")
+sleep 4
+if [ "$(count 'menu bar read' "$WORK/bar.log")" -ge $((BAR + 3)) ]; then pass "the menu bar keeps reading while the tab is closed"; else fail "the menu bar stopped reading"; fi
+if [ "$(count 'read$' "$WORK/bar.log")" -eq "$TAB" ]; then pass "the tab still reads nothing while closed"; else fail "the tab read while closed"; fi
+if grep -q "panicked" "$WORK"/*.log; then fail "the program panicked"; grep -h "panicked" -A 3 "$WORK"/*.log; fi
 stop
 exit "$FAILED"

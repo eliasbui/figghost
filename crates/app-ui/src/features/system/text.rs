@@ -15,6 +15,14 @@ impl Language {
         "CPU"
     }
 
+    /// The short names of the figures in the menu bar: processor, memory, network.
+    pub fn system_bar_labels(self) -> [&'static str; 3] {
+        match self {
+            Language::English => ["CPU", "Mem", "Net"],
+            Language::Vietnamese => ["CPU", "RAM", "Mạng"],
+        }
+    }
+
     pub fn system_efficiency(self) -> &'static str {
         match self {
             Language::English => "Efficiency",

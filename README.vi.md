@@ -89,8 +89,8 @@ Notch luôn có Clipboard, Khay tệp, Media (kèm lời bài hát), Tập trung
 | Thời tiết | Weather | Tối đa tám thành phố: hiện tại, những giờ và ngày sắp tới, bầu trời chuyển động phía sau và phần chi tiết về mùa, gió, mưa, chất lượng không khí (tắt mặc định) |
 | Yêu cầu duyệt | Pull requests | Các yêu cầu duyệt đang chờ bạn trên GitHub và GitLab (tắt mặc định) |
 | Pomodoro | Pomodoro | Phiên làm việc và nghỉ có vòng tròn tiến độ, chuỗi ngày và phím tắt (tắt mặc định) |
-| Thời gian dùng | Screen Time | Mỗi ứng dụng ở phía trước bao lâu, hôm nay và bảy ngày qua (tắt mặc định) |
-| Hệ thống | System | Bộ xử lý, bộ nhớ, mạng, đồ họa, ổ đĩa, nhiệt, quạt và sức khỏe pin (tắt mặc định) |
+| Thời gian dùng | Screen Time | Mỗi ứng dụng ở phía trước bao lâu, hôm nay và bảy ngày qua, và theo trang web trong trình duyệt nếu bạn chọn (tắt mặc định) |
+| Hệ thống | System | Bộ xử lý, bộ nhớ, mạng, đồ họa, ổ đĩa, nhiệt, quạt và sức khỏe pin, với số liệu bạn chọn nằm luôn trên thanh menu (tắt mặc định) |
 | Thiết bị | Devices | Mức pin của các thiết bị Bluetooth đang kết nối, cảnh báo khi sắp hết (tắt mặc định) |
 | Màn hình | Displays | Độ sáng và độ tương phản của màn hình ngoài qua DDC/CI, phím độ sáng cho chúng, cấu hình màu của từng màn hình, và khi có từ hai màn hình trở lên thì có chế độ Sắp xếp để kéo đổi chỗ, chọn màn hình chính và phản chiếu màn hình (tắt mặc định) |
 | Trình chiếu | Present | Chiếu một màn hình, một vùng, một cửa sổ hay một ứng dụng cho khán giả lên màn hình khác hoặc vào một cửa sổ riêng, có phóng to theo cú bấm chuột, đèn chiếu, vòng con trỏ, đứng hình, màn hình đen và trắng, cùng phím tắt cho tất cả (tắt mặc định) |
@@ -107,7 +107,7 @@ Notch luôn có Clipboard, Khay tệp, Media (kèm lời bài hát), Tập trung
 | Chụp màn hình | Capture | Chụp màn hình, chụp cuộn, quay màn hình ra MP4 hoặc GIF, trình chỉnh sửa và nhận dạng chữ tiếng Việt, tiếng Anh (tắt mặc định) |
 | Chọn màu | Colour picker | Kính lúp trên màn hình đóng băng, chép màu dạng HEX, RGB, HSL hoặc HSB (tắt mặc định) |
 | Tải video | Video download | Dán link, yt-dlp do bạn tự cài sẽ lưu video vào Downloads, tiến độ hiện trên notch đóng (tắt mặc định) |
-| Tiện ích | Utilities | Giữ máy thức, tắt tiếng micro cho mọi ứng dụng, khóa bàn phím khi lau, tạm ẩn notch (tắt mặc định) |
+| Tiện ích | Utilities | Giữ máy thức, tắt tiếng micro cho mọi ứng dụng, khóa bàn phím khi lau, tạm ẩn notch, chuyển giao diện tối, ẩn biểu tượng màn hình nền, sao chép liên kết của tab trình duyệt (tắt mặc định) |
 
 ### Cửa sổ & Phím tắt (Window & Keys)
 
@@ -194,7 +194,7 @@ Bảy tab, và mười tab khác vào cùng khi bật tính năng của chúng (
 
 ![Tab Media của notch với ảnh bìa, tên bài và các nút phát](docs/images/notch-media.png)
 
-Tab Hệ thống cho thấy bộ xử lý từng lõi (lõi tiết kiệm và lõi nhanh riêng), bộ nhớ chia theo ứng dụng, wired và nén cùng áp lực và swap, mạng với một phút lịch sử, bộ xử lý đồ họa, dung lượng còn trống của ổ khởi động, nhiệt độ bộ xử lý theo độ cùng trạng thái hệ thống báo, tốc độ quạt trên máy có quạt, và sức khỏe pin trên máy có pin. Tab tắt cho tới khi bật trong Cài đặt, mục Tab của notch, Hệ thống, nơi từng thẻ có thể bỏ đi. Nó chỉ đọc hệ thống khi tab đang hiện, mỗi giây một lần hoặc theo tần suất chọn, nên ứng dụng nhàn rỗi không tốn công cho nó.
+Tab Hệ thống cho thấy bộ xử lý từng lõi (lõi tiết kiệm và lõi nhanh riêng), bộ nhớ chia theo ứng dụng, wired và nén cùng áp lực và swap, mạng với một phút lịch sử, bộ xử lý đồ họa, dung lượng còn trống của ổ khởi động, nhiệt độ bộ xử lý theo độ cùng trạng thái hệ thống báo, tốc độ quạt trên máy có quạt, và sức khỏe pin trên máy có pin. Tab tắt cho tới khi bật trong Cài đặt, mục Tab của notch, Hệ thống, nơi từng thẻ có thể bỏ đi. Nó chỉ đọc hệ thống khi tab đang hiện, mỗi giây một lần hoặc theo tần suất chọn, nên ứng dụng nhàn rỗi không tốn công cho nó. Mức tải bộ xử lý, bộ nhớ đang dùng và tốc độ mạng có thể nằm luôn trên thanh menu, được đọc cùng nhịp khi đã chọn, và bấm vào chúng thì mở tab.
 
 ![Tab Hệ thống của notch](docs/images/notch-system.png)
 
@@ -206,7 +206,7 @@ Tab Mở nhanh là lưới tối đa mười hai ô cho ứng dụng, thư mục
 
 ![Tab Mở nhanh của notch](docs/images/notch-launcher.png)
 
-Tab Thời gian dùng cho thấy mỗi ứng dụng ở phía trước bao lâu hôm nay và trong bảy ngày qua, dưới dạng tổng và một danh sách có thanh cho từng ứng dụng, theo ứng dụng hoặc theo nhóm ứng dụng tự khai (Năng suất, Công cụ lập trình, Tiện ích...). Mỗi năm giây, khi có người ở máy, ứng dụng phía trước được cộng khoảng thời gian đó; thời gian ngừng đếm khi bàn phím và con trỏ đứng yên suốt thời gian bạn chọn (1, 2 hoặc 5 phút). Chỉ tên, bundle identifier của ứng dụng và số giây được giữ, trong ba mươi ngày, ở tệp `screentime.json` của thư mục dữ liệu: không tiêu đề cửa sổ, không chữ, không màn hình, không phím, không cần quyền, và không gì rời khỏi máy. Tắt cho tới khi bật trong Cài đặt, mục Tab của notch, Thời gian dùng.
+Tab Thời gian dùng cho thấy mỗi ứng dụng ở phía trước bao lâu hôm nay và trong bảy ngày qua, dưới dạng tổng và một danh sách có thanh cho từng ứng dụng, theo ứng dụng hoặc theo nhóm ứng dụng tự khai (Năng suất, Công cụ lập trình, Tiện ích...). Mỗi năm giây, khi có người ở máy, ứng dụng phía trước được cộng khoảng thời gian đó; thời gian ngừng đếm khi bàn phím và con trỏ đứng yên suốt thời gian bạn chọn (1, 2 hoặc 5 phút). Chỉ tên, bundle identifier của ứng dụng và số giây được giữ, trong ba mươi ngày, ở tệp `screentime.json` của thư mục dữ liệu: không tiêu đề cửa sổ, không chữ, không màn hình, không phím, không cần quyền, và không gì rời khỏi máy. Tính cả theo trang web thêm danh sách các trang mà tab phía trước của Safari hoặc trình duyệt Chromium (Chrome, Edge, Brave, Vivaldi) đã mở, hỏi qua AppleScript, nên macOS hỏi một lần cho mỗi trình duyệt; chỉ tên trang được giữ, trong `screentime-sites.json`, và cửa sổ ẩn danh được bỏ qua (Safari không cho biết cửa sổ nào là riêng tư). Tắt cho tới khi bật trong Cài đặt, mục Tab của notch, Thời gian dùng.
 
 ![Tab Thời gian dùng của notch](docs/images/notch-screentime.png)
 
@@ -352,7 +352,7 @@ Thư mới và nhắc lịch của app Outlook, trong tab Outlook của notch, m
 
 ### Tiện ích
 
-Giữ máy thức từ 15 phút đến 4 giờ hoặc cho tới khi bạn dừng, tắt tiếng chính micro để mọi ứng dụng không nghe thấy gì (nó được bật lại khi Figghost thoát, vì không có gì khác trên máy có công tắc cho việc này), khóa bàn phím trong lúc bạn lau (Command và Escape mở khóa ngay, và nó tự mở khóa sau thời gian bạn đặt), và tạm ẩn notch từ 5 phút đến 2 giờ hoặc cho tới khi bạn đánh thức, để nó không mở khi con trỏ chạm mép trên màn hình lúc bạn trình chiếu hoặc chơi game (một cú nhấp vào nó, hoặc một tác tử lập trình đang chờ câu trả lời, vẫn mở được). Mỗi thứ có chỗ ở bảng thanh menu (một công tắc cho giữ máy thức và một cho tạm ẩn notch, bắt đầu theo độ dài bạn chọn ở trang này; danh sách độ dài nằm ở menu), một phím tắt dùng ở mọi ứng dụng và một thông báo trên notch (tắt mặc định).
+Giữ máy thức từ 15 phút đến 4 giờ hoặc cho tới khi bạn dừng, tắt tiếng chính micro để mọi ứng dụng không nghe thấy gì (nó được bật lại khi Figghost thoát, vì không có gì khác trên máy có công tắc cho việc này), khóa bàn phím trong lúc bạn lau (Command và Escape mở khóa ngay, và nó tự mở khóa sau thời gian bạn đặt), và tạm ẩn notch từ 5 phút đến 2 giờ hoặc cho tới khi bạn đánh thức, để nó không mở khi con trỏ chạm mép trên màn hình lúc bạn trình chiếu hoặc chơi game (một cú nhấp vào nó, hoặc một tác tử lập trình đang chờ câu trả lời, vẫn mở được). Nó cũng chuyển cả máy giữa giao diện tối và sáng, ẩn tệp trên màn hình nền để màn hình gọn khi chia sẻ (Finder khởi động lại để nhận thay đổi), và sao chép liên kết của tab phía trước trong Safari hoặc trình duyệt Chromium dưới dạng liên kết Markdown, chỉ địa chỉ, hoặc tiêu đề và địa chỉ (Control-Option-Command-L). Mỗi thứ có chỗ ở bảng thanh menu (một công tắc cho giữ máy thức và một cho tạm ẩn notch, bắt đầu theo độ dài bạn chọn ở trang này; danh sách độ dài nằm ở menu), một phím tắt dùng ở mọi ứng dụng và một thông báo trên notch (tắt mặc định).
 
 ![Trang Tiện ích bằng tiếng Việt](docs/images/settings-utilities-vi.png)
 

@@ -89,8 +89,8 @@ The notch always has Clipboard, Shelf, Media (with lyrics), Focus and Sound; the
 | Weather | Thời tiết | Up to eight cities: now, the next hours and days, a moving sky behind them and details on season, wind, rain and air quality (off by default) |
 | Pull requests | Yêu cầu duyệt | Review requests waiting for you on GitHub and GitLab (off by default) |
 | Pomodoro | Pomodoro | Work sessions and breaks with a ring, a streak and a shortcut (off by default) |
-| Screen Time | Thời gian dùng | How long each app was in front, today and over seven days (off by default) |
-| System | Hệ thống | Processor, memory, network, graphics, disk, heat, fans and battery health (off by default) |
+| Screen Time | Thời gian dùng | How long each app was in front, today and over seven days, and by site in the browser if you choose (off by default) |
+| System | Hệ thống | Processor, memory, network, graphics, disk, heat, fans and battery health, with the figures you choose kept in the menu bar (off by default) |
 | Devices | Thiết bị | The charge of connected Bluetooth devices, with a warning when one runs low (off by default) |
 | Displays | Màn hình | Brightness and contrast of external displays over DDC/CI, the brightness keys for them, the color profile of each display, and with two or more displays an Arrange view to drag them into place, choose the main one and mirror one on another (off by default) |
 | Present | Trình chiếu | Shows a display, an area, a window or an app to an audience on another display or in a window of its own, with a zoom that follows your clicks, a spotlight, a ring around the pointer, a held picture, black and white screens and keys for all of it (off by default) |
@@ -107,7 +107,7 @@ The notch always has Clipboard, Shelf, Media (with lyrics), Focus and Sound; the
 | Capture | Chụp màn hình | Screenshots, scrolling capture, recordings as MP4 or GIF, an editor and text recognition in Vietnamese and English (off by default) |
 | Colour picker | Chọn màu | A loupe on a frozen screen that copies HEX, RGB, HSL or HSB (off by default) |
 | Video download | Tải video | Paste a link and yt-dlp, which you install yourself, saves the video to Downloads with the progress on the closed notch (off by default) |
-| Utilities | Tiện ích | Keep the Mac awake, mute the microphone for every app, lock the keyboard while you clean it, snooze the notch (off by default) |
+| Utilities | Tiện ích | Keep the Mac awake, mute the microphone for every app, lock the keyboard while you clean it, snooze the notch, switch the dark appearance, hide the desktop icons, copy the link of a browser tab (off by default) |
 
 ### Cửa sổ & Phím tắt (Window & Keys)
 
@@ -194,7 +194,7 @@ Seven tabs, ten more that join them when their feature is turned on (System, Not
 
 ![The Media tab of the notch with a cover, the title and playback buttons](docs/images/notch-media.png)
 
-The System tab shows the processor core by core (the frugal cores and the fast ones apart), the memory as apps, wired and compressed with its pressure and the swap, the network with a minute of history, the graphics processor, the room on the startup disk, the heat of the processor in degrees with the state the system gives, the speed of the fans on a Mac that has them, and the health of the battery on a Mac that has one. It is off until it is turned on in Settings, under Notch tabs, System, where each card can be left out. It reads the system only while the tab is showing, once a second or as often as chosen, so an idle app does no work for it.
+The System tab shows the processor core by core (the frugal cores and the fast ones apart), the memory as apps, wired and compressed with its pressure and the swap, the network with a minute of history, the graphics processor, the room on the startup disk, the heat of the processor in degrees with the state the system gives, the speed of the fans on a Mac that has them, and the health of the battery on a Mac that has one. It is off until it is turned on in Settings, under Notch tabs, System, where each card can be left out. It reads the system only while the tab is showing, once a second or as often as chosen, so an idle app does no work for it. The load of the processor, the memory in use and the speed of the network can each stay in the menu bar instead, read at the same pace while chosen, and a click on them opens the tab.
 
 ![The System tab of the notch](docs/images/notch-system.png)
 
@@ -206,7 +206,7 @@ The Launcher tab is a grid of up to twelve tiles for the apps, folders and Apple
 
 ![The Launcher tab of the notch](docs/images/notch-launcher.png)
 
-The Screen Time tab shows how long each app was in front today and over the last seven days, as a total and a list with a bar for each, by app or by the group an app says it belongs to (Productivity, Developer tools, Utilities, and so on). Every five seconds, while someone is at the Mac, the app in front is given that time; time stops counting when the keyboard and pointer have been still for the time you choose (1, 2 or 5 minutes). Only the name and bundle identifier of the app and the seconds are kept, for thirty days, in the file `screentime.json` of the data directory: no window title, no text, no screen, no key, no permission, and nothing leaves the Mac. It is off until it is turned on in Settings, under Notch tabs, Screen Time.
+The Screen Time tab shows how long each app was in front today and over the last seven days, as a total and a list with a bar for each, by app or by the group an app says it belongs to (Productivity, Developer tools, Utilities, and so on). Every five seconds, while someone is at the Mac, the app in front is given that time; time stops counting when the keyboard and pointer have been still for the time you choose (1, 2 or 5 minutes). Only the name and bundle identifier of the app and the seconds are kept, for thirty days, in the file `screentime.json` of the data directory: no window title, no text, no screen, no key, no permission, and nothing leaves the Mac. Count by site too adds a list of the sites the front tab of Safari or a Chromium browser (Chrome, Edge, Brave, Vivaldi) was on, asked through AppleScript, so macOS asks once for each browser; only the name of the site is kept, in `screentime-sites.json`, and incognito windows are left out (Safari does not say which of its windows are private). It is off until it is turned on in Settings, under Notch tabs, Screen Time.
 
 ![The Screen Time tab of the notch](docs/images/notch-screentime.png)
 
@@ -354,7 +354,7 @@ The new mail and the calendar reminders of the Outlook app, on an Outlook tab of
 
 ### Utilities
 
-Keep the Mac awake for 15 minutes to 4 hours or until you stop it, mute the microphone itself so every app hears nothing (it is unmuted when Figghost quits, since nothing else on the Mac has a switch for it), lock the keyboard while you wipe it (Command and Escape unlock it at once, and it unlocks by itself after the time you set), and snooze the notch for 5 minutes to 2 hours or until you wake it, so that it does not open when the pointer reaches the top of the screen while you present or play (a click on it, and a coding agent that waits for an answer, still open it). Each has a place in the menu bar panel (one switch for keeping awake and one for snoozing, which start the length chosen on this page; the lists of lengths are in the menu), a shortcut that works in any app and a notice on the notch (off by default).
+Keep the Mac awake for 15 minutes to 4 hours or until you stop it, mute the microphone itself so every app hears nothing (it is unmuted when Figghost quits, since nothing else on the Mac has a switch for it), lock the keyboard while you wipe it (Command and Escape unlock it at once, and it unlocks by itself after the time you set), and snooze the notch for 5 minutes to 2 hours or until you wake it, so that it does not open when the pointer reaches the top of the screen while you present or play (a click on it, and a coding agent that waits for an answer, still open it). It also switches the whole Mac between the dark and the light appearance, hides the files on the desktop for a clean screen to share (the Finder starts again to take it), and copies the link of the tab in front of Safari or a Chromium browser as a Markdown link, the address alone, or the title and the address (Control-Option-Command-L). Each has a place in the menu bar panel (one switch for keeping awake and one for snoozing, which start the length chosen on this page; the lists of lengths are in the menu), a shortcut that works in any app and a notice on the notch (off by default).
 
 ![The Utilities page in Vietnamese](docs/images/settings-utilities-vi.png)
 

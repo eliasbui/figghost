@@ -1,10 +1,11 @@
-// Utilities: keep the Mac awake, mute the microphone for every app, lock the keyboard to clean it, snooze the notch.
+// Utilities: keep the Mac awake, mute the microphone for every app, lock the keyboard to clean it, snooze the notch,
+// switch the dark appearance, hide the desktop icons, and copy the link of the tab in front of a browser.
 (window.__plugins = window.__plugins || []).push({
   id: 'utilities',
   icon: 'slider.horizontal.3',
   en: {
     'nav.utilities': 'Utilities', 'page.utilities': 'Utilities',
-    'page.utilities.sub': 'Keep the Mac awake, mute the microphone for every app at once, lock the keyboard while you wipe it, and snooze the notch.',
+    'page.utilities.sub': 'Keep the Mac awake, mute the microphone for every app at once, lock the keyboard while you wipe it, snooze the notch, switch to the dark appearance, hide the desktop icons, and copy the link of a browser tab.',
     'util.length.until': 'Until I stop', 'util.unit.s': 's', 'util.unit.min': 'min', 'util.unit.h': 'h',
     'util.enable.title': 'Use the utilities', 'util.enable.desc': 'Each has a place in the menu bar panel, a shortcut that works in any app, and a notice on the notch.',
     'sec.util.awake': 'Keep awake',
@@ -27,10 +28,21 @@
     'util.lock.start': 'Lock', 'util.lock.stop': 'Unlock', 'util.lock.locked': 'Locked', 'util.lock.free': 'Free',
     'util.lock.seconds.title': 'Longest it stays locked', 'util.lock.seconds.desc': 'It unlocks by itself after this long.',
     'util.lock.access.title': 'Accessibility', 'util.lock.access.desc': 'Needed to hold the keys back.', 'util.lock.access.open': 'Open settings',
+    'target.utilities:dark': 'the Dark appearance shortcut', 'target.utilities:desktop': 'the Desktop icons shortcut', 'target.utilities:link': 'the Copy tab link shortcut',
+    'sec.util.look': 'Appearance and desktop',
+    'util.dark.title': 'Dark appearance', 'util.dark.desc': 'Switches the whole Mac between dark and light, as System Settings does.',
+    'util.dark.on': 'Dark', 'util.dark.off': 'Light', 'util.dark.switch': 'Switch',
+    'util.desktop.title': 'Desktop icons', 'util.desktop.desc': 'Hides the files and drives on the desktop, for a clean screen to share. The Finder starts again to take it; its windows come back.',
+    'util.desktop.shown': 'Shown', 'util.desktop.hidden': 'Hidden', 'util.desktop.hide': 'Hide', 'util.desktop.show': 'Show',
+    'util.automation.title': 'Automation', 'util.automation.desc': 'The appearance is changed through System Events and the link is read from the browser, so macOS asks once for each whether Figghost may control it. A refusal is changed here.',
+    'sec.util.link': 'Link of a tab',
+    'util.link.title': 'Copy the link of the tab in front', 'util.link.desc': 'Press the shortcut in Safari, Chrome, Edge, Brave or Vivaldi and the address of the tab in front is copied with its title. An incognito window gives nothing.',
+    'util.link.format.title': 'Written as', 'util.link.format.desc': 'Markdown suits notes, chats and code; the address alone suits everything else.',
+    'util.link.markdown': 'Markdown link', 'util.link.url': 'Address only', 'util.link.title_url': 'Title and address',
   },
   vi: {
     'nav.utilities': 'Tiện ích', 'page.utilities': 'Tiện ích',
-    'page.utilities.sub': 'Giữ máy luôn thức, tắt tiếng micro cho mọi ứng dụng cùng lúc, khóa bàn phím khi bạn lau nó, và tạm tắt notch.',
+    'page.utilities.sub': 'Giữ máy luôn thức, tắt tiếng micro cho mọi ứng dụng cùng lúc, khóa bàn phím khi bạn lau nó, tạm tắt notch, chuyển giao diện tối, ẩn biểu tượng màn hình nền, và sao chép liên kết của tab trình duyệt.',
     'util.length.until': 'Đến khi tôi tắt', 'util.unit.s': 'giây', 'util.unit.min': 'phút', 'util.unit.h': 'giờ',
     'util.enable.title': 'Dùng các tiện ích', 'util.enable.desc': 'Mỗi tiện ích có chỗ trong bảng ở thanh menu, một phím tắt dùng ở mọi ứng dụng, và một thông báo trên notch.',
     'sec.util.awake': 'Giữ thức',
@@ -53,6 +65,17 @@
     'util.lock.start': 'Khóa', 'util.lock.stop': 'Mở khóa', 'util.lock.locked': 'Đã khóa', 'util.lock.free': 'Bình thường',
     'util.lock.seconds.title': 'Khóa tối đa', 'util.lock.seconds.desc': 'Tự mở khóa sau chừng này thời gian.',
     'util.lock.access.title': 'Trợ năng', 'util.lock.access.desc': 'Cần để giữ các phím lại.', 'util.lock.access.open': 'Mở cài đặt',
+    'target.utilities:dark': 'phím tắt Giao diện tối', 'target.utilities:desktop': 'phím tắt Biểu tượng màn hình nền', 'target.utilities:link': 'phím tắt Sao chép liên kết của tab',
+    'sec.util.look': 'Giao diện và màn hình nền',
+    'util.dark.title': 'Giao diện tối', 'util.dark.desc': 'Chuyển cả máy giữa giao diện tối và sáng, như trong Cài đặt hệ thống.',
+    'util.dark.on': 'Tối', 'util.dark.off': 'Sáng', 'util.dark.switch': 'Chuyển',
+    'util.desktop.title': 'Biểu tượng màn hình nền', 'util.desktop.desc': 'Ẩn tệp và ổ đĩa trên màn hình nền, để màn hình gọn khi chia sẻ. Finder khởi động lại để nhận thay đổi; các cửa sổ của nó vẫn mở lại như cũ.',
+    'util.desktop.shown': 'Đang hiện', 'util.desktop.hidden': 'Đang ẩn', 'util.desktop.hide': 'Ẩn', 'util.desktop.show': 'Hiện',
+    'util.automation.title': 'Tự động hóa', 'util.automation.desc': 'Giao diện được đổi qua System Events và liên kết được đọc từ trình duyệt, nên macOS hỏi một lần cho mỗi thứ xem Figghost có được điều khiển không. Lỡ từ chối thì đổi lại ở đây.',
+    'sec.util.link': 'Liên kết của tab',
+    'util.link.title': 'Sao chép liên kết của tab phía trước', 'util.link.desc': 'Nhấn phím tắt trong Safari, Chrome, Edge, Brave hoặc Vivaldi, địa chỉ của tab đang mở được sao chép cùng tiêu đề. Cửa sổ ẩn danh không cho gì.',
+    'util.link.format.title': 'Viết dạng', 'util.link.format.desc': 'Markdown hợp với ghi chú, tin nhắn và mã; chỉ địa chỉ hợp với mọi chỗ khác.',
+    'util.link.markdown': 'Liên kết Markdown', 'util.link.url': 'Chỉ địa chỉ', 'util.link.title_url': 'Tiêu đề và địa chỉ',
   },
   build() {
     const on = () => S.utilities.enabled;
@@ -97,6 +120,18 @@
       lockBtn.textContent = S.utilities.locked ? t('util.lock.stop') : t('util.lock.start');
       lockState.textContent = S.utilities.locked ? t('util.lock.locked') : t('util.lock.free');
     });
+    // Appearance and desktop
+    const darkState = h('span', { class: 'util-state' });
+    const darkBtn = button(t('util.dark.switch'), () => send({ t: 'action', name: 'utilities_dark' }), { small: true });
+    const deskState = h('span', { class: 'util-state' });
+    const deskBtn = button('', () => send({ t: 'action', name: 'utilities_desktop' }), { small: true });
+    reg(() => {
+      const u = S.utilities;
+      darkState.textContent = u.dark ? t('util.dark.on') : t('util.dark.off');
+      deskState.textContent = u.desktop_icons ? t('util.desktop.shown') : t('util.desktop.hidden');
+      deskBtn.textContent = u.desktop_icons ? t('util.desktop.hide') : t('util.desktop.show');
+    });
+    const formats = () => ['markdown', 'url', 'title_url'].map((f) => ({ value: f, label: t('util.link.' + f) }));
     return [
       card(toggleRow('utilities.enabled', t('util.enable.title'), t('util.enable.desc'))),
       sectionTitle(t('sec.util.awake')),
@@ -123,6 +158,17 @@
           button(t('util.lock.access.open'), () => send({ t: 'action', name: 'open_accessibility' }), { small: true }),
         ], when),
         row(t('util.awake.shortcut'), t('util.awake.shortcut.desc'), hotkeyButton('utilities:lock', { allowClear: true, label: t('util.lock.now.title') }), when)),
+      sectionTitle(t('sec.util.look')),
+      card(
+        row(t('util.dark.title'), t('util.dark.desc'), [darkState, darkBtn], when),
+        row(t('util.awake.shortcut'), t('util.awake.shortcut.desc'), hotkeyButton('utilities:dark', { allowClear: true, label: t('util.dark.title') }), when),
+        row(t('util.desktop.title'), t('util.desktop.desc'), [deskState, deskBtn], when),
+        row(t('util.awake.shortcut'), t('util.awake.shortcut.desc'), hotkeyButton('utilities:desktop', { allowClear: true, label: t('util.desktop.title') }), when),
+        row(t('util.automation.title'), t('util.automation.desc'), button(t('util.lock.access.open'), () => send({ t: 'action', name: 'utilities_automation' }), { small: true }), when)),
+      sectionTitle(t('sec.util.link')),
+      card(
+        row(t('util.link.title'), t('util.link.desc'), hotkeyButton('utilities:link', { allowClear: true, label: t('util.link.title') }), when),
+        selectRow({ path: 'utilities.link_format', title: t('util.link.format.title'), desc: t('util.link.format.desc'), options: formats, when: on })),
     ];
   },
   selftest({ expect, go, sent, S }) {
@@ -135,7 +181,7 @@
     expect(sent.some((m) => m.t === 'set' && m.path === 'utilities.enabled' && m.value === !was), 'utilities: the switch sends its setting: ' + JSON.stringify(sent));
     master.click();
 
-    expect(page.querySelectorAll('.hotkey').length === 4, 'utilities: a shortcut recorder for each tool');
+    expect(page.querySelectorAll('.hotkey').length === 7, 'utilities: a shortcut recorder for each tool');
     const button = (label) => [...page.querySelectorAll('.btn')].find((b) => b.textContent === label);
     sent.length = 0;
     button(t('util.awake.stop')).click();
@@ -149,6 +195,23 @@
     sent.length = 0;
     button(t('util.lock.start')).click();
     expect(sent.some((m) => m.name === 'utilities_lock'), 'utilities: the lock button sends its action');
+
+    sent.length = 0;
+    button(t('util.dark.switch')).click();
+    expect(sent.some((m) => m.name === 'utilities_dark'), 'utilities: the appearance button sends its action');
+    sent.length = 0;
+    button(t('util.desktop.hide')).click();
+    expect(sent.some((m) => m.name === 'utilities_desktop'), 'utilities: the desktop button sends its action');
+    S.utilities.desktop_icons = false; runSyncs();
+    expect(!!button(t('util.desktop.show')), 'utilities: hidden icons offer to show them');
+    S.utilities.desktop_icons = true; runSyncs();
+    const formatPick = [...page.querySelectorAll('select.pick')].find((s) => [...s.options].some((o) => o.value === 'title_url'));
+    expect(!!formatPick && formatPick.options.length === 3, 'utilities: three ways to write a link');
+    formatPick.value = 'url';
+    formatPick.dispatchEvent(new Event('change'));
+    expect(S.utilities.link_format === 'url', 'utilities: the format of a link is a word the app knows');
+    formatPick.value = 'markdown';
+    formatPick.dispatchEvent(new Event('change'));
 
     // The buttons follow what the app says.
     S.utilities.awake = false; S.utilities.mic_muted = true; S.utilities.locked = true; S.utilities.snoozed = true;

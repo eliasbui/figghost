@@ -206,4 +206,89 @@ impl Language {
             Language::Vietnamese => "Hãy cho phép Trợ năng để khóa bàn phím",
         }
     }
+
+    pub fn util_dark_menu(self) -> &'static str {
+        match self {
+            Language::English => "Dark appearance",
+            Language::Vietnamese => "Giao diện tối",
+        }
+    }
+
+    pub fn util_dark_on(self) -> &'static str {
+        match self {
+            Language::English => "Dark appearance",
+            Language::Vietnamese => "Đã chuyển sang giao diện tối",
+        }
+    }
+
+    pub fn util_dark_off(self) -> &'static str {
+        match self {
+            Language::English => "Light appearance",
+            Language::Vietnamese => "Đã chuyển sang giao diện sáng",
+        }
+    }
+
+    pub fn util_desktop_menu(self) -> &'static str {
+        match self {
+            Language::English => "Hide desktop icons",
+            Language::Vietnamese => "Ẩn biểu tượng màn hình nền",
+        }
+    }
+
+    pub fn util_desktop_hidden(self) -> &'static str {
+        match self {
+            Language::English => "Desktop icons hidden",
+            Language::Vietnamese => "Đã ẩn biểu tượng màn hình nền",
+        }
+    }
+
+    pub fn util_desktop_shown(self) -> &'static str {
+        match self {
+            Language::English => "Desktop icons shown",
+            Language::Vietnamese => "Đã hiện biểu tượng màn hình nền",
+        }
+    }
+
+    pub fn util_cannot(self) -> &'static str {
+        match self {
+            Language::English => "It could not be changed",
+            Language::Vietnamese => "Không đổi được",
+        }
+    }
+
+    /// Where the person allows Figghost to control another app, which is what was missing.
+    pub fn util_automation_hint(self) -> &'static str {
+        match self {
+            Language::English => "Allow Figghost in Privacy & Security, Automation",
+            Language::Vietnamese => "Cho phép Figghost trong Quyền riêng tư & Bảo mật, Tự động hóa",
+        }
+    }
+
+    pub fn util_link_copied(self) -> &'static str {
+        match self {
+            Language::English => "Link copied",
+            Language::Vietnamese => "Đã sao chép liên kết",
+        }
+    }
+
+    pub fn util_link_failed(self) -> &'static str {
+        match self {
+            Language::English => "The tab could not be read",
+            Language::Vietnamese => "Không đọc được tab",
+        }
+    }
+
+    pub fn util_link_not_browser(self) -> &'static str {
+        match self {
+            Language::English => "The app in front is not a browser Figghost can ask",
+            Language::Vietnamese => "Ứng dụng phía trước không phải trình duyệt Figghost hỏi được",
+        }
+    }
+
+    pub fn util_link_browsers(self) -> &'static str {
+        match self {
+            Language::English => "Safari, Chrome, Edge, Brave or Vivaldi",
+            Language::Vietnamese => "Safari, Chrome, Edge, Brave hoặc Vivaldi",
+        }
+    }
 }

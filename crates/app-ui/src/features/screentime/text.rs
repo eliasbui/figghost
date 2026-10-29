@@ -63,6 +63,9 @@ const GROUPS: [(&str, &str, &str, &str); 21] = [
 ];
 
 /// The glyph for a group code; a question mark for one that is not known.
+/// The glyph of a row of the list by site.
+pub const SITE_SYMBOL: &str = "globe";
+
 pub fn group_symbol(code: &str) -> &'static str {
     GROUPS
         .iter()
@@ -76,7 +79,7 @@ pub fn all_group_symbols() -> Vec<&'static str> {
     GROUPS
         .iter()
         .map(|g| g.1)
-        .chain(["questionmark.circle"])
+        .chain(["questionmark.circle", SITE_SYMBOL])
         .collect()
 }
 
@@ -146,6 +149,24 @@ impl Language {
         match self {
             Language::English => "Groups",
             Language::Vietnamese => "Nhóm",
+        }
+    }
+
+    pub fn screentime_sites(self) -> &'static str {
+        match self {
+            Language::English => "Sites",
+            Language::Vietnamese => "Trang web",
+        }
+    }
+
+    pub fn screentime_sites_empty(self) -> &'static str {
+        match self {
+            Language::English => {
+                "No site yet. It counts the site of the front tab of Safari or a Chromium browser."
+            }
+            Language::Vietnamese => {
+                "Chưa có trang nào. Nó tính trang của tab đang mở trong Safari hoặc trình duyệt Chromium."
+            }
         }
     }
 

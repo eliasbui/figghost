@@ -6,6 +6,11 @@
 //! days, in a file of the data directory. No window title, no text, no screen and no keystroke is looked at, and nothing
 //! leaves the Mac. No permission is needed: the app in front is public, and how long since the last input is read from the
 //! clock of the input system, not from the events.
+//!
+//! Counting by site is a switch of its own, off until turned on. Then, when the app in front is a browser that can be
+//! asked (`macos_sys::browser`), the address of its front tab is asked off the main thread, and only the site (the host)
+//! is kept, in a file of its own. An incognito window of Chromium says nothing; Safari does not tell its private windows
+//! apart. macOS asks once per browser whether Figghost may do this.
 
 use super::{AttachEnv, MAX_FILE, read_small, write_atomically};
 use crate::{
@@ -16,7 +21,7 @@ use crate::{
 use core_calendar::format::day_index;
 use logic::{IDLE_MINUTES, SAMPLE_SECONDS, Tally};
 use macos_sys::{
-    app, eventkit,
+    app, browser, eventkit,
     screentime_ui::{
         Icon, MAX_ROWS, PAGE_SIZE, Row, ScreenTimeCallbacks, ScreenTimeDisplay, ScreenTimeView,
     },
@@ -30,7 +35,8 @@ use std::{
     fs, io,
     path::PathBuf,
     rc::{Rc, Weak},
-    time::Instant,
+    thread,
+    time::{Duration, Instant},
 };
 
 pub mod logic;
@@ -38,6 +44,9 @@ pub mod settings;
 mod text;
 
 const FILE: &str = "screentime.json";
+const SITES_FILE: &str = "screentime-sites.json";
+/// A browser that does not say its tab within this long is skipped for that look.
+const ASK_TIMEOUT: Duration = Duration::from_secs(3);
 /// The tally is written this many looks apart, a minute.
 const SAVE_EVERY: u32 = 12;
 
@@ -47,6 +56,8 @@ pub struct Config {
     pub enabled: bool,
     /// How long the keyboard and pointer may be still before time stops counting, one of `IDLE_MINUTES`.
     pub idle_minutes: u32,
+    /// Also count the site of the front tab of a browser.
+    pub sites: bool,
 }
 
 impl Default for Config {
@@ -54,6 +65,7 @@ impl Default for Config {
         Self {
             enabled: false,
             idle_minutes: 2,
+            sites: false,
         }
     }
 }
@@ -73,6 +85,12 @@ pub struct Feature {
     config: RefCell<Config>,
     tally: RefCell<Tally>,
     file: PathBuf,
+    /// The same tally with sites in place of apps.
+    sites: RefCell<Tally>,
+    sites_file: PathBuf,
+    /// A browser is being asked; the next looks do not ask again until it answers.
+    asking: Cell<bool>,
+    sites_dirty: Cell<bool>,
     own_id: Option<String>,
     sampler: RefCell<Option<app::Timer>>,
     last_look: Cell<Option<Instant>>,
@@ -81,7 +99,7 @@ pub struct Feature {
     showing: Cell<bool>,
     /// 0 is today, 1 the last seven days.
     range: Cell<usize>,
-    /// 0 is by app, 1 by group.
+    /// 0 is by app, 1 by group, 2 by site.
     group: Cell<usize>,
     /// The group of each app already asked about, so that an app's file is read once.
     groups: RefCell<HashMap<String, String>>,
@@ -106,7 +124,7 @@ pub fn attach(env: &AttachEnv) -> Option<Rc<Feature>> {
                 }),
                 on_group: Box::new(move |i| {
                     if let Some(f) = group.upgrade() {
-                        f.group.set(i.min(1));
+                        f.group.set(i.min(2));
                         f.render();
                     }
                 }),
@@ -117,6 +135,10 @@ pub fn attach(env: &AttachEnv) -> Option<Rc<Feature>> {
             config: RefCell::new(config),
             tally: RefCell::default(),
             file: env.home.join(FILE),
+            sites: RefCell::default(),
+            sites_file: env.home.join(SITES_FILE),
+            asking: Cell::new(false),
+            sites_dirty: Cell::new(false),
             own_id: workspace::own_bundle_id(),
             sampler: RefCell::default(),
             last_look: Cell::new(None),
@@ -149,7 +171,21 @@ pub fn attach(env: &AttachEnv) -> Option<Rc<Feature>> {
     if feature.config.borrow().enabled {
         feature.start();
     }
+    FEATURE.with(|slot| *slot.borrow_mut() = Rc::downgrade(&feature));
     Some(feature)
+}
+
+thread_local! {
+    /// The site of a tab arrives from another thread and hops to the main one, which finds the feature here.
+    static FEATURE: RefCell<Weak<Feature>> = const { RefCell::new(Weak::new()) };
+}
+
+fn with_feature(f: impl FnOnce(&Feature)) {
+    FEATURE.with(|slot| {
+        if let Some(feature) = slot.borrow().upgrade() {
+            f(&feature);
+        }
+    });
 }
 
 fn today() -> i64 {
@@ -160,10 +196,16 @@ impl Feature {
     pub fn configure(&self, config: &Config) -> Result<(), Fault> {
         let config = config.clone().sanitized();
         let (was, now) = (self.config.borrow().enabled, config.enabled);
+        let sites = (self.config.borrow().sites, config.sites);
         *self.config.borrow_mut() = config;
         match (was, now) {
             (false, true) => self.start(),
             (true, false) => self.stop(),
+            (true, true) if sites == (true, false) => {
+                self.save();
+                self.sites.borrow_mut().clear();
+            }
+            (true, true) if sites == (false, true) => self.load_sites(),
             _ => {}
         }
         self.render();
@@ -186,12 +228,16 @@ impl Feature {
             return None;
         }
         self.tally.borrow_mut().clear();
+        self.sites.borrow_mut().clear();
         self.groups.borrow_mut().clear();
         self.dirty.set(false);
-        if let Err(e) = fs::remove_file(&self.file)
-            && e.kind() != io::ErrorKind::NotFound
-        {
-            eprintln!("screentime: cannot remove the file: {e}");
+        self.sites_dirty.set(false);
+        for file in [&self.file, &self.sites_file] {
+            if let Err(e) = fs::remove_file(file)
+                && e.kind() != io::ErrorKind::NotFound
+            {
+                eprintln!("screentime: cannot remove a file: {e}");
+            }
         }
         self.render();
         Some(Ok(()))
@@ -204,6 +250,9 @@ impl Feature {
             .unwrap_or_default();
         tally.prune(today());
         *self.tally.borrow_mut() = tally;
+        if self.config.borrow().sites {
+            self.load_sites();
+        }
         self.last_look.set(Some(Instant::now()));
         let weak = self.me.clone();
         *self.sampler.borrow_mut() = Some(app::every(SAMPLE_SECONDS as f64, move || {
@@ -220,8 +269,43 @@ impl Feature {
         self.last_look.set(None);
         self.save();
         self.tally.borrow_mut().clear();
+        self.sites.borrow_mut().clear();
         self.groups.borrow_mut().clear();
         trace::log("screentime: stopped");
+    }
+
+    fn load_sites(&self) {
+        let mut sites = read_small(&self.sites_file, MAX_FILE)
+            .map(|text| Tally::from_json(&text))
+            .unwrap_or_default();
+        sites.prune(today());
+        *self.sites.borrow_mut() = sites;
+    }
+
+    /// Asks the browser in front for its tab off the main thread, and gives the seconds of this look to its site when it
+    /// answers. A look while a browser is still being asked is not counted by site.
+    fn ask_site(&self, bundle_id: String, day: i64, seconds: u64) {
+        if self.asking.replace(true) {
+            return;
+        }
+        thread::spawn(move || {
+            let site = browser::front_tab(&bundle_id, ASK_TIMEOUT)
+                .and_then(|tab| browser::site_of(&tab.url));
+            app::on_main(move || {
+                with_feature(|f| {
+                    f.asking.set(false);
+                    let counting = {
+                        let config = f.config.borrow();
+                        config.enabled && config.sites
+                    };
+                    if let Some(site) = site.filter(|_| counting) {
+                        f.sites.borrow_mut().add(day, &site, &site, seconds);
+                        f.sites_dirty.set(true);
+                        trace::log("screentime: counted a site");
+                    }
+                });
+            });
+        });
     }
 
     /// One look: gives the seconds since the last to the app in front, if someone is there.
@@ -239,11 +323,15 @@ impl Feature {
             && !front.bundle_id.is_empty()
             && self.own_id.as_deref() != Some(front.bundle_id.as_str())
         {
+            let day = today();
             self.tally
                 .borrow_mut()
-                .add(today(), &front.bundle_id, &front.name, seconds);
+                .add(day, &front.bundle_id, &front.name, seconds);
             self.dirty.set(true);
             trace::log("screentime: counted a look");
+            if self.config.borrow().sites && browser::is_browser(&front.bundle_id) {
+                self.ask_site(front.bundle_id, day, seconds);
+            }
         }
         let looks = self.looks_since_save.get() + 1;
         if looks >= SAVE_EVERY {
@@ -257,15 +345,20 @@ impl Feature {
         }
     }
 
-    /// Writes the tally whole or not at all, if it changed.
+    /// Writes each tally whole or not at all, if it changed.
     fn save(&self) {
-        if !self.dirty.replace(false) {
-            return;
-        }
-        let mut tally = self.tally.borrow_mut();
-        tally.prune(today());
-        if let Err(e) = write_atomically(&self.file, &tally.to_json()) {
-            eprintln!("screentime: cannot write the tally: {e}");
+        for (dirty, tally, file) in [
+            (&self.dirty, &self.tally, &self.file),
+            (&self.sites_dirty, &self.sites, &self.sites_file),
+        ] {
+            if !dirty.replace(false) {
+                continue;
+            }
+            let mut tally = tally.borrow_mut();
+            tally.prune(today());
+            if let Err(e) = write_atomically(file, &tally.to_json()) {
+                eprintln!("screentime: cannot write the tally: {e}");
+            }
         }
     }
 
@@ -294,21 +387,31 @@ impl Feature {
             });
             return;
         }
-        let tally = self.tally.borrow();
+        let sites_on = self.config.borrow().sites;
+        if self.group.get() == 2 && !sites_on {
+            self.group.set(0);
+        }
         let (range, group) = (self.range.get(), self.group.get());
+        let tally = if group == 2 {
+            self.sites.borrow()
+        } else {
+            self.tally.borrow()
+        };
         let day = today();
         let from = if range == 0 { day } else { day - 6 };
-        self.view.show(display(
-            language,
-            &tally,
-            (from, day),
-            (range, group),
-            |id| self.group_of(id),
-        ));
+        let mut shown = display(language, &tally, (from, day), (range, group), |id| {
+            self.group_of(id)
+        });
+        if sites_on {
+            language.screentime_sites().clone_into(&mut shown.groups[2]);
+        }
+        self.view.show(shown);
     }
 }
 
-/// What the tab shows for a tally, a range of days and a way of grouping. Pure, so that the tests drive it.
+/// What the tab shows for a tally, a range of days and a way of grouping (by app, by group, or by site when the tally is
+/// of sites). The chip of sites has no name here; the caller names it when sites are counted. Pure, so that the tests
+/// drive it.
 fn display(
     language: Language,
     tally: &Tally,
@@ -317,25 +420,24 @@ fn display(
     group_of: impl Fn(&str) -> String,
 ) -> ScreenTimeDisplay {
     let total = tally.total(from, to);
-    let listed: Vec<(String, u64)> = if group == 0 {
-        tally.by_app(from, to)
-    } else {
+    let listed: Vec<(String, u64)> = if group == 1 {
         tally.by_group(from, to, group_of)
+    } else {
+        tally.by_app(from, to)
     };
     let longest = listed.first().map_or(1, |(_, s)| (*s).max(1));
     let rows = listed
         .into_iter()
         .take(MAX_ROWS)
         .map(|(key, seconds)| Row {
-            icon: if group == 0 {
-                workspace::app_path(&key).map_or(Icon::None, Icon::App)
-            } else {
-                Icon::Symbol(text::group_symbol(&key))
+            icon: match group {
+                0 => workspace::app_path(&key).map_or(Icon::None, Icon::App),
+                1 => Icon::Symbol(text::group_symbol(&key)),
+                _ => Icon::Symbol(text::SITE_SYMBOL),
             },
-            title: if group == 0 {
-                tally.name_of(&key).to_owned()
-            } else {
-                language.screentime_group(&key).to_owned()
+            title: match group {
+                1 => language.screentime_group(&key).to_owned(),
+                _ => tally.name_of(&key).to_owned(),
             },
             value: language.screentime_duration(seconds),
             fraction: seconds as f64 / longest as f64,
@@ -349,7 +451,11 @@ fn display(
         },
         total: language.screentime_duration(total),
         rows,
-        empty: language.screentime_empty().to_owned(),
+        empty: if group == 2 {
+            language.screentime_sites_empty().to_owned()
+        } else {
+            language.screentime_empty().to_owned()
+        },
         ranges: [
             language.screentime_today().to_owned(),
             language.screentime_week().to_owned(),
@@ -357,6 +463,7 @@ fn display(
         groups: [
             language.screentime_apps().to_owned(),
             language.screentime_groups().to_owned(),
+            String::new(),
         ],
         range,
         group,
@@ -461,6 +568,31 @@ mod tests {
             other.rows[0].icon,
             Icon::Symbol("questionmark.circle")
         ));
+    }
+
+    #[test]
+    fn a_tally_of_sites_lists_the_sites_with_a_globe_and_leaves_the_chip_to_the_caller() {
+        let mut sites = Tally::default();
+        sites.add(100, "github.com", "github.com", 1_200);
+        sites.add(100, "docs.rs", "docs.rs", 600);
+        let shown = display(Language::Vietnamese, &sites, (100, 100), (0, 2), |_| {
+            unreachable!("sites are not put into groups")
+        });
+        let titles: Vec<&str> = shown.rows.iter().map(|r| r.title.as_str()).collect();
+        assert_eq!(titles, ["github.com", "docs.rs"]);
+        assert!(matches!(
+            shown.rows[0].icon,
+            Icon::Symbol(text::SITE_SYMBOL)
+        ));
+        assert_eq!(shown.group, 2);
+        assert!(
+            shown.groups[2].is_empty(),
+            "named only when sites are counted"
+        );
+        let empty = display(Language::English, &Tally::default(), (1, 1), (0, 2), |_| {
+            String::new()
+        });
+        assert_eq!(empty.empty, Language::English.screentime_sites_empty());
     }
 
     #[test]

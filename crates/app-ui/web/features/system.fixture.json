@@ -4,5 +4,8 @@
   "processor": true,
   "memory": true,
   "network": true,
-  "details": true
+  "details": true,
+  "bar_processor": true,
+  "bar_memory": false,
+  "bar_network": true
 }

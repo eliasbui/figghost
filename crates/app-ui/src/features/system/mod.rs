@@ -3,6 +3,9 @@
 //! nothing is read while the tab is not showing: the readings start when the tab opens and stop when it closes,
 //! so an idle app does no work for it.
 //!
+//! The exception is the figures the person chooses to keep in the menu bar (processor, memory, network, each off until
+//! chosen): those are read at the same pace for as long as one of them is chosen, and a click on them opens the tab.
+//!
 //! Nothing here needs a permission. The counters come from the kernel and from the power and disk services, and
 //! none of them says what any app is doing.
 
@@ -14,7 +17,10 @@ use crate::{
     trace,
 };
 use macos_sys::{
-    app, sensors,
+    MainThreadMarker, app,
+    notch::Notch,
+    sensors,
+    status_item::TextItem,
     style::Tone,
     sysinfo::{self, Interface, Pressure, Thermal},
     system_ui::{
@@ -52,6 +58,10 @@ pub struct Config {
     pub network: bool,
     /// The row of small figures: graphics, startup disk, heat, fans and battery.
     pub details: bool,
+    /// The figures kept in the menu bar, read even while the tab is closed.
+    pub bar_processor: bool,
+    pub bar_memory: bool,
+    pub bar_network: bool,
 }
 
 impl Default for Config {
@@ -63,6 +73,9 @@ impl Default for Config {
             memory: true,
             network: true,
             details: true,
+            bar_processor: false,
+            bar_memory: false,
+            bar_network: false,
         }
     }
 }
@@ -79,6 +92,10 @@ impl Config {
     fn shows_anything(&self) -> bool {
         self.processor || self.memory || self.network || self.details
     }
+
+    fn shows_in_menu_bar(&self) -> bool {
+        self.enabled && (self.bar_processor || self.bar_memory || self.bar_network)
+    }
 }
 
 /// What the counters said at the last reading, for the differences.
@@ -89,6 +106,8 @@ struct Reading {
 }
 
 pub struct Feature {
+    mtm: MainThreadMarker,
+    notch: Weak<Notch>,
     view: Rc<SystemView>,
     config: RefCell<Config>,
     ticker: RefCell<Option<app::Timer>>,
@@ -98,6 +117,10 @@ pub struct Feature {
     showing: Cell<bool>,
     /// Bumped whenever the readings start over; a delayed reading that finds another number does nothing.
     epoch: Cell<u64>,
+    /// The figures in the menu bar, with their own readings so that the tab opening and closing does not touch them.
+    bar: RefCell<Option<TextItem>>,
+    bar_ticker: RefCell<Option<app::Timer>>,
+    bar_last: RefCell<Option<Reading>>,
     me: Weak<Feature>,
 }
 
@@ -106,6 +129,8 @@ pub fn attach(env: &AttachEnv) -> Option<Rc<Feature>> {
     let notch = env.notch?;
     let view = SystemView::new(env.mtm, notch.page_area(PAGE_SIZE.width, PAGE_SIZE.height));
     let feature = Rc::new_cyclic(|me| Feature {
+        mtm: env.mtm,
+        notch: Rc::downgrade(notch),
         view: Rc::clone(&view),
         config: RefCell::new(env.config.system.clone().sanitized()),
         ticker: RefCell::default(),
@@ -114,6 +139,9 @@ pub fn attach(env: &AttachEnv) -> Option<Rc<Feature>> {
         up: RefCell::default(),
         showing: Cell::new(false),
         epoch: Cell::new(0),
+        bar: RefCell::default(),
+        bar_ticker: RefCell::default(),
+        bar_last: RefCell::default(),
         me: me.clone(),
     });
     let (shown, hidden) = (Rc::downgrade(&feature), Rc::downgrade(&feature));
@@ -132,6 +160,7 @@ pub fn attach(env: &AttachEnv) -> Option<Rc<Feature>> {
             }
         },
     ));
+    feature.place_bar();
     Some(feature)
 }
 
@@ -142,7 +171,98 @@ impl Feature {
         if self.showing.get() {
             self.begin();
         }
+        self.place_bar();
         Ok(())
+    }
+
+    /// Puts the chosen figures in the menu bar and reads them from now on, or takes them away when none is chosen.
+    fn place_bar(&self) {
+        self.bar_ticker.borrow_mut().take();
+        self.bar_last.borrow_mut().take();
+        let config = self.config.borrow().clone();
+        if !config.shows_in_menu_bar() {
+            if self.bar.borrow_mut().take().is_some() {
+                trace::log("system: menu bar figures removed");
+            }
+            return;
+        }
+        if self.bar.borrow().is_none() {
+            let weak = self.me.clone();
+            let item = TextItem::new(self.mtm, i18n::current().system_tab(), "", move || {
+                if let Some(f) = weak.upgrade() {
+                    f.open_tab();
+                }
+            });
+            item.even_digits();
+            *self.bar.borrow_mut() = Some(item);
+            trace::log("system: menu bar figures placed");
+        }
+        self.read_bar();
+        let weak = self.me.clone();
+        app::after(FIRST_SECONDS, move || {
+            if let Some(f) = weak.upgrade() {
+                f.read_bar();
+            }
+        });
+        let weak = self.me.clone();
+        *self.bar_ticker.borrow_mut() = Some(app::every(f64::from(config.seconds), move || {
+            if let Some(f) = weak.upgrade() {
+                f.read_bar();
+            }
+        }));
+    }
+
+    /// Reads only the figures the menu bar shows and writes them there.
+    fn read_bar(&self) {
+        let config = self.config.borrow().clone();
+        let Some(bar) = &*self.bar.borrow() else {
+            return;
+        };
+        let now = Reading {
+            at: Instant::now(),
+            ticks: if config.bar_processor {
+                sysinfo::cpu_ticks().unwrap_or_default()
+            } else {
+                Vec::new()
+            },
+            interfaces: if config.bar_network {
+                sysinfo::interfaces()
+            } else {
+                Vec::new()
+            },
+        };
+        let (load, rate) = match self.bar_last.borrow().as_ref() {
+            Some(before) => {
+                let seconds = now.at.duration_since(before.at).as_secs_f64();
+                let (down, up) = logic::rates(&before.interfaces, &now.interfaces, seconds);
+                (
+                    logic::overall(&logic::core_loads(&before.ticks, &now.ticks)),
+                    down + up,
+                )
+            }
+            None => (0.0, 0.0),
+        };
+        let memory = sysinfo::memory()
+            .filter(|m| config.bar_memory && m.total > 0)
+            .map(|m| m.used() as f64 / m.total as f64);
+        *self.bar_last.borrow_mut() = Some(now);
+        trace::log("system: menu bar read");
+        bar.set_text(&logic::bar_text(
+            i18n::current().system_bar_labels(),
+            config.bar_processor.then_some(load),
+            memory,
+            config.bar_network.then_some(rate),
+        ));
+    }
+
+    /// Opens the notch on this tab, for a click on the figures in the menu bar.
+    fn open_tab(&self) {
+        let Some(notch) = self.notch.upgrade() else {
+            return;
+        };
+        if let Some(index) = notch.page_ids().iter().position(|(id, _)| *id == "system") {
+            notch.open_page(index);
+        }
     }
 
     fn stop(&self) {

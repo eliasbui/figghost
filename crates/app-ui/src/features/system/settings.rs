@@ -16,6 +16,9 @@ pub fn state(config: &Config) -> Value {
         "memory": config.memory,
         "network": config.network,
         "details": config.details,
+        "bar_processor": config.bar_processor,
+        "bar_memory": config.bar_memory,
+        "bar_network": config.bar_network,
     })
 }
 
@@ -30,6 +33,9 @@ pub fn set(config: &mut Config, path: &str, value: &Value) -> Option<Result<(), 
         "memory" => switch(&mut config.memory),
         "network" => switch(&mut config.network),
         "details" => switch(&mut config.details),
+        "bar_processor" => switch(&mut config.bar_processor),
+        "bar_memory" => switch(&mut config.bar_memory),
+        "bar_network" => switch(&mut config.bar_network),
         "seconds" => value
             .as_u64()
             .and_then(|n| u32::try_from(n).ok())
@@ -73,7 +79,16 @@ mod tests {
     #[test]
     fn the_switches_are_validated() {
         let mut config = Config::default();
-        for path in ["enabled", "processor", "memory", "network", "details"] {
+        for path in [
+            "enabled",
+            "processor",
+            "memory",
+            "network",
+            "details",
+            "bar_processor",
+            "bar_memory",
+            "bar_network",
+        ] {
             assert!(
                 set(&mut config, path, &json!("yes")).unwrap().is_err(),
                 "{path}"
@@ -93,6 +108,12 @@ mod tests {
                 && !config.memory
                 && !config.network
                 && !config.details
+        );
+        assert!(
+            set(&mut config, "bar_memory", &json!(true))
+                .unwrap()
+                .is_ok()
+                && config.bar_memory
         );
         assert!(set(&mut config, "nonsense", &json!(1)).is_none());
     }

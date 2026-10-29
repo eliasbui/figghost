@@ -20,7 +20,11 @@ pub fn state(config: &Config, runtime: &Value) -> Value {
             "mic": config.mic_shortcut,
             "lock": config.lock_shortcut,
             "snooze": config.snooze_shortcut,
+            "dark": config.dark_shortcut,
+            "desktop": config.desktop_shortcut,
+            "link": config.link_shortcut,
         },
+        "link_format": config.link_format,
         "awake": fact("awake"),
         "awake_left": runtime.get("awake_left").and_then(Value::as_u64),
         "locked": fact("locked"),
@@ -28,6 +32,8 @@ pub fn state(config: &Config, runtime: &Value) -> Value {
         "snooze_left": runtime.get("snooze_left").and_then(Value::as_u64),
         "mic_muted": runtime.get("mic_muted").and_then(Value::as_bool),
         "accessibility": fact("accessibility"),
+        "dark": fact("dark"),
+        "desktop_icons": runtime.get("desktop_icons").and_then(Value::as_bool).unwrap_or(true),
     })
 }
 
@@ -54,6 +60,11 @@ pub fn set(config: &mut Config, path: &str, value: &Value) -> Option<Result<(), 
             .and_then(|m| u32::try_from(m).ok())
             .map(|m| config.snooze_minutes = logic::snooze_minutes(m))
             .ok_or_else(bad),
+        "link_format" => value
+            .as_str()
+            .filter(|f| logic::LINK_FORMATS.contains(f))
+            .map(|f| config.link_format = f.to_owned())
+            .ok_or_else(bad),
         "lock_seconds" => value
             .as_f64()
             .filter(|n| n.is_finite())
@@ -74,6 +85,9 @@ pub fn shortcuts(config: &Config) -> Vec<(String, String)> {
         ("utilities:mic", &config.mic_shortcut),
         ("utilities:lock", &config.lock_shortcut),
         ("utilities:snooze", &config.snooze_shortcut),
+        ("utilities:dark", &config.dark_shortcut),
+        ("utilities:desktop", &config.desktop_shortcut),
+        ("utilities:link", &config.link_shortcut),
     ]
     .into_iter()
     .filter(|(_, shortcut)| !shortcut.is_empty())
@@ -92,6 +106,9 @@ pub fn set_shortcut(config: &mut Config, target: &str, value: &str) -> Option<Re
         "mic" => config.mic_shortcut = value,
         "lock" => config.lock_shortcut = value,
         "snooze" => config.snooze_shortcut = value,
+        "dark" => config.dark_shortcut = value,
+        "desktop" => config.desktop_shortcut = value,
+        "link" => config.link_shortcut = value,
         _ => return None,
     }
     Some(Ok(()))
@@ -182,6 +199,20 @@ mod tests {
         assert_eq!(config.lock_seconds, logic::LOCK_SECONDS.1);
         assert!(set(&mut config, "enabled", &json!("on")).unwrap().is_err());
         assert!(set(&mut config, "nonsense", &json!(1)).is_none());
+        set(&mut config, "link_format", &json!("title_url"))
+            .unwrap()
+            .unwrap();
+        assert_eq!(config.link_format, "title_url");
+        assert!(
+            set(&mut config, "link_format", &json!("html"))
+                .unwrap()
+                .is_err()
+        );
+        assert!(set(&mut config, "link_format", &json!(3)).unwrap().is_err());
+        assert_eq!(
+            config.link_format, "title_url",
+            "a refused value changes nothing"
+        );
     }
 
     #[test]
@@ -220,6 +251,22 @@ mod tests {
                 .iter()
                 .any(|(t, _)| t == "utilities:snooze")
         );
+        assert!(
+            set_shortcut(&mut config, "utilities:link", "")
+                .unwrap()
+                .is_ok()
+        );
+        assert!(
+            !shortcuts(&config)
+                .iter()
+                .any(|(t, _)| t == "utilities:link")
+        );
+        assert!(
+            set_shortcut(&mut config, "utilities:dark", "ctrl+opt+cmd+d")
+                .unwrap()
+                .is_ok()
+        );
+        assert_eq!(config.dark_shortcut, "ctrl+opt+cmd+d");
         assert!(set_shortcut(&mut config, "utilities:other", "ctrl+opt+cmd+x").is_none());
         assert!(set_shortcut(&mut config, "pin", "ctrl+opt+cmd+x").is_none());
     }

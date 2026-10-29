@@ -139,6 +139,25 @@ pub fn percent_text(fraction: f64) -> String {
     format!("{:.0}%", (fraction * 100.0).clamp(0.0, 100.0))
 }
 
+/// The figures of the menu bar, each with its label when it is chosen: `CPU 12%  Mem 61%  Net 1.2 MB/s`. The load
+/// and the memory are fractions, the network is bytes a second down and up together.
+pub fn bar_text(
+    labels: [&str; 3],
+    load: Option<f64>,
+    memory: Option<f64>,
+    network: Option<f64>,
+) -> String {
+    [
+        (labels[0], load.map(percent_text)),
+        (labels[1], memory.map(percent_text)),
+        (labels[2], network.map(rate_text)),
+    ]
+    .into_iter()
+    .filter_map(|(label, value)| Some(format!("{label} {}", value?)))
+    .collect::<Vec<_>>()
+    .join("  ")
+}
+
 /// The fan card: the fastest fan, as a share of the fastest it can turn. `None` for a Mac without fans.
 pub fn fastest(fans: &[Fan]) -> Option<(Fan, f64)> {
     let fan = *fans.iter().max_by(|a, b| a.rpm.total_cmp(&b.rpm))?;
@@ -325,5 +344,20 @@ mod tests {
         let shares = shares(&memory);
         assert!((shares.iter().sum::<f64>() - 0.75).abs() < 1e-9);
         assert_eq!(super::shares(&Memory { total: 0, ..memory }), [0.0; 3]);
+    }
+
+    #[test]
+    fn the_menu_bar_says_only_the_figures_chosen_each_with_its_label() {
+        let labels = ["CPU", "RAM", "Mạng"];
+        assert_eq!(
+            bar_text(labels, Some(0.123), Some(0.61), Some(1_234_000.0)),
+            "CPU 12%  RAM 61%  Mạng 1.2 MB/s"
+        );
+        assert_eq!(bar_text(labels, None, Some(0.5), None), "RAM 50%");
+        assert_eq!(
+            bar_text(labels, Some(1.7), None, Some(-3.0)),
+            "CPU 100%  Mạng 0 B/s"
+        );
+        assert_eq!(bar_text(labels, None, None, None), "");
     }
 }

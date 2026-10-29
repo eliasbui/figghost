@@ -79,9 +79,9 @@ fn apps(vi: bool) -> ScreenTimeDisplay {
             ["Today".into(), "7 days".into()]
         },
         groups: if vi {
-            ["Ứng dụng".into(), "Nhóm".into()]
+            ["Ứng dụng".into(), "Nhóm".into(), "Trang web".into()]
         } else {
-            ["Apps".into(), "Groups".into()]
+            ["Apps".into(), "Groups".into(), String::new()]
         },
         range: 0,
         group: 0,
@@ -151,6 +151,41 @@ fn groups(vi: bool) -> ScreenTimeDisplay {
     }
 }
 
+fn sites(vi: bool) -> ScreenTimeDisplay {
+    let (hours, min) = if vi { ("giờ", "phút") } else { ("h", "min") };
+    let rows = [
+        ("github.com", 1, 52, 1.0),
+        ("docs.rs", 0, 48, 0.43),
+        ("youtube.com", 0, 31, 0.28),
+        ("vnexpress.net", 0, 12, 0.11),
+    ]
+    .into_iter()
+    .map(|(site, h, m, fraction)| {
+        let value = if h > 0 {
+            format!("{h} {hours} {m} {min}")
+        } else {
+            format!("{m} {min}")
+        };
+        symbol_row("globe", site, &value, fraction)
+    })
+    .collect();
+    ScreenTimeDisplay {
+        total: if vi {
+            "13 giờ 43 phút".into()
+        } else {
+            "13 h 43 min".into()
+        },
+        rows,
+        group: 2,
+        groups: if vi {
+            ["Ứng dụng".into(), "Nhóm".into(), "Trang web".into()]
+        } else {
+            ["Apps".into(), "Groups".into(), "Sites".into()]
+        },
+        ..apps(vi)
+    }
+}
+
 fn main() {
     let mtm = MainThreadMarker::new().expect("main thread");
     let dir = PathBuf::from(
@@ -188,6 +223,8 @@ fn main() {
                 ("apps_en", apps(false)),
                 ("groups_en", groups(false)),
                 ("apps_vi", apps(true)),
+                ("sites_en", sites(false)),
+                ("sites_vi", sites(true)),
                 (
                     "empty_en",
                     ScreenTimeDisplay {

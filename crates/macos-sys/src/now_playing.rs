@@ -7,7 +7,7 @@
 //! process, which has a hard timeout, so a hung player can never block the UI, and never launches a player that is
 //! not running.
 
-use crate::{app, workspace};
+use crate::{app, process::run_capture, workspace};
 use objc2::MainThreadMarker;
 use serde_json::Value;
 use std::{
@@ -390,32 +390,6 @@ fn find_adapter() -> Option<PathBuf> {
 }
 
 /// Runs a command and returns its stdout, or `None` when it fails or outlives `timeout` (then it is killed).
-fn run_capture(command: &mut Command, timeout: Duration) -> Option<String> {
-    let mut child = command
-        .stdin(Stdio::null())
-        .stdout(Stdio::piped())
-        .stderr(Stdio::null())
-        .spawn()
-        .ok()?;
-    let started = Instant::now();
-    loop {
-        match child.try_wait().ok()? {
-            Some(status) if status.success() => {
-                let mut out = String::new();
-                child.stdout.take()?.read_to_string(&mut out).ok()?;
-                return Some(out);
-            }
-            Some(_) => return None,
-            None if started.elapsed() >= timeout => {
-                let _ = child.kill();
-                let _ = child.wait();
-                return None;
-            }
-            None => thread::sleep(Duration::from_millis(15)),
-        }
-    }
-}
-
 fn is_running(player: Player) -> bool {
     run_capture(
         Command::new("pgrep").args(["-x", player.name()]),

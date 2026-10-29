@@ -12,6 +12,7 @@ pub fn state(config: &Config, runtime: &Value) -> Value {
     json!({
         "enabled": config.enabled,
         "idle_minutes": config.idle_minutes,
+        "sites": config.sites,
         "days": runtime.get("days").and_then(Value::as_u64).unwrap_or(0),
         "today": runtime.get("today").and_then(Value::as_u64).unwrap_or(0),
     })
@@ -26,6 +27,7 @@ pub fn set(config: &mut Config, path: &str, value: &Value) -> Option<Result<(), 
             .as_bool()
             .map(|on| config.enabled = on)
             .ok_or_else(bad),
+        "sites" => value.as_bool().map(|on| config.sites = on).ok_or_else(bad),
         "idle_minutes" => value
             .as_u64()
             .and_then(|n| u32::try_from(n).ok())
@@ -82,6 +84,9 @@ mod tests {
         let mut config = Config::default();
         assert!(set(&mut config, "enabled", &json!("yes")).unwrap().is_err());
         assert!(set(&mut config, "enabled", &json!(true)).unwrap().is_ok() && config.enabled);
+        assert!(!config.sites, "sites are counted only when asked");
+        assert!(set(&mut config, "sites", &json!(1)).unwrap().is_err());
+        assert!(set(&mut config, "sites", &json!(true)).unwrap().is_ok() && config.sites);
         for minutes in IDLE_MINUTES {
             assert!(
                 set(&mut config, "idle_minutes", &json!(minutes))

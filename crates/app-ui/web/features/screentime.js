@@ -5,10 +5,11 @@
   en: {
     'nav.screentime': 'Screen Time', 'page.screentime': 'Screen Time',
     'page.screentime.sub': 'See which apps had your time today and this week, in a tab of the notch.',
-    'screentime.enable.title': 'Count the time of each app', 'screentime.enable.desc': 'Every few seconds the app in front is given that time while you are at the Mac. Only the name of the app and the time are kept, on this Mac, for thirty days. No window title, text, screen or key is ever looked at, and it needs no permission.',
+    'screentime.enable.title': 'Count the time of each app', 'screentime.enable.desc': 'Every few seconds the app in front is given that time while you are at the Mac. Only the name of the app and the time are kept, on this Mac, for thirty days. No window title, text, screen or key is looked at, and it needs no permission. Sites are counted only when the switch below is on.',
     'sec.screentime.counting': 'Counting',
     'screentime.idle.title': 'Stop counting when I am away', 'screentime.idle.desc': 'Time stops counting once the keyboard and pointer have been still this long.',
     'screentime.idle.n': '{n} min',
+    'screentime.sites.title': 'Count by site too', 'screentime.sites.desc': 'When Safari or a browser built on Chromium (Chrome, Edge, Brave, Vivaldi) is in front, the site of its front tab is given the time too, and the tab of the notch lists the sites. Only the name of the site is kept, such as github.com. Incognito windows are left out, but Safari does not say which of its windows are private, so those count. macOS asks once for each browser whether Figghost may read its tab. Firefox cannot be asked.',
     'sec.screentime.data': 'What was counted',
     'screentime.data.title': 'Counted so far', 'screentime.data.desc': '{days} days kept. Today: {today}.',
     'screentime.clear': 'Clear it all', 'screentime.clear.sure': 'Click again to clear', 'screentime.min': 'min', 'screentime.h': 'h',
@@ -16,10 +17,11 @@
   vi: {
     'nav.screentime': 'Thời gian dùng', 'page.screentime': 'Thời gian dùng',
     'page.screentime.sub': 'Xem ứng dụng nào chiếm thời gian của bạn hôm nay và tuần này.',
-    'screentime.enable.title': 'Tính thời gian của từng ứng dụng', 'screentime.enable.desc': 'Vài giây một lần, ứng dụng đang ở phía trước được cộng thời gian đó khi bạn đang dùng máy. Chỉ tên ứng dụng và thời gian được giữ lại, trên máy này, trong ba mươi ngày. Không bao giờ nhìn vào tiêu đề cửa sổ, chữ, màn hình hay phím bấm, và không cần cấp quyền.',
+    'screentime.enable.title': 'Tính thời gian của từng ứng dụng', 'screentime.enable.desc': 'Vài giây một lần, ứng dụng đang ở phía trước được cộng thời gian đó khi bạn đang dùng máy. Chỉ tên ứng dụng và thời gian được giữ lại, trên máy này, trong ba mươi ngày. Không nhìn vào tiêu đề cửa sổ, chữ, màn hình hay phím bấm, và không cần cấp quyền. Trang web chỉ được tính khi bật công tắc bên dưới.',
     'sec.screentime.counting': 'Cách tính',
     'screentime.idle.title': 'Ngừng tính khi tôi đi vắng', 'screentime.idle.desc': 'Thời gian ngừng được tính khi bàn phím và con trỏ đứng yên chừng này.',
     'screentime.idle.n': '{n} phút',
+    'screentime.sites.title': 'Tính cả theo trang web', 'screentime.sites.desc': 'Khi Safari hoặc một trình duyệt dựng trên Chromium (Chrome, Edge, Brave, Vivaldi) đang ở phía trước, trang của tab đang mở cũng được cộng thời gian, và tab trên notch liệt kê các trang. Chỉ giữ tên trang, như github.com. Cửa sổ ẩn danh được bỏ qua, nhưng Safari không cho biết cửa sổ nào là riêng tư nên những cửa sổ đó vẫn được tính. macOS hỏi một lần cho mỗi trình duyệt xem Figghost có được đọc tab không. Firefox không hỏi được.',
     'sec.screentime.data': 'Đã tính được gì',
     'screentime.data.title': 'Đã tính cho đến giờ', 'screentime.data.desc': 'Giữ {days} ngày. Hôm nay: {today}.',
     'screentime.clear': 'Xóa hết', 'screentime.clear.sure': 'Bấm lần nữa để xóa', 'screentime.min': 'phút', 'screentime.h': 'giờ',
@@ -52,7 +54,9 @@
     return [
       card(toggleRow('screentime.enabled', t('screentime.enable.title'), t('screentime.enable.desc'))),
       sectionTitle(t('sec.screentime.counting')),
-      card(selectRow({ path: 'screentime.idle_minutes', title: t('screentime.idle.title'), desc: t('screentime.idle.desc'), options: idle, when: on })),
+      card(
+        selectRow({ path: 'screentime.idle_minutes', title: t('screentime.idle.title'), desc: t('screentime.idle.desc'), options: idle, when: on }),
+        toggleRow('screentime.sites', t('screentime.sites.title'), t('screentime.sites.desc'), when)),
       sectionTitle(t('sec.screentime.data')),
       card(counted),
     ];
@@ -66,6 +70,13 @@
     master.click();
     expect(sent.some((m) => m.t === 'set' && m.path === 'screentime.enabled' && m.value === !was), 'screentime: the switch sends its setting: ' + JSON.stringify(sent));
     master.click();
+
+    const sites = [...page.querySelectorAll('.switch')][1];
+    const counted = S.screentime.sites;
+    sent.length = 0;
+    sites.click();
+    expect(sent.some((m) => m.t === 'set' && m.path === 'screentime.sites' && m.value === !counted), 'screentime: counting by site has its own switch: ' + JSON.stringify(sent));
+    sites.click();
 
     const pick = page.querySelector('select.pick');
     expect(pick.options.length === 3, 'screentime: three times to choose from');

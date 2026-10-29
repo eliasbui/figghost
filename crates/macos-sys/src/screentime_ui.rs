@@ -9,10 +9,10 @@ use crate::{
     workspace,
 };
 use objc2::{DefinedClass, MainThreadMarker, MainThreadOnly, define_class, msg_send, rc::Retained};
-use objc2_app_kit::{NSImage, NSView};
-use objc2_foundation::{NSPoint, NSRect, NSSize};
+use objc2_app_kit::{NSImage, NSStringDrawing, NSView};
+use objc2_foundation::{NSPoint, NSRect, NSSize, NSString};
 use std::{
-    cell::RefCell,
+    cell::{Cell, RefCell},
     collections::HashMap,
     path::{Path, PathBuf},
     rc::Rc,
@@ -27,6 +27,8 @@ const MARGIN: f64 = 18.0;
 const ROW_HEIGHT: f64 = 28.0;
 const LIST_TOP: f64 = 84.0;
 const ICON: f64 = 20.0;
+/// The size of the total, and the least it shrinks to when the chips leave it less room.
+const TOTAL_SIZE: (f64, f64) = (34.0, 20.0);
 
 /// What a row shows before its name.
 #[derive(Debug, Clone)]
@@ -57,8 +59,9 @@ pub struct ScreenTimeDisplay {
     /// What the list says when it has no rows.
     pub empty: String,
     pub ranges: [String; 2],
-    pub groups: [String; 2],
-    /// Which of the two ranges and which of the two groupings is chosen.
+    /// By app, by group, by site; a grouping with no name has no chip.
+    pub groups: [String; 3],
+    /// Which of the two ranges and which of the groupings is chosen.
     pub range: usize,
     pub group: usize,
     /// Words that replace everything: the tab is off.
@@ -73,6 +76,8 @@ pub struct ScreenTimeCallbacks {
 pub struct CanvasIvars {
     display: RefCell<ScreenTimeDisplay>,
     icons: RefCell<HashMap<PathBuf, Retained<NSImage>>>,
+    /// Where the leftmost chip starts, which is as far as the total may reach.
+    chips_left: Cell<f64>,
 }
 
 fn attrs(
@@ -106,6 +111,7 @@ impl ScreenTimeCanvas {
         let this = mtm.alloc::<Self>().set_ivars(CanvasIvars {
             display: RefCell::default(),
             icons: RefCell::default(),
+            chips_left: Cell::new(f64::MAX),
         });
         // SAFETY: designated initializer with valid arguments on the main thread.
         unsafe { msg_send![super(this), initWithFrame: frame] }
@@ -137,18 +143,32 @@ impl ScreenTimeCanvas {
             ),
             &attrs(9.5, Weight::Semibold, style::TEXT_TERTIARY),
         );
+        let room = (self.ivars().chips_left.get() - MARGIN - 14.0).min(240.0);
+        let total = |size: f64| {
+            text_attributes(
+                &style::digits(size, Weight::Light),
+                &white(style::TEXT),
+                Fit::Tail,
+                false,
+            )
+        };
+        // SAFETY: the attributes dictionary holds valid attribute objects.
+        let wide = unsafe {
+            NSString::from_str(&display.total).sizeWithAttributes(Some(&total(TOTAL_SIZE.0)))
+        }
+        .width;
+        let fitted = if wide > room {
+            (TOTAL_SIZE.0 * room / wide).max(TOTAL_SIZE.1)
+        } else {
+            TOTAL_SIZE.0
+        };
         draw_text(
             &display.total,
             NSRect::new(
                 NSPoint::new(MARGIN + 2.0, h - 66.0),
-                NSSize::new(240.0, 42.0),
+                NSSize::new(room, 42.0),
             ),
-            &text_attributes(
-                &style::digits(34.0, Weight::Light),
-                &white(style::TEXT),
-                Fit::Tail,
-                false,
-            ),
+            &total(fitted),
         );
         if display.rows.is_empty() {
             draw_text(
@@ -224,7 +244,7 @@ impl ScreenTimeCanvas {
 pub struct ScreenTimeView {
     canvas: Retained<ScreenTimeCanvas>,
     ranges: [Retained<TouchButton>; 2],
-    groups: [Retained<TouchButton>; 2],
+    groups: [Retained<TouchButton>; 3],
 }
 
 impl ScreenTimeView {
@@ -247,7 +267,7 @@ impl ScreenTimeView {
         };
         Rc::new(Self {
             ranges: [chip(0, true), chip(1, true)],
-            groups: [chip(0, false), chip(1, false)],
+            groups: [chip(0, false), chip(1, false), chip(2, false)],
             canvas,
         })
     }
@@ -255,17 +275,20 @@ impl ScreenTimeView {
     pub fn show(&self, display: ScreenTimeDisplay) {
         let off = display.note.is_some();
         let frame = self.canvas.frame().size;
-        // The chips sit at the top right: the two ranges, then the two groupings.
+        // The chips sit at the top right: the two ranges, then the groupings.
         let mut right = frame.width - MARGIN;
         let top = frame.height - 10.0 - 28.0;
         for (buttons, labels, chosen) in [
-            (&self.groups, &display.groups, display.group),
-            (&self.ranges, &display.ranges, display.range),
+            (&self.groups[..], &display.groups[..], display.group),
+            (&self.ranges[..], &display.ranges[..], display.range),
         ] {
             for (i, button) in buttons.iter().enumerate().rev() {
                 button.set_title(&labels[i]);
                 button.set_selected(i == chosen);
-                button.setHidden(off);
+                button.setHidden(off || labels[i].is_empty());
+                if labels[i].is_empty() {
+                    continue;
+                }
                 let width = button.fit_width();
                 right -= width;
                 button.setFrame(NSRect::new(
@@ -276,6 +299,7 @@ impl ScreenTimeView {
             }
             right -= 10.0;
         }
+        self.canvas.ivars().chips_left.set(right + 10.0);
         *self.canvas.ivars().display.borrow_mut() = display;
         self.canvas.setNeedsDisplay(true);
     }

@@ -1,6 +1,7 @@
 {
   "enabled": true,
   "idle_minutes": 2,
+  "sites": true,
   "days": 12,
   "today": 20460
 }
