@@ -10,6 +10,7 @@ use std::path::Path;
 /// `web/features/download.fixture.json` must have exactly the same keys; a unit test checks it.
 pub fn state(config: &Config, runtime: &Value) -> Value {
     let config = config.clone().sanitized();
+    let flag = |key: &str| runtime.get(key).and_then(Value::as_bool).unwrap_or(false);
     let text = |key: &str| {
         runtime
             .get(key)
@@ -34,7 +35,10 @@ pub fn state(config: &Config, runtime: &Value) -> Value {
             .cloned()
             .unwrap_or_else(|| json!({ "seq": 0, "path": "" })),
         "net_links": runtime.get("net_links").filter(|l| l.is_array()).cloned().unwrap_or_else(|| json!([])),
-        "net_paused": runtime.get("net_paused").and_then(Value::as_bool).unwrap_or(false),
+        "net_paused": flag("net_paused"),
+        "lanes": config.lanes,
+        "lanes_installed": flag("lanes_installed"),
+        "lanes_running": flag("lanes_running"),
     })
 }
 
@@ -47,6 +51,7 @@ pub fn set(config: &mut Config, path: &str, value: &Value) -> Option<Result<(), 
         "enabled" => switch(&mut config.enabled),
         "playlist" => switch(&mut config.playlist),
         "net_merge" => switch(&mut config.net_merge),
+        "lanes" => switch(&mut config.lanes),
         "quality" => value
             .as_str()
             .and_then(Quality::parse)
@@ -95,6 +100,15 @@ mod tests {
         assert_eq!(s["picked"], json!({ "seq": 0, "path": "" }));
         assert_eq!(s["net_merge"], json!(false));
         assert_eq!(
+            (
+                s["lanes"].clone(),
+                s["lanes_installed"].clone(),
+                s["lanes_running"].clone()
+            ),
+            (json!(true), json!(false), json!(false)),
+            "Lanes shows on the notch, and is not known to be there before the app has looked"
+        );
+        assert_eq!(
             (s["net_links"].clone(), s["net_paused"].clone()),
             (json!([]), json!(false))
         );
@@ -107,8 +121,14 @@ mod tests {
             "picked": { "seq": 2, "path": "/Users/x/Movies" },
             "net_links": [{ "name": "en0" }],
             "net_paused": true,
+            "lanes_installed": true,
+            "lanes_running": true,
         });
         let s = state(&Config::default(), &runtime);
+        assert_eq!(
+            (s["lanes_installed"].clone(), s["lanes_running"].clone()),
+            (json!(true), json!(true))
+        );
         assert_eq!(s["net_links"], json!([{ "name": "en0" }]));
         assert_eq!(s["net_paused"], json!(true));
         assert_eq!(s["ytdlp_version"], json!("2026.08.19"));
@@ -143,7 +163,7 @@ mod tests {
     #[test]
     fn the_switches_the_quality_and_the_folder_are_validated() {
         let mut config = Config::default();
-        for path in ["enabled", "playlist", "net_merge"] {
+        for path in ["enabled", "playlist", "net_merge", "lanes"] {
             for bad in [json!("yes"), json!(null), json!(1)] {
                 assert!(
                     set(&mut config, path, &bad).unwrap().is_err(),
@@ -154,6 +174,7 @@ mod tests {
         assert!(set(&mut config, "enabled", &json!(true)).unwrap().is_ok() && config.enabled);
         assert!(set(&mut config, "playlist", &json!(true)).unwrap().is_ok() && config.playlist);
         assert!(set(&mut config, "net_merge", &json!(true)).unwrap().is_ok() && config.net_merge);
+        assert!(set(&mut config, "lanes", &json!(false)).unwrap().is_ok() && !config.lanes);
         for q in Quality::ALL {
             assert!(
                 set(&mut config, "quality", &json!(q.key()))

@@ -22,5 +22,8 @@
     { "name": "en1", "label": "Wi-Fi", "state": "up", "primary": false, "connections": 4, "speed": 12300000 },
     { "name": "en8", "label": "iPhone USB", "state": "checking", "primary": false, "connections": 0, "speed": 0 }
   ],
-  "net_paused": false
+  "net_paused": false,
+  "lanes": true,
+  "lanes_installed": false,
+  "lanes_running": false
 }

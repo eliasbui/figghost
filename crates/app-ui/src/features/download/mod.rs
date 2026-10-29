@@ -8,6 +8,9 @@
 //!
 //! With net-merge on, yt-dlp goes through the proxy of `core-netmerge` on 127.0.0.1, which spreads its connections over
 //! the Mac's links (Wi-Fi, Ethernet, a phone on USB); the proxy runs from the first download until the last one ends.
+//!
+//! The downloads of Lanes, the download manager by the same author, show on the closed notch too, whether this feature is
+//! on or not: `lanes` reads the list Lanes writes for its browser extension.
 
 use super::{AttachEnv, run_bounded_with};
 use crate::{i18n, settings::model::Fault, trace};
@@ -31,6 +34,7 @@ use std::{
 };
 
 pub mod jobs;
+pub mod lanes;
 pub mod logic;
 pub mod settings;
 mod text;
@@ -38,6 +42,9 @@ mod text;
 /// The two slots of the closed notch: the download that goes on, and the short notice when one ends.
 const RUNNING_SLOT: &str = "download";
 const NOTICE_SLOT: &str = "download-done";
+/// The same two for the downloads of Lanes.
+const LANES_SLOT: &str = "lanes";
+const LANES_NOTICE_SLOT: &str = "lanes-done";
 /// Below a question of an agent that waits for an answer (30) and the notice of an agent that finished (25), so that a
 /// download the person started never covers what waits for them; above agents at work (10), since a download is
 /// something the person asked for by name.
@@ -49,6 +56,9 @@ const NOTICE_SECONDS: f64 = 5.0;
 const SYNC_SECONDS: f64 = 0.5;
 /// A command is stopped if it has not answered after this many seconds.
 const VERSION_SECONDS: u64 = 10;
+/// How often the list of Lanes is looked at: a look at the time the file was changed, unless it changed or something
+/// is on the notch.
+const LANES_SECONDS: f64 = 1.0;
 
 #[derive(Debug, Clone, PartialEq, Serialize, Deserialize)]
 #[serde(default)]
@@ -62,6 +72,8 @@ pub struct Config {
     pub playlist: bool,
     /// net-merge: a video comes in pieces over several connections at once, spread over every link of the Mac.
     pub net_merge: bool,
+    /// The downloads of Lanes show on the closed notch, whether the switch of this feature is on or not.
+    pub lanes: bool,
 }
 
 impl Default for Config {
@@ -72,6 +84,7 @@ impl Default for Config {
             quality: Quality::Best.key().to_owned(),
             playlist: false,
             net_merge: false,
+            lanes: true,
         }
     }
 }
@@ -124,6 +137,11 @@ pub struct Feature {
     merge: RefCell<Option<core_netmerge::Merge>>,
     /// Numbers the downloads for the proxy, which sends the first connection of each to a site by the Mac's own link.
     merged: Cell<u64>,
+    /// The look at the list of Lanes, there while its switch is on.
+    lanes_timer: RefCell<Option<app::Timer>>,
+    lanes: RefCell<lanes::Seen>,
+    /// The icon of Lanes, made the first time it is shown.
+    lanes_icon: RefCell<Option<Arc<Vec<u8>>>>,
     me: Weak<Feature>,
 }
 
@@ -145,6 +163,9 @@ pub fn attach(env: &AttachEnv) -> Option<Rc<Feature>> {
         picked: RefCell::default(),
         merge: RefCell::default(),
         merged: Cell::new(0),
+        lanes_timer: RefCell::default(),
+        lanes: RefCell::default(),
+        lanes_icon: RefCell::default(),
         me: me.clone(),
     });
     // The app quitting does not run the threads to their end, and what yt-dlp started would be left running.
@@ -153,6 +174,7 @@ pub fn attach(env: &AttachEnv) -> Option<Rc<Feature>> {
     if config.enabled {
         feature.start();
     }
+    feature.keep_lanes(config.lanes);
     Some(feature)
 }
 
@@ -165,6 +187,7 @@ impl Feature {
             (true, false) => self.stop(),
             _ => {}
         }
+        self.keep_lanes(config.lanes);
         Ok(())
     }
 
@@ -271,6 +294,8 @@ impl Feature {
             "picked": { "seq": seq, "path": chosen },
             "net_links": net.links.iter().map(link_json).collect::<Vec<_>>(),
             "net_paused": net.paused && !net.links.is_empty(),
+            "lanes_installed": workspace::app_path(lanes::BUNDLE_ID).is_some(),
+            "lanes_running": workspace::is_running(lanes::BUNDLE_ID),
         })
     }
 
@@ -354,6 +379,16 @@ impl Feature {
             }
             "download_clear" => {
                 self.engine.clear_finished();
+                Ok(())
+            }
+            "lanes_open" => {
+                if let Some(path) = workspace::app_path(lanes::BUNDLE_ID) {
+                    workspace::open_path(&path);
+                }
+                Ok(())
+            }
+            "lanes_get" => {
+                workspace::open_url(lanes::PAGE);
                 Ok(())
             }
             "download_pick" => {
@@ -451,6 +486,113 @@ impl Feature {
         }
     }
 
+    /// Starts or stops the look at the list of Lanes to match its switch, and takes its downloads off the notch when it
+    /// stops.
+    fn keep_lanes(&self, on: bool) {
+        if on && self.lanes_timer.borrow().is_none() {
+            let weak = self.me.clone();
+            *self.lanes_timer.borrow_mut() = Some(app::every(LANES_SECONDS, move || {
+                if let Some(f) = weak.upgrade() {
+                    f.look_at_lanes();
+                }
+            }));
+            self.look_at_lanes();
+        } else if !on && self.lanes_timer.borrow_mut().take().is_some() {
+            *self.lanes.borrow_mut() = lanes::Seen::default();
+            if let Some(notch) = self.notch.as_ref().and_then(Weak::upgrade) {
+                notch.set_activity(LANES_SLOT, None);
+                super::islands::clear_slot(&notch, LANES_NOTICE_SLOT);
+            }
+        }
+    }
+
+    /// Puts the downloads of Lanes on the notch. While the file has not changed and nothing is shown, this is a look at
+    /// the time it was changed and nothing more; while something is shown it is read each time, so that a Lanes that
+    /// quit in the middle of a download takes it off the notch.
+    fn look_at_lanes(&self) {
+        let path = lanes::progress_file(&self.home);
+        let stamp = std::fs::metadata(&path).and_then(|m| m.modified()).ok();
+        let mut seen = self.lanes.borrow_mut();
+        if stamp == seen.stamp && seen.shown.is_empty() {
+            return;
+        }
+        // A file that is gone is an empty list; one that does not read whole is being written, and waits.
+        let items = match std::fs::read(&path) {
+            Ok(bytes) => match lanes::parse(&bytes) {
+                Some(items) => items,
+                None => return,
+            },
+            Err(_) => Vec::new(),
+        };
+        seen.stamp = stamp;
+        let ended = seen.watch.update(&items);
+        let running = lanes::running(&items).filter(|_| workspace::is_running(lanes::BUNDLE_ID));
+        let Some(notch) = self.notch.as_ref().and_then(Weak::upgrade) else {
+            return;
+        };
+        let key = running.map_or_else(String::new, percent_text);
+        if seen.shown != key {
+            let activity = running.map(|_| Activity {
+                left: self.lanes_ear(),
+                right: Ear::Text {
+                    text: key.clone(),
+                    tone: Tone::Blue,
+                },
+                detail: None,
+                page: None,
+                priority: RUNNING_PRIORITY,
+            });
+            notch.set_activity(LANES_SLOT, activity);
+            seen.shown = key;
+        }
+        if let Some((name, done)) = ended.into_iter().last() {
+            let (symbol, tone) = if done {
+                ("checkmark.circle.fill", Tone::Green)
+            } else {
+                ("exclamationmark.triangle.fill", Tone::Red)
+            };
+            super::islands::show_for(
+                &notch,
+                LANES_NOTICE_SLOT,
+                Activity {
+                    left: Ear::Symbol {
+                        name: symbol,
+                        tone,
+                        pulse: false,
+                    },
+                    right: Ear::Text {
+                        text: logic::short_name(&name),
+                        tone,
+                    },
+                    detail: None,
+                    page: None,
+                    priority: NOTICE_PRIORITY,
+                },
+                Some(NOTICE_SECONDS),
+            );
+        }
+    }
+
+    /// The icon of Lanes, or the download symbol when there is none to be had.
+    fn lanes_ear(&self) -> Ear {
+        let mut icon = self.lanes_icon.borrow_mut();
+        if icon.is_none() {
+            *icon = workspace::app_icon_png(lanes::BUNDLE_ID, 64.0).map(Arc::new);
+        }
+        icon.as_ref().map_or(
+            Ear::Symbol {
+                name: "arrow.down.circle.fill",
+                tone: Tone::Blue,
+                pulse: false,
+            },
+            |bytes| Ear::Artwork {
+                // The same picture each time, so that the notch does not draw it again.
+                id: 0x006c_616e_6573,
+                bytes: Arc::clone(bytes),
+            },
+        )
+    }
+
     /// The entry of the menu bar panel; it does something only when the clipboard holds a link.
     pub fn menu_entries(this: &Rc<Self>) -> Vec<Entry> {
         let (act, shown) = (this.me.clone(), this.me.clone());
@@ -523,6 +665,10 @@ mod tests {
         assert_eq!(config.quality, "best");
         assert!(!config.playlist);
         assert!(!config.net_merge, "net-merge waits to be asked for");
+        assert!(
+            config.lanes,
+            "Lanes shows its downloads, which costs nothing without it"
+        );
     }
 
     #[test]
@@ -533,6 +679,7 @@ mod tests {
             quality: "4k".into(),
             playlist: true,
             net_merge: true,
+            lanes: false,
         }
         .sanitized();
         assert_eq!(odd.quality, "best");
@@ -561,6 +708,7 @@ mod tests {
             !parsed.net_merge,
             "a file from before net-merge leaves it off"
         );
+        assert!(parsed.lanes, "a file from before Lanes shows its downloads");
     }
 
     #[test]

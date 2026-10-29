@@ -163,6 +163,15 @@ pub fn bundle_info(path: &Path) -> Option<(String, String)> {
     Some((id, name))
 }
 
+/// Whether an app with this bundle identifier is running, with a Dock icon or without one.
+pub fn is_running(bundle_id: &str) -> bool {
+    objc2_app_kit::NSRunningApplication::runningApplicationsWithBundleIdentifier(
+        &NSString::from_str(bundle_id),
+    )
+    .iter()
+    .any(|app| !app.isTerminated())
+}
+
 /// Apps with a Dock icon that are running now, without this one.
 pub fn running_apps() -> Vec<App> {
     let ours = std::process::id() as i32;

@@ -1,6 +1,6 @@
 // Video download: paste a link and yt-dlp, which you installed yourself, saves the video to your Downloads folder. The
 // state is under S.download; the progress comes with it every two seconds while the page is open, and the app checks every
-// link again.
+// link again. At the foot, Lanes, the download manager by the same author, and a switch for its downloads on the notch.
 (window.__plugins = window.__plugins || []).push({
   id: 'download',
   icon: 'arrow.down.circle.fill',
@@ -38,6 +38,14 @@
     'fault.download_off': 'Turn on Download videos first.',
     'fault.download_missing': 'yt-dlp is not installed. In Terminal, run: brew install yt-dlp',
     'fault.download_bad_url': 'That is not a link that starts with http:// or https://.',
+    'sec.download.lanes': 'Lanes',
+    'download.lanes.title': 'Lanes, a download manager',
+    'download.lanes.desc': 'Lanes, by the maker of Figghost, downloads any file over many connections at once and picks up where it stopped. Its extension takes over the downloads of Chrome, Edge and Brave and puts a button on the videos you watch, with a choice of resolution; YouTube goes through yt-dlp. Free and open source (MIT).',
+    'download.lanes.installed': 'Installed', 'download.lanes.running': 'Running',
+    'download.lanes.missing': 'Not installed', 'download.lanes.brew': 'With Homebrew: brew install --cask eliasbui/lanes/lanes',
+    'download.lanes.open': 'Open Lanes', 'download.lanes.get': 'Get Lanes',
+    'download.lanes.notch.title': 'Show Lanes downloads on the notch',
+    'download.lanes.notch.desc': 'While Lanes downloads, the closed notch shows its icon and the share done, then a short notice when a download finishes or fails. Figghost only reads the list Lanes keeps for its extension. It works with Download videos off.',
   },
   vi: {
     'nav.download': 'Tải video', 'page.download': 'Tải video',
@@ -73,6 +81,14 @@
     'fault.download_off': 'Hãy bật Tải video trước.',
     'fault.download_missing': 'Chưa cài yt-dlp. Trong Terminal, chạy: brew install yt-dlp',
     'fault.download_bad_url': 'Đó không phải link bắt đầu bằng http:// hoặc https://.',
+    'sec.download.lanes': 'Lanes',
+    'download.lanes.title': 'Lanes, trình quản lý tải xuống',
+    'download.lanes.desc': 'Lanes, của cùng tác giả Figghost, tải mọi loại tệp qua nhiều kết nối cùng lúc và tải tiếp từ chỗ đã dừng. Tiện ích của nó nhận các lượt tải của Chrome, Edge và Brave, và thêm nút tải lên video bạn đang xem, có chọn độ phân giải; YouTube đi qua yt-dlp. Miễn phí và mã nguồn mở (MIT).',
+    'download.lanes.installed': 'Đã cài', 'download.lanes.running': 'Đang chạy',
+    'download.lanes.missing': 'Chưa cài', 'download.lanes.brew': 'Với Homebrew: brew install --cask eliasbui/lanes/lanes',
+    'download.lanes.open': 'Mở Lanes', 'download.lanes.get': 'Tải Lanes',
+    'download.lanes.notch.title': 'Hiện lượt tải của Lanes trên notch',
+    'download.lanes.notch.desc': 'Khi Lanes đang tải, notch đóng hiện biểu tượng của nó và phần trăm đã tải, rồi một thông báo ngắn khi một lượt tải xong hoặc lỗi. Figghost chỉ đọc danh sách Lanes giữ cho tiện ích của nó. Vẫn chạy khi Tải video tắt.',
   },
   build() {
     const dl = () => S.download;
@@ -195,6 +211,20 @@
       clear.disabled = !jobs.some((j) => j.status === 'done' || j.status === 'failed' || j.status === 'cancelled');
     });
 
+    // Lanes: what it is, a way to it, and its downloads on the notch, none of which needs this feature on -----------
+    const lanesState = h('span', { class: 'download-state' });
+    const lanesOpen = button(t('download.lanes.open'), () => act('lanes_open'), { small: true });
+    const lanesGet = button(t('download.lanes.get'), () => act('lanes_get'), { small: true, icon: 'arrow.down.circle.fill' });
+    const lanesRow = row(t('download.lanes.title'), t('download.lanes.desc'), h('div', { class: 'download-folder' }, lanesState, lanesOpen, lanesGet));
+    reg(() => {
+      const d = dl();
+      lanesRow.dataset.state = d.lanes_installed ? 'ready' : 'missing';
+      lanesRow.querySelector('.row-desc').textContent = t('download.lanes.desc') + (d.lanes_installed ? '' : ' ' + t('download.lanes.brew'));
+      lanesState.textContent = t(d.lanes_running ? 'download.lanes.running' : d.lanes_installed ? 'download.lanes.installed' : 'download.lanes.missing');
+      lanesOpen.hidden = !d.lanes_installed;
+      lanesGet.hidden = d.lanes_installed;
+    });
+
     return [
       card(toggleRow('download.enabled', t('download.enable.title'), t('download.enable.desc'))),
       sectionTitle(t('sec.download.tools')),
@@ -208,6 +238,8 @@
       card(toggleRow('download.net_merge', t('download.net.title'), t('download.net.desc'), { when: on }), nets),
       sectionTitle(t('sec.download.list')),
       card(box, h('div', { class: 'download-toolbar' }, clear)),
+      sectionTitle(t('sec.download.lanes')),
+      card(lanesRow, toggleRow('download.lanes', t('download.lanes.notch.title'), t('download.lanes.notch.desc'))),
     ];
   },
   selftest({ expect, go, sent, S }) {
@@ -218,7 +250,7 @@
     go('download');
     const page = document.querySelector('#scroller');
     const btn = (label) => [...page.querySelectorAll('.btn')].find((b) => b.textContent === label);
-    expect(page.querySelectorAll('.switch').length === 3, 'download: one switch for the feature, one for playlists and one for net-merge');
+    expect(page.querySelectorAll('.switch').length === 4, 'download: one switch for the feature, one for playlists, one for net-merge and one for Lanes');
     expect(page.textContent.includes(t('download.ytdlp.found', { version: '2026.08.19' })), 'download: the version of yt-dlp is shown');
     expect(page.textContent.includes('brew install ffmpeg'), 'download: a missing ffmpeg says what it costs and how to install it');
     sent.length = 0;
@@ -319,6 +351,26 @@
     S.download.ytdlp = was; runSyncs();
     S.download.enabled = false; runSyncs();
     expect(btn(t('download.go')).disabled, 'download: no link can be sent while the feature is off');
+
+    // Lanes: Get Lanes while it is not installed, Open Lanes once it is, and its switch works with the feature off.
+    const lanesSwitch = page.querySelector('.switch[data-path="download.lanes"]');
+    expect(!lanesSwitch.closest('.row').classList.contains('disabled'), 'download: the Lanes switch is not held by the feature being off');
+    sent.length = 0;
+    lanesSwitch.click();
+    expect(sent.some((m) => m.t === 'set' && m.path === 'download.lanes' && m.value === false), 'download: the Lanes switch sends its setting: ' + JSON.stringify(sent));
+    lanesSwitch.click();
+    expect(page.textContent.includes('brew install --cask eliasbui/lanes/lanes'), 'download: Lanes not installed says how to get it');
+    expect(!btn(t('download.lanes.get')).hidden && btn(t('download.lanes.open')).hidden, 'download: only Get Lanes while it is not installed');
+    sent.length = 0;
+    btn(t('download.lanes.get')).click();
+    expect(sent.some((m) => m.name === 'lanes_get'), 'download: Get Lanes asks the app to open its page: ' + JSON.stringify(sent));
+    S.download.lanes_installed = true; S.download.lanes_running = true; runSyncs();
+    expect(btn(t('download.lanes.get')).hidden && !btn(t('download.lanes.open')).hidden, 'download: only Open Lanes once it is installed');
+    expect(page.textContent.includes(t('download.lanes.running')), 'download: a running Lanes says so');
+    sent.length = 0;
+    btn(t('download.lanes.open')).click();
+    expect(sent.some((m) => m.name === 'lanes_open'), 'download: Open Lanes asks the app to open it: ' + JSON.stringify(sent));
+    S.download.lanes_installed = false; S.download.lanes_running = false;
     S.download.enabled = true; runSyncs();
   },
 });
