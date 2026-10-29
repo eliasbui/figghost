@@ -465,7 +465,9 @@
     return out.map((x) => ({ ...x, share: x.size / whole }));
   }
 
-  const PALETTE = ['#5e5ce6', '#0a84ff', '#64d2ff', '#30d158', '#a3d93b', '#ffd60a', '#ff9f0a', '#ff6b35', '#ff375f', '#bf5af2', '#ac8e68'];
+  // Shades of the accent, from the full colour to a pale one mixed with white, as the rest of the window has no other
+  // colour; white keeps the pale ones bright on the dark theme.
+  const PALETTE = [100, 86, 74, 62, 52, 43, 35].map((n) => `color-mix(in srgb, var(--tint) ${n}%, #ffffff)`);
   const R_OUT = 90;
   const R_IN = 58;
   const point = (r, turn) => (100 + r * Math.sin(turn * 2 * Math.PI)).toFixed(2) + ' ' + (100 - r * Math.cos(turn * 2 * Math.PI)).toFixed(2);

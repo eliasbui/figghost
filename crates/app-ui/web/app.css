@@ -845,7 +845,7 @@ html.reduce-motion *::after {
     --side: #2b2b2e;
     --side-edge: rgba(255, 255, 255, 0.08);
     --side-shadow: 0 2px 12px rgba(0, 0, 0, 0.35);
-    --group: rgba(255, 255, 255, 0.05);
+    --group: #262628;
     --group-edge: rgba(255, 255, 255, 0.07);
     --stroke: rgba(255, 255, 255, 0.07);
     --hover: rgba(255, 255, 255, 0.06);
@@ -919,9 +919,8 @@ html.reduce-motion *::after {
 .result { display: flex; align-items: center; gap: 9px; flex: none; height: 38px; padding: 0 8px; border: 0; border-radius: 8px; background: transparent; text-align: left; }
 .result:hover { background: var(--hover); }
 .result[aria-selected="true"] { background: var(--tint); color: #ffffff; }
-.result[aria-selected="true"] .pico, .result[aria-selected="true"] .result-name { color: #ffffff; }
+.result[aria-selected="true"] .result-name { color: #ffffff; }
 .result[aria-selected="true"] .result-cat { color: rgba(255, 255, 255, 0.8); }
-.result .pico { width: 18px; height: 18px; }
 .result-text { display: flex; flex: 1; flex-direction: column; min-width: 0; }
 .result-name { overflow: hidden; color: var(--text); font-size: 13px; text-overflow: ellipsis; white-space: nowrap; }
 .result-cat { overflow: hidden; color: var(--text-2); font-size: 11px; text-overflow: ellipsis; white-space: nowrap; }
@@ -972,20 +971,31 @@ html.reduce-motion *::after {
 }
 .nav-item:hover:not([aria-current="page"]) { background: var(--hover); }
 .nav-item[aria-current="page"] { background: var(--tint); color: #ffffff; }
-.nav-item[aria-current="page"] .pico { color: #ffffff; }
 .nav-label { flex: 1; min-width: 0; overflow: hidden; text-overflow: ellipsis; white-space: nowrap; }
 .nav-off { flex: none; color: var(--text-2); font-size: 11px; }
 .nav-off[hidden] { display: none; }
 .nav-item[aria-current="page"] .nav-off { color: rgba(255, 255, 255, 0.75); }
 /* In a window that is not in front, the selection turns grey, as in any Mac sidebar. */
 html.inactive .nav-item[aria-current="page"], html.inactive .me[aria-current="page"] { background: var(--selection-idle); color: var(--text); }
-html.inactive .nav-item[aria-current="page"] .pico { color: var(--tint); }
 html.inactive .me[aria-current="page"] .me-status, html.inactive .nav-item[aria-current="page"] .nav-off { color: var(--text-2); }
 
-/* PAGE ICONS: the glyph of a page in one colour, the accent's. */
-.pico { display: inline-grid; flex: none; place-items: center; width: 16px; height: 16px; color: var(--tint); }
-.pico svg { width: 100%; height: 100%; }
-.pico .glyph { width: 100%; height: 100%; }
+/* PAGE ICONS: the glyph of a page in white on a squircle of the accent, lit from above as the system's own icons
+   are: lighter at the top, a fine highlight on the upper edge, a hairline, and a shadow half a point deep. */
+.pico {
+  display: inline-grid;
+  flex: none;
+  place-items: center;
+  width: 20px;
+  height: 20px;
+  border-radius: 5.5px;
+  color: #ffffff;
+  background: linear-gradient(180deg, color-mix(in srgb, var(--tint) 80%, #ffffff), var(--tint) 55%, color-mix(in srgb, var(--tint) 90%, #000000));
+  box-shadow: inset 0 0.5px 0 rgba(255, 255, 255, 0.4), inset 0 0 0 0.5px rgba(0, 0, 0, 0.12), 0 0.5px 1px rgba(0, 0, 0, 0.18);
+}
+.pico svg { width: 14px; height: 14px; filter: drop-shadow(0 0.5px 0.5px rgba(0, 0, 0, 0.2)); }
+.pico .glyph { width: 13px; height: 13px; }
+/* On the selected row the tile keeps a white edge, so it does not melt into the accent around it. */
+.nav-item[aria-current="page"] .pico, .result[aria-selected="true"] .pico { box-shadow: 0 0 0 1px rgba(255, 255, 255, 0.6), 0 0.5px 1px rgba(0, 0, 0, 0.18); }
 
 /* MAIN: a toolbar with the history and the name of the page, then the page. */
 #main { position: relative; display: flex; flex-direction: column; min-width: 0; min-height: 0; }
@@ -1017,7 +1027,6 @@ html.inactive .me[aria-current="page"] .me-status, html.inactive .nav-item[aria-
 .row-desc.clamp { display: -webkit-box; overflow: hidden; -webkit-box-orient: vertical; -webkit-line-clamp: 2; }
 .row-desc.clamp.open { display: block; }
 .more { padding: 0; border: 0; background: none; color: var(--tint); font-size: 11px; }
-.row > .pico { width: 16px; height: 16px; }
 .row-control .row-title { color: var(--text-2); }
 /* A state is said in words, in its colour: green for what is done, orange for what still needs doing. */
 .chip { height: auto; padding: 0; border: 0; background: none; color: var(--text-2); font-size: 12px; }
@@ -1036,8 +1045,9 @@ html.inactive .me[aria-current="page"] .me-status, html.inactive .nav-item[aria-
 .page-hero + .card { margin-top: 10px; }
 .page-hero .row-text { flex: 1; min-width: 0; }
 .page-hero .row-title { font-weight: 600; }
-.head-icon { width: 38px; height: 38px; border-radius: 9px; background: var(--tint); color: #ffffff; }
-.head-icon svg, .head-icon .glyph { width: 22px; height: 22px; }
+.head-icon { width: 38px; height: 38px; border-radius: 9px; box-shadow: inset 0 0.5px 0 rgba(255, 255, 255, 0.4), inset 0 0 0 0.5px rgba(0, 0, 0, 0.12), 0 1px 2.5px rgba(0, 0, 0, 0.2); }
+.head-icon svg { width: 24px; height: 24px; filter: drop-shadow(0 0.5px 1px rgba(0, 0, 0, 0.22)); }
+.head-icon .glyph { width: 22px; height: 22px; }
 .head-app { flex: none; width: 40px; height: 40px; }
 
 /* The features on General: the switch turns one on and off, the name opens its page. */
@@ -1090,6 +1100,10 @@ input[type="range"] { width: 160px; }
 .page-foot { display: flex; justify-content: flex-end; margin-top: 14px; }
 .sheet-scrim { position: fixed; inset: 0; z-index: 30; background: var(--scrim); }
 .sheet-scrim[hidden] { display: none; }
+/* The sheet comes down from the toolbar as the system's sheets do, briefly; under Reduce motion it is simply there. */
+.sheet-scrim:not([hidden]) { animation: fade 160ms ease-out; }
+.sheet-scrim:not([hidden]) .sheet { animation: sheet-in 240ms cubic-bezier(0.22, 1, 0.36, 1); }
+@keyframes sheet-in { from { opacity: 0; transform: translate(-50%, -12px) scale(0.98); } }
 .sheet {
   position: absolute;
   top: 52px;
@@ -1111,7 +1125,7 @@ input[type="range"] { width: 160px; }
 .found { box-shadow: inset 0 0 0 2px var(--tint); border-radius: 8px; transition: box-shadow 0.4s var(--ease-out); }
 
 html.increase-contrast .card, html.increase-contrast .page-hero, html.increase-contrast #sidebar, html.increase-contrast .sheet { box-shadow: 0 0 0 1px var(--stroke); }
-html.increase-contrast .pico { box-shadow: none; }
+html.increase-contrast .pico { background: var(--tint); box-shadow: inset 0 0 0 1px rgba(0, 0, 0, 0.45); }
 html.increase-contrast .switch:not([aria-checked="true"]) { box-shadow: inset 0 0 0 1px var(--boundary); }
 
 /* STYLE CARDS: the looks of the volume indicator and the music widget, each with a small picture. */
@@ -1158,7 +1172,7 @@ html.increase-contrast .switch:not([aria-checked="true"]) { box-shadow: inset 0 
 /* The limits of one Orca account on the AI agents page: the window, a bar, the share used and when it starts over. */
 .acct-limit { display: grid; grid-template-columns: 56px minmax(60px, 1fr) 40px minmax(0, 150px); align-items: center; gap: 8px; margin-top: 6px; color: var(--text-2); font-size: var(--fs-small); }
 .acct-bar { height: 6px; border-radius: 3px; background: var(--track); overflow: hidden; }
-.acct-bar i { display: block; height: 100%; border-radius: 3px; background: var(--accent); }
+.acct-bar i { display: block; height: 100%; border-radius: 3px; background: var(--tint); }
 .acct-bar.warn i { background: var(--warn); }
 .acct-bar.bad i { background: var(--bad); }
 .acct-value { color: var(--text); font-weight: 600; text-align: right; font-variant-numeric: tabular-nums; }

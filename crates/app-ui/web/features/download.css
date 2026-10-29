@@ -17,7 +17,7 @@
 .download-item[data-status="done"] .download-note { color: var(--good); }
 .download-bar { display: block; height: 4px; margin-top: 5px; border-radius: 999px; background: var(--field); overflow: hidden; }
 .download-bar[hidden] { display: none; }
-.download-bar > span { display: block; height: 100%; border-radius: 999px; background: var(--accent); transition: width 0.3s; }
+.download-bar > span { display: block; height: 100%; border-radius: 999px; background: var(--tint); transition: width 0.3s; }
 .download-tools { display: flex; gap: 6px; flex: none; }
 .download-tools .btn[hidden], .download-folder .btn[hidden] { display: none; }
 .download-toolbar { display: flex; justify-content: flex-end; padding: 8px var(--row-inset); border-top: 0.5px solid var(--stroke); }

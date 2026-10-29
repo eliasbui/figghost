@@ -1,6 +1,6 @@
 /* Music widget style cards: a small glass slab drawn the way the widget lays out */
 .mw-cards { grid-template-columns: repeat(5, minmax(0, 1fr)); }
-.mw-art { display: block; background: var(--well); }
+.mw-art { display: block; background: linear-gradient(135deg, color-mix(in srgb, var(--tint) 55%, var(--group)), color-mix(in srgb, var(--tint) 18%, var(--group))); }
 .mw-art i { position: absolute; display: block; background: color-mix(in srgb, var(--text) 38%, transparent); border-radius: 3px; }
 .mw-art .mw-cover { background: color-mix(in srgb, var(--text) 52%, transparent); }
 .mw-art .mw-bar { height: 3px; background: color-mix(in srgb, var(--text) 30%, transparent); }

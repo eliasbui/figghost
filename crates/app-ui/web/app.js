@@ -1015,6 +1015,14 @@ function pageGeneral() {
 // -- scrolling ------------------------------------------------------
 
 function cssVar(name) { return getComputedStyle(document.documentElement).getPropertyValue(name).trim(); }
+/** The colour a CSS variable resolves to, for a canvas, which does not know keywords such as the system's accent. */
+function cssColor(name) {
+  const probe = h('span', { style: `color:var(${name})` });
+  document.body.append(probe);
+  const color = getComputedStyle(probe).color;
+  probe.remove();
+  return color;
+}
 
 const PRESETS = {
   precise: { step_px: 28, speed: 0.9, duration_ms: 220 },
@@ -1061,7 +1069,7 @@ function scrollPad() {
     const bar = w / 60;
     deltas.forEach((d, i) => {
       const bh = (d / peak) * (hgt - 8);
-      ctx.fillStyle = cssVar('--accent');
+      ctx.fillStyle = cssColor('--tint');
       ctx.globalAlpha = 0.35 + 0.65 * (i / deltas.length);
       ctx.fillRect(i * bar + 1, hgt - 4 - bh, Math.max(1, bar - 2), bh);
     });
