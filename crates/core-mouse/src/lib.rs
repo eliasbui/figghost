@@ -28,9 +28,13 @@ pub enum ScrollSource {
     Trackpad,
     /// Notched wheel: line-based, no phases.
     Mouse,
-    /// Pixel-based without phases: high-resolution wheel drivers or another app's synthetic scrolling.
+    /// Pixel-based without phases: high-resolution wheel drivers.
     PixelWheel,
     SelfGenerated,
+    /// Posted by another app, such as a remote desktop host. Remote hosts take any event that is not their own for
+    /// someone at the machine and lock the remote side out for a while (Chrome Remote Desktop: two seconds after
+    /// each one), so a wheel of theirs swallowed and glided under this app's name freezes the session.
+    OtherApp,
 }
 
 /// The event fields every decision depends on, copied out of the CGEvent.
@@ -40,6 +44,8 @@ pub struct RawScroll {
     pub phase: i64,
     pub momentum_phase: i64,
     pub user_data: i64,
+    /// The process that posted the event; 0 for the hardware.
+    pub pid: i64,
     pub flags: u64,
     /// Line deltas, `[horizontal, vertical]`.
     pub lines: [i64; 2],
@@ -54,6 +60,7 @@ impl RawScroll {
             phase: event.int(field::SCROLL_PHASE),
             momentum_phase: event.int(field::SCROLL_MOMENTUM_PHASE),
             user_data: event.int(field::SOURCE_USER_DATA),
+            pid: event.int(field::SOURCE_UNIX_PROCESS_ID),
             flags: event.flags(),
             lines: [
                 event.int(field::SCROLL_DELTA_AXIS_2),
@@ -70,6 +77,8 @@ impl RawScroll {
 pub fn classify(raw: &RawScroll) -> ScrollSource {
     if raw.user_data == SELF_TAG {
         ScrollSource::SelfGenerated
+    } else if raw.pid != 0 {
+        ScrollSource::OtherApp
     } else if raw.phase != 0 || raw.momentum_phase != 0 {
         ScrollSource::Trackpad
     } else if raw.continuous {
@@ -106,7 +115,10 @@ const MODIFIER_FLAGS: u64 = SHIFT | CONTROL | OPTION | COMMAND;
 
 pub fn decide(settings: &Settings, frontmost: &str, raw: &RawScroll) -> Action {
     let source = classify(raw);
-    if matches!(source, ScrollSource::Trackpad | ScrollSource::SelfGenerated) {
+    if matches!(
+        source,
+        ScrollSource::Trackpad | ScrollSource::SelfGenerated | ScrollSource::OtherApp
+    ) {
         return Action::Pass;
     }
     let (smooth, reverse) = settings.effective(frontmost);
@@ -650,6 +662,28 @@ mod tests {
             ..RawScroll::default()
         };
         assert_eq!(decide(&on, "app", &pixel), Action::Zoom { zoom_in: false });
+    }
+
+    #[test]
+    fn another_apps_wheel_is_left_alone() {
+        let remote = RawScroll {
+            pid: 4242,
+            continuous: true,
+            points: [0.0, -12.0],
+            ..RawScroll::default()
+        };
+        assert_eq!(classify(&remote), ScrollSource::OtherApp);
+        let reversed = Settings {
+            reverse: true,
+            command_zoom: true,
+            ..Settings::default()
+        };
+        assert_eq!(decide(&reversed, "app", &remote), Action::Pass);
+        let zoom = RawScroll {
+            flags: COMMAND,
+            ..remote
+        };
+        assert_eq!(decide(&reversed, "app", &zoom), Action::Pass);
     }
 
     #[test]

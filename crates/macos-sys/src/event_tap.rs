@@ -28,6 +28,8 @@ pub const fn mask(event_type: u32) -> u64 {
 
 /// `CGEventField` ids used by the scroll engine (CGEventTypes.h).
 pub mod field {
+    /// The process that posted the event; 0 for the hardware.
+    pub const SOURCE_UNIX_PROCESS_ID: u32 = 41;
     pub const SOURCE_USER_DATA: u32 = 42;
     pub const SCROLL_DELTA_AXIS_1: u32 = 11;
     pub const SCROLL_DELTA_AXIS_2: u32 = 12;
