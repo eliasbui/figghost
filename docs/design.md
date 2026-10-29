@@ -21,7 +21,7 @@ Until 2.1.17 the window was "the ghost's world": a sky that followed the hour, h
 
 - `crates/app-ui/web/app.css`: the base part (the system's metrics and the plain controls) and the "macOS forms" layer on top of it, each with its tokens at its top.
 - `crates/app-ui/web/app.js`: `NAV`, `TAB_PAGES` and `ADVANCED`; `pageHead`, `tidy`, `featureList`, `meBlock` and `renderNavItems`; the symbols of the pages in `PAGE_SYMBOLS` (each also listed in `SYMBOLS` of `src/settings/page.rs`, which draws them).
-- Liquid Glass: on macOS 26 the whole window is the system's glass, tinted with the window's own colour, and every `[data-glass]` the page reports (`placeGlass` in `app.js`) is a pane of glass laid over it and under the page (`lay_glass` in `crates/macos-sys/src/webview.rs`): the sidebar and the toolbar's capsules (back and forward, the search). The groups stay solid, so what is read never sits on glass. The page leaves the glass clear; on an older system, in a preview or under Reduce transparency it paints a solid window itself.
+- Liquid Glass: on macOS 26 the whole window is the system's glass under a veil of the window's own colour (`VEIL` in `webview.rs`, 0.8 of the way to solid, so what is behind the window only shows faintly and the page stays easy to read), and every `[data-glass]` the page reports (`placeGlass` in `app.js`) is a pane of glass laid over it and under the page (`lay_glass` in `crates/macos-sys/src/webview.rs`): the sidebar and the toolbar's capsules (back and forward, the search). The groups stay solid, so what is read never sits on glass. The page leaves the glass clear; on an older system, in a preview or under Reduce transparency it paints a solid window itself.
 
 ## Looking at it
 

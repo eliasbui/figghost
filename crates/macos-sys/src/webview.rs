@@ -13,15 +13,15 @@ use objc2::{
 use objc2_app_kit::{
     NSAppearance, NSAppearanceCustomization, NSAppearanceNameAqua, NSAppearanceNameDarkAqua,
     NSApplication, NSAutoresizingMaskOptions, NSBackingStoreType, NSBitmapImageFileType,
-    NSBitmapImageRep, NSColor, NSEvent, NSEventMask, NSEventType, NSGlassEffectView,
-    NSGlassEffectViewStyle, NSImage, NSPanel, NSScreen, NSStatusWindowLevel, NSView,
-    NSVisualEffectBlendingMode, NSVisualEffectMaterial, NSVisualEffectState, NSVisualEffectView,
-    NSWindow, NSWindowDelegate, NSWindowOrderingMode, NSWindowStyleMask, NSWindowTitleVisibility,
-    NSWorkspace,
+    NSBitmapImageRep, NSBox, NSBoxType, NSColor, NSEvent, NSEventMask, NSEventType,
+    NSGlassEffectView, NSGlassEffectViewStyle, NSImage, NSPanel, NSScreen, NSStatusWindowLevel,
+    NSTitlePosition, NSView, NSVisualEffectBlendingMode, NSVisualEffectMaterial,
+    NSVisualEffectState, NSVisualEffectView, NSWindow, NSWindowDelegate, NSWindowOrderingMode,
+    NSWindowStyleMask, NSWindowTitleVisibility, NSWorkspace,
 };
 use objc2_foundation::{
-    NSDictionary, NSError, NSNotification, NSNumber, NSObject, NSObjectProtocol, NSPoint, NSRect,
-    NSSize, NSString, NSURL,
+    NSArray, NSDictionary, NSError, NSNotification, NSNumber, NSObject, NSObjectProtocol, NSPoint,
+    NSRect, NSSize, NSString, NSURL,
 };
 use objc2_web_kit::{
     WKNavigationAction, WKNavigationActionPolicy, WKNavigationDelegate, WKNavigationType,
@@ -346,6 +346,41 @@ fn glass_background(
     (Retained::into_super(effect), None)
 }
 
+/// How much of the window's colour lies over its glass, from 0 (clear glass) to 1 (a plain window).
+const VEIL: f64 = 0.8;
+
+/// The colour of the settings page's window (`--canvas` of app.css, light and dark) at `VEIL`, asked again for each
+/// appearance. The system's window colour does not fill a box on macOS 26, and a colour made see-through once keeps
+/// the appearance it was made in.
+fn veil_color() -> Retained<NSColor> {
+    let provider = RcBlock::new(|appearance: NonNull<NSAppearance>| -> NonNull<NSColor> {
+        // SAFETY: AppKit passes a live appearance for the length of the call; the names are process-lifetime
+        // constants.
+        let dark = unsafe {
+            let names = NSArray::from_slice(&[NSAppearanceNameAqua, NSAppearanceNameDarkAqua]);
+            appearance
+                .as_ref()
+                .bestMatchFromAppearancesWithNames(&names)
+                .is_some_and(|name| &*name == NSAppearanceNameDarkAqua)
+        };
+        let (r, g, b) = if dark {
+            (0x1c, 0x1c, 0x1e)
+        } else {
+            (0xef, 0xef, 0xf2)
+        };
+        let color = NSColor::colorWithSRGBRed_green_blue_alpha(
+            f64::from(r) / 255.0,
+            f64::from(g) / 255.0,
+            f64::from(b) / 255.0,
+            VEIL,
+        );
+        // AppKit takes the colour without owning it, so it lives on in the autorelease pool.
+        NonNull::new(Retained::autorelease_return(color)).expect("a colour")
+    });
+    // SAFETY: the provider is a block of the expected signature that AppKit may call on any appearance change.
+    unsafe { NSColor::colorWithName_dynamicProvider(None, &provider) }
+}
+
 /// The root the web view moved to and the panes of glass on it, once the page has asked for them.
 #[derive(Default)]
 struct GlassBed {
@@ -386,19 +421,24 @@ fn lay_glass(
         if let Some(old) = &old {
             if let Some(glass) = old.downcast_ref::<NSGlassEffectView>() {
                 glass.setContentView(None);
-                // The window's own colour, light or dark with it, half through, so the page's groups sit on glass of
-                // the window's tone rather than on whatever is behind it.
-                glass.setTintColor(Some(
-                    &NSColor::windowBackgroundColor().colorWithAlphaComponent(0.6),
-                ));
             }
             window.setContentView(Some(&root));
-            old.setFrame(root.bounds());
-            old.setAutoresizingMask(
-                NSAutoresizingMaskOptions::ViewWidthSizable
-                    | NSAutoresizingMaskOptions::ViewHeightSizable,
-            );
-            root.addSubview(old);
+            // Over the glass, most of the way to solid, the window's own colour (a box draws its fill again when
+            // the appearance changes): what is behind the window only shows faintly, so the page reads as easily
+            // as on a plain window. The panes sit on top of it.
+            let veil = NSBox::initWithFrame(mtm.alloc(), root.bounds());
+            veil.setBoxType(NSBoxType::Custom);
+            veil.setTitlePosition(NSTitlePosition::NoTitle);
+            veil.setBorderWidth(0.0);
+            veil.setFillColor(&veil_color());
+            for view in [&**old, &*veil] {
+                view.setFrame(root.bounds());
+                view.setAutoresizingMask(
+                    NSAutoresizingMaskOptions::ViewWidthSizable
+                        | NSAutoresizingMaskOptions::ViewHeightSizable,
+                );
+                root.addSubview(view);
+            }
         } else {
             window.setContentView(Some(&root));
         }
