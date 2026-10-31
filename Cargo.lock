@@ -19,7 +19,7 @@ dependencies = [
 
 [[package]]
 name = "app-ui"
-version = "2.2.11"
+version = "2.2.12"
 dependencies = [
  "core-agents",
  "core-audio-fx",
@@ -289,7 +289,7 @@ dependencies = [
 
 [[package]]
 name = "core-agents"
-version = "2.2.11"
+version = "2.2.12"
 dependencies = [
  "rusqlite",
  "serde",
@@ -299,19 +299,19 @@ dependencies = [
 
 [[package]]
 name = "core-audio-fx"
-version = "2.2.11"
+version = "2.2.12"
 
 [[package]]
 name = "core-calendar"
-version = "2.2.11"
+version = "2.2.12"
 
 [[package]]
 name = "core-capture"
-version = "2.2.11"
+version = "2.2.12"
 
 [[package]]
 name = "core-clipboard"
-version = "2.2.11"
+version = "2.2.12"
 dependencies = [
  "rusqlite",
  "serde_json",
@@ -359,7 +359,7 @@ dependencies = [
 
 [[package]]
 name = "core-jarvis"
-version = "2.2.11"
+version = "2.2.12"
 dependencies = [
  "core-smart",
  "serde",
@@ -368,14 +368,14 @@ dependencies = [
 
 [[package]]
 name = "core-lyrics"
-version = "2.2.11"
+version = "2.2.12"
 dependencies = [
  "serde_json",
 ]
 
 [[package]]
 name = "core-mouse"
-version = "2.2.11"
+version = "2.2.12"
 dependencies = [
  "macos-sys",
  "serde",
@@ -384,7 +384,7 @@ dependencies = [
 
 [[package]]
 name = "core-netcontrol"
-version = "2.2.11"
+version = "2.2.12"
 dependencies = [
  "core-netmerge",
  "libc",
@@ -392,7 +392,7 @@ dependencies = [
 
 [[package]]
 name = "core-netmerge"
-version = "2.2.11"
+version = "2.2.12"
 dependencies = [
  "libc",
  "socket2",
@@ -401,25 +401,25 @@ dependencies = [
 
 [[package]]
 name = "core-notes"
-version = "2.2.11"
+version = "2.2.12"
 
 [[package]]
 name = "core-smart"
-version = "2.2.11"
+version = "2.2.12"
 dependencies = [
  "serde_json",
 ]
 
 [[package]]
 name = "core-typing"
-version = "2.2.11"
+version = "2.2.12"
 dependencies = [
  "gonhanh-core",
 ]
 
 [[package]]
 name = "core-window"
-version = "2.2.11"
+version = "2.2.12"
 
 [[package]]
 name = "cpufeatures"
@@ -735,7 +735,7 @@ dependencies = [
 
 [[package]]
 name = "figghost-desktop"
-version = "2.2.11"
+version = "2.2.12"
 dependencies = [
  "arboard",
  "auto-launch",
@@ -1603,7 +1603,7 @@ checksum = "f9f8bd3e56ce4dfc153cf470fffbfa98c7620958b312ca5c3a4b8d5181fd13c6"
 
 [[package]]
 name = "macos-sys"
-version = "2.2.11"
+version = "2.2.12"
 dependencies = [
  "block2",
  "core-calendar",
@@ -1769,7 +1769,7 @@ dependencies = [
 
 [[package]]
 name = "nowplaying-adapter"
-version = "2.2.11"
+version = "2.2.12"
 dependencies = [
  "block2",
  "dispatch2",
