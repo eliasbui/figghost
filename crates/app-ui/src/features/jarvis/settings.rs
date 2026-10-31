@@ -1,7 +1,7 @@
 //! This feature's part of the settings model: the JSON the page renders and the changes it may make.
 //! Pure data with no AppKit, so every rule is covered by plain unit tests.
 
-use super::{Config, Provider, Spoken, codex_status, forget_key, has_key, store_key, valid_model};
+use super::{Config, Provider, Spoken, codex_account, codex_status, forget_key, has_key, store_key, valid_model};
 use crate::{config::parse_hotkey, settings::model::Fault};
 use serde_json::{Value, json};
 
@@ -17,8 +17,9 @@ pub fn state(config: &Config, runtime: &Value) -> Value {
         "default_model": config.provider.default_model(),
         "needs_key": config.provider.needs_key(),
         "key": has_key(config.provider),
-        // Only the provider that has one is looked at, so that a sign-in file is never read for nothing.
+        // Only the provider that has one is looked at, so that the Keychain is never read for nothing.
         "signin": if config.provider == Provider::Codex { codex_status() } else { "" },
+        "account": if config.provider == Provider::Codex { codex_account() } else { json!({ "email": "", "plan": "", "error": "" }) },
         "voice": config.voice,
         "language": match config.language {
             Spoken::Auto => "auto",
@@ -118,7 +119,8 @@ mod tests {
         assert_eq!(s["enabled"], json!(false));
         assert_eq!(s["provider"], json!("anthropic"));
         assert_eq!(s["needs_key"], json!(true));
-        assert_eq!(s["signin"], json!(""), "no sign-in file is read for a provider that has none");
+        assert_eq!(s["signin"], json!(""), "no sign-in is read for a provider that has none");
+        assert_eq!(s["account"]["email"], json!(""));
         assert_eq!(s["model"], json!(""));
         assert_ne!(s["default_model"], json!(""));
         assert_eq!(s["voice"], json!(true), "it listens and speaks unless told not to");

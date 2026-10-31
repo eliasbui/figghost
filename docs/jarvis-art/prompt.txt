@@ -1,0 +1,21 @@
+Use your image generation tool to create ONE image and save it in the current folder as jarvis-sheet.png. Do not create or edit any other file.
+
+The image is a pixel-art sprite sheet for a small original character named Jarvis, a voice assistant: a round floating robot head (like a small orb) with a dark glass visor showing two glowing cyan eyes, a short antenna with a light on top, a light grey and white body. No text, no letters, no logos, no resemblance to any existing film or game character.
+
+Layout: exactly 12 sprites of the same character at the same size, in a grid of 4 columns and 3 rows, each sprite well separated from the others with plain empty space, on a single flat solid pure-black (#000000) background. Nothing touches the edge of the image. Crisp hard-edged pixels, no anti-aliasing, no gradients, no shadows, no glow halos outside the body, a limited palette of about 8 colours (PICO-8 style). Each sprite is about 40 art pixels wide.
+
+Order, left to right then top to bottom:
+1 idle, eyes open, looking ahead
+2 blink, eyes closed as two short lines
+3 looking left
+4 looking right
+5 listening: eyes wide, antenna light bright cyan
+6 talking, mouth line under the eyes open (a small oval)
+7 talking, mouth half open
+8 happy, eyes as upward arcs
+9 thinking: eyes looking up, antenna light yellow
+10 sad or error: eyes as small x shapes, antenna light red
+11 waving hello with a small hand at the side, hand up
+12 waving hello, hand lower
+
+Reply only with the file name when done.

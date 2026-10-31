@@ -5,6 +5,7 @@
 
 use crate::{
     app,
+    mascot::Sheet,
     panel::{FigPanel, Key},
     style::{self, Tone, Weight, white},
     widgets::{Fit, draw_text, text_attributes, view_png},
@@ -38,8 +39,13 @@ const DISC_RADIUS: f64 = 26.0;
 /// The round button at the right end of the line to type in, which starts and stops listening.
 const MIC: NSPoint = NSPoint::new(SIZE.width - EDGE - 22.0, EDGE + INPUT_HEIGHT / 2.0);
 const MIC_RADIUS: f64 = 14.0;
+/// The character in the corner while there is a talk, and in the middle of the log before there is one.
+const FACE: f64 = 64.0;
+const BIG_FACE: f64 = 150.0;
 /// How long the character takes to rise when the panel opens.
 const WAKE_SECONDS: f64 = 0.45;
+/// How long it waves hello when the panel opens.
+const HELLO_SECONDS: f64 = 1.4;
 /// The animation is drawn this many times a second.
 const FRAME_SECONDS: f64 = 1.0 / 30.0;
 
@@ -53,6 +59,62 @@ pub enum Stage {
     Thinking,
     Speaking,
     Error,
+}
+
+/// The frames of the character's sheet (`assets/jarvis/jarvis.png`, drawn by agy from `docs/jarvis-art`), in order.
+pub mod frame {
+    pub const IDLE: usize = 0;
+    pub const BLINK: usize = 1;
+    pub const LOOK_LEFT: usize = 2;
+    pub const LOOK_RIGHT: usize = 3;
+    pub const LISTEN: usize = 4;
+    pub const TALK_OPEN: usize = 5;
+    pub const TALK_HALF: usize = 6;
+    pub const HAPPY: usize = 7;
+    pub const THINK: usize = 8;
+    pub const ERROR: usize = 9;
+    pub const WAVE_A: usize = 10;
+    pub const WAVE_B: usize = 11;
+    pub const COUNT: usize = 12;
+}
+
+/// The frame the character shows: `opened` seconds after the panel opened, `t` seconds on a running clock. Without
+/// movement each stage has one still frame.
+pub fn frame_for(stage: Stage, opened: f64, t: f64, animate: bool) -> usize {
+    use frame::*;
+    if !animate {
+        return match stage {
+            Stage::Idle => IDLE,
+            Stage::Listening => LISTEN,
+            Stage::Thinking => THINK,
+            Stage::Speaking => TALK_OPEN,
+            Stage::Error => ERROR,
+        };
+    }
+    if opened < HELLO_SECONDS && matches!(stage, Stage::Idle | Stage::Speaking) {
+        return if (opened / 0.2) as usize % 2 == 0 { WAVE_A } else { WAVE_B };
+    }
+    match stage {
+        Stage::Idle => {
+            // A blink every four seconds, and a look aside now and then.
+            let beat = t % 8.0;
+            if beat % 4.0 < 0.14 {
+                BLINK
+            } else if (5.0..5.8).contains(&beat) {
+                LOOK_LEFT
+            } else if (5.8..6.6).contains(&beat) {
+                LOOK_RIGHT
+            } else {
+                IDLE
+            }
+        }
+        Stage::Listening => {
+            if t % 3.0 < 0.12 { BLINK } else { LISTEN }
+        }
+        Stage::Thinking => [THINK, LOOK_LEFT, THINK, LOOK_RIGHT][(t / 0.45) as usize % 4],
+        Stage::Speaking => [TALK_OPEN, TALK_HALF, IDLE, TALK_HALF][(t / 0.11) as usize % 4],
+        Stage::Error => ERROR,
+    }
 }
 
 #[derive(Debug, Clone, PartialEq, Eq)]
@@ -131,6 +193,8 @@ pub struct JarvisIvars {
     /// Whether the character moves; not under Reduce motion.
     animate: Cell<bool>,
     on_mic: RefCell<Option<Rc<dyn Fn()>>>,
+    /// The drawn character; without it a disc stands in.
+    sheet: RefCell<Option<Sheet>>,
 }
 
 define_class!(
@@ -172,9 +236,39 @@ impl JarvisView {
             started: Instant::now(),
             animate: Cell::new(true),
             on_mic: RefCell::new(None),
+            sheet: RefCell::new(None),
         });
         // SAFETY: designated initializer with valid arguments on the main thread.
         unsafe { msg_send![super(this), initWithFrame: NSRect::new(NSPoint::ZERO, SIZE)] }
+    }
+
+    /// The drawn character, `size` points tall, with its middle at `centre`: it floats, rises when the panel opens,
+    /// and shows what Jarvis is doing. False when there is no sheet to draw from.
+    fn paint_face(&self, display: &JarvisDisplay, centre: NSPoint, size: f64) -> bool {
+        let ivars = self.ivars();
+        let sheet = ivars.sheet.borrow();
+        let Some(sheet) = sheet.as_ref().filter(|s| s.frames() >= frame::COUNT) else { return false };
+        let animate = ivars.animate.get();
+        let t = ivars.started.elapsed().as_secs_f64();
+        let opened = ivars.opened.get().elapsed().as_secs_f64();
+        let age = ivars.since.get().elapsed().as_secs_f64();
+        let wake = if animate { style::ease_out((opened / WAKE_SECONDS).min(1.0)) } else { 1.0 };
+        let float = if animate { size * 0.03 * (t * 2.2).sin() } else { 0.0 };
+        let shake = if animate && display.stage == Stage::Error { size * 0.08 * (-6.0 * age).exp() * (age * 46.0).sin() } else { 0.0 };
+        let side = size * (0.6 + 0.4 * wake);
+        let middle = NSPoint::new(centre.x + shake, centre.y + float - (1.0 - wake) * size * 0.2);
+        if display.stage == Stage::Listening {
+            // A ring behind the head that follows the voice.
+            let level = if animate { f64::from(ivars.level.get()) } else { 0.0 };
+            let r = side * (0.42 + 0.14 * level);
+            style::fill_circle(
+                NSRect::new(NSPoint::new(middle.x - r, middle.y - r), NSSize::new(2.0 * r, 2.0 * r)),
+                &Tone::Blue.color().colorWithAlphaComponent(0.18 + 0.25 * level),
+            );
+        }
+        let at = frame_for(display.stage, opened, t, animate);
+        sheet.draw(at, NSRect::new(NSPoint::new(middle.x - side / 2.0, middle.y - side / 2.0), NSSize::new(side, side)));
+        true
     }
 
     /// The character: a disc that rises when the panel opens and then shows what Jarvis is doing.
@@ -268,7 +362,17 @@ impl JarvisView {
             style::fill_rounded(self.bounds(), RADIUS, &style::black(0.82));
         }
 
-        self.paint_character(&display);
+        // Before there is a talk the character is large in the middle; once there is one it sits in the corner.
+        let alone = display.lines.is_empty();
+        let corner = NSPoint::new(EDGE + FACE / 2.0 - 4.0, SIZE.height - EDGE - FACE / 2.0 + 6.0);
+        if alone {
+            let middle = NSPoint::new(SIZE.width / 2.0, FOOT + (SIZE.height - HEAD - EDGE - FOOT) * 0.62);
+            if !self.paint_face(&display, middle, BIG_FACE) {
+                self.paint_character(&display);
+            }
+        } else if !self.paint_face(&display, corner, FACE) {
+            self.paint_character(&display);
+        }
 
         // The name with its mark, and what is going on.
         let left = DISC.x + DISC_RADIUS + 12.0;
@@ -301,11 +405,13 @@ impl JarvisView {
         // The talk, newest at the bottom, the oldest that do not fit left out.
         let top = SIZE.height - HEAD - EDGE;
         let room = top - FOOT;
-        if display.lines.is_empty() {
+        if alone {
+            let has_face = self.ivars().sheet.borrow().is_some();
+            let height = if has_face { room * 0.62 - BIG_FACE / 2.0 - 8.0 } else { room };
             draw_text(
                 &display.greeting,
-                NSRect::new(NSPoint::new(EDGE + 6.0, FOOT), NSSize::new(SIZE.width - 2.0 * EDGE - 12.0, room)),
-                &attributes(0.55, 14.0, Weight::Regular),
+                NSRect::new(NSPoint::new(EDGE + 6.0, FOOT), NSSize::new(SIZE.width - 2.0 * EDGE - 12.0, height)),
+                &text_attributes(&style::font(14.0, Weight::Regular), &white(0.62), Fit::Words, has_face),
             );
         }
         let shown = fitting(&display.lines, room);
@@ -344,11 +450,13 @@ pub struct JarvisPanel {
 
 impl JarvisPanel {
     /// `on_key` hears Return, Escape and the other keys of the panel and returns whether it took them.
-    pub fn new(mtm: MainThreadMarker, on_key: impl Fn(Key) -> bool + 'static) -> Rc<Self> {
+    /// `face` is the PNG of the character's frames, a row of squares; `None` draws a disc instead.
+    pub fn new(mtm: MainThreadMarker, face: Option<&[u8]>, on_key: impl Fn(Key) -> bool + 'static) -> Rc<Self> {
         let panel = FigPanel::new(mtm, NSRect::new(NSPoint::ZERO, SIZE));
         panel.setHasShadow(true);
         panel.set_key_handler(on_key);
         let view = JarvisView::new(mtm);
+        *view.ivars().sheet.borrow_mut() = face.and_then(Sheet::from_png);
         let field = NSTextField::initWithFrame(
             mtm.alloc(),
             NSRect::new(
@@ -391,10 +499,12 @@ impl JarvisPanel {
             if ivars.animate.get() {
                 let view = self.view.clone();
                 *self.frames.borrow_mut() = Some(app::every(FRAME_SECONDS, move || {
-                    let area = NSRect::new(
-                        NSPoint::new(DISC.x - 60.0, DISC.y - 60.0),
-                        NSSize::new(120.0, 120.0),
-                    );
+                    // The corner while there is a talk; the whole log while the large character is in it.
+                    let area = if view.ivars().display.borrow().lines.is_empty() {
+                        view.bounds()
+                    } else {
+                        NSRect::new(NSPoint::new(0.0, SIZE.height - HEAD - EDGE), NSSize::new(SIZE.width, HEAD + EDGE))
+                    };
                     view.setNeedsDisplayInRect(area);
                 }));
             }
@@ -498,6 +608,25 @@ mod tests {
         assert_eq!(shown.last().unwrap().0.text, "line 29");
         let used: f64 = shown.iter().map(|(_, h)| h + GAP).sum();
         assert!(used - GAP <= 200.0 + 1.0);
+    }
+
+    #[test]
+    fn the_character_waves_then_shows_what_jarvis_does() {
+        use frame::*;
+        assert!(matches!(frame_for(Stage::Idle, 0.1, 10.0, true), WAVE_A | WAVE_B), "it waves hello when the panel opens");
+        assert_eq!(frame_for(Stage::Idle, 5.0, 1.0, true), IDLE);
+        assert_eq!(frame_for(Stage::Idle, 5.0, 4.05, true), BLINK);
+        assert_eq!(frame_for(Stage::Listening, 0.1, 1.0, true), LISTEN, "listening at once is not hidden by the wave");
+        assert_eq!(frame_for(Stage::Error, 5.0, 1.0, true), ERROR);
+        let talking: std::collections::HashSet<usize> = (0..40).map(|i| frame_for(Stage::Speaking, 5.0, f64::from(i) * 0.05, true)).collect();
+        assert!(talking.contains(&TALK_OPEN) && talking.contains(&TALK_HALF), "the mouth moves while it speaks");
+        let thinking: std::collections::HashSet<usize> = (0..40).map(|i| frame_for(Stage::Thinking, 5.0, f64::from(i) * 0.1, true)).collect();
+        assert!(thinking.len() > 1);
+        for stage in [Stage::Idle, Stage::Listening, Stage::Thinking, Stage::Speaking, Stage::Error] {
+            let still = frame_for(stage, 0.0, 0.0, false);
+            assert!((0..20).all(|i| frame_for(stage, f64::from(i), f64::from(i) * 0.37, false) == still), "Reduce motion keeps it still");
+            assert!(still < COUNT);
+        }
     }
 
     #[test]

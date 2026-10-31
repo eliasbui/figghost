@@ -99,38 +99,24 @@ if [ -f "$WORK/request.json" ] && grep -q '"stream": *true' "$WORK/request.json"
 if kill -0 "$PID" 2>/dev/null; then pass "the program is still running after the answer"; else fail "the program died"; tail -20 "$WORK/on.log"; fi
 stop
 
-# Codex: the sign-in of the Codex command line, here a made-up one in a folder of its own (CODEX_HOME). Its access
-# token is a made-up JWT that runs out in the year 2100, so the real sign-in of this Mac is never read or sent.
-mkdir -p "$WORK/codex"
-cat > "$WORK/codex/auth.json" <<JSON
+# Codex: Jarvis signs in to ChatGPT by itself and keeps the session in the Keychain; the sign-in of the Codex
+# command line is never read. A made-up one in a folder of its own (CODEX_HOME) must therefore send nothing. Skipped
+# when this Mac already has a session of Jarvis, which would rightly be used.
+if security find-generic-password -s vn.figghost.jarvis -a codex-session >/dev/null 2>&1; then
+    echo "skip: this Mac has a ChatGPT session of Jarvis, so the check that Codex's own is ignored is not run"
+else
+    mkdir -p "$WORK/codex"
+    cat > "$WORK/codex/auth.json" <<JSON
 { "tokens": { "access_token": "e30.eyJleHAiOjQxMDI0NDQ4MDB9.sig", "account_id": "acct-check", "refresh_token": "never-used" } }
 JSON
-cat > "$WORK/codex/models_cache.json" <<JSON
-{ "models": [ { "slug": "hidden-one", "visibility": "hide", "priority": 1 }, { "slug": "listed-model", "visibility": "list", "priority": 2 } ] }
-JSON
-rm -f "$WORK/request.json" "$WORK/request.json.headers"
-CODEX_HOME="$WORK/codex" run '{ "enabled": true, "provider": "codex", "voice": false, "speak": false, "sound": false }' codex "$URL"
-sleep 7
-if grep -q "jarvis: asking codex (listed-model)" "$WORK/codex.log"; then pass "Codex asks the model its own cache lists first"; else fail "Codex was not asked"; grep "jarvis" "$WORK/codex.log" || true; fi
-if grep -q "jarvis: answered with 13 characters" "$WORK/codex.log"; then pass "the answer of the Responses format arrives whole"; else fail "no Codex answer"; fi
-if [ -f "$WORK/request.json.headers" ] && grep -qi "^authorization: Bearer e30" "$WORK/request.json.headers" \
-    && grep -qi "^chatgpt-account-id: acct-check" "$WORK/request.json.headers" && grep -qi "^originator: figghost" "$WORK/request.json.headers"; then
-    pass "the request carries the sign-in, the account and who is asking"
-else
-    fail "the Codex headers were wrong"; cat "$WORK/request.json.headers" 2>/dev/null || true
+    rm -f "$WORK/request.json" "$WORK/request.json.headers"
+    CODEX_HOME="$WORK/codex" run '{ "enabled": true, "provider": "codex", "voice": false, "speak": false, "sound": false }' nosign "$URL"
+    sleep 6
+    if grep -q "jarvis: asking" "$WORK/nosign.log" || [ -f "$WORK/request.json" ]; then fail "the sign-in of the Codex program was used"; else pass "the sign-in of the Codex program is never used"; fi
+    if grep -q "never-used" "$WORK/codex/auth.json"; then pass "the Codex sign-in file is left as it was"; else fail "the Codex sign-in file was changed"; fi
+    if kill -0 "$PID" 2>/dev/null; then pass "the program is still running with no sign-in"; else fail "the program died with no sign-in"; fi
+    stop
 fi
-if grep -q "refresh" "$WORK/request.json" "$WORK/request.json.headers" 2>/dev/null; then fail "the refresh token was sent"; else pass "the refresh token is never sent"; fi
-if [ "$(cat "$WORK/codex/auth.json" | wc -c)" -gt 0 ] && grep -q "never-used" "$WORK/codex/auth.json"; then pass "the sign-in file is left as it was"; else fail "the sign-in file was changed"; fi
-stop
-
-# With no sign-in the panel says what to do and asks nothing.
-mkdir -p "$WORK/nocodex"
-rm -f "$WORK/request.json"
-CODEX_HOME="$WORK/nocodex" run '{ "enabled": true, "provider": "codex", "voice": false, "speak": false, "sound": false }' nosign "$URL"
-sleep 6
-if grep -q "jarvis: asking" "$WORK/nosign.log" || [ -f "$WORK/request.json" ]; then fail "a question was sent with no sign-in"; else pass "with no Codex sign-in nothing is sent"; fi
-if kill -0 "$PID" 2>/dev/null; then pass "the program is still running with no sign-in"; else fail "the program died with no sign-in"; fi
-stop
 kill "$SERVER" 2>/dev/null || true; wait "$SERVER" 2>/dev/null || true; SERVER=""
 
 # With nothing at the address the question fails and says so.

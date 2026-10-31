@@ -362,6 +362,7 @@ name = "core-jarvis"
 version = "2.2.10"
 dependencies = [
  "core-smart",
+ "serde",
  "serde_json",
 ]
 

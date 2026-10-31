@@ -17,7 +17,7 @@ fn main() {
     let dir = PathBuf::from(env::args().nth(1).unwrap_or_else(|| "/tmp/jarvis".into()));
     fs::create_dir_all(&dir).expect("output directory");
     app::run_accessory(mtm, move || {
-        let panel = JarvisPanel::new(mtm, |_| false);
+        let panel = JarvisPanel::new(mtm, Some(include_bytes!("../../app-ui/assets/jarvis/jarvis.png")), |_| false);
         let base = |stage, symbol, status: &str, lines: Vec<Line>| JarvisDisplay {
             stage,
             symbol,

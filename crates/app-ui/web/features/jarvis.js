@@ -13,8 +13,9 @@
     'jarvis.model.title': 'Model', 'jarvis.model.desc': 'Leave empty for the service\'s usual one. Names change, so type the one you want.',
     'jarvis.key.title': 'Key', 'jarvis.key.desc': 'Kept in the Keychain of this Mac, never in the settings file.',
     'jarvis.key.ph': 'Paste the key', 'jarvis.key.save': 'Save', 'jarvis.key.remove': 'Remove',
-    'jarvis.signin.ready': 'Signed in to Codex', 'jarvis.signin.missing': 'Codex is not signed in on this Mac: run codex login', 'jarvis.signin.expired': 'The Codex sign-in ran out: use Codex once to renew it', 'jarvis.signin.unreadable': 'The Codex sign-in file cannot be read',
-    'jarvis.signin.note': 'Uses the sign-in of the Codex command line and counts against your ChatGPT plan. It is only read, never renewed or changed here. This is not an official way for other programs to use that service, and OpenAI may stop it at any time.',
+    'jarvis.signin.ready': 'Signed in', 'jarvis.signin.missing': 'Not signed in', 'jarvis.signin.expired': 'The sign-in ended, sign in again', 'jarvis.signin.signing': 'Waiting for the browser...',
+    'jarvis.signin.in': 'Sign in with ChatGPT', 'jarvis.signin.out': 'Sign out', 'jarvis.signin.cancel': 'Cancel', 'jarvis.signin.failed': 'The sign-in did not finish: ',
+    'jarvis.signin.note': 'Jarvis signs in to ChatGPT by itself, in your browser, and keeps the sign-in in the Keychain of this Mac; the Codex program is not needed. Questions count against your ChatGPT plan. This is not an official way for other programs to use that service, and OpenAI may stop it at any time.',
     'jarvis.key.saved': 'A key is saved', 'jarvis.key.none': 'No key yet', 'jarvis.key.notneeded': 'No key needed',
     'sec.jarvis.voice': 'Voice',
     'jarvis.voice.title': 'Talk to Jarvis', 'jarvis.voice.desc': 'The panel asks what you want, listens, and sends what you said after a silence. Turn it off to only type.',
@@ -40,8 +41,9 @@
     'jarvis.model.title': 'Mô hình', 'jarvis.model.desc': 'Để trống thì dùng mô hình thường dùng của dịch vụ. Tên hay đổi nên bạn gõ tên muốn dùng.',
     'jarvis.key.title': 'Khóa', 'jarvis.key.desc': 'Được giữ trong Keychain của máy này, không bao giờ nằm trong tệp cài đặt.',
     'jarvis.key.ph': 'Dán khóa vào đây', 'jarvis.key.save': 'Lưu', 'jarvis.key.remove': 'Xóa',
-    'jarvis.signin.ready': 'Đã đăng nhập Codex', 'jarvis.signin.missing': 'Codex chưa đăng nhập trên máy này: chạy codex login', 'jarvis.signin.expired': 'Phiên đăng nhập Codex đã hết hạn: dùng Codex một lần để làm mới', 'jarvis.signin.unreadable': 'Không đọc được tệp đăng nhập của Codex',
-    'jarvis.signin.note': 'Dùng đăng nhập của Codex trên dòng lệnh và tính vào gói ChatGPT của bạn. Ở đây chỉ đọc, không bao giờ làm mới hay sửa. Đây không phải cách chính thức để chương trình khác dùng dịch vụ đó, và OpenAI có thể ngừng bất cứ lúc nào.',
+    'jarvis.signin.ready': 'Đã đăng nhập', 'jarvis.signin.missing': 'Chưa đăng nhập', 'jarvis.signin.expired': 'Phiên đăng nhập đã hết, hãy đăng nhập lại', 'jarvis.signin.signing': 'Đang chờ trình duyệt...',
+    'jarvis.signin.in': 'Đăng nhập bằng ChatGPT', 'jarvis.signin.out': 'Đăng xuất', 'jarvis.signin.cancel': 'Hủy', 'jarvis.signin.failed': 'Đăng nhập chưa xong: ',
+    'jarvis.signin.note': 'Jarvis tự đăng nhập ChatGPT qua trình duyệt và giữ phiên trong Keychain của máy này, không cần cài Codex. Câu hỏi được tính vào gói ChatGPT của bạn. Đây không phải cách chính thức để chương trình khác dùng dịch vụ đó, và OpenAI có thể ngừng bất cứ lúc nào.',
     'jarvis.key.saved': 'Đã có khóa', 'jarvis.key.none': 'Chưa có khóa', 'jarvis.key.notneeded': 'Không cần khóa',
     'sec.jarvis.voice': 'Giọng nói',
     'jarvis.voice.title': 'Nói chuyện với Jarvis', 'jarvis.voice.desc': 'Bảng hỏi bạn muốn gì, lắng nghe, rồi gửi điều bạn nói sau một lúc im lặng. Tắt để chỉ gõ.',
@@ -77,9 +79,26 @@
     }, { small: true });
     const remove = button(t('jarvis.key.remove'), () => send({ t: 'set', path: 'jarvis.key', value: '' }), { small: true });
     field.addEventListener('keydown', (e) => { if (e.key === 'Enter') save.click(); });
+    // The ChatGPT plan: Jarvis's own sign-in in the browser, with the account it is and a way out.
+    const act0 = (name) => send({ t: 'action', name });
+    const signIn = button(t('jarvis.signin.in'), () => act0('jarvis_codex_sign_in'), { small: true });
+    const signOut = button(t('jarvis.signin.out'), () => act0('jarvis_codex_sign_out'), { small: true });
+    const cancel = button(t('jarvis.signin.cancel'), () => act0('jarvis_codex_cancel'), { small: true });
     reg(() => {
       const needed = S.jarvis.needs_key;
-      status.textContent = S.jarvis.signin ? t('jarvis.signin.' + S.jarvis.signin) : t(!needed ? 'jarvis.key.notneeded' : S.jarvis.key ? 'jarvis.key.saved' : 'jarvis.key.none');
+      const state = S.jarvis.signin;
+      const account = S.jarvis.account || {};
+      if (state) {
+        let text = t('jarvis.signin.' + state);
+        if (state === 'ready' && account.email) text += ': ' + account.email + (account.plan ? ' (' + account.plan + ')' : '');
+        if (state !== 'ready' && state !== 'signing' && account.error) text = t('jarvis.signin.failed') + account.error;
+        status.textContent = text;
+      } else {
+        status.textContent = t(!needed ? 'jarvis.key.notneeded' : S.jarvis.key ? 'jarvis.key.saved' : 'jarvis.key.none');
+      }
+      signIn.style.display = state === 'missing' || state === 'expired' ? '' : 'none';
+      signOut.style.display = state === 'ready' ? '' : 'none';
+      cancel.style.display = state === 'signing' ? '' : 'none';
       field.style.display = needed ? '' : 'none';
       save.style.display = needed ? '' : 'none';
       remove.style.display = needed && S.jarvis.key ? '' : 'none';
@@ -117,7 +136,7 @@
           when: on,
         }),
         row(t('jarvis.model.title'), t('jarvis.model.desc'), model, when),
-        row(t('jarvis.key.title'), t('jarvis.key.desc'), h('div', { class: 'jarvis-key' }, status, field, save, remove), when)),
+        row(t('jarvis.key.title'), t('jarvis.key.desc'), h('div', { class: 'jarvis-key' }, status, field, save, remove, signIn, cancel, signOut), when)),
       note,
       sectionTitle(t('sec.jarvis.voice')),
       card(
@@ -148,6 +167,7 @@
     expect(sent.some((m) => m.path === 'jarvis.model' && m.value === 'gpt-4o'), 'jarvis: the model is sent trimmed: ' + JSON.stringify(sent));
 
     const field = page.querySelector('input[type="password"]');
+    const visibleBtn = (text) => [...page.querySelectorAll('.btn')].find((b) => b.textContent === text && b.style.display !== 'none');
     const buttons = (text) => [...page.querySelectorAll('.btn')].filter((b) => b.textContent === text);
     sent.length = 0;
     field.value = 'sk-test'; buttons(t('jarvis.key.save'))[0].click();
@@ -157,12 +177,24 @@
     expect(page.textContent.includes(t('jarvis.key.saved')) && buttons(t('jarvis.key.remove'))[0].style.display !== 'none', 'jarvis: a saved key says so and can be removed');
     S.jarvis.provider = 'local'; S.jarvis.needs_key = false; runSyncs();
     expect(page.textContent.includes(t('jarvis.key.notneeded')) && field.style.display === 'none', 'jarvis: a model on this Mac needs no key');
-    S.jarvis.provider = 'codex'; S.jarvis.needs_key = false; S.jarvis.signin = 'expired'; runSyncs();
-    expect(page.textContent.includes(t('jarvis.signin.expired')) && field.style.display === 'none', 'jarvis: an expired Codex sign-in says what to do, and no key is asked for');
+    S.jarvis.provider = 'codex'; S.jarvis.needs_key = false; S.jarvis.signin = 'expired'; S.jarvis.account = { email: 'a@b.c', plan: 'plus', error: '' }; runSyncs();
+    expect(page.textContent.includes(t('jarvis.signin.expired')) && field.style.display === 'none', 'jarvis: an expired sign-in says what to do, and no key is asked for');
     expect(page.querySelector('.jarvis-note').style.display !== 'none', 'jarvis: the Codex route says it is not an official one');
+    sent.length = 0;
+    visibleBtn(t('jarvis.signin.in')).click();
+    expect(sent.some((m) => m.t === 'action' && m.name === 'jarvis_codex_sign_in'), 'jarvis: the sign-in button starts the sign-in: ' + JSON.stringify(sent));
+    S.jarvis.signin = 'signing'; runSyncs();
+    sent.length = 0;
+    visibleBtn(t('jarvis.signin.cancel')).click();
+    expect(sent.some((m) => m.name === 'jarvis_codex_cancel'), 'jarvis: a sign-in that waits can be cancelled');
     S.jarvis.signin = 'ready'; runSyncs();
-    expect(page.textContent.includes(t('jarvis.signin.ready')), 'jarvis: a Codex sign-in that is there says so');
-    S.jarvis.provider = 'anthropic'; S.jarvis.needs_key = true; S.jarvis.key = false; S.jarvis.signin = ''; runSyncs();
+    expect(page.textContent.includes('a@b.c') && page.textContent.includes('plus'), 'jarvis: the account signed in is shown');
+    sent.length = 0;
+    visibleBtn(t('jarvis.signin.out')).click();
+    expect(sent.some((m) => m.name === 'jarvis_codex_sign_out'), 'jarvis: signing out is offered');
+    S.jarvis.signin = 'missing'; S.jarvis.account = { email: '', plan: '', error: 'port 1455 is busy' }; runSyncs();
+    expect(page.textContent.includes('port 1455 is busy'), 'jarvis: why a sign-in failed is shown');
+    S.jarvis.provider = 'anthropic'; S.jarvis.needs_key = true; S.jarvis.key = false; S.jarvis.signin = ''; S.jarvis.account = { email: '', plan: '', error: '' }; runSyncs();
     expect(page.querySelector('.jarvis-note').style.display === 'none', 'jarvis: the note is only for Codex');
 
     const seg = (text) => [...page.querySelectorAll('.seg button')].find((b) => b.textContent === text);

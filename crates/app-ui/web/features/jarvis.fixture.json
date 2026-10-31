@@ -13,5 +13,6 @@
   "sound": true,
   "speech": "ask",
   "microphone": false,
-  "signin": ""
+  "signin": "",
+  "account": { "email": "", "plan": "", "error": "" }
 }

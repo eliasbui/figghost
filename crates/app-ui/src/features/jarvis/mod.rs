@@ -37,7 +37,7 @@ use std::{
     rc::{Rc, Weak},
     sync::{
         Arc, Mutex,
-        atomic::Ordering,
+        atomic::{AtomicBool, Ordering},
     },
 };
 
@@ -53,6 +53,13 @@ const LOOK_SECONDS: f64 = 0.05;
 /// A silence after words after which they are sent, and how long the microphone waits for words at all.
 const SILENCE_SECONDS: f64 = 2.0;
 const QUIET_SECONDS: f64 = 10.0;
+/// While the panel is open with the voice on, a microphone that heard nothing opens again until this long has passed
+/// without words; then it rests until the button or the shortcut.
+const HANDS_FREE_SECONDS: f64 = 120.0;
+/// The voice takes a moment to start after it is given the greeting; before that it is not taken as finished.
+const GREETING_GRACE_SECONDS: f64 = 0.8;
+/// The frames of the character, drawn by agy (`docs/jarvis-art`).
+const FACE: &[u8] = include_bytes!("../../../assets/jarvis/jarvis.png");
 /// How often the microphone's silence and the voice that is speaking are looked at.
 const TICK_SECONDS: f64 = 0.15;
 /// The turns sent with a question; older ones are forgotten so that a long talk never grows the request.
@@ -65,7 +72,7 @@ language the person writes in. Reply in plain text: no markdown, no headings, no
 pub enum Provider {
     #[default]
     Anthropic,
-    /// The ChatGPT plan, through the sign-in of the Codex command line.
+    /// The ChatGPT plan, through Figghost's own sign-in with the public client of Codex.
     Codex,
     #[serde(rename = "openai")]
     OpenAi,
@@ -138,7 +145,7 @@ impl Provider {
         match self {
             Provider::Anthropic => "claude-haiku-5-5",
             // What Codex lists first is read from its own cache when there is one (see `Config::source`).
-            Provider::Codex => "gpt-5",
+            Provider::Codex => codex::FALLBACK_MODEL,
             Provider::OpenAi => "gpt-4o-mini",
             Provider::Gemini => "gemini-2.0-flash",
             Provider::DeepSeek => "deepseek-chat",
@@ -160,28 +167,133 @@ pub fn valid_model(model: &str) -> bool {
             .all(|c| c.is_ascii_alphanumeric() || matches!(c, '.' | '_' | '-' | ':' | '/'))
 }
 
-/// Where the sign-in of Codex is: its own folder, in `CODEX_HOME` or the home folder.
-fn codex_home() -> Option<(std::path::PathBuf, std::path::PathBuf)> {
-    let home = std::env::var_os("HOME").map(std::path::PathBuf::from)?;
-    let folder = std::env::var_os("CODEX_HOME").map_or_else(|| home.join(".codex"), std::path::PathBuf::from);
-    Some((folder.join("auth.json"), folder.join("models_cache.json")))
-}
-
 fn unix_now() -> i64 {
     std::time::SystemTime::now()
         .duration_since(std::time::UNIX_EPOCH)
         .map_or(0, |d| i64::try_from(d.as_secs()).unwrap_or(0))
 }
 
-/// The state of the Codex sign-in for the page: `ready`, `missing`, `expired` or `unreadable`.
-pub fn codex_status() -> &'static str {
-    let Some((auth, _)) = codex_home() else { return "missing" };
-    match codex::read(&auth, unix_now()) {
-        Ok(_) => "ready",
-        Err(codex::SignIn::Missing) => "missing",
-        Err(codex::SignIn::Expired) => "expired",
-        Err(codex::SignIn::Unreadable) => "unreadable",
+/// The Keychain account of Figghost's own ChatGPT session (through the Codex client); the Codex program of this Mac
+/// is never read.
+const CODEX_ACCOUNT: &str = "codex-session";
+/// One sign-in at a time, and the flag that stops it.
+static SIGNING_IN: AtomicBool = AtomicBool::new(false);
+static SIGN_IN_CANCEL: Mutex<Option<codex::Cancel>> = Mutex::new(None);
+/// Why the last sign-in failed, for the page; empty when it did not.
+static SIGN_IN_ERROR: Mutex<String> = Mutex::new(String::new());
+/// Refresh tokens rotate, so two renewals must never run at once.
+static RENEWING: Mutex<()> = Mutex::new(());
+
+fn codex_session() -> Option<codex::Session> {
+    match keychain::read(SERVICE, CODEX_ACCOUNT) {
+        Ok(Some(bytes)) => codex::Session::from_json(&bytes),
+        _ => None,
     }
+}
+
+fn save_codex(session: &codex::Session) {
+    if let Err(status) = keychain::write(SERVICE, CODEX_ACCOUNT, session.to_json().as_bytes()) {
+        eprintln!("jarvis: cannot keep the ChatGPT session (status {status})");
+    }
+}
+
+/// The session is over: the tokens go, who it was stays so the page can say so.
+fn end_codex(session: codex::Session) {
+    save_codex(&codex::Session { email: session.email, plan: session.plan, ..codex::Session::default() });
+}
+
+/// The state of the ChatGPT sign-in for the page: `ready`, `missing`, `expired` or `signing`.
+pub fn codex_status() -> &'static str {
+    if SIGNING_IN.load(Ordering::SeqCst) {
+        return "signing";
+    }
+    match codex_session() {
+        Some(s) if s.signed_in() => "ready",
+        Some(s) if !s.email.is_empty() => "expired",
+        _ => "missing",
+    }
+}
+
+/// Who is signed in, for the page; never a token.
+pub fn codex_account() -> Value {
+    let error = SIGN_IN_ERROR.lock().map(|e| e.clone()).unwrap_or_default();
+    match codex_session() {
+        Some(s) => json!({ "email": s.email, "plan": s.plan, "error": error }),
+        None => json!({ "email": "", "plan": "", "error": error }),
+    }
+}
+
+/// Opens OpenAI's sign-in page in the browser and waits for it on another thread; the session is kept in the
+/// Keychain when it comes back.
+fn codex_sign_in() {
+    if SIGNING_IN.swap(true, Ordering::SeqCst) {
+        return;
+    }
+    let cancel = codex::Cancel::default();
+    *SIGN_IN_CANCEL.lock().unwrap_or_else(|p| p.into_inner()) = Some(cancel.clone());
+    *SIGN_IN_ERROR.lock().unwrap_or_else(|p| p.into_inner()) = String::new();
+    std::thread::spawn(move || {
+        let open = |url: &str| {
+            let url = url.to_owned();
+            app::on_main(move || workspace::open_url(&url));
+        };
+        let result = codex::sign_in(&open, &cancel, &unix_now);
+        match result {
+            Ok(session) => {
+                trace::log(&format!("jarvis: signed in to ChatGPT ({} plan)", session.plan));
+                save_codex(&session);
+            }
+            Err(why) => {
+                trace::log(&format!("jarvis: the ChatGPT sign-in stopped: {why}"));
+                if why != "cancelled" {
+                    *SIGN_IN_ERROR.lock().unwrap_or_else(|p| p.into_inner()) = why;
+                }
+            }
+        }
+        SIGN_IN_CANCEL.lock().unwrap_or_else(|p| p.into_inner()).take();
+        SIGNING_IN.store(false, Ordering::SeqCst);
+    });
+}
+
+fn codex_cancel() {
+    if let Some(cancel) = SIGN_IN_CANCEL.lock().unwrap_or_else(|p| p.into_inner()).as_ref() {
+        cancel.store(true, Ordering::SeqCst);
+    }
+}
+
+/// Forgets the session. Codex itself signs out the same way, with no revocation.
+fn codex_sign_out() {
+    let _ = keychain::delete(SERVICE, CODEX_ACCOUNT);
+    *SIGN_IN_ERROR.lock().unwrap_or_else(|p| p.into_inner()) = String::new();
+}
+
+/// A fresh access token for `source`, renewed first when it is about to run out. Runs on the thread that asks, since
+/// a renewal goes to OpenAI. `ended` is what to say when the session is over.
+fn codex_ready(source: &mut Source, ended: &str) -> Result<(), Failure> {
+    let _one = RENEWING.lock().unwrap_or_else(|p| p.into_inner());
+    let session = codex_session().filter(codex::Session::signed_in).ok_or_else(|| Failure::Service(ended.to_owned()))?;
+    let session = if session.due(unix_now()) {
+        match codex::refresh(codex::TOKEN, session.clone(), unix_now()) {
+            Ok(renewed) => {
+                save_codex(&renewed);
+                renewed
+            }
+            Err(codex::Renew::Ended(why)) => {
+                trace::log(&format!("jarvis: the ChatGPT session ended: {why}"));
+                end_codex(session);
+                return Err(Failure::Service(ended.to_owned()));
+            }
+            Err(codex::Renew::Later(why)) => {
+                trace::log(&format!("jarvis: the ChatGPT session could not be renewed now: {why}"));
+                return Err(Failure::Unreachable);
+            }
+        }
+    } else {
+        session
+    };
+    source.key = session.access_token;
+    source.account = session.account_id;
+    Ok(())
 }
 
 pub fn has_key(provider: Provider) -> bool {
@@ -261,10 +373,14 @@ impl Config {
             .filter(|url| url.starts_with("http://127.0.0.1"))
             .unwrap_or_else(|| provider.url().to_owned());
         let (key, account, default) = if provider == Provider::Codex {
-            let (auth, cache) = codex_home().ok_or(Block::SignIn(codex::SignIn::Missing))?;
-            let sign = codex::read(&auth, unix_now()).map_err(Block::SignIn)?;
-            let model = codex::default_model(&cache).unwrap_or_else(|| provider.default_model().to_owned());
-            (sign.access_token, sign.account_id, model)
+            // The token itself is made ready on the thread that asks (`codex_ready`), which may renew it.
+            let session = codex_session().unwrap_or_default();
+            if !session.signed_in() {
+                let why = if session.email.is_empty() { codex::SignIn::Missing } else { codex::SignIn::Expired };
+                return Err(Block::SignIn(why));
+            }
+            let model = if session.model.is_empty() { provider.default_model().to_owned() } else { session.model };
+            (String::new(), String::new(), model)
         } else {
             let key = key_of(provider);
             if provider.needs_key() && key.is_empty() {
@@ -368,8 +484,13 @@ pub struct Feature {
     unspoken: RefCell<String>,
     /// While the panel is open: looks at the silence of the microphone and at the end of the voice.
     ticker: RefCell<Option<app::Timer>>,
-    /// The voice is asking what it can do; the microphone opens when it has.
+    /// The voice is asking what it can do; the microphone opens when it has. When it was asked.
     greeting: Cell<bool>,
+    greeted: Cell<Option<Instant>>,
+    /// Words were last heard, or the panel opened: the microphone keeps opening again until long after.
+    awake: Cell<Instant>,
+    /// Listening waits for the access that was just asked for, and starts when it is given.
+    waiting_access: Cell<bool>,
 }
 
 pub fn attach(env: &AttachEnv) -> Option<Rc<Feature>> {
@@ -390,6 +511,9 @@ pub fn attach(env: &AttachEnv) -> Option<Rc<Feature>> {
         unspoken: RefCell::default(),
         ticker: RefCell::default(),
         greeting: Cell::new(false),
+        greeted: Cell::new(None),
+        awake: Cell::new(Instant::now()),
+        waiting_access: Cell::new(false),
     });
     feature.register_hotkey(&config);
     // For the checks, which cannot press a global shortcut or type: the same as pressing it, and then typing the
@@ -473,6 +597,9 @@ impl Feature {
             "jarvis_allow" => self.ask_access(),
             "jarvis_open_speech" => permissions::open_pane(dictation::SPEECH_PANE),
             "jarvis_open_microphone" => permissions::open_pane(permissions::MICROPHONE_PANE),
+            "jarvis_codex_sign_in" => codex_sign_in(),
+            "jarvis_codex_cancel" => codex_cancel(),
+            "jarvis_codex_sign_out" => codex_sign_out(),
             _ => return None,
         }
         Some(Ok(()))
@@ -497,7 +624,7 @@ impl Feature {
         let mut slot = self.panel.borrow_mut();
         let panel = slot.get_or_insert_with(|| {
             let weak = self.me.clone();
-            let panel = JarvisPanel::new(self.mtm, {
+            let panel = JarvisPanel::new(self.mtm, Some(FACE), {
                 let weak = weak.clone();
                 move |key| weak.upgrade().is_some_and(|f| f.key(key))
             });
@@ -581,8 +708,10 @@ impl Feature {
         }));
         // Jarvis asks what it can do, out loud, and then listens; with no voice it only listens.
         let config = self.config.borrow().clone();
+        self.awake.set(Instant::now());
         if config.speak && config.voice {
             self.greeting.set(true);
+            self.greeted.set(Some(Instant::now()));
             self.say(language.jarvis_ask(), &language);
         } else if config.voice {
             self.listen();
@@ -595,6 +724,7 @@ impl Feature {
         self.hear_stop(true);
         self.speaker.stop();
         self.greeting.set(false);
+        self.waiting_access.set(false);
         self.ticker.borrow_mut().take();
         self.unspoken.borrow_mut().clear();
         self.lines.borrow_mut().clear();
@@ -652,6 +782,7 @@ impl Feature {
             self.speaker.stop();
             self.greeting.set(false);
             self.stop();
+            self.awake.set(Instant::now());
             self.listen();
         }
     }
@@ -663,10 +794,12 @@ impl Feature {
             Some(false) => self.note(self.language().jarvis_no_speech_access()),
             None => {
                 self.ask_access();
+                self.waiting_access.set(true);
                 self.note(self.language().jarvis_asking())
             }
             Some(true) => {
                 self.ask_access();
+                self.waiting_access.set(true);
                 self.note(self.language().jarvis_no_microphone())
             }
         }
@@ -727,6 +860,7 @@ impl Feature {
                     if hearing.words != text {
                         hearing.words = text.clone();
                         hearing.changed = Instant::now();
+                        self.awake.set(Instant::now());
                     }
                     last
                 };
@@ -781,9 +915,25 @@ impl Feature {
             if any && quiet >= SILENCE_SECONDS {
                 self.hear_finish();
             } else if !any && long >= QUIET_SECONDS {
+                // Nothing said: with the voice on the microphone opens again at once, until a long while has passed
+                // with no words, so that Jarvis can be spoken to without a press each time.
                 self.hear_stop(true);
                 self.rest();
                 self.paint();
+                if self.config.borrow().voice && self.awake.get().elapsed().as_secs_f64() < HANDS_FREE_SECONDS {
+                    self.listen();
+                }
+            }
+            return;
+        }
+        // The access asked for when the panel wanted to listen has been given: listen now.
+        if self.waiting_access.get()
+            && speech::speech_access() == Some(true)
+            && permissions::microphone_trusted()
+        {
+            self.waiting_access.set(false);
+            if self.config.borrow().voice && self.flight.borrow().is_none() && !self.speaker.is_speaking() {
+                self.listen();
             }
             return;
         }
@@ -799,7 +949,10 @@ impl Feature {
             if config.voice {
                 self.listen();
             }
-        } else if self.greeting.get() && !self.speaker.is_speaking() {
+        } else if self.greeting.get()
+            && !self.speaker.is_speaking()
+            && self.greeted.get().is_none_or(|at| at.elapsed().as_secs_f64() >= GREETING_GRACE_SECONDS)
+        {
             // The spoken greeting is over: listen.
             self.greeting.set(false);
             if config.voice {
@@ -853,12 +1006,18 @@ impl Feature {
         let cancel = Cancel::default();
         let inbox: Inbox = Arc::default();
         let turns = self.turns.borrow().clone();
+        let codex = config.provider == Provider::Codex;
+        let ended = language.jarvis_codex(codex::SignIn::Expired).to_owned();
         {
             let (cancel, inbox) = (cancel.clone(), inbox.clone());
+            let mut source = source;
             std::thread::spawn(move || {
                 let pieces = inbox.clone();
-                let result = core_jarvis::stream(&source, SYSTEM, &turns, ANSWER_SECONDS, &cancel, &mut |piece| {
-                    pieces.lock().unwrap().push_back(Update::Text(piece.to_owned()));
+                let ready = if codex { codex_ready(&mut source, &ended) } else { Ok(()) };
+                let result = ready.and_then(|()| {
+                    core_jarvis::stream(&source, SYSTEM, &turns, ANSWER_SECONDS, &cancel, &mut |piece| {
+                        pieces.lock().unwrap().push_back(Update::Text(piece.to_owned()));
+                    })
                 });
                 inbox.lock().unwrap().push_back(Update::Done(result));
             });

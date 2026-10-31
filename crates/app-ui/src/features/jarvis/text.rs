@@ -130,19 +130,19 @@ impl Language {
         use core_jarvis::codex::SignIn;
         match (self, why) {
             (Language::English, SignIn::Missing) => {
-                "Codex is not signed in on this Mac. Run `codex login` in a terminal, or sign in to Codex in Orca and switch to that account, then ask again."
+                "Jarvis is not signed in to ChatGPT yet. Open Settings, Jarvis, and press Sign in with ChatGPT, then ask again."
             }
             (Language::Vietnamese, SignIn::Missing) => {
-                "Codex chưa đăng nhập trên máy này. Chạy `codex login` trong terminal, hoặc đăng nhập Codex trong Orca rồi chuyển sang tài khoản đó, sau đó hỏi lại."
+                "Jarvis chưa đăng nhập ChatGPT. Mở Cài đặt, mục Jarvis, bấm Đăng nhập bằng ChatGPT rồi hỏi lại."
             }
             (Language::English, SignIn::Expired) => {
-                "The Codex sign-in has run out. Use Codex once (for example `codex` in a terminal), which renews it, then ask again."
+                "The ChatGPT sign-in of Jarvis has ended. Open Settings, Jarvis, and sign in again."
             }
             (Language::Vietnamese, SignIn::Expired) => {
-                "Phiên đăng nhập Codex đã hết hạn. Dùng Codex một lần (ví dụ chạy `codex` trong terminal) để nó tự làm mới, rồi hỏi lại."
+                "Phiên đăng nhập ChatGPT của Jarvis đã hết. Mở Cài đặt, mục Jarvis, rồi đăng nhập lại."
             }
-            (Language::English, SignIn::Unreadable) => "The Codex sign-in file could not be read. Sign in to Codex again.",
-            (Language::Vietnamese, SignIn::Unreadable) => "Không đọc được tệp đăng nhập của Codex. Hãy đăng nhập lại Codex.",
+            (Language::English, SignIn::Unreadable) => "OpenAI could not be reached to renew the sign-in. Try again in a moment.",
+            (Language::Vietnamese, SignIn::Unreadable) => "Không liên lạc được OpenAI để làm mới phiên đăng nhập. Thử lại sau giây lát.",
         }
     }
 }
