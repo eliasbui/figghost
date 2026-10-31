@@ -23,7 +23,7 @@ pub enum NetError {
 }
 
 /// A value for a curl configuration file: quoted, with the characters that mean something escaped.
-fn quote(value: &str) -> String {
+pub fn quote(value: &str) -> String {
     let mut out = String::from("\"");
     for c in value.chars() {
         match c {

@@ -15,6 +15,7 @@ core-capture.workspace = true
 core-calendar.workspace = true
 core-lyrics.workspace = true
 core-smart.workspace = true
+core-jarvis.workspace = true
 core-audio-fx.workspace = true
 core-typing.workspace = true
 core-notes.workspace = true

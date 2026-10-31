@@ -1,0 +1,17 @@
+{
+  "enabled": true,
+  "shortcut": "ctrl+opt+space",
+  "provider": "anthropic",
+  "model": "",
+  "default_model": "claude-haiku-5-5",
+  "needs_key": true,
+  "key": false,
+  "voice": true,
+  "language": "auto",
+  "on_device": true,
+  "speak": true,
+  "sound": true,
+  "speech": "ask",
+  "microphone": false,
+  "signin": ""
+}

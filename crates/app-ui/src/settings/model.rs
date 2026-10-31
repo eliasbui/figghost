@@ -1658,6 +1658,7 @@ mod tests {
             "utilities",
             "breaks",
             "dictation",
+            "jarvis",
             "browser",
             "notes",
             "launcher",

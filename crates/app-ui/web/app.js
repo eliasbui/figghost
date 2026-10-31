@@ -828,7 +828,7 @@ const PAGE_SYMBOLS = {
   notch: 'rectangle.topthird.inset.filled', islands: 'capsule', notifications: 'bell.badge', volume: 'speaker.wave.2',
   sound: 'speaker.wave.2', musicwidget: 'music.quarternote.3',
   scroll: 'computermouse', cursor: 'cursorarrow.rays', wheel: 'chart.pie', tiling: 'rectangle.split.2x1', pin: 'pin',
-  clipboard: 'list.clipboard', typing: 'keyboard', snippets: 'text.cursor', dictation: 'mic', smart: 'text.magnifyingglass',
+  clipboard: 'list.clipboard', typing: 'keyboard', snippets: 'text.cursor', dictation: 'mic', jarvis: 'sparkles', smart: 'text.magnifyingglass',
   translate: 'character.bubble',
   capture: 'camera.viewfinder', vision: 'eyedropper.halffull', download: 'arrow.down.circle', browser: 'safari',
   utilities: 'slider.horizontal.3', breaks: 'eye', menubar: 'menubar.rectangle', mole: 'wand.and.stars',
@@ -1848,7 +1848,7 @@ const NAV = [
   { sec: 'overview', pages: ['general', 'keys'] },
   { sec: 'notch', pages: ['notch', 'islands', 'notifications', 'volume', 'musicwidget'] },
   { sec: 'mouse', pages: ['scroll', 'cursor', 'wheel', 'tiling', 'pin'] },
-  { sec: 'text', pages: ['clipboard', 'typing', 'snippets', 'dictation', 'smart', 'translate'] },
+  { sec: 'text', pages: ['clipboard', 'typing', 'snippets', 'dictation', 'jarvis', 'smart', 'translate'] },
   { sec: 'capture', pages: ['capture', 'vision', 'download', 'browser'] },
   { sec: 'mac', pages: ['utilities', 'breaks', 'menubar', 'mole'] },
 ];

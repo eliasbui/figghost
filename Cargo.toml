@@ -37,6 +37,7 @@ core-clipboard = { path = "crates/core-clipboard" }
 core-window = { path = "crates/core-window" }
 core-agents = { path = "crates/core-agents" }
 core-smart = { path = "crates/core-smart" }
+core-jarvis = { path = "crates/core-jarvis" }
 core-lyrics = { path = "crates/core-lyrics" }
 core-calendar = { path = "crates/core-calendar" }
 core-capture = { path = "crates/core-capture" }

@@ -26,6 +26,7 @@ dependencies = [
  "core-calendar",
  "core-capture",
  "core-clipboard",
+ "core-jarvis",
  "core-lyrics",
  "core-mouse",
  "core-netmerge",
@@ -353,6 +354,14 @@ dependencies = [
  "bitflags 2.13.2",
  "core-foundation",
  "libc",
+]
+
+[[package]]
+name = "core-jarvis"
+version = "2.2.8"
+dependencies = [
+ "core-smart",
+ "serde_json",
 ]
 
 [[package]]

@@ -22,6 +22,8 @@ pub mod ddc;
 pub mod desktop;
 pub mod devices_ui;
 pub mod dictation_ui;
+pub mod jarvis_ui;
+pub mod voice_out;
 pub mod display_layout;
 pub mod displays_ui;
 pub mod editor_ui;

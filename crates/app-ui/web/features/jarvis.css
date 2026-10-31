@@ -1,0 +1,4 @@
+/* Jarvis. Styles for the page in web/features/jarvis.js, using the variables at the top of app.css. */
+.jarvis-key { display: flex; flex-wrap: wrap; gap: 8px; align-items: center; justify-content: flex-end; }
+.jarvis-key .text-field, .jarvis-model { width: 220px; }
+.jarvis-note { margin: 6px 14px 0; color: var(--text-2, inherit); font-size: 11px; line-height: 1.4; }

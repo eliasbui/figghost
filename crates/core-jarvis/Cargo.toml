@@ -1,0 +1,10 @@
+[package]
+name = "core-jarvis"
+version.workspace = true
+edition.workspace = true
+rust-version.workspace = true
+publish.workspace = true
+
+[dependencies]
+core-smart.workspace = true
+serde_json.workspace = true
