@@ -26,11 +26,15 @@
     'network.card.save': 'Save', 'network.card.unwire': 'Remove the wire', 'network.card.held': 'Held to {speed} for the apps above it',
     'network.priority.high': 'Main', 'network.priority.normal': 'Normal', 'network.priority.low': 'Below',
     'network.close': 'Close',
-    'sec.network.tether': 'Share with a phone (Beta)',
-    'network.tether.title': 'Android phone on USB', 'network.tether.desc': 'Gives the phone this Mac\'s connection over the cable, through gnirehtet. Turn on USB debugging on the phone, plug it in, then start.',
-    'network.tether.missing': 'Needs gnirehtet and adb: brew install gnirehtet android-platform-tools',
-    'network.tether.none': 'No phone found', 'network.tether.phones': 'Phones: {list}', 'network.tether.unauthorized': 'A phone waits: allow this Mac on its screen',
-    'network.tether.start': 'Start sharing', 'network.tether.stop': 'Stop', 'network.tether.running': 'Sharing',
+    'sec.network.tether': 'Phone sharing (Beta)',
+    'network.tether.title': 'Phone sharing', 'network.tether.desc': 'An Android phone on a USB cable uses this Mac\'s connection. Its Wi-Fi and mobile data can stay off.',
+    'network.tether.missing': 'Phone sharing needs two free tools, installed once. Paste this in Terminal:',
+    'network.tether.none': 'No phone connected', 'network.tether.none.hint': 'Plug in an Android phone with USB debugging on (Settings, Developer options).',
+    'network.tether.unauthorized': 'Waiting for the phone', 'network.tether.unauthorized.hint': 'Unlock the phone and allow this Mac on its screen.',
+    'network.tether.ready': 'Ready: {model}', 'network.tether.ready.hint': 'The phone asks once to allow a VPN connection: that is how it takes this Mac\'s connection.',
+    'network.tether.running': 'Sharing with {model}', 'network.tether.running.hint': 'The phone is on this Mac\'s connection. Stop turns its VPN off too.',
+    'network.tether.lost': 'Connection lost', 'network.tether.lost.hint': 'The phone was unplugged. Plug it in again to go on, or stop.',
+    'network.tether.start': 'Start sharing', 'network.tether.stop': 'Stop sharing', 'network.tether.vpnoff': 'Turn off the phone\'s VPN',
     'network.tether.iphone': 'An iPhone cannot take a Mac\'s connection over USB this way. Use Internet Sharing in System Settings, General, Sharing.',
   },
   vi: {
@@ -56,11 +60,15 @@
     'network.card.save': 'Lưu', 'network.card.unwire': 'Gỡ dây', 'network.card.held': 'Đang bị giữ ở {speed} để nhường app phía trên',
     'network.priority.high': 'Chính', 'network.priority.normal': 'Thường', 'network.priority.low': 'Xếp sau',
     'network.close': 'Đóng',
-    'sec.network.tether': 'Chia mạng cho điện thoại (Beta)',
-    'network.tether.title': 'Điện thoại Android cắm USB', 'network.tether.desc': 'Cho điện thoại dùng mạng của Mac qua dây cáp, nhờ gnirehtet. Bật gỡ lỗi USB trên điện thoại, cắm cáp, rồi bấm bắt đầu.',
-    'network.tether.missing': 'Cần gnirehtet và adb: brew install gnirehtet android-platform-tools',
-    'network.tether.none': 'Chưa thấy điện thoại', 'network.tether.phones': 'Điện thoại: {list}', 'network.tether.unauthorized': 'Có điện thoại đang chờ: cho phép máy Mac này trên màn hình điện thoại',
-    'network.tether.start': 'Bắt đầu chia mạng', 'network.tether.stop': 'Dừng', 'network.tether.running': 'Đang chia mạng',
+    'sec.network.tether': 'Phone sharing (Beta)',
+    'network.tether.title': 'Phone sharing', 'network.tether.desc': 'Điện thoại Android cắm cáp USB dùng mạng của máy Mac này. Wi-Fi và dữ liệu di động của điện thoại có thể tắt.',
+    'network.tether.missing': 'Phone sharing cần hai công cụ miễn phí, chỉ cài một lần. Dán lệnh này vào Terminal:',
+    'network.tether.none': 'Chưa có điện thoại', 'network.tether.none.hint': 'Cắm điện thoại Android đã bật Gỡ lỗi USB (Cài đặt, Tùy chọn nhà phát triển).',
+    'network.tether.unauthorized': 'Đang chờ điện thoại', 'network.tether.unauthorized.hint': 'Mở khóa điện thoại và bấm Cho phép máy Mac này trên màn hình.',
+    'network.tether.ready': 'Sẵn sàng: {model}', 'network.tether.ready.hint': 'Lần đầu điện thoại hỏi cho phép kết nối VPN: đó là cách nó dùng mạng của máy Mac.',
+    'network.tether.running': 'Đang chia mạng cho {model}', 'network.tether.running.hint': 'Điện thoại đang dùng mạng của máy Mac. Bấm Dừng sẽ tắt luôn VPN trên điện thoại.',
+    'network.tether.lost': 'Mất kết nối', 'network.tether.lost.hint': 'Điện thoại đã bị rút cáp. Cắm lại để tiếp tục, hoặc bấm Dừng.',
+    'network.tether.start': 'Bắt đầu chia mạng', 'network.tether.stop': 'Dừng chia mạng', 'network.tether.vpnoff': 'Tắt VPN trên điện thoại',
     'network.tether.iphone': 'iPhone không nhận mạng của Mac qua USB theo cách này. Dùng Chia sẻ Internet trong Cài đặt hệ thống, Cài đặt chung, Chia sẻ.',
   },
   build() {
@@ -98,21 +106,37 @@
     const restoreRow = row(t('network.restore'), t('network.restore.desc'), button(t('network.restore'), () => act('network_restore'), { small: true }));
     reg(() => { restoreRow.hidden = !N().saved || (N().control && N().status === 'on'); });
 
-    // ---- the phone
-    const phone = h('span', { class: 'row-desc network-status' });
+    // ---- Phone sharing: one card that says where it stands with a coloured light, and the one button that moves on.
+    const light = h('span', { class: 'phone-light', 'aria-hidden': 'true' });
+    const badge = h('div', { class: 'phone-badge' }, icon('iphone.radiowaves.left.and.right', 'phone-glyph'), light);
+    const phoneTitle = h('div', { class: 'phone-state' });
+    const phoneHint = h('div', { class: 'phone-hint' });
+    // The command is written only while it is needed: the card does not name the tool it runs otherwise.
+    const install = h('code', { class: 'code phone-install' });
     const start = button(t('network.tether.start'), () => act('network_tether_start'), { small: true, primary: true });
-    const stop = button(t('network.tether.stop'), () => act('network_tether_stop'), { small: true });
+    const stop = button(t('network.tether.stop'), () => act('network_tether_stop'), { small: true, danger: true });
+    const vpnOff = button(t('network.tether.vpnoff'), () => act('network_tether_stop'), { small: true });
+    const phoneCard = h('div', { class: 'phone-card' },
+      badge,
+      h('div', { class: 'phone-text' }, h('div', { class: 'phone-name', text: t('network.tether.title') }), phoneTitle, phoneHint, install),
+      h('div', { class: 'phone-actions' }, start, vpnOff, stop));
     reg(() => {
       const tt = N().tether || {};
-      const ready = tt.gnirehtet && tt.adb;
+      const tools = tt.gnirehtet && tt.adb;
       const phones = tt.phones || [];
-      phone.textContent = !ready ? t('network.tether.missing')
-        : tt.running ? t('network.tether.running')
-        : tt.unauthorized ? t('network.tether.unauthorized')
-        : phones.length ? t('network.tether.phones', { list: phones.join(', ') }) : t('network.tether.none');
-      start.hidden = !ready || tt.running;
-      start.disabled = !phones.length;
-      stop.hidden = !tt.running;
+      const model = phones.map((p) => p.model || p.serial).join(', ');
+      const state = !tools ? 'missing' : tt.running ? (phones.length ? 'running' : 'lost') : tt.unauthorized ? 'unauthorized' : phones.length ? 'ready' : 'none';
+      phoneCard.dataset.state = state;
+      phoneTitle.textContent = state === 'missing' ? '' : t('network.tether.' + state, { model });
+      phoneHint.textContent = state === 'missing' ? t('network.tether.missing') : t('network.tether.' + state + '.hint');
+      install.hidden = state !== 'missing';
+      install.textContent = state === 'missing' ? 'brew install gnirehtet android-platform-tools' : '';
+      phoneTitle.hidden = state === 'missing';
+      // A button's own display wins over `hidden`, so they are shown and hidden by their style.
+      const show = (el, yes) => { el.style.display = yes ? '' : 'none'; };
+      show(start, state === 'ready');
+      show(stop, !!tt.running);
+      show(vpnOff, state === 'ready');
     });
 
     return [
@@ -124,8 +148,8 @@
       card(toggleRow('network.control', t('network.control.title'), t('network.control.desc'), when),
         row(status, null, null, when), restoreRow),
       sectionTitle(t('sec.network.tether')),
-      card(row(t('network.tether.title'), t('network.tether.desc'), h('div', { class: 'network-phone' }, phone, start, stop), when),
-        h('p', { class: 'network-note', text: t('network.tether.iphone') })),
+      card(h('div', { class: 'row block' }, phoneCard),
+        h('p', { class: 'network-note', text: t('network.tether.desc') + ' ' + t('network.tether.iphone') })),
     ];
   },
 
@@ -176,13 +200,13 @@
       }
       const merge = (n.merge || []).filter((m) => links.some((l) => l.name === m));
       const apps = [];
-      const add = (name) => { if (name && !apps.some((a) => a.name.toLowerCase() === name.toLowerCase())) apps.push({ name, down: 0, up: 0, interfaces: [], idle: true }); };
-      for (const name of n.known_apps || []) add(name);
+      const add = (name, bundle) => { if (name && !apps.some((a) => a.name.toLowerCase() === name.toLowerCase())) apps.push({ name, bundle: bundle || '', down: 0, up: 0, interfaces: [], idle: true }); };
+      for (const k of n.known_apps || []) add(k.name, k.bundle);
       for (const a of n.apps || []) add(a.name);
       for (const w of n.wires || []) add(w.app);
       for (const a of apps) {
         const now = (n.apps || []).find((x) => x.name.toLowerCase() === a.name.toLowerCase());
-        if (now) Object.assign(a, now, { idle: !(now.down || now.up) && !(now.interfaces || []).length });
+        if (now) Object.assign(a, now, { bundle: now.bundle || a.bundle, idle: !(now.down || now.up) && !(now.interfaces || []).length });
         a.wire = (n.wires || []).find((w) => w.app.toLowerCase() === a.name.toLowerCase());
       }
       return { links, merge: merge.length >= 2 ? merge : [], apps };
@@ -272,6 +296,7 @@
         const el = node(id, 'link', (l.primary ? 'primary ' : '') + (l.away ? 'away ' : '') + (at[id].inside ? 'inside' : ''));
         el.title = l.primary ? t('network.link.primary') : l.away ? t('network.link.away') : '';
         el.firstChild.replaceChildren(
+          icon(linkSymbol(l), 'network-link-glyph'),
           h('div', { class: 'network-node-title', text: l.label || l.name }),
           h('div', { class: 'network-node-sub', text: l.away ? t('network.link.away') : l.name }),
           h('div', { class: 'network-node-speed', text: l.away ? '' : speed(l.down) }));
@@ -283,8 +308,11 @@
         const el = node(id, 'app', (a.wire ? 'wired ' : '') + (a.idle ? 'idle ' : '') + (picked === a.name ? 'picked' : ''));
         el.title = a.idle ? t('network.app.idle') : '';
         el.firstChild.replaceChildren(
-          h('div', { class: 'network-node-title', text: a.name }),
-          h('div', { class: 'network-node-sub', text: speed(a.down) + ' / ' + speed(a.up) + (a.wire ? '  ' + t('network.priority.' + a.wire.priority) : '') }));
+          // The glyph lies under the icon, so an app whose icon cannot be had still shows one.
+          h('span', { class: 'network-app-icon' }, icon('app.dashed', 'network-app-glyph'), a.bundle ? iconImg(a.bundle) : null),
+          h('div', { class: 'network-app-text' },
+            h('div', { class: 'network-node-title', text: a.name }),
+            h('div', { class: 'network-node-sub', text: speed(a.down) + ' / ' + speed(a.up) + (a.wire ? '  ' + t('network.priority.' + a.wire.priority) : '') })));
         put(el, at[id]);
         seen.add(id);
       }
@@ -532,6 +560,8 @@
     expect(nodes('link').filter((n) => n.classList.contains('inside')).length === 2, 'network: the circle holds the two connections');
     const names = nodes('app').map((n) => n.dataset.node.slice(4));
     expect(names.includes('Spotify'), 'network: an app seen before stays on the canvas while it is idle: ' + names);
+    expect(canvas.querySelector('.network-node.app img[data-id="/Applications/Spotify.app"]'), 'network: an app shows its icon, an idle one too');
+    expect(canvas.querySelectorAll('.network-node.link .glyph').length === 2, 'network: each connection shows its glyph');
     const steam = nodes('app').find((n) => n.dataset.node === 'app:Steam');
     expect(steam && steam.style.left === '560px' && steam.style.top === '80px', 'network: a box stays where it was put');
     expect(canvas.querySelectorAll('.network-wire.join').length === 1, 'network: the straight wire joins the two connections');
@@ -545,17 +575,38 @@
     holder.remove();
     syncs.splice(syncsBefore);
 
+    const phoneCard = page.querySelector('.phone-card');
+    const btn = (text) => [...phoneCard.querySelectorAll('.btn')].find((b) => b.textContent === text && b.style.display !== 'none');
+    const shown = () => [...phoneCard.querySelectorAll('.btn')].filter((b) => b.style.display !== 'none').length;
+    expect(shown() === 2, 'network: a ready phone offers to start and to turn its VPN off, nothing else: ' + shown());
+    expect(phoneCard.dataset.state === 'ready' && phoneCard.textContent.includes('SM G991B') && btn(t('network.tether.start')), 'network: a phone plugged in is ready to share, by its model');
+    expect(!phoneCard.textContent.toLowerCase().includes('gnirehtet'), 'network: Phone sharing does not show the tool it runs');
     S.network.tether.running = true; runSyncs();
-    const stop = [...page.querySelectorAll('.btn')].find((b) => b.textContent === t('network.tether.stop'));
-    expect(stop && !stop.hidden, 'network: sharing with the phone can be stopped');
+    expect(phoneCard.dataset.state === 'running' && !btn(t('network.tether.start')) && shown() === 1, 'network: sharing shows as connected, with only its stop button');
     sent.length = 0;
-    stop.click();
+    btn(t('network.tether.stop')).click();
     expect(sent.some((m) => m.t === 'action' && m.name === 'network_tether_stop'), 'network: stop sends its action');
-    S.network.tether.running = false; S.network.status = 'denied'; runSyncs();
+    S.network.tether.phones = []; runSyncs();
+    expect(phoneCard.dataset.state === 'lost', 'network: a phone unplugged while sharing shows as lost');
+    S.network.tether.running = false; S.network.tether.unauthorized = 1; runSyncs();
+    expect(phoneCard.dataset.state === 'unauthorized', 'network: a phone that has not allowed this Mac says so');
+    S.network.tether.unauthorized = 0; S.network.tether.adb = false; runSyncs();
+    expect(phoneCard.dataset.state === 'missing' && !phoneCard.querySelector('.phone-install').hidden, 'network: the missing tools come with the command that installs them');
+    S.network.tether.adb = true; S.network.tether.phones = [{ serial: 'R58M12ABC', model: 'SM G991B' }]; runSyncs();
+    S.network.status = 'denied'; runSyncs();
     expect(page.textContent.includes(t('network.status.denied')), 'network: a refused password says what to do');
     S.network.status = 'on'; runSyncs();
   },
 });
+
+// The glyph of a connection, from what System Settings calls it.
+function linkSymbol(l) {
+  const label = String(l.label || '').toLowerCase();
+  if (label.includes('wi-fi') || label.includes('wifi') || label.includes('airport')) return 'wifi';
+  if (label.includes('iphone') || label.includes('android') || label.includes('phone')) return 'iphone';
+  if (/ethernet|lan|usb|thunderbolt|dock|adapter/.test(label)) return 'cable.connector';
+  return 'network';
+}
 
 // Formatting shared by the page and the canvas.
 function netHelpers() {

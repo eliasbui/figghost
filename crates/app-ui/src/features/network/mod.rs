@@ -52,7 +52,8 @@ const MAX_APPS: usize = 40;
 const PHONES_EVERY_SECONDS: u64 = 4;
 /// How often the links are listed while the proxy is off; listing may run `networksetup`, so never on the main thread.
 const LINKS_EVERY_SECONDS: u64 = 3;
-/// Every app seen using the network stays on the diagram; this file keeps them across runs, one name a line.
+/// Every app seen using the network stays on the diagram; this file keeps them across runs, one a line: the name, then
+/// after a tab the path of its bundle when it has one (for its icon).
 const APPS_FILE: &str = "network-apps.txt";
 const MAX_KNOWN_APPS: usize = 80;
 /// The most links kept on the diagram, the places of its nodes, and the links in the Combined circle.
@@ -219,7 +220,7 @@ impl Status {
 /// The phones `adb` lists, asked off the main thread.
 #[derive(Default)]
 struct Phones {
-    ready: Vec<String>,
+    ready: Vec<tether::Phone>,
     unauthorized: usize,
     asked: Option<Instant>,
     busy: bool,
@@ -240,8 +241,8 @@ pub struct Feature {
     /// The app this program is, left out of the watched list while the proxy carries the others: its own count would
     /// be theirs again.
     me: String,
-    /// Every app seen using the network, oldest first; kept in `network-apps.txt`.
-    known_apps: RefCell<Vec<String>>,
+    /// Every app seen using the network, oldest first, with the path of its bundle; kept in `network-apps.txt`.
+    known_apps: RefCell<Vec<KnownApp>>,
     /// The links while the proxy is off, listed on another thread.
     idle_links: Arc<Mutex<IdleLinks>>,
 }
@@ -254,29 +255,54 @@ struct IdleLinks {
     busy: bool,
 }
 
-/// The names in the apps file that can stand as app names.
-pub fn read_known_apps(text: &str) -> Vec<String> {
-    let mut out: Vec<String> = Vec::new();
-    for line in text.lines().map(str::trim) {
-        if rules::valid_app(line) && !out.iter().any(|a| a.eq_ignore_ascii_case(line)) && out.len() < MAX_KNOWN_APPS {
-            out.push(line.to_owned());
+/// An app kept on the diagram: its name, and the path of its bundle or nothing.
+#[derive(Debug, Clone, PartialEq, Eq)]
+pub struct KnownApp {
+    pub name: String,
+    pub bundle: String,
+}
+
+/// A path that can be shown as the icon of an app: an absolute path to a bundle, with no way up out of it.
+fn valid_bundle(path: &str) -> bool {
+    path.starts_with('/') && path.ends_with(".app") && !path.contains("/../") && valid_text(path, 400)
+}
+
+/// The apps of the apps file that can stand as apps.
+pub fn read_known_apps(text: &str) -> Vec<KnownApp> {
+    let mut out: Vec<KnownApp> = Vec::new();
+    for line in text.lines() {
+        let (name, bundle) = line.split_once('\t').unwrap_or((line, ""));
+        let (name, bundle) = (name.trim(), bundle.trim());
+        if rules::valid_app(name) && !out.iter().any(|a| a.name.eq_ignore_ascii_case(name)) && out.len() < MAX_KNOWN_APPS {
+            out.push(KnownApp { name: name.to_owned(), bundle: if valid_bundle(bundle) { bundle.to_owned() } else { String::new() } });
         }
     }
     out
 }
 
-/// Adds the apps of `seen` that are not known yet, never forgetting one; true when the list grew.
-pub fn remember_apps(known: &mut Vec<String>, seen: impl IntoIterator<Item = String>) -> bool {
-    let before = known.len();
-    for name in seen {
-        if known.len() >= MAX_KNOWN_APPS {
-            break;
+pub fn write_known_apps(apps: &[KnownApp]) -> String {
+    apps.iter().map(|a| if a.bundle.is_empty() { format!("{}\n", a.name) } else { format!("{}\t{}\n", a.name, a.bundle) }).collect()
+}
+
+/// Adds the apps of `seen` (name, bundle) that are not known yet, and the bundle of one known without it, never
+/// forgetting one; true when the list changed.
+pub fn remember_apps(known: &mut Vec<KnownApp>, seen: impl IntoIterator<Item = (String, String)>) -> bool {
+    let mut changed = false;
+    for (name, bundle) in seen {
+        let bundle = if valid_bundle(&bundle) { bundle } else { String::new() };
+        if let Some(app) = known.iter_mut().find(|a| a.name.eq_ignore_ascii_case(&name)) {
+            if app.bundle.is_empty() && !bundle.is_empty() {
+                app.bundle = bundle;
+                changed = true;
+            }
+            continue;
         }
-        if rules::valid_app(&name) && name != core_netcontrol::proxy::UNKNOWN_APP && !known.iter().any(|a| a.eq_ignore_ascii_case(&name)) {
-            known.push(name);
+        if known.len() < MAX_KNOWN_APPS && rules::valid_app(&name) && name != core_netcontrol::proxy::UNKNOWN_APP {
+            known.push(KnownApp { name, bundle });
+            changed = true;
         }
     }
-    known.len() > before
+    changed
 }
 
 pub fn attach(env: &AttachEnv) -> Option<Rc<Feature>> {
@@ -305,7 +331,7 @@ pub fn attach(env: &AttachEnv) -> Option<Rc<Feature>> {
     let weak = Rc::downgrade(&feature);
     app::on_terminate(move || {
         if let Some(f) = weak.upgrade() {
-            f.stop_tether();
+            f.stop_tether_and(true);
             if f.control.borrow().is_some() {
                 // On the way out: done here and now, with a password if it takes one.
                 restore_settings(&f.home, f.config.borrow().port);
@@ -507,12 +533,40 @@ impl Feature {
         *self.status.lock().unwrap_or_else(PoisonError::into_inner)
     }
 
-    fn stop_tether(&self) {
-        if let Some(mut child) = self.tether.borrow_mut().take() {
-            macos_sys::process::kill_group(child.id());
-            let _ = child.wait();
-            trace::log("network: phone sharing stopped");
+    /// Stops sharing: the relay on the Mac ends, and each phone is told to turn its VPN off, so that it does not stay
+    /// on a VPN that leads nowhere. `wait` runs the phones' part here and now (when the app quits), else off the main
+    /// thread.
+    fn stop_tether_and(&self, wait: bool) {
+        let Some(mut child) = self.tether.borrow_mut().take() else { return };
+        macos_sys::process::kill_group(child.id());
+        let _ = child.wait();
+        trace::log("network: phone sharing stopped");
+        self.phones_off(wait);
+    }
+
+    /// Tells each phone that is plugged in to turn the VPN of sharing off.
+    fn phones_off(&self, wait: bool) {
+        let phones = self.phones.lock().unwrap_or_else(PoisonError::into_inner).ready.clone();
+        let (Some(gnirehtet), Some(adb)) = (tether::find("gnirehtet"), tether::find("adb")) else { return };
+        let work = move || {
+            for phone in phones {
+                if let Some(args) = tether::stop_args(&phone.serial) {
+                    let args: Vec<&str> = args.iter().map(String::as_str).collect();
+                    let adb = adb.to_string_lossy().into_owned();
+                    let ok = run_bounded_output(&gnirehtet.to_string_lossy(), &args, &[("ADB", adb.as_str())], 8).is_ok();
+                    trace::log(&format!("network: the VPN of a phone was {}turned off", if ok { "" } else { "not " }));
+                }
+            }
+        };
+        if wait {
+            work();
+        } else {
+            thread::spawn(work);
         }
+    }
+
+    fn stop_tether(&self) {
+        self.stop_tether_and(false);
     }
 
     fn tether_running(&self) -> bool {
@@ -557,7 +611,6 @@ impl Feature {
         Ok(())
     }
 
-    /// Asks `adb` for the phones now and then, off the main thread.
     /// The links the last listing found; a new one is asked on another thread when it is due.
     fn idle_links(&self) -> Vec<core_netmerge::LinkStats> {
         let mut idle = self.idle_links.lock().unwrap_or_else(PoisonError::into_inner);
@@ -576,7 +629,8 @@ impl Feature {
         idle.links.clone()
     }
 
-    fn phones(&self) -> (Vec<String>, usize) {
+    /// Asks `adb` for the phones now and then, off the main thread.
+    fn phones(&self) -> (Vec<tether::Phone>, usize) {
         let mut phones = self.phones.lock().unwrap_or_else(PoisonError::into_inner);
         let due = phones
             .asked
@@ -589,7 +643,7 @@ impl Feature {
             phones.asked = Some(Instant::now());
             let shared = Arc::clone(&self.phones);
             thread::spawn(move || {
-                let text = run_bounded(&adb.to_string_lossy(), &["devices"], 6).unwrap_or_default();
+                let text = run_bounded(&adb.to_string_lossy(), &["devices", "-l"], 6).unwrap_or_default();
                 let mut phones = shared.lock().unwrap_or_else(PoisonError::into_inner);
                 phones.ready = tether::parse_devices(&text);
                 phones.unauthorized = tether::count_unauthorized(&text);
@@ -603,7 +657,12 @@ impl Feature {
         Some(match name {
             "network_tether_start" => self.start_tether(),
             "network_tether_stop" => {
-                self.stop_tether();
+                // Also when this run did not start it (a phone left on its VPN by a run that ended badly).
+                if self.tether.borrow().is_some() {
+                    self.stop_tether();
+                } else {
+                    self.phones_off(false);
+                }
                 Ok(())
             }
             // Puts the system's settings back even with the switches off, for a person who sees the web stop.
@@ -627,10 +686,17 @@ impl Feature {
         let idle = if snapshot.is_none() { self.idle_links() } else { Vec::new() };
         let mut out = view(&usage, snapshot.as_ref(), &self.me, &idle);
         // Every app seen stays on the diagram, also once it stops using the network.
-        let seen = out["apps"].as_array().map(|apps| apps.iter().filter_map(|a| a["name"].as_str().map(str::to_owned)).collect::<Vec<_>>()).unwrap_or_default();
+        let seen = out["apps"]
+            .as_array()
+            .map(|apps| {
+                apps.iter()
+                    .filter_map(|a| Some((a["name"].as_str()?.to_owned(), a["bundle"].as_str().unwrap_or_default().to_owned())))
+                    .collect::<Vec<_>>()
+            })
+            .unwrap_or_default();
         let grew = remember_apps(&mut self.known_apps.borrow_mut(), seen);
         if grew {
-            let text = self.known_apps.borrow().join("\n") + "\n";
+            let text = write_known_apps(&self.known_apps.borrow());
             let path = self.home.join(APPS_FILE);
             thread::spawn(move || {
                 if let Err(e) = fs::write(&path, text) {
@@ -638,7 +704,7 @@ impl Feature {
                 }
             });
         }
-        out["known_apps"] = json!(*self.known_apps.borrow());
+        out["known_apps"] = json!(self.known_apps.borrow().iter().map(|a| json!({ "name": a.name, "bundle": a.bundle })).collect::<Vec<_>>());
         out["status"] = json!(self.status().id());
         out["saved"] = json!(saved_path(&self.home).exists());
         out["port"] = json!(
@@ -651,7 +717,7 @@ impl Feature {
             "gnirehtet": tether::find("gnirehtet").is_some(),
             "adb": tether::find("adb").is_some(),
             "running": self.tether_running(),
-            "phones": ready,
+            "phones": ready.iter().map(|p| json!({ "serial": p.serial, "model": p.model })).collect::<Vec<_>>(),
             "unauthorized": unauthorized,
         });
         out
@@ -796,13 +862,18 @@ mod tests {
 
     #[test]
     fn every_app_seen_is_kept_and_none_is_forgotten() {
-        let mut known = read_known_apps("Safari\n\nsafari\nbad/name\nSteam\n");
-        assert_eq!(known, ["Safari", "Steam"]);
-        assert!(remember_apps(&mut known, vec!["Zoom".into(), "STEAM".into(), "?".into()]));
-        assert_eq!(known, ["Safari", "Steam", "Zoom"], "an app that stopped is kept, and the unknown one is not added");
-        assert!(!remember_apps(&mut known, vec!["Zoom".into()]));
+        let names = |k: &[KnownApp]| k.iter().map(|a| a.name.clone()).collect::<Vec<_>>();
+        let mut known = read_known_apps("Safari\t/Applications/Safari.app\n\nsafari\nbad/name\nSteam\t/etc/../x.app\n");
+        assert_eq!(names(&known), ["Safari", "Steam"]);
+        assert_eq!((known[0].bundle.as_str(), known[1].bundle.as_str()), ("/Applications/Safari.app", ""), "a path that climbs out is no icon");
+        let seen = |n: &str, b: &str| (n.to_owned(), b.to_owned());
+        assert!(remember_apps(&mut known, vec![seen("Zoom", ""), seen("STEAM", "/Applications/Steam.app"), seen("?", "")]));
+        assert_eq!(names(&known), ["Safari", "Steam", "Zoom"], "an app that stopped is kept, and the unknown one is not added");
+        assert_eq!(known[1].bundle, "/Applications/Steam.app", "a bundle found later is kept");
+        assert!(!remember_apps(&mut known, vec![seen("Zoom", "")]));
+        assert_eq!(read_known_apps(&write_known_apps(&known)), known);
         for i in 0..200 {
-            remember_apps(&mut known, vec![format!("app {i}")]);
+            remember_apps(&mut known, vec![seen(&format!("app {i}"), "")]);
         }
         assert_eq!(known.len(), MAX_KNOWN_APPS);
     }

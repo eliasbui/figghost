@@ -297,6 +297,12 @@ const SYMBOLS: &[&str] = &[
     "info.circle.fill",
     "sparkles",
     "network",
+    // The Network diagram and Phone sharing.
+    "wifi",
+    "cable.connector",
+    "iphone",
+    "iphone.radiowaves.left.and.right",
+    "app.dashed",
     "bell.badge.fill",
     "waveform.circle.fill",
     "waveform.and.mic",

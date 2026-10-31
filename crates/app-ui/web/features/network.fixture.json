@@ -10,7 +10,13 @@
   "merge": ["en0", "en7"],
   "known_links": [{ "name": "en0", "label": "Wi-Fi" }, { "name": "en7", "label": "USB 10/100/1000 LAN" }],
   "layout": { "app:Steam": [560, 80] },
-  "known_apps": ["Steam", "Microsoft Edge", "Dropbox", "mDNSResponder", "Spotify"],
+  "known_apps": [
+    { "name": "Steam", "bundle": "/Applications/Steam.app" },
+    { "name": "Microsoft Edge", "bundle": "/Applications/Microsoft Edge.app" },
+    { "name": "Dropbox", "bundle": "/Applications/Dropbox.app" },
+    { "name": "mDNSResponder", "bundle": "" },
+    { "name": "Spotify", "bundle": "/Applications/Spotify.app" }
+  ],
   "status": "on",
   "saved": true,
   "running": true,
@@ -27,5 +33,5 @@
   ],
   "total_down": 6101200,
   "total_up": 420300,
-  "tether": { "gnirehtet": true, "adb": true, "running": false, "phones": ["R58M12ABC"], "unauthorized": 0 }
+  "tether": { "gnirehtet": true, "adb": true, "running": false, "phones": [{ "serial": "R58M12ABC", "model": "SM G991B" }], "unauthorized": 0 }
 }

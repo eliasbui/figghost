@@ -333,10 +333,10 @@ mod tests {
         assert!(set(&mut c, "known_link", &json!({ "name": "en0", "label": "Wi-Fi 2" })).unwrap().is_ok());
         assert_eq!(c.links.len(), 1);
         assert!(set(&mut c, "known_link", &json!({ "name": "nope", "label": "x" })).unwrap().is_err());
-        let s = state(&c, &json!({ "known_apps": ["Safari"] }));
+        let s = state(&c, &json!({ "known_apps": [{ "name": "Safari", "bundle": "" }] }));
         assert_eq!(s["known_links"][0]["label"], json!("Wi-Fi 2"));
         assert_eq!(s["layout"]["app:Safari"], json!([120, 0]));
-        assert_eq!(s["known_apps"], json!(["Safari"]));
+        assert_eq!(s["known_apps"][0]["name"], json!("Safari"));
     }
 
     #[test]

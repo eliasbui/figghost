@@ -10,7 +10,6 @@
 .network-empty { padding: 6px 0; }
 .network-status[data-state="denied"], .network-status[data-state="failed"] { color: var(--bad); }
 .network-status[data-state="on"] { color: var(--good); }
-.network-phone { display: flex; flex-wrap: wrap; gap: 8px; align-items: center; justify-content: flex-end; max-width: 360px; }
 .network-note { margin: 6px 14px 8px; color: var(--text-2); font-size: var(--fs-small); line-height: 1.4; }
 
 /* The canvas, in a window of its own: a header under the window's buttons, then a board on a dotted grid that
@@ -37,7 +36,7 @@
 
 .network-node.link { z-index: 2; width: 96px; height: 96px; border-radius: 50%; padding: 10px; text-align: center; background: var(--group); box-shadow: 0 0 0 1.5px var(--group-edge), 0 2px 6px var(--shadow); }
 .network-node.link .network-node-body { align-items: center; }
-.network-node.link .network-node-title { white-space: normal; display: -webkit-box; -webkit-line-clamp: 2; -webkit-box-orient: vertical; line-height: 1.2; max-width: 100%; }
+.network-node.link .network-node-title { max-width: 100%; }
 .network-node.link.primary { box-shadow: 0 0 0 2px var(--accent), 0 2px 6px var(--shadow); }
 .network-node.link.away { opacity: 0.55; }
 .network-node.merge { z-index: 1; border-radius: 50%; border: 2px dashed var(--accent); background: color-mix(in srgb, var(--accent) 7%, transparent); }
@@ -70,3 +69,43 @@
 .network-field { display: flex; flex-direction: column; gap: 4px; font-size: var(--fs-small); color: var(--text-2); }
 .network-limit { width: 100%; box-sizing: border-box; }
 .network-actions { display: flex; justify-content: flex-end; gap: 8px; margin-top: 10px; }
+
+/* Phone sharing: a badge with the phone's glyph and a light that says where it stands; rings go out while it shares. */
+.phone-card { display: grid; grid-template-columns: auto 1fr auto; gap: 14px; align-items: center; width: 100%; }
+.phone-badge { position: relative; width: 52px; height: 52px; border-radius: 14px; display: grid; place-items: center;
+  background: linear-gradient(160deg, color-mix(in srgb, var(--accent) 85%, white), var(--accent)); box-shadow: 0 2px 8px var(--shadow); }
+.phone-glyph { width: 26px; height: 26px; background: white; }
+.phone-light { position: absolute; right: -3px; bottom: -3px; width: 14px; height: 14px; border-radius: 50%; background: var(--text-3); box-shadow: 0 0 0 2.5px var(--solid); }
+.phone-card[data-state="ready"] .phone-light { background: var(--accent); }
+.phone-card[data-state="running"] .phone-light { background: var(--good); }
+.phone-card[data-state="unauthorized"] .phone-light, .phone-card[data-state="lost"] .phone-light { background: var(--warn); animation: phone-blink 1.2s ease-in-out infinite; }
+.phone-card[data-state="missing"] .phone-badge, .phone-card[data-state="none"] .phone-badge { filter: grayscale(1); opacity: 0.7; }
+.phone-card[data-state="running"] .phone-badge::before, .phone-card[data-state="running"] .phone-badge::after {
+  content: ''; position: absolute; inset: 0; border-radius: 14px; border: 2px solid var(--good); animation: phone-ring 2s ease-out infinite; pointer-events: none; }
+.phone-card[data-state="running"] .phone-badge::after { animation-delay: 1s; }
+@keyframes phone-ring { from { transform: scale(1); opacity: 0.8; } to { transform: scale(1.55); opacity: 0; } }
+@keyframes phone-blink { 50% { opacity: 0.35; } }
+@media (prefers-reduced-motion: reduce) {
+  .phone-card .phone-light, .phone-card .phone-badge::before, .phone-card .phone-badge::after { animation: none !important; }
+}
+.phone-text { min-width: 0; display: flex; flex-direction: column; gap: 2px; }
+.phone-name { font-weight: 600; }
+.phone-state { font-size: var(--fs-small); font-weight: 500; }
+.phone-card[data-state="running"] .phone-state { color: var(--good); }
+.phone-card[data-state="unauthorized"] .phone-state, .phone-card[data-state="lost"] .phone-state { color: var(--warn); }
+.phone-hint { color: var(--text-2); font-size: var(--fs-small); line-height: 1.35; }
+.phone-install { margin-top: 4px; align-self: flex-start; user-select: text; -webkit-user-select: text; }
+.phone-install[hidden], .phone-state[hidden] { display: none; }
+.phone-actions { display: flex; flex-direction: column; gap: 6px; align-items: stretch; }
+
+/* Icons on the canvas: the glyph of a connection over its name, the icon of an app beside it. */
+.network-link-glyph { width: 20px; height: 20px; margin-bottom: 2px; }
+.network-node.link.primary .network-link-glyph { background: var(--accent); }
+.network-node.app .network-node-body { flex-direction: row; align-items: center; justify-content: flex-start; gap: 9px; }
+.network-app-icon { position: relative; width: 30px; height: 30px; flex: none; display: grid; place-items: center; }
+.network-app-icon .app-icon { position: absolute; inset: 0; width: 30px; height: 30px; }
+.network-app-icon .app-icon:not([src]) { display: none; }
+.network-app-icon:has(.app-icon[src]) .network-app-glyph { visibility: hidden; }
+.network-app-glyph { width: 22px; height: 22px; color: var(--text-3); }
+.network-app-text { min-width: 0; display: flex; flex-direction: column; }
+.network-node.app { padding-left: 12px; }

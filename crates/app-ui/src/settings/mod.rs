@@ -728,7 +728,12 @@ impl SettingsFeature {
         for id in ids.iter().take(MAX_ICONS) {
             let cached = self.icons.borrow().get(id).cloned();
             let url = cached.or_else(|| {
-                let png = workspace::app_icon_png(id, ICON_PIXELS)?;
+                // An app of the Network diagram is known by the path of its bundle, other ids by bundle id.
+                let png = if id.starts_with('/') && id.ends_with(".app") && !id.contains("/../") {
+                    workspace::file_icon_png(std::path::Path::new(id), ICON_PIXELS)?
+                } else {
+                    workspace::app_icon_png(id, ICON_PIXELS)?
+                };
                 let url = format!("data:image/png;base64,{}", base64(&png));
                 self.icons.borrow_mut().insert(id.clone(), url.clone());
                 Some(url)

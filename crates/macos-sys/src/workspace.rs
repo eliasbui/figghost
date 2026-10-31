@@ -274,7 +274,15 @@ pub fn icon_of(path: &Path, points: f64) -> Retained<NSImage> {
 
 /// The app's icon as PNG bytes, `size` pixels square.
 pub fn app_icon_png(bundle_id: &str, size: f64) -> Option<Vec<u8>> {
-    let path = app_path(bundle_id)?;
+    file_icon_png(&app_path(bundle_id)?, size)
+}
+
+/// The icon Finder shows for a file or a bundle, as PNG bytes, `size` pixels square; `None` for one that is not
+/// there.
+pub fn file_icon_png(path: &std::path::Path, size: f64) -> Option<Vec<u8>> {
+    if !path.exists() {
+        return None;
+    }
     let icon =
         NSWorkspace::sharedWorkspace().iconForFile(&NSString::from_str(&path.to_string_lossy()));
     let drawn = NSImage::imageWithSize_flipped_drawingHandler(
@@ -327,4 +335,14 @@ pub fn running_app(pid: i32) -> Option<App> {
             .unwrap_or_default(),
         pid,
     })
+}
+
+#[cfg(test)]
+mod tests {
+    #[test]
+    fn the_icon_of_a_bundle_is_drawn_and_a_missing_one_is_none() {
+        let png = super::file_icon_png(std::path::Path::new("/System/Applications/Calculator.app"), 32.0).expect("an icon");
+        assert!(png.starts_with(b"\x89PNG"));
+        assert!(super::file_icon_png(std::path::Path::new("/Applications/No Such App.app"), 32.0).is_none());
+    }
 }
