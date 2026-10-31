@@ -7,6 +7,10 @@
     { "app": "Microsoft Edge", "target": "merge", "priority": "high", "down_kbps": 0, "up_kbps": 0 },
     { "app": "Dropbox", "target": "link:en7", "priority": "low", "down_kbps": 2048, "up_kbps": 512 }
   ],
+  "merge": ["en0", "en7"],
+  "known_links": [{ "name": "en0", "label": "Wi-Fi" }, { "name": "en7", "label": "USB 10/100/1000 LAN" }],
+  "layout": { "app:Steam": [560, 80] },
+  "known_apps": ["Steam", "Microsoft Edge", "Dropbox", "mDNSResponder", "Spotify"],
   "status": "on",
   "saved": true,
   "running": true,

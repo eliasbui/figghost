@@ -1115,6 +1115,8 @@ mod tests {
                 "interfaces": [{ "name": "en0", "down": 1 }], "proxied": false, "held_to": null }] }),
         );
         config.network.wires = vec![crate::features::network::Wire { app: "Safari".into(), ..Default::default() }];
+        config.network.links = vec![crate::features::network::KnownLink { name: "en0".into(), label: "Wi-Fi".into() }];
+        config.network.layout.insert("app:Steam".into(), [560, 80]);
         config.weather.places = vec![crate::features::weather::logic::Place {
             name: "Hanoi".into(),
             region: String::new(),

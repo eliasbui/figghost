@@ -1,5 +1,5 @@
-// Network: a diagram of the Mac's connections wired to the apps that use them, what each app moves, and (beta) wires
-// that choose the connection of an app, its speed and its place behind the apps wired before it.
+// Network: what each app moves and through which connection, and (beta) wires that choose the connection of an app,
+// its speed and its place behind the apps wired before it. The diagram is drawn by `canvas()` in a window of its own.
 (window.__plugins = window.__plugins || []).push({
   id: 'network',
   icon: 'network',
@@ -7,7 +7,7 @@
     'nav.network': 'Network', 'page.network': 'Network',
     'page.network.sub': 'See which app uses which connection and how much, and wire an app to Wi-Fi, Ethernet or both.',
     'network.enable.title': 'Watch the network', 'network.enable.desc': 'Reads what each app sends and receives, once a second and only while this page is open. Nothing leaves the Mac.',
-    'network.open': 'Open the diagram', 'network.open.desc': 'The connections on the left, where they meet in the middle, the apps on the right. Drag from an app to a place to wire it.',
+    'network.open': 'Open the diagram', 'network.open.desc': 'Opens in a window of its own: each connection is a circle and each app a box you can move anywhere. Wire one connection to another to combine them.',
     'sec.network.summary': 'Now',
     'network.total': 'All apps', 'network.apps.none': 'No app is using the network yet.',
     'network.col.app': 'App', 'network.col.down': 'Down', 'network.col.up': 'Up', 'network.col.total': 'Since opened', 'network.col.via': 'Through',
@@ -19,8 +19,9 @@
     'network.hub.merge': 'Combined', 'network.hub.merge.desc': 'Every connection at once: each new connection of the app takes the next one', 'network.hub.system': 'Automatic', 'network.hub.system.desc': 'The way macOS chooses',
     'network.links': 'Connections', 'network.meet': 'Single or combined', 'network.apps': 'Apps',
     'network.link.primary': 'macOS uses this one', 'network.links.none': 'No connection with an address.',
-    'network.watching': 'Watching only: the wires show where each app goes. Turn on Wiring to choose.',
-    'network.drag': 'Drag from the dot of an app to a connection or to Combined. The first app wired to a place is the main one; apps wired after it come below it when the connection is full.',
+    'network.watching': 'Wires are kept now and take effect once Apply the wires is on in Settings. An app without a wire goes the way macOS chooses, drawn dashed.',
+    'network.drag': 'Drag from the dot of a connection to an app, or from an app to a connection. Wire Wi-Fi to Ethernet to combine them: an app wired to the big circle uses both, to a small one only that one. Drag a box or a circle to move it.',
+    'network.merge.split': 'Separate', 'network.link.away': 'Not connected', 'network.app.idle': 'Not using the network now', 'network.hub.merge.all': 'Combined (every connection)',
     'network.card.target': 'Leaves by', 'network.card.priority': 'Priority', 'network.card.down': 'Most down (KB/s)', 'network.card.up': 'Most up (KB/s)', 'network.card.limit.none': 'No limit',
     'network.card.save': 'Save', 'network.card.unwire': 'Remove the wire', 'network.card.held': 'Held to {speed} for the apps above it',
     'network.priority.high': 'Main', 'network.priority.normal': 'Normal', 'network.priority.low': 'Below',
@@ -36,7 +37,7 @@
     'nav.network': 'Mạng', 'page.network': 'Mạng',
     'page.network.sub': 'Xem app nào đang dùng đường mạng nào, dùng bao nhiêu, và nối app vào Wi-Fi, Ethernet hay cả hai.',
     'network.enable.title': 'Theo dõi mạng', 'network.enable.desc': 'Đọc lượng dữ liệu mỗi app gửi và nhận, mỗi giây một lần và chỉ khi trang này đang mở. Không có gì rời khỏi máy.',
-    'network.open': 'Mở sơ đồ', 'network.open.desc': 'Bên trái là các đường mạng, ở giữa là chỗ chúng gặp nhau, bên phải là các app. Kéo từ một app sang một chỗ để nối dây.',
+    'network.open': 'Mở sơ đồ', 'network.open.desc': 'Mở trong một cửa sổ riêng: mỗi đường mạng là một vòng tròn, mỗi app là một ô có thể kéo đi bất cứ đâu. Nối đường mạng này sang đường mạng kia để gộp chúng.',
     'sec.network.summary': 'Hiện tại',
     'network.total': 'Mọi app', 'network.apps.none': 'Chưa có app nào dùng mạng.',
     'network.col.app': 'App', 'network.col.down': 'Tải về', 'network.col.up': 'Tải lên', 'network.col.total': 'Từ lúc mở', 'network.col.via': 'Qua',
@@ -48,8 +49,9 @@
     'network.hub.merge': 'Gộp', 'network.hub.merge.desc': 'Dùng mọi đường cùng lúc: mỗi kết nối mới của app đi một đường kế tiếp', 'network.hub.system': 'Tự động', 'network.hub.system.desc': 'Đường macOS tự chọn',
     'network.links': 'Đường mạng', 'network.meet': 'Đơn hay gộp', 'network.apps': 'App',
     'network.link.primary': 'macOS đang dùng đường này', 'network.links.none': 'Chưa có đường mạng nào có địa chỉ.',
-    'network.watching': 'Chỉ đang theo dõi: dây cho thấy mỗi app đang đi đường nào. Bật Nối dây để tự chọn.',
-    'network.drag': 'Kéo từ chấm của một app sang một đường mạng hoặc sang Gộp. App nối vào một chỗ đầu tiên là app chính; app nối sau sẽ xếp dưới khi đường đó đầy.',
+    'network.watching': 'Dây được lưu ngay và có hiệu lực khi bật Áp dụng các dây trong Cài đặt. App chưa nối dây đi đường macOS tự chọn, vẽ bằng nét đứt.',
+    'network.drag': 'Kéo từ chấm của một đường mạng sang một app, hoặc từ app sang đường mạng. Nối Wi-Fi sang Ethernet để gộp: app nối vào vòng tròn lớn dùng cả hai, nối vào vòng tròn nhỏ chỉ dùng mạng đó. Kéo ô hoặc vòng tròn để di chuyển.',
+    'network.merge.split': 'Tách ra', 'network.link.away': 'Chưa kết nối', 'network.app.idle': 'Hiện không dùng mạng', 'network.hub.merge.all': 'Gộp (mọi đường mạng)',
     'network.card.target': 'Đi qua', 'network.card.priority': 'Ưu tiên', 'network.card.down': 'Tải về tối đa (KB/s)', 'network.card.up': 'Tải lên tối đa (KB/s)', 'network.card.limit.none': 'Không giới hạn',
     'network.card.save': 'Lưu', 'network.card.unwire': 'Gỡ dây', 'network.card.held': 'Đang bị giữ ở {speed} để nhường app phía trên',
     'network.priority.high': 'Chính', 'network.priority.normal': 'Thường', 'network.priority.low': 'Xếp sau',
@@ -66,27 +68,7 @@
     const on = () => N().enabled;
     const when = { when: on };
     const act = (name) => send({ t: 'action', name });
-
-    const speed = (b) => {
-      const n = Number(b) || 0;
-      if (n >= 1e9) return (n / 1e9).toFixed(1) + ' GB/s';
-      if (n >= 1e6) return (n / 1e6).toFixed(1) + ' MB/s';
-      if (n >= 1e3) return Math.round(n / 1e3) + ' KB/s';
-      return n + ' B/s';
-    };
-    const size = (b) => {
-      const n = Number(b) || 0;
-      if (n >= 1e9) return (n / 1e9).toFixed(2) + ' GB';
-      if (n >= 1e6) return (n / 1e6).toFixed(1) + ' MB';
-      if (n >= 1e3) return Math.round(n / 1e3) + ' KB';
-      return n + ' B';
-    };
-    const linkName = (iface) => {
-      const l = (N().links || []).find((x) => x.name === iface);
-      return l ? l.label : iface;
-    };
-    const wireOf = (app) => (N().wires || []).find((w) => w.app.toLowerCase() === app.toLowerCase());
-    const targetLabel = (target) => target === 'merge' ? t('network.hub.merge') : target === 'system' ? t('network.hub.system') : linkName(String(target).replace('link:', ''));
+    const { speed, size, linkName } = netHelpers();
 
     // ---- the summary on the page
     const total = h('div', { class: 'network-total' });
@@ -105,215 +87,6 @@
         h('span', { class: 'network-via', text: (a.interfaces || []).map((i) => linkName(i.name)).join(', ') || '-' })));
       table.replaceChildren(head, ...rows);
     });
-
-    // ---- the diagram, in a sheet over the whole window
-    const board = h('div', { class: 'network-board' });
-    const svg = document.createElementNS('http://www.w3.org/2000/svg', 'svg');
-    svg.setAttribute('class', 'network-wires');
-    const nodes = h('div', { class: 'network-nodes' });
-    board.append(svg, nodes);
-    const note = h('p', { class: 'network-note' });
-    const detail = h('div', { class: 'network-card', hidden: true });
-    const closeBtn = button(t('network.close'), () => closeBoard(), { small: true });
-    const scrim = h('div', { class: 'network-scrim', hidden: true },
-      h('div', { class: 'network-sheet', role: 'dialog', 'aria-modal': 'true', 'aria-label': t('page.network') },
-        h('div', { class: 'network-sheet-head' },
-          h('h2', { text: t('page.network') }), h('span', { class: 'network-total-head' }), closeBtn),
-        note, board, detail));
-    let picked = null;
-    let dragging = null;
-    const key = (e) => { if (e.key === 'Escape') { e.stopPropagation(); if (!detail.hidden) { detail.hidden = true; picked = null; } else closeBoard(); } };
-    function openBoard() {
-      scrim.hidden = false;
-      window.addEventListener('keydown', key, true);
-      draw();
-      closeBtn.focus();
-    }
-    function closeBoard() {
-      scrim.hidden = true;
-      detail.hidden = true;
-      picked = null;
-      window.removeEventListener('keydown', key, true);
-    }
-    scrim.addEventListener('click', (e) => { if (e.target === scrim) closeBoard(); });
-
-    const NS = 'http://www.w3.org/2000/svg';
-    const path = (from, to, cls, width) => {
-      const p = document.createElementNS(NS, 'path');
-      const mx = (from.x + to.x) / 2;
-      p.setAttribute('d', `M ${from.x} ${from.y} C ${mx} ${from.y}, ${mx} ${to.y}, ${to.x} ${to.y}`);
-      p.setAttribute('class', cls);
-      p.style.strokeWidth = width + 'px';
-      svg.append(p);
-      return p;
-    };
-    // Thicker for more traffic: 1.5 points idle, about 7 at 100 MB/s.
-    const thick = (b) => 1.5 + Math.min(6, Math.log10(1 + (Number(b) || 0) / 1e4) * 1.6);
-
-    function draw() {
-      if (scrim.hidden || dragging) return;
-      const n = N();
-      const control = n.control && n.running;
-      note.textContent = n.paused ? t('network.paused') : control ? t('network.drag') : t('network.watching');
-      scrim.querySelector('.network-total-head').textContent = t('network.total') + ': ' + speed(n.total_down) + ' / ' + speed(n.total_up);
-      nodes.replaceChildren();
-      svg.replaceChildren();
-      const width = board.clientWidth || 760;
-      const cols = { links: 16, meet: Math.round(width * 0.36), apps: Math.round(width - 236) };
-      const node = (cls, x, y, target, kids) => {
-        const el = h('div', { class: 'network-node ' + cls, style: `left:${x}px; top:${y}px`, 'data-target': target || null }, kids);
-        nodes.append(el);
-        return el;
-      };
-      const header = (x, text) => nodes.append(h('div', { class: 'network-col', style: `left:${x}px`, text }));
-      header(cols.links, t('network.links'));
-      header(cols.meet, t('network.meet'));
-      header(cols.apps, t('network.apps'));
-      const links = n.links || [];
-      const anchor = {};
-      links.forEach((l, i) => {
-        const y = 36 + i * 74;
-        const el = node('link' + (l.primary ? ' primary' : ''), cols.links, y, 'link:' + l.name, [
-          h('div', { class: 'network-node-title', text: l.label }),
-          h('div', { class: 'network-node-sub', text: l.name + '  ' + l.ip }),
-          h('div', { class: 'network-node-speed', text: speed(l.down) + ' / ' + speed(l.up) }),
-        ]);
-        if (l.primary) el.title = t('network.link.primary');
-        anchor['link:' + l.name] = { x: cols.links + 190, y: y + 30, el };
-      });
-      if (!links.length) node('empty', cols.links, 36, null, [h('div', { class: 'network-node-sub', text: t('network.links.none') })]);
-      const hubs = [['merge', 36], ['system', 136]];
-      for (const [id, y] of hubs) {
-        const el = node('hub ' + id, cols.meet, y, id, [
-          h('div', { class: 'network-node-title', text: t('network.hub.' + id) }),
-          h('div', { class: 'network-node-sub', text: t('network.hub.' + id + '.desc') }),
-        ]);
-        anchor[id] = { x: cols.meet, y: y + 30, out: { x: cols.meet + 190, y: y + 30 }, el };
-      }
-      // Every link that has an address feeds Combined; the one macOS uses feeds Automatic.
-      for (const l of links) {
-        const a = anchor['link:' + l.name];
-        path(a, anchor.merge, 'network-wire feed', 1.5);
-        if (l.primary) path(a, anchor.system, 'network-wire feed', 1.5);
-      }
-      // The apps: those wired, in the order of their place and priority, then the others by what they move.
-      const rank = { high: 0, normal: 1, low: 2 };
-      const apps = (n.apps || []).slice();
-      for (const w of n.wires || []) if (!apps.some((a) => a.name.toLowerCase() === w.app.toLowerCase())) apps.push({ name: w.app, down: 0, up: 0, received: 0, sent: 0, interfaces: [] });
-      apps.sort((a, b) => {
-        const wa = wireOf(a.name), wb = wireOf(b.name);
-        if (!!wa !== !!wb) return wa ? -1 : 1;
-        if (wa && wb && wa.target !== wb.target) return wa.target < wb.target ? -1 : 1;
-        if (wa && wb && rank[wa.priority] !== rank[wb.priority]) return rank[wa.priority] - rank[wb.priority];
-        return (b.down || 0) - (a.down || 0);
-      });
-      const shown = apps.slice(0, 18);
-      board.style.height = Math.max(240, 36 + Math.max(links.length * 74, 220, shown.length * 46) + 16) + 'px';
-      shown.forEach((a, i) => {
-        const y = 36 + i * 46;
-        const wire = wireOf(a.name);
-        const port = h('span', { class: 'network-port', 'aria-hidden': 'true' });
-        const el = node('app' + (wire ? ' wired' : '') + (picked === a.name ? ' picked' : ''), cols.apps, y, null, [
-          port,
-          h('div', { class: 'network-node-title', text: a.name }),
-          h('div', { class: 'network-node-sub', text: speed(a.down) + ' / ' + speed(a.up) + (wire ? '  ' + t('network.priority.' + wire.priority) : '') }),
-        ]);
-        el.dataset.app = a.name;
-        el.tabIndex = 0;
-        el.addEventListener('click', () => pick(a.name));
-        el.addEventListener('keydown', (e) => { if (e.key === 'Enter' || e.key === ' ') { e.preventDefault(); pick(a.name); } });
-        port.addEventListener('pointerdown', (e) => startDrag(e, a.name, { x: cols.apps, y: y + 20 }));
-        const at = { x: cols.apps, y: y + 20 };
-        const cls = 'network-wire' + ((a.down || 0) > 0 ? ' live' : '');
-        if (wire && control) {
-          const to = wire.target.startsWith('link:') ? anchor[wire.target] : anchor[wire.target] && anchor[wire.target].out;
-          if (to) path(to, at, cls + ' ' + wire.priority, thick(a.down));
-        } else if (wire) {
-          const to = wire.target.startsWith('link:') ? anchor[wire.target] : anchor[wire.target] && anchor[wire.target].out;
-          if (to) path(to, at, 'network-wire planned', 1.5);
-        } else {
-          // Not wired: where it goes now, from what was seen of its sockets.
-          const seen = (a.interfaces || []).filter((x) => anchor['link:' + x.name]);
-          if (seen.length) for (const x of seen) path(anchor['link:' + x.name], at, cls + ' seen', thick(x.down));
-          else path(anchor.system.out, at, 'network-wire seen', 1.5);
-        }
-      });
-      svg.setAttribute('width', width);
-      svg.setAttribute('height', board.style.height);
-      if (picked) fillCard(picked);
-    }
-    reg(draw);
-    window.addEventListener('resize', () => draw());
-
-    function startDrag(e, app, from) {
-      if (!N().control) return;
-      e.preventDefault();
-      e.stopPropagation();
-      const box = board.getBoundingClientRect();
-      dragging = { app, line: null };
-      const move = (ev) => {
-        if (dragging.line) dragging.line.remove();
-        dragging.line = path({ x: ev.clientX - box.left, y: ev.clientY - box.top }, from, 'network-wire dragging', 2.5);
-        for (const el of nodes.querySelectorAll('[data-target]')) el.classList.toggle('drop', el.contains(document.elementFromPoint(ev.clientX, ev.clientY)));
-      };
-      const up = (ev) => {
-        window.removeEventListener('pointermove', move);
-        window.removeEventListener('pointerup', up);
-        const over = document.elementFromPoint(ev.clientX, ev.clientY);
-        const target = over && over.closest && over.closest('[data-target]');
-        dragging = null;
-        if (target) send({ t: 'set', path: 'network.wire', value: { app, target: target.dataset.target } });
-        draw();
-      };
-      window.addEventListener('pointermove', move);
-      window.addEventListener('pointerup', up);
-    }
-
-    // ---- the card of one app
-    const cardTitle = h('h3');
-    const held = h('p', { class: 'network-note' });
-    const targetSel = h('select', { class: 'select', 'aria-label': t('network.card.target') });
-    const prioSel = h('select', { class: 'select', 'aria-label': t('network.card.priority') });
-    for (const p of ['high', 'normal', 'low']) prioSel.append(h('option', { value: p, text: t('network.priority.' + p) }));
-    const downIn = h('input', { type: 'number', min: '0', max: '1000000', step: '64', class: 'text-field network-limit', placeholder: t('network.card.limit.none'), 'aria-label': t('network.card.down') });
-    const upIn = h('input', { type: 'number', min: '0', max: '1000000', step: '64', class: 'text-field network-limit', placeholder: t('network.card.limit.none'), 'aria-label': t('network.card.up') });
-    const field = (label, control) => h('label', { class: 'network-field' }, h('span', { text: label }), control);
-    const limit = (input) => { const v = Math.round(Number(input.value)); return v > 0 ? Math.min(v, 1000000) : 0; };
-    const save = button(t('network.card.save'), () => {
-      if (!picked) return;
-      send({ t: 'set', path: 'network.rule', value: { app: picked, target: targetSel.value, priority: prioSel.value, down_kbps: limit(downIn), up_kbps: limit(upIn) } });
-    }, { primary: true, small: true });
-    const unwire = button(t('network.card.unwire'), () => { if (picked) send({ t: 'set', path: 'network.unwire', value: picked }); }, { small: true });
-    detail.append(cardTitle, held,
-      h('div', { class: 'network-fields' },
-        field(t('network.card.target'), targetSel), field(t('network.card.priority'), prioSel),
-        field(t('network.card.down'), downIn), field(t('network.card.up'), upIn)),
-      h('div', { class: 'network-actions' }, unwire, save));
-    function pick(app) {
-      picked = app;
-      detail.hidden = false;
-      fillCard(app, true);
-      for (const el of nodes.querySelectorAll('.network-node.app')) el.classList.toggle('picked', el.dataset.app === app);
-    }
-    function fillCard(app, fresh) {
-      const n = N();
-      const wire = wireOf(app);
-      const a = (n.apps || []).find((x) => x.name === app);
-      cardTitle.textContent = app;
-      held.textContent = a && a.held_to ? t('network.card.held', { speed: speed(a.held_to) }) : '';
-      held.hidden = !held.textContent;
-      const options = [['system', t('network.hub.system')], ['merge', t('network.hub.merge')], ...(n.links || []).map((l) => ['link:' + l.name, l.label + ' (' + l.name + ')'])];
-      if (wire && !options.some(([v]) => v === wire.target)) options.push([wire.target, targetLabel(wire.target)]);
-      // Only a fresh card is filled: a card being edited keeps what the person chose while the speeds change.
-      if (!fresh) return;
-      targetSel.replaceChildren(...options.map(([v, label]) => h('option', { value: v, text: label })));
-      targetSel.value = wire ? wire.target : 'system';
-      prioSel.value = wire ? wire.priority : 'normal';
-      downIn.value = wire && wire.down_kbps ? wire.down_kbps : '';
-      upIn.value = wire && wire.up_kbps ? wire.up_kbps : '';
-      for (const el of [targetSel, prioSel, downIn, upIn, save]) el.disabled = !n.control;
-      unwire.hidden = !wire;
-    }
 
     // ---- wiring: the switch, where it stands, the way back
     const status = h('span', { class: 'row-desc network-status' });
@@ -344,7 +117,7 @@
 
     return [
       card(toggleRow('network.enabled', t('network.enable.title'), t('network.enable.desc')),
-        row(t('network.open'), t('network.open.desc'), button(t('network.open'), openBoard, { primary: true, small: true }), when)),
+        row(t('network.open'), t('network.open.desc'), button(t('network.open'), () => act('network_canvas_open'), { primary: true, small: true }), when)),
       sectionTitle(t('sec.network.summary')),
       card(row(total, null, null, when), h('div', { class: 'row block network-table-row' }, table)),
       sectionTitle(t('sec.network.control')),
@@ -353,8 +126,384 @@
       sectionTitle(t('sec.network.tether')),
       card(row(t('network.tether.title'), t('network.tether.desc'), h('div', { class: 'network-phone' }, phone, start, stop), when),
         h('p', { class: 'network-note', text: t('network.tether.iphone') })),
-      scrim,
     ];
+  },
+
+  // The diagram, in a window of its own (the page told `__canvas` is network): connections as circles, apps as boxes, all
+  // moved freely on a dotted grid; one connection wired to another makes the Combined circle around both.
+  canvas() {
+    const N = () => S.network;
+    const send1 = (path, value) => send({ t: 'set', path, value });
+    const { speed, linkName } = netHelpers();
+    const GRID = 20, D = 96, CHILD = 100, APP_W = 184, APP_H = 54;
+    const snap = (v) => Math.max(0, Math.round(v / GRID) * GRID);
+
+    const head = h('header', { class: 'network-canvas-head', 'data-drag': '' });
+    const title = h('h1', { text: t('page.network') });
+    const totals = h('span', { class: 'network-total-head' });
+    const note = h('span', { class: 'network-canvas-note' });
+    const close = button(t('network.close'), () => send({ t: 'action', name: 'network_canvas_close' }), { small: true });
+    head.append(title, totals, note, close);
+    const scroller = h('div', { class: 'network-canvas-scroll' });
+    const board = h('div', { class: 'network-canvas-board' });
+    const NS = 'http://www.w3.org/2000/svg';
+    const svg = document.createElementNS(NS, 'svg');
+    svg.setAttribute('class', 'network-wires');
+    const layer = h('div', { class: 'network-nodes' });
+    board.append(svg, layer);
+    scroller.append(board);
+    const detail = h('div', { class: 'network-card floating', hidden: true });
+    const root = h('div', { class: 'network-canvas' }, head, scroller, detail);
+
+    // Where each node is: what the person put there (kept in the settings), else a place of its own on the grid.
+    const local = new Map();
+    const placed = (id) => local.get(id) || ((N().layout || {})[id] && { x: N().layout[id][0], y: N().layout[id][1] });
+    const els = new Map();
+    let picked = null, moving = null, wiring = null;
+    const told = new Set();
+
+    const model = () => {
+      const n = N();
+      const live = n.links || [];
+      const links = [];
+      for (const k of n.known_links || []) links.push({ name: k.name, label: k.label, away: true });
+      for (const l of live) {
+        const at = links.find((x) => x.name === l.name);
+        if (at) Object.assign(at, l, { away: false }); else links.push(Object.assign({}, l, { away: false }));
+        // A connection seen is kept on the diagram, also while it is away.
+        const known = (n.known_links || []).find((k) => k.name === l.name);
+        if ((!known || known.label !== l.label) && !told.has(l.name + l.label)) { told.add(l.name + l.label); send1('network.known_link', { name: l.name, label: l.label }); }
+      }
+      const merge = (n.merge || []).filter((m) => links.some((l) => l.name === m));
+      const apps = [];
+      const add = (name) => { if (name && !apps.some((a) => a.name.toLowerCase() === name.toLowerCase())) apps.push({ name, down: 0, up: 0, interfaces: [], idle: true }); };
+      for (const name of n.known_apps || []) add(name);
+      for (const a of n.apps || []) add(a.name);
+      for (const w of n.wires || []) add(w.app);
+      for (const a of apps) {
+        const now = (n.apps || []).find((x) => x.name.toLowerCase() === a.name.toLowerCase());
+        if (now) Object.assign(a, now, { idle: !(now.down || now.up) && !(now.interfaces || []).length });
+        a.wire = (n.wires || []).find((w) => w.app.toLowerCase() === a.name.toLowerCase());
+      }
+      return { links, merge: merge.length >= 2 ? merge : [], apps };
+    };
+
+    // Places: the circles down the left, the apps in columns to their right, each until it is moved.
+    const layout = (m) => {
+      const at = {};
+      let y = 40;
+      if (m.merge.length) {
+        const size = m.merge.length * CHILD + 60;
+        at.merge = placed('merge') || { x: 40, y };
+        at.merge.size = size;
+        y += size + 40;
+        m.merge.forEach((name, i) => {
+          at['link:' + name] = { x: at.merge.x + size / 2 + (i - (m.merge.length - 1) / 2) * CHILD - D / 2, y: at.merge.y + size / 2 - D / 2, inside: true };
+        });
+      }
+      for (const l of m.links) {
+        if (m.merge.includes(l.name)) continue;
+        at['link:' + l.name] = placed('link:' + l.name) || { x: 60, y };
+        y += D + 50;
+      }
+      // An app not moved yet takes the next cell of the columns that no box already covers.
+      const boxes = [];
+      for (const a of m.apps) { const p = placed('app:' + a.name); if (p) { at['app:' + a.name] = p; boxes.push(p); } }
+      let cell = 0;
+      const clear = (c) => !boxes.some((b) => Math.abs(b.x - c.x) < APP_W + 16 && Math.abs(b.y - c.y) < APP_H + 16);
+      for (const a of m.apps) {
+        const id = 'app:' + a.name;
+        if (at[id]) continue;
+        let c;
+        do { c = { x: 420 + Math.floor(cell / 9) * 220, y: 40 + (cell % 9) * 80 }; cell++; } while (!clear(c) && cell < 400);
+        at[id] = c;
+        boxes.push(c);
+      }
+      return at;
+    };
+
+    const node = (id, kind, cls) => {
+      let el = els.get(id);
+      if (!el) {
+        el = h('div', { class: 'network-node' });
+        el.dataset.node = id;
+        el.dataset.kind = kind;
+        const port = h('span', { class: 'network-port', 'aria-hidden': 'true' });
+        el.append(h('div', { class: 'network-node-body' }), port);
+        port.addEventListener('pointerdown', (e) => startWire(e, id));
+        el.addEventListener('pointerdown', (e) => { if (!e.target.closest('.network-port, button')) startMove(e, id); });
+        if (kind === 'app') {
+          el.tabIndex = 0;
+          el.addEventListener('keydown', (e) => { if (e.key === 'Enter' || e.key === ' ') { e.preventDefault(); pick(id.slice(4)); } });
+        }
+        layer.append(el);
+        els.set(id, el);
+      }
+      el.className = 'network-node ' + kind + ' ' + cls;
+      return el;
+    };
+    const put = (el, p, size) => {
+      el.style.left = p.x + 'px';
+      el.style.top = p.y + 'px';
+      if (size) { el.style.width = size + 'px'; el.style.height = size + 'px'; }
+    };
+
+    let current = null;
+    function sync() {
+      if (moving || wiring) return;
+      const n = N();
+      const control = n.control && n.running;
+      note.textContent = n.paused ? t('network.paused') : control ? t('network.drag') : t('network.watching') + ' ' + t('network.drag');
+      totals.textContent = t('network.total') + ': ' + speed(n.total_down) + ' / ' + speed(n.total_up);
+      const m = model();
+      const at = layout(m);
+      current = { m, at };
+      const seen = new Set();
+      if (m.merge.length) {
+        const el = node('merge', 'merge', '');
+        const body = el.firstChild;
+        const split = button(t('network.merge.split'), () => send1('network.merge', []), { small: true });
+        body.replaceChildren(h('div', { class: 'network-node-title', text: t('network.hub.merge') }), split);
+        put(el, at.merge, at.merge.size);
+        seen.add('merge');
+      }
+      for (const l of m.links) {
+        const id = 'link:' + l.name;
+        const el = node(id, 'link', (l.primary ? 'primary ' : '') + (l.away ? 'away ' : '') + (at[id].inside ? 'inside' : ''));
+        el.title = l.primary ? t('network.link.primary') : l.away ? t('network.link.away') : '';
+        el.firstChild.replaceChildren(
+          h('div', { class: 'network-node-title', text: l.label || l.name }),
+          h('div', { class: 'network-node-sub', text: l.away ? t('network.link.away') : l.name }),
+          h('div', { class: 'network-node-speed', text: l.away ? '' : speed(l.down) }));
+        put(el, at[id]);
+        seen.add(id);
+      }
+      for (const a of m.apps) {
+        const id = 'app:' + a.name;
+        const el = node(id, 'app', (a.wire ? 'wired ' : '') + (a.idle ? 'idle ' : '') + (picked === a.name ? 'picked' : ''));
+        el.title = a.idle ? t('network.app.idle') : '';
+        el.firstChild.replaceChildren(
+          h('div', { class: 'network-node-title', text: a.name }),
+          h('div', { class: 'network-node-sub', text: speed(a.down) + ' / ' + speed(a.up) + (a.wire ? '  ' + t('network.priority.' + a.wire.priority) : '') }));
+        put(el, at[id]);
+        seen.add(id);
+      }
+      for (const [id, el] of els) if (!seen.has(id)) { el.remove(); els.delete(id); }
+      let w = 0, hgt = 0;
+      for (const [id, p] of Object.entries(at)) {
+        w = Math.max(w, p.x + (p.size || (id.startsWith('app:') ? APP_W : D)) + 400);
+        hgt = Math.max(hgt, p.y + (p.size || D) + 300);
+      }
+      board.style.width = Math.max(w, scroller.clientWidth || 900) + 'px';
+      board.style.height = Math.max(hgt, scroller.clientHeight || 600) + 'px';
+      wires();
+      if (picked) fillCard(picked);
+    }
+
+    // Anchors: the right edge of a circle, the left edge of an app box.
+    const out = (id) => {
+      const { at } = current;
+      const p = at[id];
+      if (!p) return null;
+      if (id === 'merge') return { x: p.x + p.size, y: p.y + p.size / 2 };
+      return { x: p.x + D, y: p.y + D / 2 };
+    };
+    const into = (id) => { const p = current.at[id]; return p && { x: p.x, y: p.y + APP_H / 2 }; };
+    const thick = (b) => 1.5 + Math.min(6, Math.log10(1 + (Number(b) || 0) / 1e4) * 1.6);
+    const line = (from, to, cls, width, curved) => {
+      const p = document.createElementNS(NS, 'path');
+      const mx = (from.x + to.x) / 2;
+      p.setAttribute('d', curved ? `M ${from.x} ${from.y} C ${mx} ${from.y}, ${mx} ${to.y}, ${to.x} ${to.y}` : `M ${from.x} ${from.y} L ${to.x} ${to.y}`);
+      p.setAttribute('class', cls);
+      p.style.strokeWidth = width + 'px';
+      svg.append(p);
+      return p;
+    };
+    function wires() {
+      svg.replaceChildren();
+      const { m, at } = current;
+      const control = N().control && N().running;
+      // The straight wire between the connections of the Combined circle.
+      for (let i = 1; i < m.merge.length; i++) {
+        const a = at['link:' + m.merge[i - 1]], b = at['link:' + m.merge[i]];
+        line({ x: a.x + D, y: a.y + D / 2 }, { x: b.x, y: b.y + D / 2 }, 'network-wire join', 3);
+      }
+      for (const a of m.apps) {
+        const to = into('app:' + a.name);
+        if (!to) continue;
+        if (a.wire && a.wire.target !== 'system') {
+          const from = out(a.wire.target === 'merge' ? (m.merge.length ? 'merge' : null) : a.wire.target);
+          if (from) line(from, to, 'network-wire ' + (control ? a.wire.priority : 'planned'), control ? thick(a.down) : 1.8, true);
+          continue;
+        }
+        if (a.idle) continue;
+        // Wired by itself: the connections its sockets were seen on, else the one macOS uses.
+        const seen = (a.interfaces || []).map((x) => 'link:' + x.name).filter((id) => at[id]);
+        const primary = m.links.find((l) => l.primary);
+        const froms = seen.length ? seen : primary ? ['link:' + primary.name] : [];
+        for (const id of froms) line(out(id), to, 'network-wire seen', thick(a.down), true);
+      }
+    }
+
+    // Moving a node: it follows the pointer, its wires with it, and it lands on the grid.
+    function startMove(e, id) {
+      if (e.button !== 0) return;
+      e.preventDefault();
+      // A connection inside the Combined circle moves the circle.
+      if (current.at[id] && current.at[id].inside) id = 'merge';
+      const el = els.get(id);
+      const start = { x: e.clientX, y: e.clientY };
+      const from = { x: current.at[id].x, y: current.at[id].y };
+      let moved = false;
+      moving = id;
+      el.setPointerCapture(e.pointerId);
+      const move = (ev) => {
+        const dx = ev.clientX - start.x, dy = ev.clientY - start.y;
+        if (!moved && Math.abs(dx) + Math.abs(dy) < 4) return;
+        moved = true;
+        const p = { x: Math.max(0, from.x + dx), y: Math.max(0, from.y + dy) };
+        current.at[id].x = p.x; current.at[id].y = p.y;
+        if (id === 'merge') {
+          current.m.merge.forEach((name, i) => {
+            const c = current.at['link:' + name];
+            const size = current.at.merge.size;
+            c.x = p.x + size / 2 + (i - (current.m.merge.length - 1) / 2) * CHILD - D / 2;
+            c.y = p.y + size / 2 - D / 2;
+            put(els.get('link:' + name), c);
+          });
+        }
+        put(el, p);
+        wires();
+      };
+      const up = () => {
+        el.removeEventListener('pointermove', move);
+        el.removeEventListener('pointerup', up);
+        el.removeEventListener('pointercancel', up);
+        moving = null;
+        if (moved) {
+          const p = { x: snap(current.at[id].x), y: snap(current.at[id].y) };
+          local.set(id, p);
+          send1('network.place', { id, x: p.x, y: p.y });
+        } else if (id.startsWith('app:')) {
+          pick(id.slice(4));
+        }
+        sync();
+      };
+      el.addEventListener('pointermove', move);
+      el.addEventListener('pointerup', up);
+      el.addEventListener('pointercancel', up);
+    }
+
+    // Wiring: from the dot of a node to another node.
+    function startWire(e, id) {
+      if (e.button !== 0) return;
+      e.preventDefault();
+      e.stopPropagation();
+      const box = () => board.getBoundingClientRect();
+      const from = id.startsWith('app:') ? into(id) : out(id);
+      wiring = { id, line: null };
+      const target = (ev) => {
+        const over = document.elementFromPoint(ev.clientX, ev.clientY);
+        const el = over && over.closest && over.closest('[data-node]');
+        return el && el.dataset.node !== id ? el : null;
+      };
+      const move = (ev) => {
+        if (wiring.line) wiring.line.remove();
+        const b = box();
+        wiring.line = line(from, { x: ev.clientX - b.left, y: ev.clientY - b.top }, 'network-wire dragging', 2.5, false);
+        const over = target(ev);
+        for (const el of els.values()) el.classList.toggle('drop', el === over);
+      };
+      const up = (ev) => {
+        window.removeEventListener('pointermove', move);
+        window.removeEventListener('pointerup', up);
+        const over = target(ev);
+        wiring = null;
+        for (const el of els.values()) el.classList.remove('drop');
+        if (over) connect(id, over.dataset.node);
+        sync();
+      };
+      window.addEventListener('pointermove', move);
+      window.addEventListener('pointerup', up);
+    }
+
+    // What a wire from one node to another means.
+    function connect(a, b) {
+      const kind = (id) => id === 'merge' ? 'merge' : id.split(':')[0];
+      const link = (id) => id.slice(5);
+      const merge = (N().merge || []).slice();
+      const place = (id) => id === 'merge' ? 'merge' : 'link:' + link(id);
+      if (kind(a) === 'app' && kind(b) !== 'app') return send1('network.wire', { app: a.slice(4), target: place(b) });
+      if (kind(b) === 'app' && kind(a) !== 'app') return send1('network.wire', { app: b.slice(4), target: place(a) });
+      if (kind(a) === 'app') return;
+      // A connection wired to another, or to the circle: the Combined circle around them.
+      const names = [a, b].filter((id) => id !== 'merge').map(link);
+      const joined = merge.length && (names.some((x) => merge.includes(x)) || a === 'merge' || b === 'merge') ? merge : [];
+      for (const x of names) if (!joined.includes(x)) joined.push(x);
+      if (joined.length >= 2) send1('network.merge', joined.slice(0, 4));
+    }
+
+    // ---- the card of one app
+    const cardTitle = h('h3');
+    const held = h('p', { class: 'network-note' });
+    const targetSel = h('select', { class: 'select', 'aria-label': t('network.card.target') });
+    const prioSel = h('select', { class: 'select', 'aria-label': t('network.card.priority') });
+    for (const p of ['high', 'normal', 'low']) prioSel.append(h('option', { value: p, text: t('network.priority.' + p) }));
+    const downIn = h('input', { type: 'number', min: '0', max: '1000000', step: '64', class: 'text-field network-limit', placeholder: t('network.card.limit.none'), 'aria-label': t('network.card.down') });
+    const upIn = h('input', { type: 'number', min: '0', max: '1000000', step: '64', class: 'text-field network-limit', placeholder: t('network.card.limit.none'), 'aria-label': t('network.card.up') });
+    const field = (label, control) => h('label', { class: 'network-field' }, h('span', { text: label }), control);
+    const limit = (input) => { const v = Math.round(Number(input.value)); return v > 0 ? Math.min(v, 1000000) : 0; };
+    const save = button(t('network.card.save'), () => {
+      if (!picked) return;
+      send1('network.rule', { app: picked, target: targetSel.value, priority: prioSel.value, down_kbps: limit(downIn), up_kbps: limit(upIn) });
+    }, { primary: true, small: true });
+    const unwire = button(t('network.card.unwire'), () => { if (picked) send1('network.unwire', picked); }, { small: true });
+    const shut = button(t('network.close'), () => unpick(), { small: true });
+    detail.append(cardTitle, held,
+      h('div', { class: 'network-fields' },
+        field(t('network.card.target'), targetSel), field(t('network.card.priority'), prioSel),
+        field(t('network.card.down'), downIn), field(t('network.card.up'), upIn)),
+      h('div', { class: 'network-actions' }, shut, unwire, save));
+    function pick(app) {
+      picked = app;
+      detail.hidden = false;
+      fillCard(app, true);
+      for (const [id, el] of els) el.classList.toggle('picked', id === 'app:' + app);
+    }
+    function unpick() {
+      picked = null;
+      detail.hidden = true;
+      for (const el of els.values()) el.classList.remove('picked');
+    }
+    function fillCard(app, fresh) {
+      const n = N();
+      const wire = (n.wires || []).find((w) => w.app.toLowerCase() === app.toLowerCase());
+      const a = (n.apps || []).find((x) => x.name === app);
+      cardTitle.textContent = app;
+      held.textContent = a && a.held_to ? t('network.card.held', { speed: speed(a.held_to) }) : '';
+      held.hidden = !held.textContent;
+      if (!fresh) return;
+      const links = current ? current.m.links : [];
+      const options = [['system', t('network.hub.system')], ['merge', (n.merge || []).length >= 2 ? t('network.hub.merge') + ' (' + n.merge.map(linkName).join(' + ') + ')' : t('network.hub.merge.all')],
+        ...links.map((l) => ['link:' + l.name, (l.label || l.name) + ' (' + l.name + ')'])];
+      targetSel.replaceChildren(...options.map(([v, label]) => h('option', { value: v, text: label })));
+      targetSel.value = wire ? wire.target : 'system';
+      prioSel.value = wire ? wire.priority : 'normal';
+      downIn.value = wire && wire.down_kbps ? wire.down_kbps : '';
+      upIn.value = wire && wire.up_kbps ? wire.up_kbps : '';
+      unwire.hidden = !wire;
+    }
+
+    // Only the canvas window listens to the whole window; the self-test draws the canvas inside the settings page.
+    if (window.__canvas) {
+      window.addEventListener('keydown', (e) => {
+        if (e.key !== 'Escape') return;
+        if (!detail.hidden) unpick(); else send({ t: 'action', name: 'network_canvas_close' });
+      });
+      window.addEventListener('resize', () => sync());
+    }
+    reg(sync);
+    return root;
   },
   selftest({ expect, go, sent, S }) {
     go('network');
@@ -365,31 +514,36 @@
     expect(sent.some((m) => m.t === 'set' && m.path === 'network.enabled' && m.value === !was), 'network: the switch sends its setting: ' + JSON.stringify(sent));
     page.querySelector('.switch[data-path="network.enabled"]').click();
     expect(page.querySelector('.network-table').textContent.includes('Steam'), 'network: the apps are listed with what they move');
+    sent.length = 0;
+    [...page.querySelectorAll('.btn')].find((b) => b.textContent === t('network.open')).click();
+    expect(sent.some((m) => m.t === 'action' && m.name === 'network_canvas_open'), 'network: the diagram opens in a window of its own');
 
-    const open = [...page.querySelectorAll('.btn')].find((b) => b.textContent === t('network.open'));
-    open.click();
-    const scrim = document.querySelector('.network-scrim');
-    expect(!scrim.hidden, 'network: the diagram opens');
-    const links = scrim.querySelectorAll('.network-node.link');
-    expect(links.length === S.network.links.length, 'network: one node for each connection');
-    expect(scrim.querySelector('.network-node.hub.merge') && scrim.querySelector('.network-node.hub.system'), 'network: the two places where connections meet');
-    expect(scrim.querySelectorAll('.network-wire').length >= S.network.links.length + 3, 'network: the wires are drawn');
-    const steam = [...scrim.querySelectorAll('.network-node.app')].find((n) => n.dataset.app === 'Steam');
-    expect(steam && steam.classList.contains('wired'), 'network: a wired app says so');
-    steam.click();
-    const card = scrim.querySelector('.network-card');
-    expect(!card.hidden && card.querySelector('h3').textContent === 'Steam', 'network: a click opens the card of the app');
-    expect(card.querySelector('select').value === 'link:en7', 'network: the card shows the wire of the app');
+    // The canvas, drawn here as its window draws it.
+    const holder = document.createElement('div');
+    holder.style.cssText = 'position:fixed;left:0;top:0;width:1100px;height:700px;';
+    document.body.append(holder);
+    let canvas;
+    const syncsBefore = syncs.length;
+    canvas = this.canvas();
+    holder.append(canvas);
+    runSyncs();
+    const nodes = (kind) => [...canvas.querySelectorAll('.network-node.' + kind)];
+    expect(canvas.querySelector('.network-node.merge'), 'network: two connections wired together are the Combined circle');
+    expect(nodes('link').filter((n) => n.classList.contains('inside')).length === 2, 'network: the circle holds the two connections');
+    const names = nodes('app').map((n) => n.dataset.node.slice(4));
+    expect(names.includes('Spotify'), 'network: an app seen before stays on the canvas while it is idle: ' + names);
+    const steam = nodes('app').find((n) => n.dataset.node === 'app:Steam');
+    expect(steam && steam.style.left === '560px' && steam.style.top === '80px', 'network: a box stays where it was put');
+    expect(canvas.querySelectorAll('.network-wire.join').length === 1, 'network: the straight wire joins the two connections');
+    expect(canvas.querySelectorAll('.network-wire').length >= 4, 'network: the apps are wired');
     sent.length = 0;
-    card.querySelector('.network-limit').value = '1024';
-    [...card.querySelectorAll('.btn')].find((b) => b.textContent === t('network.card.save')).click();
-    expect(sent.some((m) => m.path === 'network.rule' && m.value.app === 'Steam' && m.value.down_kbps === 1024 && m.value.target === 'link:en7'), 'network: the card sends the whole rule: ' + JSON.stringify(sent));
+    canvas.querySelector('.network-node.merge .btn').click();
+    expect(sent.some((m) => m.path === 'network.merge' && Array.isArray(m.value) && m.value.length === 0), 'network: the circle can be taken apart');
     sent.length = 0;
-    [...card.querySelectorAll('.btn')].find((b) => b.textContent === t('network.card.unwire')).click();
-    expect(sent.some((m) => m.path === 'network.unwire' && m.value === 'Steam'), 'network: the wire can be removed');
-    window.dispatchEvent(new KeyboardEvent('keydown', { key: 'Escape' }));
-    window.dispatchEvent(new KeyboardEvent('keydown', { key: 'Escape' }));
-    expect(scrim.hidden, 'network: Escape closes the card, then the diagram');
+    [...canvas.querySelectorAll('.btn')].find((b) => b.textContent === t('network.close')).click();
+    expect(sent.some((m) => m.t === 'action' && m.name === 'network_canvas_close'), 'network: the window has its close button');
+    holder.remove();
+    syncs.splice(syncsBefore);
 
     S.network.tether.running = true; runSyncs();
     const stop = [...page.querySelectorAll('.btn')].find((b) => b.textContent === t('network.tether.stop'));
@@ -402,3 +556,27 @@
     S.network.status = 'on'; runSyncs();
   },
 });
+
+// Formatting shared by the page and the canvas.
+function netHelpers() {
+  const speed = (b) => {
+    const n = Number(b) || 0;
+    if (n >= 1e9) return (n / 1e9).toFixed(1) + ' GB/s';
+    if (n >= 1e6) return (n / 1e6).toFixed(1) + ' MB/s';
+    if (n >= 1e3) return Math.round(n / 1e3) + ' KB/s';
+    return n + ' B/s';
+  };
+  const size = (b) => {
+    const n = Number(b) || 0;
+    if (n >= 1e9) return (n / 1e9).toFixed(2) + ' GB';
+    if (n >= 1e6) return (n / 1e6).toFixed(1) + ' MB';
+    if (n >= 1e3) return Math.round(n / 1e3) + ' KB';
+    return n + ' B';
+  };
+  const linkName = (iface) => {
+    const all = [...(S.network.links || []), ...(S.network.known_links || [])];
+    const l = all.find((x) => x.name === iface);
+    return l ? l.label : iface;
+  };
+  return { speed, size, linkName };
+}

@@ -1,7 +1,7 @@
 //! This feature's part of the settings model: the JSON the page renders and the changes it may make.
 //! Pure data with no AppKit, so every rule is covered by plain unit tests.
 
-use super::{Config, Wire};
+use super::{CANVAS_EDGE, Config, KnownLink, MAX_KNOWN_LINKS, MAX_MERGE, MAX_PLACES, Wire, valid_text};
 use crate::settings::model::Fault;
 use core_netcontrol::rules::{
     self, MAX_KBPS, MAX_RULES, Priority, Target, priority_for_new_wire, valid_app,
@@ -27,6 +27,10 @@ pub fn state(config: &Config, runtime: &Value) -> Value {
         "wires": config.wires.iter().map(|w| json!({
             "app": w.app, "target": w.target, "priority": w.priority, "down_kbps": w.down_kbps, "up_kbps": w.up_kbps,
         })).collect::<Vec<_>>(),
+        "merge": config.merge,
+        "known_links": config.links.iter().map(|l| json!({ "name": l.name, "label": l.label })).collect::<Vec<_>>(),
+        "layout": config.layout,
+        "known_apps": list("known_apps"),
         "status": runtime["status"].as_str().unwrap_or("off"),
         "saved": runtime["saved"].as_bool().unwrap_or(false),
         "running": runtime["running"].as_bool().unwrap_or(false),
@@ -123,6 +127,47 @@ pub fn set(config: &mut Config, path: &str, value: &Value) -> Option<Result<(), 
                 {
                     Some(old) => *old = wire,
                     None if count < MAX_RULES => config.wires.push(wire),
+                    None => return None,
+                }
+                Some(())
+            })()
+            .ok_or_else(bad),
+            // One link wired to another on the diagram: the links of the Combined circle. An empty list takes it away.
+            "merge" => value
+                .as_array()
+                .and_then(|list| {
+                    let names: Vec<String> = list.iter().map(|v| v.as_str().map(str::to_owned)).collect::<Option<_>>()?;
+                    let ok = (names.is_empty() || (2..=MAX_MERGE).contains(&names.len()))
+                        && names.iter().all(|n| rules::valid_interface(n));
+                    ok.then(|| {
+                        config.merge = names;
+                        let cleaned = config.clone().sanitized().merge;
+                        config.merge = cleaned;
+                    })
+                })
+                .ok_or_else(bad),
+            // Where a node was put on the canvas.
+            "place" => (|| {
+                let id = value["id"].as_str().filter(|id| valid_text(id, 90))?;
+                let at = |k: &str| value[k].as_i64().map(|v| v.clamp(0, i64::from(CANVAS_EDGE)) as i32);
+                let (x, y) = (at("x")?, at("y")?);
+                if !config.layout.contains_key(id) && config.layout.len() >= MAX_PLACES {
+                    return None;
+                }
+                config.layout.insert(id.to_owned(), [x, y]);
+                Some(())
+            })()
+            .ok_or_else(bad),
+            // A connection seen by the canvas, kept on it while it is away.
+            "known_link" => (|| {
+                let name = value["name"].as_str().filter(|n| rules::valid_interface(n))?;
+                let label = value["label"].as_str().map(str::trim).filter(|l| valid_text(l, 64))?;
+                let count = config.links.len();
+                match config.links.iter_mut().find(|l| l.name == name) {
+                    Some(l) => l.label = label.to_owned(),
+                    None if count < MAX_KNOWN_LINKS => {
+                        config.links.push(KnownLink { name: name.to_owned(), label: label.to_owned() })
+                    }
                     None => return None,
                 }
                 Some(())
@@ -271,6 +316,27 @@ mod tests {
             c.wires[0].priority, "low",
             "a refused change leaves the rule as it was"
         );
+    }
+
+    #[test]
+    fn the_combined_circle_the_places_and_the_links_kept_are_validated() {
+        let mut c = Config::default();
+        assert!(set(&mut c, "merge", &json!(["en0", "en7"])).unwrap().is_ok());
+        assert_eq!(c.merge, ["en0", "en7"]);
+        assert!(set(&mut c, "merge", &json!(["en0"])).unwrap().is_err(), "one link is no circle");
+        assert!(set(&mut c, "merge", &json!(["en0", "../x"])).unwrap().is_err());
+        assert!(set(&mut c, "merge", &json!([])).unwrap().is_ok() && c.merge.is_empty());
+        assert!(set(&mut c, "place", &json!({ "id": "app:Safari", "x": 120, "y": -40 })).unwrap().is_ok());
+        assert_eq!(c.layout["app:Safari"], [120, 0]);
+        assert!(set(&mut c, "place", &json!({ "id": "", "x": 1, "y": 1 })).unwrap().is_err());
+        assert!(set(&mut c, "known_link", &json!({ "name": "en0", "label": "Wi-Fi" })).unwrap().is_ok());
+        assert!(set(&mut c, "known_link", &json!({ "name": "en0", "label": "Wi-Fi 2" })).unwrap().is_ok());
+        assert_eq!(c.links.len(), 1);
+        assert!(set(&mut c, "known_link", &json!({ "name": "nope", "label": "x" })).unwrap().is_err());
+        let s = state(&c, &json!({ "known_apps": ["Safari"] }));
+        assert_eq!(s["known_links"][0]["label"], json!("Wi-Fi 2"));
+        assert_eq!(s["layout"]["app:Safari"], json!([120, 0]));
+        assert_eq!(s["known_apps"], json!(["Safari"]));
     }
 
     #[test]

@@ -67,6 +67,8 @@ pub struct SettingsFeature {
     ctx: Rc<AppContext>,
     me: Weak<SettingsFeature>,
     window: RefCell<Option<Rc<WebWindow>>>,
+    /// The diagram of the Network feature, in a window of its own: the same page, showing only the canvas.
+    canvas: RefCell<Option<Rc<WebWindow>>>,
     refresh: RefCell<Option<app::Timer>>,
     names: RefCell<HashMap<String, String>>,
     icons: RefCell<HashMap<String, String>>,
@@ -87,6 +89,7 @@ impl SettingsFeature {
             ctx,
             me: me.clone(),
             window: RefCell::default(),
+            canvas: RefCell::default(),
             refresh: RefCell::default(),
             names: RefCell::default(),
             icons: RefCell::default(),
@@ -125,8 +128,10 @@ impl SettingsFeature {
             "dark" => Some(true),
             _ => None,
         };
-        if let Some(window) = self.window.borrow().as_ref() {
-            window.set_dark(dark);
+        for window in [&self.window, &self.canvas] {
+            if let Some(window) = window.borrow().as_ref() {
+                window.set_dark(dark);
+            }
         }
     }
 
@@ -165,13 +170,66 @@ impl SettingsFeature {
         *self.window.borrow_mut() = Some(Rc::clone(&window));
         self.apply_theme();
         self.last_state.borrow_mut().clear();
+        self.keep_refreshing();
+        window.show(mtm);
+    }
+
+    /// Pushes the state while either window is open.
+    fn keep_refreshing(&self) {
+        if self.refresh.borrow().is_some() {
+            return;
+        }
         let weak = self.me.clone();
         *self.refresh.borrow_mut() = Some(app::every(REFRESH_SECONDS, move || {
             if let Some(this) = weak.upgrade() {
                 this.push_state(false);
             }
         }));
+    }
+
+    /// Opens the canvas of the Network feature in a window of its own, or brings it to the front.
+    fn open_canvas(&self) {
+        let mtm = self.ctx.mtm;
+        let existing = self.canvas.borrow().clone();
+        if let Some(window) = existing {
+            window.show(mtm);
+            return;
+        }
+        app::set_regular(mtm, true);
+        let (on_message, on_close) = (self.me.clone(), self.me.clone());
+        let window = WebWindow::new(
+            mtm,
+            &WindowSpec { title: "Figghost Network", width: 1100.0, height: 720.0, min_width: 640.0, min_height: 420.0 },
+            &page::html_canvas("network"),
+            move |text| {
+                if let Some(this) = on_message.upgrade() {
+                    this.handle(&text);
+                }
+            },
+            move || {
+                if let Some(this) = on_close.upgrade() {
+                    this.canvas_closed();
+                }
+            },
+        );
+        *self.canvas.borrow_mut() = Some(Rc::clone(&window));
+        self.apply_theme();
+        self.keep_refreshing();
         window.show(mtm);
+        // The new page has no state yet.
+        self.push_state(true);
+    }
+
+    fn canvas_closed(&self) {
+        let weak = self.me.clone();
+        app::after(0.0, move || {
+            let Some(this) = weak.upgrade() else { return };
+            this.canvas.borrow_mut().take();
+            if this.window.borrow().is_none() {
+                this.refresh.borrow_mut().take();
+                app::set_regular(this.ctx.mtm, false);
+            }
+        });
     }
 
     /// Pushes the current state to an open window, for changes made elsewhere (the menu).
@@ -180,7 +238,9 @@ impl SettingsFeature {
     }
 
     fn closed(&self) {
-        self.refresh.borrow_mut().take();
+        if self.canvas.borrow().is_none() {
+            self.refresh.borrow_mut().take();
+        }
         // The page may have been capturing a shortcut when it went away.
         self.recording(false);
         let weak = self.me.clone();
@@ -196,14 +256,19 @@ impl SettingsFeature {
                 .is_some_and(|w| w.is_visible());
             if !reopened {
                 this.window.borrow_mut().take();
-                app::set_regular(this.ctx.mtm, false);
+                if this.canvas.borrow().is_none() {
+                    app::set_regular(this.ctx.mtm, false);
+                }
             }
         });
     }
 
     fn post(&self, message: &Value) {
-        if let Some(window) = self.window.borrow().as_ref() {
-            window.host.post(&message.to_string());
+        let text = message.to_string();
+        for window in [&self.window, &self.canvas] {
+            if let Some(window) = window.borrow().as_ref() {
+                window.host.post(&text);
+            }
         }
     }
 
@@ -277,7 +342,7 @@ impl SettingsFeature {
 
     /// Sends the state to the page; `force` sends it even when it has not changed since the last time.
     fn push_state(&self, force: bool) {
-        if self.window.borrow().is_none() {
+        if self.window.borrow().is_none() && self.canvas.borrow().is_none() {
             return;
         }
         let json = state(&self.ctx.config.borrow(), &self.env());
@@ -488,6 +553,13 @@ impl SettingsFeature {
     fn action(&self, name: &str) {
         let mtm = self.ctx.mtm;
         match name {
+            "network_canvas_open" => self.open_canvas(),
+            "network_canvas_close" => {
+                let canvas = self.canvas.borrow().clone();
+                if let Some(canvas) = canvas {
+                    canvas.close();
+                }
+            }
             "check_permissions" => self.ctx.permissions_popup.show(),
             "open_accessibility" => {
                 permissions::accessibility_trusted(true);

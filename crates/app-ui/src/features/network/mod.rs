@@ -27,7 +27,7 @@ use serde::{Deserialize, Serialize};
 use serde_json::{Value, json};
 use std::{
     cell::RefCell,
-    collections::HashMap,
+    collections::{BTreeMap, HashMap},
     fs,
     os::unix::process::CommandExt,
     path::{Path, PathBuf},
@@ -50,6 +50,17 @@ const ADMIN_SECONDS: u64 = 180;
 const MAX_APPS: usize = 40;
 /// How often `adb devices` is asked while the page shows the phone row.
 const PHONES_EVERY_SECONDS: u64 = 4;
+/// How often the links are listed while the proxy is off; listing may run `networksetup`, so never on the main thread.
+const LINKS_EVERY_SECONDS: u64 = 3;
+/// Every app seen using the network stays on the diagram; this file keeps them across runs, one name a line.
+const APPS_FILE: &str = "network-apps.txt";
+const MAX_KNOWN_APPS: usize = 80;
+/// The most links kept on the diagram, the places of its nodes, and the links in the Combined circle.
+pub const MAX_KNOWN_LINKS: usize = 12;
+pub const MAX_PLACES: usize = 300;
+pub const MAX_MERGE: usize = 4;
+/// The canvas is this large, in points.
+pub const CANVAS_EDGE: i32 = 6000;
 
 /// One wire as the settings file keeps it.
 #[derive(Debug, Clone, PartialEq, Serialize, Deserialize)]
@@ -98,6 +109,14 @@ impl Wire {
     }
 }
 
+/// A connection that stays on the diagram while it is away, by its interface and what System Settings calls it.
+#[derive(Debug, Clone, PartialEq, Eq, Serialize, Deserialize, Default)]
+#[serde(default)]
+pub struct KnownLink {
+    pub name: String,
+    pub label: String,
+}
+
 #[derive(Debug, Clone, PartialEq, Serialize, Deserialize)]
 #[serde(default)]
 pub struct Config {
@@ -107,6 +126,13 @@ pub struct Config {
     /// The port of the proxy on 127.0.0.1, 1024 to 65535.
     pub port: u16,
     pub wires: Vec<Wire>,
+    /// The links in the Combined circle, made by wiring one link to another on the diagram; empty is no circle, and
+    /// a wire to Combined then spreads over every link.
+    pub merge: Vec<String>,
+    /// The connections kept on the diagram.
+    pub links: Vec<KnownLink>,
+    /// Where each node of the diagram was put: `link:en0`, `merge` or `app:<name>`, to its top left corner.
+    pub layout: BTreeMap<String, [i32; 2]>,
 }
 
 impl Default for Config {
@@ -116,8 +142,16 @@ impl Default for Config {
             control: false,
             port: DEFAULT_PORT,
             wires: Vec::new(),
+            merge: Vec::new(),
+            links: Vec::new(),
+            layout: BTreeMap::new(),
         }
     }
+}
+
+/// A label or a node id that can be kept: short and without control characters.
+pub fn valid_text(text: &str, most: usize) -> bool {
+    !text.trim().is_empty() && text.chars().count() <= most && !text.chars().any(char::is_control)
 }
 
 impl Config {
@@ -129,6 +163,27 @@ impl Config {
         }
         let kept = rules::sanitized(self.wires.iter().filter_map(Wire::rule).collect());
         self.wires = kept.iter().map(Wire::from_rule).collect();
+        let mut merge: Vec<String> = Vec::new();
+        for name in &self.merge {
+            if rules::valid_interface(name) && !merge.contains(name) && merge.len() < MAX_MERGE {
+                merge.push(name.clone());
+            }
+        }
+        // One link is no circle.
+        self.merge = if merge.len() >= 2 { merge } else { Vec::new() };
+        let mut links: Vec<KnownLink> = Vec::new();
+        for l in &self.links {
+            if rules::valid_interface(&l.name) && valid_text(&l.label, 64) && !links.iter().any(|k| k.name == l.name) && links.len() < MAX_KNOWN_LINKS {
+                links.push(l.clone());
+            }
+        }
+        self.links = links;
+        self.layout = std::mem::take(&mut self.layout)
+            .into_iter()
+            .filter(|(id, _)| valid_text(id, 90))
+            .take(MAX_PLACES)
+            .map(|(id, [x, y])| (id, [x.clamp(0, CANVAS_EDGE), y.clamp(0, CANVAS_EDGE)]))
+            .collect();
         self
     }
 
@@ -185,6 +240,43 @@ pub struct Feature {
     /// The app this program is, left out of the watched list while the proxy carries the others: its own count would
     /// be theirs again.
     me: String,
+    /// Every app seen using the network, oldest first; kept in `network-apps.txt`.
+    known_apps: RefCell<Vec<String>>,
+    /// The links while the proxy is off, listed on another thread.
+    idle_links: Arc<Mutex<IdleLinks>>,
+}
+
+/// The links of the system, listed off the main thread (naming them may run `networksetup`).
+#[derive(Default)]
+struct IdleLinks {
+    links: Vec<core_netmerge::LinkStats>,
+    asked: Option<Instant>,
+    busy: bool,
+}
+
+/// The names in the apps file that can stand as app names.
+pub fn read_known_apps(text: &str) -> Vec<String> {
+    let mut out: Vec<String> = Vec::new();
+    for line in text.lines().map(str::trim) {
+        if rules::valid_app(line) && !out.iter().any(|a| a.eq_ignore_ascii_case(line)) && out.len() < MAX_KNOWN_APPS {
+            out.push(line.to_owned());
+        }
+    }
+    out
+}
+
+/// Adds the apps of `seen` that are not known yet, never forgetting one; true when the list grew.
+pub fn remember_apps(known: &mut Vec<String>, seen: impl IntoIterator<Item = String>) -> bool {
+    let before = known.len();
+    for name in seen {
+        if known.len() >= MAX_KNOWN_APPS {
+            break;
+        }
+        if rules::valid_app(&name) && name != core_netcontrol::proxy::UNKNOWN_APP && !known.iter().any(|a| a.eq_ignore_ascii_case(&name)) {
+            known.push(name);
+        }
+    }
+    known.len() > before
 }
 
 pub fn attach(env: &AttachEnv) -> Option<Rc<Feature>> {
@@ -200,6 +292,8 @@ pub fn attach(env: &AttachEnv) -> Option<Rc<Feature>> {
         me: owner::app_of(std::process::id() as i32)
             .map(|a| a.name)
             .unwrap_or_default(),
+        known_apps: RefCell::new(read_known_apps(&fs::read_to_string(env.home.join(APPS_FILE)).unwrap_or_default())),
+        idle_links: Arc::default(),
     });
     FEATURE.with(|slot| *slot.borrow_mut() = Rc::downgrade(&feature));
     // A run that ended without putting the settings back left them here.
@@ -349,6 +443,7 @@ impl Feature {
         if wanted && !running && !refused {
             match Control::start(config.port, config.rules()) {
                 Ok(control) => {
+                    control.set_merge(config.merge.clone());
                     let port = control.port();
                     trace::log("network: proxy on");
                     *self.control.borrow_mut() = Some(control);
@@ -380,6 +475,7 @@ impl Feature {
             self.put_back();
         } else if let Some(control) = self.control.borrow().as_ref() {
             control.set_rules(config.rules());
+            control.set_merge(config.merge.clone());
         }
         if !wanted && matches!(self.status(), Status::Denied | Status::Failed) {
             set_status(&self.status, Status::Off);
@@ -462,6 +558,24 @@ impl Feature {
     }
 
     /// Asks `adb` for the phones now and then, off the main thread.
+    /// The links the last listing found; a new one is asked on another thread when it is due.
+    fn idle_links(&self) -> Vec<core_netmerge::LinkStats> {
+        let mut idle = self.idle_links.lock().unwrap_or_else(PoisonError::into_inner);
+        let due = idle.asked.is_none_or(|at| at.elapsed().as_secs() >= LINKS_EVERY_SECONDS);
+        if due && !idle.busy {
+            idle.busy = true;
+            idle.asked = Some(Instant::now());
+            let shared = Arc::clone(&self.idle_links);
+            thread::spawn(move || {
+                let links = core_netmerge::idle_stats().links;
+                let mut idle = shared.lock().unwrap_or_else(PoisonError::into_inner);
+                idle.links = links;
+                idle.busy = false;
+            });
+        }
+        idle.links.clone()
+    }
+
     fn phones(&self) -> (Vec<String>, usize) {
         let mut phones = self.phones.lock().unwrap_or_else(PoisonError::into_inner);
         let due = phones
@@ -510,7 +624,21 @@ impl Feature {
         let snapshot = self.control.borrow().as_ref().map(Control::snapshot);
         let usage = self.monitor.usage();
         let (ready, unauthorized) = self.phones();
-        let mut out = view(&usage, snapshot.as_ref(), &self.me);
+        let idle = if snapshot.is_none() { self.idle_links() } else { Vec::new() };
+        let mut out = view(&usage, snapshot.as_ref(), &self.me, &idle);
+        // Every app seen stays on the diagram, also once it stops using the network.
+        let seen = out["apps"].as_array().map(|apps| apps.iter().filter_map(|a| a["name"].as_str().map(str::to_owned)).collect::<Vec<_>>()).unwrap_or_default();
+        let grew = remember_apps(&mut self.known_apps.borrow_mut(), seen);
+        if grew {
+            let text = self.known_apps.borrow().join("\n") + "\n";
+            let path = self.home.join(APPS_FILE);
+            thread::spawn(move || {
+                if let Err(e) = fs::write(&path, text) {
+                    eprintln!("network: cannot keep the list of apps: {e}");
+                }
+            });
+        }
+        out["known_apps"] = json!(*self.known_apps.borrow());
         out["status"] = json!(self.status().id());
         out["saved"] = json!(saved_path(&self.home).exists());
         out["port"] = json!(
@@ -531,7 +659,7 @@ impl Feature {
 }
 
 /// The links and the apps for the page: what `nettop` saw, with what went through the proxy added to its app.
-pub fn view(usage: &[Usage], snapshot: Option<&Snapshot>, me: &str) -> Value {
+pub fn view(usage: &[Usage], snapshot: Option<&Snapshot>, me: &str, idle: &[core_netmerge::LinkStats]) -> Value {
     let proxied = snapshot.is_some();
     // The links: those the proxy follows, else those of the system, with what the apps received by each interface.
     let mut by_interface: HashMap<String, (u64, usize)> = HashMap::new();
@@ -554,8 +682,7 @@ pub fn view(usage: &[Usage], snapshot: Option<&Snapshot>, me: &str) -> Value {
                 })
             })
             .collect(),
-        None => core_netmerge::idle_stats()
-            .links
+        None => idle
             .iter()
             .map(|l| {
                 let (down, _) = by_interface.get(&l.name).copied().unwrap_or_default();
@@ -667,6 +794,40 @@ mod tests {
         assert_eq!(odd.rules()[0].target, Target::Link("en0".into()));
     }
 
+    #[test]
+    fn every_app_seen_is_kept_and_none_is_forgotten() {
+        let mut known = read_known_apps("Safari\n\nsafari\nbad/name\nSteam\n");
+        assert_eq!(known, ["Safari", "Steam"]);
+        assert!(remember_apps(&mut known, vec!["Zoom".into(), "STEAM".into(), "?".into()]));
+        assert_eq!(known, ["Safari", "Steam", "Zoom"], "an app that stopped is kept, and the unknown one is not added");
+        assert!(!remember_apps(&mut known, vec!["Zoom".into()]));
+        for i in 0..200 {
+            remember_apps(&mut known, vec![format!("app {i}")]);
+        }
+        assert_eq!(known.len(), MAX_KNOWN_APPS);
+    }
+
+    #[test]
+    fn the_diagram_keeps_its_circle_its_links_and_its_places_within_bounds() {
+        let c = Config {
+            merge: vec!["en0".into(), "en0".into(), "../x".into(), "en7".into()],
+            links: vec![
+                KnownLink { name: "en0".into(), label: "Wi-Fi".into() },
+                KnownLink { name: "en0".into(), label: "again".into() },
+                KnownLink { name: "bad name".into(), label: "x".into() },
+            ],
+            layout: [("app:Safari".to_owned(), [-5, 99_999]), ("bad\u{7}".to_owned(), [1, 1])].into_iter().collect(),
+            ..Config::default()
+        }
+        .sanitized();
+        assert_eq!(c.merge, ["en0", "en7"]);
+        assert_eq!(c.links.len(), 1);
+        assert_eq!(c.layout.get("app:Safari"), Some(&[0, CANVAS_EDGE]));
+        assert_eq!(c.layout.len(), 1);
+        let one = Config { merge: vec!["en0".into()], ..Config::default() }.sanitized();
+        assert!(one.merge.is_empty(), "one link is no circle");
+    }
+
     fn usage(name: &str, down: u64, iface: &str) -> Usage {
         Usage {
             name: name.into(),
@@ -700,7 +861,7 @@ mod tests {
             }],
             paused: false,
         };
-        let v = view(&watched, Some(&snapshot), "Figghost");
+        let v = view(&watched, Some(&snapshot), "Figghost", &[]);
         let names: Vec<&str> = v["apps"]
             .as_array()
             .unwrap()
@@ -717,7 +878,7 @@ mod tests {
         assert_eq!(v["apps"][0]["held_to"], json!(2048));
         assert_eq!(v["apps"][0]["interfaces"][1]["name"], json!("en7"));
         assert_eq!(v["total_down"], json!(1600));
-        let v = view(&watched, None, "Figghost");
+        let v = view(&watched, None, "Figghost", &[]);
         assert_eq!(
             v["apps"][0]["name"],
             json!("Figghost"),

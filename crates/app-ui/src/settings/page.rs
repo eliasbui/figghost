@@ -394,7 +394,18 @@ fn assets() -> String {
 }
 
 pub fn html() -> String {
-    let script = format!("{}\n{}\n{SCRIPT}", assets(), FEATURE_SCRIPTS.join("\n"));
+    page_with("")
+}
+
+/// The same page for a window that shows only the canvas of one feature (`network`).
+#[allow(dead_code)]
+pub fn html_canvas(id: &str) -> String {
+    let id: String = id.chars().filter(char::is_ascii_lowercase).collect();
+    page_with(&format!("window.__canvas = '{id}';\n"))
+}
+
+fn page_with(prelude: &str) -> String {
+    let script = format!("{prelude}{}\n{}\n{SCRIPT}", assets(), FEATURE_SCRIPTS.join("\n"));
     let style = format!("{}{STYLE}\n{}", font_faces(), FEATURE_STYLES.join("\n"));
     INDEX
         .replace("/*__CSS__*/", &style)
@@ -418,6 +429,14 @@ pub fn fixture() -> Value {
 #[cfg(test)]
 mod tests {
     use super::*;
+
+    #[test]
+    fn the_canvas_window_is_the_same_page_told_which_canvas_to_show() {
+        let page = html_canvas("network");
+        assert!(page.contains("window.__canvas = 'network';"));
+        assert!(!html().contains("window.__canvas ="));
+        assert!(html_canvas("x'; alert(1)//").contains("window.__canvas = 'xalert';"), "only letters reach the script");
+    }
 
     #[test]
     fn the_page_is_one_self_contained_document() {

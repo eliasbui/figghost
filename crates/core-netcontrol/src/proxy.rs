@@ -143,6 +143,8 @@ impl AppSlot {
 
 struct State {
     rules: Vec<Rule>,
+    /// The links that Combined spreads over, by interface name; empty is every link.
+    merge: Vec<String>,
     slots: Vec<Slot>,
     primary: Option<String>,
     apps: HashMap<String, AppSlot>,
@@ -185,6 +187,7 @@ impl Control {
         let port = listener.local_addr()?.port();
         let mut state = State {
             rules,
+            merge: Vec::new(),
             slots: Vec::new(),
             primary: None,
             apps: HashMap::new(),
@@ -226,6 +229,11 @@ impl Control {
 
     pub fn set_rules(&self, rules: Vec<Rule>) {
         self.shared.state().rules = rules;
+    }
+
+    /// The links Combined spreads over; empty is every link.
+    pub fn set_merge(&self, links: Vec<String>) {
+        self.shared.state().merge = links;
     }
 
     pub fn snapshot(&self) -> Snapshot {
@@ -311,11 +319,12 @@ impl State {
                     .filter(|s| s.present)
                     .map(|s| s.peak)
                     .fold(0.0, f64::max);
+                let chosen = |s: &Slot| self.merge.is_empty() || self.merge.contains(&s.link.name);
                 let mut pool: Vec<(usize, f64)> = self
                     .slots
                     .iter()
                     .enumerate()
-                    .filter(|(_, s)| s.present && s.cooldown.is_none_or(|until| now >= until))
+                    .filter(|(_, s)| chosen(s) && s.present && s.cooldown.is_none_or(|until| now >= until))
                     .map(|(i, s)| {
                         let weight = if best > 0.0 && s.peak > 0.0 {
                             (s.peak / best).max(0.05)
@@ -862,6 +871,7 @@ mod tests {
         let now = Instant::now();
         let mut state = State {
             rules: Vec::new(),
+            merge: Vec::new(),
             slots: Vec::new(),
             primary: Some("en0".into()),
             apps: HashMap::new(),
@@ -883,6 +893,11 @@ mod tests {
             "a wire to one link asks for it alone"
         );
         assert!(state.plan(&Target::System, now).is_empty());
+        state.slots[1].cooldown = None;
+        state.update(vec![link("en0", 1), link("en7", 2), link("en8", 3)], now);
+        state.merge = vec!["en0".into(), "en8".into()];
+        let plan = state.plan(&Target::Merge, now);
+        assert!(plan.len() == 2 && plan.iter().all(|&i| state.slots[i].link.name != "en7"), "Combined spreads over its own links only");
         state.primary = None;
         assert!(
             state.plan(&Target::Merge, now).is_empty(),

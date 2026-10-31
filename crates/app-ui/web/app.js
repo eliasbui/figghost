@@ -2272,12 +2272,25 @@ function applyDisplay() {
   if ($('#sidebar')) placeGlass();
 }
 
+/** A window that shows only the canvas of one feature (`window.__canvas`), drawn by its plugin's `canvas()`. */
+function mountCanvas() {
+  const plugin = PLUGINS.find((p) => p.id === window.__canvas && p.canvas);
+  document.documentElement.lang = lang;
+  document.documentElement.classList.add('canvas-mode');
+  dropSyncs(pageSyncs);
+  pageSyncs = scoped(() => { $('#root').replaceChildren(plugin ? plugin.canvas() : h('p', { text: window.__canvas })); });
+}
+
 function onState(next) {
   const first = S === null;
   const before = lang;
   S = next;
   lang = resolveLang(S.general.language);
   applyDisplay();
+  if (window.__canvas) {
+    if (first || lang !== before) mountCanvas(); else runSyncs();
+    return;
+  }
   if (first) {
     shellSyncs = scoped(buildShell);
     go('general');
