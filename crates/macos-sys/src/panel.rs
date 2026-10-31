@@ -361,6 +361,13 @@ impl FigPanel {
         solid
     }
 
+    /// Whether the content sits on Liquid Glass (macOS 26), which draws its own rim, rather than on a stand-in.
+    pub fn is_glass(&self) -> bool {
+        // Looked up by name: the class is not there before macOS 26.
+        let Some(glass) = AnyClass::get(c"NSGlassEffectView") else { return false };
+        self.contentView().is_some_and(|v| v.isKindOfClass(glass))
+    }
+
     /// The handler returns true when it consumed the key.
     pub fn set_key_handler(&self, handler: impl Fn(Key) -> bool + 'static) {
         *self.ivars().on_key.borrow_mut() = Some(Rc::new(handler));

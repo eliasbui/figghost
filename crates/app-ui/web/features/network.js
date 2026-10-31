@@ -21,7 +21,7 @@
     'network.link.primary': 'macOS uses this one', 'network.links.none': 'No connection with an address.',
     'network.watching': 'Wires are kept now and take effect once Apply the wires is on in Settings. An app without a wire goes the way macOS chooses, drawn dashed.',
     'network.drag': 'Drag from the dot of a connection to an app, or from an app to a connection. Wire Wi-Fi to Ethernet to combine them: an app wired to the big circle uses both, to a small one only that one. Drag a box or a circle to move it.',
-    'network.merge.split': 'Separate', 'network.link.away': 'Not connected', 'network.app.idle': 'Not using the network now', 'network.hub.merge.all': 'Combined (every connection)',
+    'network.merge.split': 'Separate', 'network.merge.resize': 'Drag to make the circle larger or smaller', 'network.link.away': 'Not connected', 'network.app.idle': 'Not using the network now', 'network.hub.merge.all': 'Combined (every connection)',
     'network.card.target': 'Leaves by', 'network.card.priority': 'Priority', 'network.card.down': 'Most down (KB/s)', 'network.card.up': 'Most up (KB/s)', 'network.card.limit.none': 'No limit',
     'network.card.save': 'Save', 'network.card.unwire': 'Remove the wire', 'network.card.held': 'Held to {speed} for the apps above it',
     'network.priority.high': 'Main', 'network.priority.normal': 'Normal', 'network.priority.low': 'Below',
@@ -35,6 +35,10 @@
     'network.tether.running': 'Sharing with {model}', 'network.tether.running.hint': 'The phone is on this Mac\'s connection. Stop turns its VPN off too.',
     'network.tether.lost': 'Connection lost', 'network.tether.lost.hint': 'The phone was unplugged. Plug it in again to go on, or stop.',
     'network.tether.start': 'Start sharing', 'network.tether.stop': 'Stop sharing', 'network.tether.vpnoff': 'Turn off the phone\'s VPN',
+    'network.tether.down': 'Down', 'network.tether.up': 'Up', 'network.tether.used': 'Used',
+    'network.tether.test': 'Test the connection', 'network.tether.testing': 'Testing the phone\'s connection...',
+    'network.tether.test.good': 'The phone reaches the internet: {ms} ms, nothing lost.', 'network.tether.test.slow': 'The phone reaches the internet, but slowly: {ms} ms, {loss}% lost.',
+    'network.tether.test.dns': 'The phone reaches the internet by address, but cannot look up names. Stop and start sharing again.', 'network.tether.test.none': 'The phone does not reach the internet. Check that it allowed the VPN, or unplug and plug it in again.',
     'network.tether.iphone': 'An iPhone cannot take a Mac\'s connection over USB this way. Use Internet Sharing in System Settings, General, Sharing.',
   },
   vi: {
@@ -55,7 +59,7 @@
     'network.link.primary': 'macOS đang dùng đường này', 'network.links.none': 'Chưa có đường mạng nào có địa chỉ.',
     'network.watching': 'Dây được lưu ngay và có hiệu lực khi bật Áp dụng các dây trong Cài đặt. App chưa nối dây đi đường macOS tự chọn, vẽ bằng nét đứt.',
     'network.drag': 'Kéo từ chấm của một đường mạng sang một app, hoặc từ app sang đường mạng. Nối Wi-Fi sang Ethernet để gộp: app nối vào vòng tròn lớn dùng cả hai, nối vào vòng tròn nhỏ chỉ dùng mạng đó. Kéo ô hoặc vòng tròn để di chuyển.',
-    'network.merge.split': 'Tách ra', 'network.link.away': 'Chưa kết nối', 'network.app.idle': 'Hiện không dùng mạng', 'network.hub.merge.all': 'Gộp (mọi đường mạng)',
+    'network.merge.split': 'Tách ra', 'network.merge.resize': 'Kéo để phóng to hoặc thu nhỏ vòng tròn', 'network.link.away': 'Chưa kết nối', 'network.app.idle': 'Hiện không dùng mạng', 'network.hub.merge.all': 'Gộp (mọi đường mạng)',
     'network.card.target': 'Đi qua', 'network.card.priority': 'Ưu tiên', 'network.card.down': 'Tải về tối đa (KB/s)', 'network.card.up': 'Tải lên tối đa (KB/s)', 'network.card.limit.none': 'Không giới hạn',
     'network.card.save': 'Lưu', 'network.card.unwire': 'Gỡ dây', 'network.card.held': 'Đang bị giữ ở {speed} để nhường app phía trên',
     'network.priority.high': 'Chính', 'network.priority.normal': 'Thường', 'network.priority.low': 'Xếp sau',
@@ -69,6 +73,10 @@
     'network.tether.running': 'Đang chia mạng cho {model}', 'network.tether.running.hint': 'Điện thoại đang dùng mạng của máy Mac. Bấm Dừng sẽ tắt luôn VPN trên điện thoại.',
     'network.tether.lost': 'Mất kết nối', 'network.tether.lost.hint': 'Điện thoại đã bị rút cáp. Cắm lại để tiếp tục, hoặc bấm Dừng.',
     'network.tether.start': 'Bắt đầu chia mạng', 'network.tether.stop': 'Dừng chia mạng', 'network.tether.vpnoff': 'Tắt VPN trên điện thoại',
+    'network.tether.down': 'Tải về', 'network.tether.up': 'Tải lên', 'network.tether.used': 'Đã dùng',
+    'network.tether.test': 'Kiểm tra kết nối', 'network.tether.testing': 'Đang kiểm tra kết nối của điện thoại...',
+    'network.tether.test.good': 'Điện thoại vào được internet: {ms} ms, không mất gói nào.', 'network.tether.test.slow': 'Điện thoại vào được internet nhưng chậm: {ms} ms, mất {loss}% gói.',
+    'network.tether.test.dns': 'Điện thoại ra được internet bằng địa chỉ IP nhưng không phân giải được tên miền. Hãy dừng rồi bắt đầu chia mạng lại.', 'network.tether.test.none': 'Điện thoại không vào được internet. Kiểm tra điện thoại đã cho phép VPN chưa, hoặc rút cáp rồi cắm lại.',
     'network.tether.iphone': 'iPhone không nhận mạng của Mac qua USB theo cách này. Dùng Chia sẻ Internet trong Cài đặt hệ thống, Cài đặt chung, Chia sẻ.',
   },
   build() {
@@ -116,10 +124,22 @@
     const start = button(t('network.tether.start'), () => act('network_tether_start'), { small: true, primary: true });
     const stop = button(t('network.tether.stop'), () => act('network_tether_stop'), { small: true, danger: true });
     const vpnOff = button(t('network.tether.vpnoff'), () => act('network_tether_stop'), { small: true });
+    // The meter: what the phone moves through the Mac, with a bar each that follows the speed.
+    const gauge = (label) => {
+      const value = h('span', { class: 'phone-gauge-value' });
+      const fill = h('span', { class: 'phone-gauge-fill' });
+      return { el: h('div', { class: 'phone-gauge' }, h('span', { class: 'phone-gauge-label', text: label }), value, h('span', { class: 'phone-gauge-bar' }, fill)), value, fill };
+    };
+    const gDown = gauge(t('network.tether.down')), gUp = gauge(t('network.tether.up'));
+    const used = h('div', { class: 'phone-used' });
+    const meter = h('div', { class: 'phone-meter' }, gDown.el, gUp.el, used);
+    const testBtn = button(t('network.tether.test'), () => act('network_tether_test'), { small: true });
+    const testLine = h('div', { class: 'phone-test' });
     const phoneCard = h('div', { class: 'phone-card' },
       badge,
       h('div', { class: 'phone-text' }, h('div', { class: 'phone-name', text: t('network.tether.title') }), phoneTitle, phoneHint, install),
-      h('div', { class: 'phone-actions' }, start, vpnOff, stop));
+      h('div', { class: 'phone-actions' }, start, vpnOff, stop, testBtn),
+      meter, testLine);
     reg(() => {
       const tt = N().tether || {};
       const tools = tt.gnirehtet && tt.adb;
@@ -137,6 +157,20 @@
       show(start, state === 'ready');
       show(stop, !!tt.running);
       show(vpnOff, state === 'ready');
+      const test = tt.test || { state: 'idle' };
+      show(testBtn, (state === 'ready' || state === 'running') && test.state !== 'running');
+      // A full bar is 20 MB/s, on a scale of tens, so that a slow phone still moves its bar.
+      const level = (b) => Math.min(100, Math.max(0, Math.log10(1 + (Number(b) || 0) / 1e3) / Math.log10(2e4) * 100));
+      const m = tt.meter || {};
+      meter.hidden = state !== 'running';
+      gDown.value.textContent = speed(m.down); gDown.fill.style.width = level(m.down) + '%';
+      gUp.value.textContent = speed(m.up); gUp.fill.style.width = level(m.up) + '%';
+      used.textContent = t('network.tether.used') + ': ' + size((m.received || 0) + (m.sent || 0));
+      testLine.dataset.verdict = test.state === 'done' ? test.verdict : test.state;
+      testLine.textContent = test.state === 'running' ? t('network.tether.testing')
+        : test.state === 'done' ? (test.phone ? test.phone + ': ' : '') + t('network.tether.test.' + test.verdict, { ms: test.ms == null ? '-' : test.ms, loss: test.loss })
+        : '';
+      testLine.hidden = !testLine.textContent;
     });
 
     return [
@@ -159,7 +193,17 @@
     const N = () => S.network;
     const send1 = (path, value) => send({ t: 'set', path, value });
     const { speed, linkName } = netHelpers();
-    const GRID = 20, D = 96, CHILD = 100, APP_W = 184, APP_H = 54;
+    // D: a connection on its own; C: one inside the Combined circle, smaller so that it can move about in there.
+    const GRID = 20, D = 96, C = 70, APP_W = 184, APP_H = 54;
+    const MERGE_MIN = 200, MERGE_MAX = 640;
+    // A connection inside the circle keeps its middle this far within the circle's edge.
+    const inCircle = (rel, size) => {
+      const r = size / 2 - C / 2 - 8;
+      const cx = rel.x + C / 2 - size / 2, cy = rel.y + C / 2 - size / 2;
+      const d = Math.hypot(cx, cy);
+      const k = d > r ? r / d : 1;
+      return { x: Math.round(size / 2 + cx * k - C / 2), y: Math.round(size / 2 + cy * k - C / 2) };
+    };
     const snap = (v) => Math.max(0, Math.round(v / GRID) * GRID);
 
     const head = h('header', { class: 'network-canvas-head', 'data-drag': '' });
@@ -217,12 +261,14 @@
       const at = {};
       let y = 40;
       if (m.merge.length) {
-        const size = m.merge.length * CHILD + 60;
-        at.merge = placed('merge') || { x: 40, y };
-        at.merge.size = size;
+        const kept = placed('merge:size');
+        const size = Math.min(MERGE_MAX, Math.max(MERGE_MIN, kept ? kept.x : m.merge.length * (C + 16) + 90));
+        at.merge = Object.assign({}, placed('merge') || { x: 40, y }, { size });
         y += size + 40;
         m.merge.forEach((name, i) => {
-          at['link:' + name] = { x: at.merge.x + size / 2 + (i - (m.merge.length - 1) / 2) * CHILD - D / 2, y: at.merge.y + size / 2 - D / 2, inside: true };
+          // Where it was put inside the circle, else in a row across its middle.
+          const rel = inCircle(placed('in:' + name) || { x: size / 2 + (i - (m.merge.length - 1) / 2) * (C + 16) - C / 2, y: size / 2 - C / 2 + 6 }, size);
+          at['link:' + name] = { x: at.merge.x + rel.x, y: at.merge.y + rel.y, rel, inside: true, d: C };
         });
       }
       for (const l of m.links) {
@@ -288,6 +334,11 @@
         const body = el.firstChild;
         const split = button(t('network.merge.split'), () => send1('network.merge', []), { small: true });
         body.replaceChildren(h('div', { class: 'network-node-title', text: t('network.hub.merge') }), split);
+        if (!el.querySelector('.network-grip')) {
+          const grip = h('span', { class: 'network-grip', title: t('network.merge.resize') });
+          grip.addEventListener('pointerdown', (e) => startResize(e));
+          el.append(grip);
+        }
         put(el, at.merge, at.merge.size);
         seen.add('merge');
       }
@@ -300,7 +351,7 @@
           h('div', { class: 'network-node-title', text: l.label || l.name }),
           h('div', { class: 'network-node-sub', text: l.away ? t('network.link.away') : l.name }),
           h('div', { class: 'network-node-speed', text: l.away ? '' : speed(l.down) }));
-        put(el, at[id]);
+        put(el, at[id], at[id].d);
         seen.add(id);
       }
       for (const a of m.apps) {
@@ -334,7 +385,8 @@
       const p = at[id];
       if (!p) return null;
       if (id === 'merge') return { x: p.x + p.size, y: p.y + p.size / 2 };
-      return { x: p.x + D, y: p.y + D / 2 };
+      const d = p.d || D;
+      return { x: p.x + d, y: p.y + d / 2 };
     };
     const into = (id) => { const p = current.at[id]; return p && { x: p.x, y: p.y + APP_H / 2 }; };
     const thick = (b) => 1.5 + Math.min(6, Math.log10(1 + (Number(b) || 0) / 1e4) * 1.6);
@@ -353,8 +405,12 @@
       const control = N().control && N().running;
       // The straight wire between the connections of the Combined circle.
       for (let i = 1; i < m.merge.length; i++) {
+        // From edge to edge, along the line between the two middles, wherever they were put.
         const a = at['link:' + m.merge[i - 1]], b = at['link:' + m.merge[i]];
-        line({ x: a.x + D, y: a.y + D / 2 }, { x: b.x, y: b.y + D / 2 }, 'network-wire join', 3);
+        const ca = { x: a.x + C / 2, y: a.y + C / 2 }, cb = { x: b.x + C / 2, y: b.y + C / 2 };
+        const d = Math.hypot(cb.x - ca.x, cb.y - ca.y) || 1;
+        const ux = (cb.x - ca.x) / d, uy = (cb.y - ca.y) / d;
+        if (d > C) line({ x: ca.x + ux * C / 2, y: ca.y + uy * C / 2 }, { x: cb.x - ux * C / 2, y: cb.y - uy * C / 2 }, 'network-wire join', 3);
       }
       for (const a of m.apps) {
         const to = into('app:' + a.name);
@@ -377,9 +433,8 @@
     function startMove(e, id) {
       if (e.button !== 0) return;
       e.preventDefault();
-      // A connection inside the Combined circle moves the circle.
-      if (current.at[id] && current.at[id].inside) id = 'merge';
       const el = els.get(id);
+      const inside = current.at[id] && current.at[id].inside;
       const start = { x: e.clientX, y: e.clientY };
       const from = { x: current.at[id].x, y: current.at[id].y };
       let moved = false;
@@ -389,16 +444,23 @@
         const dx = ev.clientX - start.x, dy = ev.clientY - start.y;
         if (!moved && Math.abs(dx) + Math.abs(dy) < 4) return;
         moved = true;
+        const M = current.at.merge;
+        if (inside) {
+          // A connection in the Combined circle moves about inside it, never out of it.
+          const rel = inCircle({ x: from.x + dx - M.x, y: from.y + dy - M.y }, M.size);
+          Object.assign(current.at[id], { rel, x: M.x + rel.x, y: M.y + rel.y });
+          put(el, current.at[id], C);
+          wires();
+          return;
+        }
         const p = { x: Math.max(0, from.x + dx), y: Math.max(0, from.y + dy) };
         current.at[id].x = p.x; current.at[id].y = p.y;
         if (id === 'merge') {
-          current.m.merge.forEach((name, i) => {
+          for (const name of current.m.merge) {
             const c = current.at['link:' + name];
-            const size = current.at.merge.size;
-            c.x = p.x + size / 2 + (i - (current.m.merge.length - 1) / 2) * CHILD - D / 2;
-            c.y = p.y + size / 2 - D / 2;
-            put(els.get('link:' + name), c);
-          });
+            c.x = p.x + c.rel.x; c.y = p.y + c.rel.y;
+            put(els.get('link:' + name), c, C);
+          }
         }
         put(el, p);
         wires();
@@ -408,7 +470,11 @@
         el.removeEventListener('pointerup', up);
         el.removeEventListener('pointercancel', up);
         moving = null;
-        if (moved) {
+        if (moved && inside) {
+          const name = id.slice(5), rel = current.at[id].rel;
+          local.set('in:' + name, rel);
+          send1('network.place', { id: 'in:' + name, x: rel.x, y: rel.y });
+        } else if (moved) {
           const p = { x: snap(current.at[id].x), y: snap(current.at[id].y) };
           local.set(id, p);
           send1('network.place', { id, x: p.x, y: p.y });
@@ -420,6 +486,50 @@
       el.addEventListener('pointermove', move);
       el.addEventListener('pointerup', up);
       el.addEventListener('pointercancel', up);
+    }
+
+    // The grip of the Combined circle makes it larger or smaller; the connections in it stay inside.
+    function startResize(e) {
+      if (e.button !== 0) return;
+      e.preventDefault();
+      e.stopPropagation();
+      const grip = e.currentTarget;
+      const M = current.at.merge;
+      const start = { x: e.clientX, y: e.clientY, size: M.size };
+      moving = 'merge';
+      grip.setPointerCapture(e.pointerId);
+      const names = current.m.merge;
+      // Each connection keeps its place relative to the middle of the circle as it grows.
+      const offsets = names.map((n) => { const r = current.at['link:' + n].rel; return { x: r.x + C / 2 - M.size / 2, y: r.y + C / 2 - M.size / 2 }; });
+      const move = (ev) => {
+        const grow = Math.max(ev.clientX - start.x, ev.clientY - start.y);
+        const size = Math.round(Math.min(MERGE_MAX, Math.max(MERGE_MIN, start.size + grow)));
+        M.size = size;
+        put(els.get('merge'), M, size);
+        names.forEach((n, i) => {
+          const rel = inCircle({ x: size / 2 + offsets[i].x - C / 2, y: size / 2 + offsets[i].y - C / 2 }, size);
+          Object.assign(current.at['link:' + n], { rel, x: M.x + rel.x, y: M.y + rel.y });
+          put(els.get('link:' + n), current.at['link:' + n], C);
+        });
+        wires();
+      };
+      const up = () => {
+        grip.removeEventListener('pointermove', move);
+        grip.removeEventListener('pointerup', up);
+        grip.removeEventListener('pointercancel', up);
+        moving = null;
+        local.set('merge:size', { x: M.size, y: M.size });
+        send1('network.place', { id: 'merge:size', x: M.size, y: M.size });
+        for (const n of names) {
+          const rel = current.at['link:' + n].rel;
+          local.set('in:' + n, rel);
+          send1('network.place', { id: 'in:' + n, x: rel.x, y: rel.y });
+        }
+        sync();
+      };
+      grip.addEventListener('pointermove', move);
+      grip.addEventListener('pointerup', up);
+      grip.addEventListener('pointercancel', up);
     }
 
     // Wiring: from the dot of a node to another node.
@@ -565,6 +675,12 @@
     const steam = nodes('app').find((n) => n.dataset.node === 'app:Steam');
     expect(steam && steam.style.left === '560px' && steam.style.top === '80px', 'network: a box stays where it was put');
     expect(canvas.querySelectorAll('.network-wire.join').length === 1, 'network: the straight wire joins the two connections');
+    const merge = canvas.querySelector('.network-node.merge');
+    const inner = nodes('link').filter((n) => n.classList.contains('inside'));
+    expect(inner.every((n) => parseFloat(n.style.width) < 96), 'network: the connections in the circle are smaller than those on their own');
+    const inRect = (n) => { const a = n.getBoundingClientRect(), b = merge.getBoundingClientRect(); return a.left >= b.left && a.right <= b.right && a.top >= b.top && a.bottom <= b.bottom; };
+    expect(inner.every(inRect), 'network: they sit inside the circle');
+    expect(merge.querySelector('.network-grip'), 'network: the circle has a grip to resize it');
     expect(canvas.querySelectorAll('.network-wire').length >= 4, 'network: the apps are wired');
     sent.length = 0;
     canvas.querySelector('.network-node.merge .btn').click();
@@ -578,11 +694,20 @@
     const phoneCard = page.querySelector('.phone-card');
     const btn = (text) => [...phoneCard.querySelectorAll('.btn')].find((b) => b.textContent === text && b.style.display !== 'none');
     const shown = () => [...phoneCard.querySelectorAll('.btn')].filter((b) => b.style.display !== 'none').length;
-    expect(shown() === 2, 'network: a ready phone offers to start and to turn its VPN off, nothing else: ' + shown());
+    expect(shown() === 3, 'network: a ready phone offers to start, to turn its VPN off and to test, nothing else: ' + shown());
     expect(phoneCard.dataset.state === 'ready' && phoneCard.textContent.includes('SM G991B') && btn(t('network.tether.start')), 'network: a phone plugged in is ready to share, by its model');
     expect(!phoneCard.textContent.toLowerCase().includes('gnirehtet'), 'network: Phone sharing does not show the tool it runs');
+    expect(phoneCard.querySelector('.phone-test').textContent.includes('23.4 ms'), 'network: the last test of the connection is shown with its time');
+    sent.length = 0;
+    btn(t('network.tether.test')).click();
+    expect(sent.some((m) => m.t === 'action' && m.name === 'network_tether_test'), 'network: the connection can be tested');
     S.network.tether.running = true; runSyncs();
-    expect(phoneCard.dataset.state === 'running' && !btn(t('network.tether.start')) && shown() === 1, 'network: sharing shows as connected, with only its stop button');
+    expect(phoneCard.dataset.state === 'running' && !btn(t('network.tether.start')) && btn(t('network.tether.stop')), 'network: sharing shows as connected, with its stop button');
+    expect(!phoneCard.querySelector('.phone-meter').hidden && phoneCard.querySelector('.phone-meter').textContent.includes('2.4 MB/s'), 'network: the meter shows what the phone moves while it shares');
+    S.network.tether.test = { state: 'running' }; runSyncs();
+    expect(!btn(t('network.tether.test')) && phoneCard.textContent.includes(t('network.tether.testing')), 'network: a test that runs says so and cannot start twice');
+    S.network.tether.test = { state: 'done', phone: 'SM G991B', verdict: 'none', loss: 100, ms: null }; runSyncs();
+    expect(phoneCard.querySelector('.phone-test').dataset.verdict === 'none', 'network: a phone that does not reach the internet is said so');
     sent.length = 0;
     btn(t('network.tether.stop')).click();
     expect(sent.some((m) => m.t === 'action' && m.name === 'network_tether_stop'), 'network: stop sends its action');

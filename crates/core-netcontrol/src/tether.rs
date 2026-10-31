@@ -81,6 +81,44 @@ pub fn count_unauthorized(text: &str) -> usize {
         .count()
 }
 
+/// Where the phone pings to see whether it reaches the internet, by address and then by name (which needs DNS).
+pub const PING_ADDRESS: &str = "1.1.1.1";
+pub const PING_NAME: &str = "google.com";
+
+/// The arguments that make `phone` ping `host` `count` times from its own shell, through `adb`.
+pub fn ping_args(serial: &str, host: &str, count: u32) -> Option<Vec<String>> {
+    let host_ok = !host.is_empty() && host.bytes().all(|b| b.is_ascii_alphanumeric() || matches!(b, b'.' | b'-'));
+    (valid_serial(serial) && host_ok).then(|| {
+        ["-s", serial, "shell", "ping", "-c", &count.to_string(), "-W", "2", host].iter().map(|s| (*s).to_owned()).collect()
+    })
+}
+
+/// What a ping said: how many answers came back of those sent, and the average time of one, in milliseconds.
+#[derive(Debug, Clone, Copy, PartialEq)]
+pub struct Ping {
+    pub sent: u32,
+    pub received: u32,
+    pub average_ms: Option<f64>,
+}
+
+/// Reads the summary of `ping` as Android's toybox and BSD print it.
+pub fn parse_ping(text: &str) -> Option<Ping> {
+    let mut out = None;
+    for line in text.lines() {
+        if let Some((sent, rest)) = line.split_once(" packets transmitted, ") {
+            let sent = sent.trim().parse().ok()?;
+            let received = rest.split_whitespace().next()?.parse().ok()?;
+            out = Some(Ping { sent, received, average_ms: None });
+        }
+        if let (Some(ping), Some((_, values))) = (out.as_mut(), line.split_once(" = ")) {
+            if line.contains("min/avg/max") {
+                ping.average_ms = values.split('/').nth(1).and_then(|v| v.trim().parse().ok());
+            }
+        }
+    }
+    out
+}
+
 #[cfg(test)]
 mod tests {
     use super::*;
@@ -101,6 +139,22 @@ mod tests {
         assert_eq!(stop_args("a b"), None);
         assert_eq!(count_unauthorized(text), 1);
         assert!(parse_devices("").is_empty());
+    }
+
+    #[test]
+    fn a_ping_from_the_phone_is_asked_and_read() {
+        assert_eq!(
+            ping_args("R58", PING_ADDRESS, 4).unwrap(),
+            ["-s", "R58", "shell", "ping", "-c", "4", "-W", "2", "1.1.1.1"]
+        );
+        assert!(ping_args("R58", "a;reboot", 1).is_none() && ping_args("-x", "1.1.1.1", 1).is_none());
+        let android = "PING 1.1.1.1 (1.1.1.1) 56(84) bytes of data.\n64 bytes from 1.1.1.1: icmp_seq=1 ttl=57 time=21.4 ms\n\n--- 1.1.1.1 ping statistics ---\n4 packets transmitted, 3 received, 25% packet loss, time 3004ms\nrtt min/avg/max/mdev = 18.120/22.517/27.301/3.402 ms\n";
+        assert_eq!(parse_ping(android), Some(Ping { sent: 4, received: 3, average_ms: Some(22.517) }));
+        let none = "PING google.com (142.250.1.1) 56(84) bytes of data.\n\n--- google.com ping statistics ---\n2 packets transmitted, 0 received, 100% packet loss, time 1001ms\n";
+        assert_eq!(parse_ping(none), Some(Ping { sent: 2, received: 0, average_ms: None }));
+        let bsd = "--- 1.1.1.1 ping statistics ---\n3 packets transmitted, 3 packets received, 0.0% packet loss\nround-trip min/avg/max/stddev = 9.1/10.5/12.0/1.2 ms\n";
+        assert_eq!(parse_ping(bsd).unwrap().average_ms, Some(10.5));
+        assert_eq!(parse_ping("ping: unknown host google.com"), None);
     }
 
     #[test]

@@ -33,5 +33,7 @@
   ],
   "total_down": 6101200,
   "total_up": 420300,
-  "tether": { "gnirehtet": true, "adb": true, "running": false, "phones": [{ "serial": "R58M12ABC", "model": "SM G991B" }], "unauthorized": 0 }
+  "tether": { "gnirehtet": true, "adb": true, "running": false, "phones": [{ "serial": "R58M12ABC", "model": "SM G991B" }], "unauthorized": 0,
+    "meter": { "down": 2400000, "up": 180000, "received": 512000000, "sent": 21000000 },
+    "test": { "state": "done", "phone": "SM G991B", "verdict": "good", "loss": 0, "ms": 23.4 } }
 }

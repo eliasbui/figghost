@@ -3,7 +3,7 @@
 //! `cargo run -p macos-sys --example render_jarvis -- /tmp/jarvis`
 
 use macos_sys::{
-    MainThreadMarker, app,
+    MainThreadMarker, NSSize, app,
     jarvis_ui::{JarvisDisplay, JarvisPanel, Line, Stage},
 };
 use std::{env, fs, path::PathBuf, process};
@@ -61,6 +61,17 @@ fn main() {
         // A voice that has been loud for a moment, for the ring of the listening character.
         for level in [0.2, 0.8, 0.9, 0.6] {
             panel.level(level);
+        }
+        // Pulled larger and to the smallest size, with the talk and with nothing yet.
+        for (name, index, size) in [
+            ("large-talk", 1, NSSize::new(760.0, 820.0)),
+            ("large-empty", 0, NSSize::new(760.0, 820.0)),
+            ("small-talk", 1, NSSize::new(360.0, 420.0)),
+        ] {
+            let png = panel.png_sized(&scenes[index].1, size).expect("the panel draws");
+            let path = dir.join(format!("{name}.png"));
+            fs::write(&path, png).expect("write png");
+            println!("wrote {}", path.display());
         }
         for (name, display) in scenes {
             let png = panel.png(&display).expect("the panel draws");

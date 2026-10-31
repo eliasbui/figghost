@@ -41,6 +41,7 @@ pub fn state(config: &Config, runtime: &Value) -> Value {
         "total_up": number("total_up"),
         "tether": runtime.get("tether").filter(|v| v.is_object()).cloned().unwrap_or_else(|| json!({
             "gnirehtet": false, "adb": false, "running": false, "phones": [], "unauthorized": 0,
+            "meter": { "down": 0, "up": 0, "received": 0, "sent": 0 }, "test": { "state": "idle" },
         })),
     })
 }

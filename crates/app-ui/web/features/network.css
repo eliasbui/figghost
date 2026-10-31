@@ -42,6 +42,14 @@
 .network-node.merge { z-index: 1; border-radius: 50%; border: 2px dashed var(--accent); background: color-mix(in srgb, var(--accent) 7%, transparent); }
 .network-node.merge .network-node-body { justify-content: space-between; align-items: center; padding: 14px 0 16px; }
 .network-node.merge .network-node-title { color: var(--accent); text-transform: uppercase; letter-spacing: 0.05em; font-size: 11px; }
+/* A connection inside the Combined circle: smaller, its address left out. */
+.network-node.link.inside { padding: 6px; font-size: 10.5px; }
+.network-node.link.inside .network-node-title { font-size: 11px; }
+.network-node.link.inside .network-node-sub { display: none; }
+.network-node.link.inside .network-node-speed { font-size: 10px; margin-top: 0; }
+.network-node.link.inside .network-link-glyph { width: 15px; height: 15px; margin-bottom: 1px; }
+.network-grip { position: absolute; right: 12%; bottom: 12%; width: 16px; height: 16px; border-radius: 4px; cursor: nwse-resize; z-index: 3;
+  background: linear-gradient(135deg, transparent 45%, var(--accent) 45%, var(--accent) 55%, transparent 55%, transparent 70%, var(--accent) 70%, var(--accent) 80%, transparent 80%); }
 .network-node.app { z-index: 3; width: 184px; height: 54px; padding: 6px 12px 6px 16px; border-radius: 8px; background: var(--group); box-shadow: 0 0 0 1px var(--group-edge), 0 1px 3px var(--shadow); }
 .network-node.app.wired { box-shadow: 0 0 0 1.5px var(--accent-2), 0 1px 3px var(--shadow); }
 .network-node.app.idle { opacity: 0.6; }
@@ -109,3 +117,20 @@
 .network-app-glyph { width: 22px; height: 22px; color: var(--text-3); }
 .network-app-text { min-width: 0; display: flex; flex-direction: column; }
 .network-node.app { padding-left: 12px; }
+
+/* The meter and the test of Phone sharing, across the card under its text. */
+.phone-meter { grid-column: 1 / -1; display: grid; grid-template-columns: 1fr 1fr auto; gap: 14px; align-items: center; padding: 10px 12px; border-radius: 10px; background: var(--solid-2); }
+.phone-meter[hidden], .phone-test[hidden] { display: none; }
+.phone-gauge { display: grid; grid-template-columns: auto 1fr; grid-template-rows: auto 6px; gap: 3px 8px; align-items: baseline; }
+.phone-gauge-label { color: var(--text-2); font-size: 11px; }
+.phone-gauge-value { justify-self: end; font-weight: 600; font-variant-numeric: tabular-nums; font-size: var(--fs-small); }
+.phone-gauge-bar { grid-column: 1 / -1; height: 6px; border-radius: 3px; background: var(--track); overflow: hidden; }
+.phone-gauge-fill { display: block; height: 100%; width: 0; border-radius: 3px; background: var(--good); transition: width 0.6s ease; }
+.phone-gauge + .phone-gauge .phone-gauge-fill { background: var(--accent); }
+.phone-used { color: var(--text-2); font-size: var(--fs-small); font-variant-numeric: tabular-nums; white-space: nowrap; }
+.phone-test { grid-column: 1 / -1; font-size: var(--fs-small); padding-left: 2px; }
+.phone-test[data-verdict="good"] { color: var(--good); }
+.phone-test[data-verdict="slow"], .phone-test[data-verdict="dns"] { color: var(--warn); }
+.phone-test[data-verdict="none"] { color: var(--bad); }
+.phone-test[data-verdict="running"] { color: var(--text-2); }
+@media (prefers-reduced-motion: reduce) { .phone-gauge-fill { transition: none; } }

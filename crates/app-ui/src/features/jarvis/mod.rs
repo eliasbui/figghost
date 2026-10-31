@@ -60,6 +60,19 @@ const HANDS_FREE_SECONDS: f64 = 120.0;
 const GREETING_GRACE_SECONDS: f64 = 0.8;
 /// The frames of the character, drawn by agy (`docs/jarvis-art`).
 const FACE: &[u8] = include_bytes!("../../../assets/jarvis/jarvis.png");
+/// Where the panel was left and how large, in the data directory: `x y width height` in screen points.
+const FRAME_FILE: &str = "jarvis-frame.txt";
+
+/// The frame in the frame file, when it is four finite numbers with a size.
+pub fn read_frame(text: &str) -> Option<[f64; 4]> {
+    let n: Vec<f64> = text.split_whitespace().map(str::parse).collect::<Result<_, _>>().ok()?;
+    let [x, y, w, h] = <[f64; 4]>::try_from(n).ok()?;
+    ([x, y, w, h].iter().all(|v| v.is_finite()) && w > 0.0 && h > 0.0).then_some([x, y, w, h])
+}
+
+pub fn write_frame([x, y, w, h]: [f64; 4]) -> String {
+    format!("{x:.0} {y:.0} {w:.0} {h:.0}\n")
+}
 /// How often the microphone's silence and the voice that is speaking are looked at.
 const TICK_SECONDS: f64 = 0.15;
 /// The turns sent with a question; older ones are forgotten so that a long talk never grows the request.
@@ -467,6 +480,7 @@ struct Hearing {
 
 pub struct Feature {
     mtm: MainThreadMarker,
+    home: std::path::PathBuf,
     me: Weak<Feature>,
     config: RefCell<Config>,
     hotkey: RefCell<Option<Hotkey>>,
@@ -497,6 +511,7 @@ pub fn attach(env: &AttachEnv) -> Option<Rc<Feature>> {
     let config = env.config.jarvis.clone().sanitized();
     let feature = Rc::new_cyclic(|me| Feature {
         mtm: env.mtm,
+        home: env.home.to_owned(),
         me: me.clone(),
         config: RefCell::new(config.clone()),
         hotkey: RefCell::default(),
@@ -628,6 +643,10 @@ impl Feature {
                 let weak = weak.clone();
                 move |key| weak.upgrade().is_some_and(|f| f.key(key))
             });
+            let saved = std::fs::read_to_string(self.home.join(FRAME_FILE)).ok().and_then(|t| read_frame(&t));
+            panel.set_saved_frame(saved.map(|[x, y, w, h]| {
+                macos_sys::NSRect::new(macos_sys::NSPoint::new(x, y), macos_sys::NSSize::new(w, h))
+            }));
             panel.set_on_mic(move || {
                 if let Some(f) = weak.upgrade() {
                     f.mic();
@@ -730,6 +749,14 @@ impl Feature {
         self.lines.borrow_mut().clear();
         self.turns.borrow_mut().clear();
         if let Some(panel) = self.panel.borrow().as_ref() {
+            if panel.is_visible() {
+                // Where it was left and how large, to open there again, also after a restart.
+                let f = panel.frame();
+                let text = write_frame([f.origin.x, f.origin.y, f.size.width, f.size.height]);
+                if let Err(e) = std::fs::write(self.home.join(FRAME_FILE), text) {
+                    eprintln!("jarvis: cannot keep where the panel was: {e}");
+                }
+            }
             panel.hide();
         }
     }
@@ -1105,6 +1132,16 @@ impl Feature {
 #[cfg(test)]
 mod tests {
     use super::*;
+
+    #[test]
+    fn the_place_of_the_panel_goes_to_its_file_and_back() {
+        let frame = [120.0, 80.0, 640.0, 720.0];
+        assert_eq!(read_frame(&write_frame(frame)), Some(frame));
+        assert_eq!(read_frame("1 2 3"), None);
+        assert_eq!(read_frame("1 2 0 4"), None);
+        assert_eq!(read_frame("1 2 inf 4"), None);
+        assert_eq!(read_frame("x y w h"), None);
+    }
 
     #[test]
     fn it_is_off_by_default_and_a_config_file_can_say_anything() {

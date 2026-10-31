@@ -245,6 +245,8 @@ pub struct Feature {
     known_apps: RefCell<Vec<KnownApp>>,
     /// The links while the proxy is off, listed on another thread.
     idle_links: Arc<Mutex<IdleLinks>>,
+    /// The last test of the phone's connection: `{ "state": "idle" }`, running, or done with its verdict.
+    phone_test: Arc<Mutex<Value>>,
 }
 
 /// The links of the system, listed off the main thread (naming them may run `networksetup`).
@@ -320,6 +322,7 @@ pub fn attach(env: &AttachEnv) -> Option<Rc<Feature>> {
             .unwrap_or_default(),
         known_apps: RefCell::new(read_known_apps(&fs::read_to_string(env.home.join(APPS_FILE)).unwrap_or_default())),
         idle_links: Arc::default(),
+        phone_test: Arc::new(Mutex::new(json!({ "state": "idle" }))),
     });
     FEATURE.with(|slot| *slot.borrow_mut() = Rc::downgrade(&feature));
     // A run that ended without putting the settings back left them here.
@@ -656,6 +659,7 @@ impl Feature {
     pub fn action(&self, name: &str) -> Option<Result<(), Fault>> {
         Some(match name {
             "network_tether_start" => self.start_tether(),
+            "network_tether_test" => self.test_phone(),
             "network_tether_stop" => {
                 // Also when this run did not start it (a phone left on its VPN by a run that ended badly).
                 if self.tether.borrow().is_some() {
@@ -719,9 +723,71 @@ impl Feature {
             "running": self.tether_running(),
             "phones": ready.iter().map(|p| json!({ "serial": p.serial, "model": p.model })).collect::<Vec<_>>(),
             "unauthorized": unauthorized,
+            "meter": phone_meter(&usage),
+            "test": self.phone_test.lock().unwrap_or_else(PoisonError::into_inner).clone(),
         });
         out
     }
+
+    /// Has the phone ping the internet from its own shell, by address and then by name, off the main thread.
+    fn test_phone(&self) -> Result<(), Fault> {
+        let phone = self.phones.lock().unwrap_or_else(PoisonError::into_inner).ready.first().cloned();
+        let phone = phone.ok_or_else(|| Fault::new("no_phone", "tether"))?;
+        let adb = tether::find("adb").ok_or_else(|| Fault::new("missing_tool", "adb"))?;
+        {
+            let mut test = self.phone_test.lock().unwrap_or_else(PoisonError::into_inner);
+            if test["state"] == "running" {
+                return Ok(());
+            }
+            *test = json!({ "state": "running", "phone": phone.model });
+        }
+        let shared = Arc::clone(&self.phone_test);
+        thread::spawn(move || {
+            let adb = adb.to_string_lossy().into_owned();
+            let ping = |host: &str, count: u32| {
+                let args = tether::ping_args(&phone.serial, host, count)?;
+                let args: Vec<&str> = args.iter().map(String::as_str).collect();
+                let (_, text) = run_bounded_output(&adb, &args, &[], 15).ok()?;
+                tether::parse_ping(&text)
+            };
+            let address = ping(tether::PING_ADDRESS, 4);
+            let name = ping(tether::PING_NAME, 2);
+            let result = phone_test_result(&phone.model, address, name);
+            trace::log(&format!("network: the phone's connection was tested: {}", result["verdict"]));
+            *shared.lock().unwrap_or_else(PoisonError::into_inner) = result;
+        });
+        Ok(())
+    }
+}
+
+/// What went through the relay of Phone sharing is what the phone moved: its traffic reaches the Mac over `adb` on
+/// the loopback, which is not counted, and leaves by the Mac's own links.
+pub fn phone_meter(usage: &[Usage]) -> Value {
+    let relay = usage.iter().filter(|u| u.name.to_ascii_lowercase().contains("gnirehtet"));
+    let (mut down, mut up, mut received, mut sent) = (0, 0, 0, 0);
+    for u in relay {
+        down += u.down;
+        up += u.up;
+        received += u.received;
+        sent += u.sent;
+    }
+    json!({ "down": down, "up": up, "received": received, "sent": sent })
+}
+
+/// The verdict of a test: `good` (answers by address and by name), `slow` (they come back, but late or some lost),
+/// `dns` (by address only: the phone cannot look names up), or `none` (nothing came back).
+pub fn phone_test_result(phone: &str, address: Option<tether::Ping>, name: Option<tether::Ping>) -> Value {
+    let reached = address.is_some_and(|p| p.received > 0);
+    let named = name.is_some_and(|p| p.received > 0);
+    let loss = address.map_or(100.0, |p| if p.sent == 0 { 100.0 } else { 100.0 * f64::from(p.sent - p.received.min(p.sent)) / f64::from(p.sent) });
+    let ms = address.and_then(|p| p.average_ms);
+    let verdict = match (reached, named) {
+        (false, _) => "none",
+        (true, false) => "dns",
+        (true, true) if loss > 0.0 || ms.is_some_and(|m| m > 250.0) => "slow",
+        _ => "good",
+    };
+    json!({ "state": "done", "phone": phone, "verdict": verdict, "loss": loss.round(), "ms": ms.map(|m| (m * 10.0).round() / 10.0) })
 }
 
 /// The links and the apps for the page: what `nettop` saw, with what went through the proxy added to its app.
@@ -858,6 +924,21 @@ mod tests {
         assert_eq!(odd.port, DEFAULT_PORT);
         assert_eq!(odd.wires.len(), 1);
         assert_eq!(odd.rules()[0].target, Target::Link("en0".into()));
+    }
+
+    #[test]
+    fn the_phone_test_says_what_it_found_and_the_meter_counts_the_relay() {
+        use core_netcontrol::tether::Ping;
+        let ok = Some(Ping { sent: 4, received: 4, average_ms: Some(23.0) });
+        assert_eq!(phone_test_result("Pixel", ok, ok)["verdict"], json!("good"));
+        let lossy = Some(Ping { sent: 4, received: 3, average_ms: Some(23.0) });
+        let r = phone_test_result("Pixel", lossy, ok);
+        assert_eq!((r["verdict"].clone(), r["loss"].clone()), (json!("slow"), json!(25.0)));
+        assert_eq!(phone_test_result("Pixel", ok, Some(Ping { sent: 2, received: 0, average_ms: None }))["verdict"], json!("dns"));
+        assert_eq!(phone_test_result("Pixel", None, None)["verdict"], json!("none"));
+        let relay = Usage { name: "gnirehtet".into(), down: 500, up: 40, received: 9000, sent: 700, ..Usage::default() };
+        let other = usage("Safari", 100, "en0");
+        assert_eq!(phone_meter(&[relay, other]), json!({ "down": 500, "up": 40, "received": 9000, "sent": 700 }));
     }
 
     #[test]
