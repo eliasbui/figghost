@@ -45,6 +45,8 @@ struct Sky {
 }
 
 /// Looked up at run time so the app still runs where SkyLight changes; `None` falls back to the plain level.
+// Each transmute takes the type of the field it fills, which the struct above spells out.
+#[allow(clippy::missing_transmute_annotations)]
 fn sky() -> Option<&'static Sky> {
     static SKY: OnceLock<Option<Sky>> = OnceLock::new();
     SKY.get_or_init(|| {

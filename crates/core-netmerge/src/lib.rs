@@ -298,6 +298,18 @@ fn primary_ip() -> Option<Ipv4Addr> {
     }
 }
 
+/// A TCP connection to `to` that leaves by `link`, or by the system's own route without one, for another proxy that
+/// chooses its links by rules of its own (figghost's `core-netcontrol`).
+pub fn connect_by(link: Option<&Link>, to: SocketAddr, timeout: Duration) -> io::Result<TcpStream> {
+    connect(link, to, timeout)
+}
+
+/// Whether the system's own route leaves by none of the links, as when a VPN carries everything.
+pub fn route_elsewhere(links: &[Link]) -> bool {
+    let primary = primary_ip();
+    !links.iter().any(|l| Some(l.ip) == primary)
+}
+
 /// A TCP connection to `to` that leaves by `link`, or by the system's own route without one.
 fn connect(link: Option<&Link>, to: SocketAddr, timeout: Duration) -> io::Result<TcpStream> {
     let socket = Socket::new(Domain::for_address(to), Type::STREAM, Some(Protocol::TCP))?;

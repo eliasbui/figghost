@@ -45,6 +45,7 @@ core-audio-fx = { path = "crates/core-audio-fx" }
 core-typing = { path = "crates/core-typing" }
 core-notes = { path = "crates/core-notes" }
 core-netmerge = { path = "crates/core-netmerge" }
+core-netcontrol = { path = "crates/core-netcontrol" }
 # The Telex and VNI engine of Gõ Nhanh, under the BSD 3-Clause licence (crates/app-ui/assets/GoNhanh-LICENSE.txt).
 # It is not on crates.io, so it is pinned to the last commit that changed it.
 gonhanh-core = { git = "https://github.com/khaphanspace/gonhanh.org", rev = "7ae856713adec91694c50d6ee38290b64b48bb3f" }

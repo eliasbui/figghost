@@ -24,6 +24,7 @@ use std::{
 pub mod breaks;
 pub mod dictation;
 pub mod jarvis;
+pub mod network;
 pub mod browser;
 pub mod calendar;
 pub mod capture;
@@ -295,6 +296,7 @@ pub struct Features {
     pub breaks: Option<Rc<breaks::Feature>>,
     pub dictation: Option<Rc<dictation::Feature>>,
     pub jarvis: Option<Rc<jarvis::Feature>>,
+    pub network: Option<Rc<network::Feature>>,
     pub browser: Option<Rc<browser::Feature>>,
     pub notes: Option<Rc<notes::Feature>>,
     pub launcher: Option<Rc<launcher::Feature>>,
@@ -345,6 +347,7 @@ impl Features {
             breaks: breaks::attach(env),
             dictation: dictation::attach(env),
             jarvis: jarvis::attach(env),
+            network: network::attach(env),
             browser: None,
             notes: notes::attach(env),
             launcher: launcher::attach(env),
@@ -436,6 +439,9 @@ impl Features {
         }
         if let Some(f) = &self.jarvis {
             out.insert("jarvis", f.runtime());
+        }
+        if let Some(f) = &self.network {
+            out.insert("network", f.runtime());
         }
         if let Some(f) = &self.breaks {
             out.insert("breaks", f.runtime());
@@ -579,6 +585,10 @@ impl Features {
                 .jarvis
                 .as_ref()
                 .map_or(Ok(()), |f| f.configure(&config.jarvis)),
+            "network" => self
+                .network
+                .as_ref()
+                .map_or(Ok(()), |f| f.configure(&config.network)),
             "browser" => self
                 .browser
                 .as_ref()
@@ -897,6 +907,11 @@ impl Features {
         {
             return Some(result);
         }
+        if let Some(f) = &self.network
+            && let Some(result) = f.action(name)
+        {
+            return Some(result);
+        }
         if let Some(f) = &self.present
             && let Some(result) = f.action(name)
         {
@@ -1132,6 +1147,10 @@ pub fn state(
         jarvis::settings::state(&config.jarvis, runtime.get("jarvis").unwrap_or(&none)),
     );
     root.insert(
+        "network".into(),
+        network::settings::state(&config.network, runtime.get("network").unwrap_or(&none)),
+    );
+    root.insert(
         "screentime".into(),
         screentime::settings::state(
             &config.screentime,
@@ -1251,6 +1270,8 @@ pub fn set(config: &mut Config, path: &str, value: &Value) -> Option<Result<&'st
             .map(|r| r.map(|()| "dictation")),
         "jarvis" => jarvis::settings::set(&mut config.jarvis, rest, value)
             .map(|r| r.map(|()| "jarvis")),
+        "network" => network::settings::set(&mut config.network, rest, value)
+            .map(|r| r.map(|()| "network")),
         "screentime" => screentime::settings::set(&mut config.screentime, rest, value)
             .map(|r| r.map(|()| "screentime")),
         "system" => {

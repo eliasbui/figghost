@@ -30,6 +30,7 @@ const FEATURE_SCRIPTS: &[&str] = &[
     include_str!("../../web/features/breaks.js"),
     include_str!("../../web/features/dictation.js"),
     include_str!("../../web/features/jarvis.js"),
+    include_str!("../../web/features/network.js"),
     include_str!("../../web/features/browser.js"),
     include_str!("../../web/features/notes.js"),
     include_str!("../../web/features/launcher.js"),
@@ -73,6 +74,7 @@ const FEATURE_STYLES: &[&str] = &[
     include_str!("../../web/features/launcher.css"),
     include_str!("../../web/features/dictation.css"),
     include_str!("../../web/features/jarvis.css"),
+    include_str!("../../web/features/network.css"),
     include_str!("../../web/features/prs.css"),
     include_str!("../../web/features/updates.css"),
     include_str!("../../web/features/snippets.css"),
@@ -149,6 +151,10 @@ const FEATURE_FIXTURES: &[(&str, &str)] = &[
     (
         "jarvis",
         include_str!("../../web/features/jarvis.fixture.json"),
+    ),
+    (
+        "network",
+        include_str!("../../web/features/network.fixture.json"),
     ),
     (
         "browser",
@@ -290,6 +296,7 @@ const SYMBOLS: &[&str] = &[
     "rectangle.split.2x1.fill",
     "info.circle.fill",
     "sparkles",
+    "network",
     "bell.badge.fill",
     "waveform.circle.fill",
     "waveform.and.mic",

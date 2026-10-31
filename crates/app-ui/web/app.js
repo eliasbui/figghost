@@ -831,7 +831,7 @@ const PAGE_SYMBOLS = {
   clipboard: 'list.clipboard', typing: 'keyboard', snippets: 'text.cursor', dictation: 'mic', jarvis: 'sparkles', smart: 'text.magnifyingglass',
   translate: 'character.bubble',
   capture: 'camera.viewfinder', vision: 'eyedropper.halffull', download: 'arrow.down.circle', browser: 'safari',
-  utilities: 'slider.horizontal.3', breaks: 'eye', menubar: 'menubar.rectangle', mole: 'wand.and.stars',
+  utilities: 'slider.horizontal.3', network: 'network', breaks: 'eye', menubar: 'menubar.rectangle', mole: 'wand.and.stars',
   agents: 'terminal', prs: 'arrow.triangle.pull', calendar: 'calendar', outlook: 'envelope', pomodoro: 'timer',
   dayprogress: 'sun.horizon', screentime: 'hourglass', notes: 'note.text', launcher: 'square.grid.2x2',
   weather: 'cloud.sun', video: 'play.rectangle', system: 'cpu', updates: 'shippingbox', devices: 'airpodspro',
@@ -1850,7 +1850,7 @@ const NAV = [
   { sec: 'mouse', pages: ['scroll', 'cursor', 'wheel', 'tiling', 'pin'] },
   { sec: 'text', pages: ['clipboard', 'typing', 'snippets', 'dictation', 'jarvis', 'smart', 'translate'] },
   { sec: 'capture', pages: ['capture', 'vision', 'download', 'browser'] },
-  { sec: 'mac', pages: ['utilities', 'breaks', 'menubar', 'mole'] },
+  { sec: 'mac', pages: ['utilities', 'network', 'breaks', 'menubar', 'mole'] },
 ];
 const TAB_PAGES = ['agents', 'prs', 'calendar', 'outlook', 'pomodoro', 'dayprogress', 'screentime', 'notes', 'launcher', 'weather', 'video', 'system', 'updates', 'devices', 'displays', 'present', 'shelf', 'media'];
 /** The page the sidebar marks while `id` is open: itself, or the Notch page for the page of one of its tabs. */

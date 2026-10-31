@@ -1,0 +1,58 @@
+/* Network. Styles for the page in web/features/network.js, using the variables at the top of app.css. */
+.network-total { font-variant-numeric: tabular-nums; }
+.network-table-row { padding-top: 0; }
+.network-table { width: 100%; font-size: var(--fs-small); font-variant-numeric: tabular-nums; }
+.network-tr { display: grid; grid-template-columns: 2.2fr 1fr 1fr 1fr 1.4fr; gap: 8px; padding: 5px 0; border-top: 1px solid var(--stroke); }
+.network-tr.head { color: var(--text-2); border-top: 0; }
+.network-tr span { overflow: hidden; text-overflow: ellipsis; white-space: nowrap; }
+.network-app { font-weight: 500; }
+.network-via { color: var(--text-2); }
+.network-empty { padding: 6px 0; }
+.network-status[data-state="denied"], .network-status[data-state="failed"] { color: var(--bad); }
+.network-status[data-state="on"] { color: var(--good); }
+.network-phone { display: flex; flex-wrap: wrap; gap: 8px; align-items: center; justify-content: flex-end; max-width: 360px; }
+.network-note { margin: 6px 14px 8px; color: var(--text-2); font-size: var(--fs-small); line-height: 1.4; }
+
+/* The diagram: a sheet over the window, the wires drawn under the nodes. */
+.network-scrim { position: fixed; inset: 0; z-index: 40; background: var(--scrim); display: flex; align-items: center; justify-content: center; }
+.network-scrim[hidden] { display: none; }
+.network-sheet { width: min(980px, calc(100% - 48px)); max-height: calc(100% - 48px); overflow: auto; background: var(--solid); color: var(--text); border-radius: var(--r-card); box-shadow: 0 18px 50px var(--shadow), 0 0 0 1px var(--stroke); padding: 14px 16px 16px; }
+.network-sheet-head { display: flex; align-items: center; gap: 12px; }
+.network-sheet-head h2 { margin: 0; font-size: 17px; }
+.network-total-head { flex: 1; color: var(--text-2); font-size: var(--fs-small); font-variant-numeric: tabular-nums; }
+.network-sheet > .network-note { margin: 8px 0; }
+.network-board { position: relative; min-height: 240px; }
+.network-wires { position: absolute; inset: 0; pointer-events: none; overflow: visible; }
+.network-nodes { position: absolute; inset: 0; }
+.network-col { position: absolute; top: 4px; font-size: 11px; font-weight: 600; color: var(--text-2); text-transform: uppercase; letter-spacing: 0.04em; }
+.network-node { position: absolute; width: 190px; box-sizing: border-box; padding: 7px 10px; border-radius: 9px; background: var(--group); box-shadow: 0 0 0 1px var(--group-edge), 0 1px 2px var(--shadow); font-size: var(--fs-small); }
+.network-node.link { min-height: 60px; }
+.network-node.link.primary { box-shadow: 0 0 0 1.5px var(--accent), 0 1px 2px var(--shadow); }
+.network-node.hub { min-height: 60px; background: var(--solid-2); }
+.network-node.app { width: 220px; padding-left: 22px; cursor: pointer; }
+.network-node.app.picked, .network-node:focus-visible { box-shadow: 0 0 0 2px var(--accent); outline: none; }
+.network-node.drop { box-shadow: 0 0 0 2px var(--good); }
+.network-node.empty { background: transparent; box-shadow: none; }
+.network-node-title { font-weight: 600; font-size: 12px; overflow: hidden; text-overflow: ellipsis; white-space: nowrap; }
+.network-node-sub { color: var(--text-2); overflow: hidden; text-overflow: ellipsis; white-space: nowrap; }
+.network-node-speed { margin-top: 2px; font-variant-numeric: tabular-nums; }
+.network-port { position: absolute; left: -6px; top: 50%; width: 12px; height: 12px; margin-top: -6px; border-radius: 50%; background: var(--accent); box-shadow: 0 0 0 2px var(--solid); cursor: crosshair; }
+.network-wire { fill: none; stroke: var(--text-3); stroke-linecap: round; }
+.network-wire.feed { stroke: var(--track); }
+.network-wire.seen { stroke: var(--text-3); stroke-dasharray: 3 4; }
+.network-wire.planned { stroke: var(--text-3); stroke-dasharray: 6 5; }
+.network-wire.high { stroke: var(--accent); }
+.network-wire.normal { stroke: var(--accent-2); }
+.network-wire.low { stroke: var(--warn); }
+.network-wire.dragging { stroke: var(--good); stroke-dasharray: 4 4; }
+.network-wire.live { stroke-dasharray: 8 6; animation: network-flow 0.9s linear infinite; }
+@keyframes network-flow { to { stroke-dashoffset: -14; } }
+@media (prefers-reduced-motion: reduce) { .network-wire.live { animation: none; stroke-dasharray: none; } }
+
+.network-card { margin-top: 12px; padding: 12px 14px; border-radius: 10px; background: var(--solid-2); box-shadow: 0 0 0 1px var(--stroke); }
+.network-card[hidden] { display: none; }
+.network-card h3 { margin: 0 0 4px; font-size: 14px; }
+.network-fields { display: grid; grid-template-columns: repeat(4, minmax(0, 1fr)); gap: 10px; margin-top: 8px; }
+.network-field { display: flex; flex-direction: column; gap: 4px; font-size: var(--fs-small); color: var(--text-2); }
+.network-limit { width: 100%; box-sizing: border-box; }
+.network-actions { display: flex; justify-content: flex-end; gap: 8px; margin-top: 10px; }

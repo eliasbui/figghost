@@ -1,0 +1,27 @@
+{
+  "enabled": true,
+  "control": true,
+  "port": 47117,
+  "wires": [
+    { "app": "Steam", "target": "link:en7", "priority": "high", "down_kbps": 0, "up_kbps": 0 },
+    { "app": "Microsoft Edge", "target": "merge", "priority": "high", "down_kbps": 0, "up_kbps": 0 },
+    { "app": "Dropbox", "target": "link:en7", "priority": "low", "down_kbps": 2048, "up_kbps": 512 }
+  ],
+  "status": "on",
+  "saved": true,
+  "running": true,
+  "paused": false,
+  "links": [
+    { "name": "en0", "label": "Wi-Fi", "ip": "192.168.1.20", "primary": true, "down": 1850000, "up": 120000, "connections": 14 },
+    { "name": "en7", "label": "USB 10/100/1000 LAN", "ip": "10.0.0.5", "primary": false, "down": 5200000, "up": 300000, "connections": 9 }
+  ],
+  "apps": [
+    { "name": "Steam", "bundle": "/Applications/Steam.app", "down": 4100000, "up": 90000, "received": 912000000, "sent": 4000000, "interfaces": [{ "name": "en7", "down": 4100000 }], "proxied": true, "held_to": null },
+    { "name": "Microsoft Edge", "bundle": "/Applications/Microsoft Edge.app", "down": 1650000, "up": 80000, "received": 120000000, "sent": 9000000, "interfaces": [{ "name": "en0", "down": 900000 }, { "name": "en7", "down": 750000 }], "proxied": true, "held_to": null },
+    { "name": "Dropbox", "bundle": "/Applications/Dropbox.app", "down": 350000, "up": 250000, "received": 40000000, "sent": 30000000, "interfaces": [{ "name": "en7", "down": 350000 }], "proxied": true, "held_to": 900000 },
+    { "name": "mDNSResponder", "bundle": "", "down": 1200, "up": 300, "received": 62248788, "sent": 181561, "interfaces": [{ "name": "en0", "down": 1200 }], "proxied": false, "held_to": null }
+  ],
+  "total_down": 6101200,
+  "total_up": 420300,
+  "tether": { "gnirehtet": true, "adb": true, "running": false, "phones": ["R58M12ABC"], "unauthorized": 0 }
+}

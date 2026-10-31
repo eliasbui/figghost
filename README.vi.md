@@ -108,6 +108,7 @@ Notch luôn có Clipboard, Khay tệp, Media (kèm lời bài hát), Tập trung
 | Chọn màu | Colour picker | Kính lúp trên màn hình đóng băng, chép màu dạng HEX, RGB, HSL hoặc HSB (tắt mặc định) |
 | Tải video | Video download | Dán link, yt-dlp do bạn tự cài sẽ lưu video vào Downloads, tiến độ hiện trên notch đóng; net-merge, bản beta, tải qua mọi đường mạng của Mac cùng lúc (tắt mặc định) |
 | Trình duyệt | Browser | Extension cho Chrome, Edge, Brave, Vivaldi và Arc, chặn các trang bạn liệt kê trong phiên làm việc Pomodoro và gửi video sang Tải video (tắt mặc định) |
+| Mạng | Network | Sơ đồ nối Wi-Fi, Ethernet và điện thoại cắm USB với các ứng dụng đang dùng, kèm lượng dữ liệu mỗi ứng dụng dùng; nối một ứng dụng vào một đường hoặc gộp mọi đường cùng lúc, với giới hạn tốc độ và mức ưu tiên (nối dây đang thử nghiệm), và chia mạng của Mac cho điện thoại Android qua USB (thử nghiệm) (tắt mặc định) |
 | Tiện ích | Utilities | Giữ máy thức, tắt tiếng micro cho mọi ứng dụng, khóa bàn phím khi lau, tạm ẩn notch, chuyển giao diện tối, ẩn biểu tượng màn hình nền, sao chép liên kết của tab trình duyệt (tắt mặc định) |
 | Nghỉ mắt | Breaks | Cho mắt nghỉ một lát sau một quãng dùng máy, chờ khi đang họp hoặc có ứng dụng toàn màn hình, kèm nhắc chớp mắt và ngồi thẳng (tắt mặc định) |
 
@@ -361,6 +362,14 @@ Thư mới và nhắc lịch của app Outlook, trong tab Outlook của notch, m
 Giữ máy thức từ 15 phút đến 4 giờ hoặc cho tới khi bạn dừng, tắt tiếng chính micro để mọi ứng dụng không nghe thấy gì (nó được bật lại khi Figghost thoát, vì không có gì khác trên máy có công tắc cho việc này), khóa bàn phím trong lúc bạn lau (Command và Escape mở khóa ngay, và nó tự mở khóa sau thời gian bạn đặt), và tạm ẩn notch từ 5 phút đến 2 giờ hoặc cho tới khi bạn đánh thức, để nó không mở khi con trỏ chạm mép trên màn hình lúc bạn trình chiếu hoặc chơi game (một cú nhấp vào nó, hoặc một tác tử lập trình đang chờ câu trả lời, vẫn mở được). Nó cũng chuyển cả máy giữa giao diện tối và sáng, ẩn tệp trên màn hình nền để màn hình gọn khi chia sẻ (Finder khởi động lại để nhận thay đổi), và sao chép liên kết của tab phía trước trong Safari hoặc trình duyệt Chromium dưới dạng liên kết Markdown, chỉ địa chỉ, hoặc tiêu đề và địa chỉ (Control-Option-Command-L). Mỗi thứ có chỗ ở bảng thanh menu (một công tắc cho giữ máy thức và một cho tạm ẩn notch, bắt đầu theo độ dài bạn chọn ở trang này; danh sách độ dài nằm ở menu), một phím tắt dùng ở mọi ứng dụng và một thông báo trên notch (tắt mặc định).
 
 ![Trang Tiện ích bằng tiếng Việt](docs/images/settings-utilities-vi.png)
+
+### Mạng
+
+Trang Mạng cho thấy ứng dụng nào đang dùng mạng, nhanh bao nhiêu và qua đường nào: Wi-Fi, Ethernet, điện thoại cắm USB. Mở sơ đồ sẽ thấy các đường mạng ở bên trái, hai chỗ chúng gặp nhau ở giữa (Gộp, dùng mọi đường cùng lúc, và Tự động, đường macOS tự chọn), các ứng dụng ở bên phải, nối với nhau bằng dây dày theo lượng dữ liệu đi qua. Phần theo dõi đọc `nettop` mỗi giây một lần khi trang đang mở, không cần quyền gì và không gửi gì đi đâu.
+
+Nối dây (thử nghiệm) cho phép kéo một ứng dụng sang một đường hoặc sang Gộp, đặt giới hạn tốc độ tải lên và tải về, và mức ưu tiên: ứng dụng nối vào một chỗ đầu tiên là ứng dụng chính, ứng dụng nối sau sẽ nhường nó khi đường đó đầy. Tính năng này không cần extension quản trị: nó trỏ proxy SOCKS và proxy web bảo mật của macOS về một proxy của Figghost trên 127.0.0.1, nên chỉ áp dụng cho ứng dụng theo cài đặt proxy của hệ thống (trình duyệt và phần lớn ứng dụng); ứng dụng bỏ qua cài đặt này, như nhiều game và công cụ dòng lệnh, chỉ được theo dõi. macOS có thể hỏi mật khẩu quản trị khi đổi cài đặt. Cài đặt cũ của từng dịch vụ mạng được giữ lại cho tới khi trả về: khi tắt nối dây, khi Figghost thoát, hoặc ở lần mở sau nếu app bị dừng đột ngột, và có nút để trả về bằng tay. Khi VPN chở toàn bộ lưu lượng, mọi ứng dụng đi đường thường. Gộp chia các kết nối của một ứng dụng ra nhiều đường, nên một lượt tải gồm nhiều kết nối sẽ nhanh hơn; một kết nối đơn vẫn chỉ nhanh bằng một đường.
+
+Chia mạng cho điện thoại (thử nghiệm) cho điện thoại Android cắm USB dùng mạng của Mac qua [gnirehtet](https://github.com/Genymobile/gnirehtet), do bạn tự cài (`brew install gnirehtet android-platform-tools`); cần bật gỡ lỗi USB trên điện thoại trước. iPhone không nhận mạng của Mac theo cách này; dùng Chia sẻ Internet trong Cài đặt hệ thống (tắt mặc định).
 
 ### Trình duyệt
 

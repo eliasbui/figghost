@@ -1105,6 +1105,16 @@ mod tests {
                 "net_links": [{ "name": "en0", "label": "Ethernet", "state": "up", "primary": true,
                 "connections": 1, "speed": 1 }] }),
         );
+        // The links and the apps of the Network page are only measured while that page is open, and wires are only
+        // there once an app was wired.
+        e.runtime.insert(
+            "network",
+            json!({ "links": [{ "name": "en0", "label": "Wi-Fi", "ip": "10.0.0.2", "primary": true, "down": 1, "up": 1,
+                "connections": 1 }],
+                "apps": [{ "name": "Safari", "bundle": "", "down": 1, "up": 1, "received": 1, "sent": 1,
+                "interfaces": [{ "name": "en0", "down": 1 }], "proxied": false, "held_to": null }] }),
+        );
+        config.network.wires = vec![crate::features::network::Wire { app: "Safari".into(), ..Default::default() }];
         config.weather.places = vec![crate::features::weather::logic::Place {
             name: "Hanoi".into(),
             region: String::new(),
@@ -1659,6 +1669,7 @@ mod tests {
             "breaks",
             "dictation",
             "jarvis",
+            "network",
             "browser",
             "notes",
             "launcher",

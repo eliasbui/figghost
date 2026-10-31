@@ -21,6 +21,7 @@ core-typing.workspace = true
 core-notes.workspace = true
 # net-merge for Video download: the proxy that spreads yt-dlp's connections over the Mac's links.
 core-netmerge.workspace = true
+core-netcontrol.workspace = true
 # Reads the store of Notification Center for the Notifications tab, read-only.
 rusqlite.workspace = true
 serde.workspace = true

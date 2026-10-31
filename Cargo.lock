@@ -29,6 +29,7 @@ dependencies = [
  "core-jarvis",
  "core-lyrics",
  "core-mouse",
+ "core-netcontrol",
  "core-netmerge",
  "core-notes",
  "core-smart",
@@ -378,6 +379,14 @@ dependencies = [
  "macos-sys",
  "serde",
  "serde_json",
+]
+
+[[package]]
+name = "core-netcontrol"
+version = "2.2.9"
+dependencies = [
+ "core-netmerge",
+ "libc",
 ]
 
 [[package]]
