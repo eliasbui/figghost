@@ -81,42 +81,77 @@ pub fn count_unauthorized(text: &str) -> usize {
         .count()
 }
 
-/// Where the phone pings to see whether it reaches the internet, by address and then by name (which needs DNS).
-pub const PING_ADDRESS: &str = "1.1.1.1";
-pub const PING_NAME: &str = "google.com";
-
-/// The arguments that make `phone` ping `host` `count` times from its own shell, through `adb`.
-pub fn ping_args(serial: &str, host: &str, count: u32) -> Option<Vec<String>> {
-    let host_ok = !host.is_empty() && host.bytes().all(|b| b.is_ascii_alphanumeric() || matches!(b, b'.' | b'-'));
-    (valid_serial(serial) && host_ok).then(|| {
-        ["-s", serial, "shell", "ping", "-c", &count.to_string(), "-W", "2", host].iter().map(|s| (*s).to_owned()).collect()
-    })
-}
-
-/// What a ping said: how many answers came back of those sent, and the average time of one, in milliseconds.
-#[derive(Debug, Clone, Copy, PartialEq)]
-pub struct Ping {
-    pub sent: u32,
-    pub received: u32,
-    pub average_ms: Option<f64>,
-}
-
-/// Reads the summary of `ping` as Android's toybox and BSD print it.
-pub fn parse_ping(text: &str) -> Option<Ping> {
-    let mut out = None;
-    for line in text.lines() {
-        if let Some((sent, rest)) = line.split_once(" packets transmitted, ") {
-            let sent = sent.trim().parse().ok()?;
-            let received = rest.split_whitespace().next()?.parse().ok()?;
-            out = Some(Ping { sent, received, average_ms: None });
+/// The DNS servers of this Mac, from `scutil --dns`, for the phone to ask: the relay carries its questions to them
+/// from the Mac, so names resolve as they do here (a company network often lets no other DNS server through). Only
+/// IPv4, which is all the relay carries, and never a loopback or link-local address, which on the phone would stay on
+/// the phone. At most three, in the order the Mac asks them.
+pub fn dns_servers(scutil: &str) -> Vec<String> {
+    let mut out: Vec<String> = Vec::new();
+    for line in scutil.lines() {
+        let Some((key, value)) = line.split_once(':') else { continue };
+        if !key.trim().starts_with("nameserver[") {
+            continue;
         }
-        if let (Some(ping), Some((_, values))) = (out.as_mut(), line.split_once(" = ")) {
-            if line.contains("min/avg/max") {
-                ping.average_ms = values.split('/').nth(1).and_then(|v| v.trim().parse().ok());
-            }
+        let Ok(ip) = value.trim().parse::<std::net::Ipv4Addr>() else { continue };
+        if ip.is_loopback() || ip.is_link_local() || ip.is_unspecified() || ip.is_multicast() {
+            continue;
+        }
+        let ip = ip.to_string();
+        if !out.contains(&ip) && out.len() < 3 {
+            out.push(ip);
         }
     }
     out
+}
+
+/// The DNS server the phone falls back to when the Mac's do not answer.
+pub const FALLBACK_DNS: &str = "8.8.8.8";
+
+/// The arguments of `gnirehtet autorun`: the phone asks `dns` first, then the public one.
+pub fn autorun_args(dns: &[String]) -> Vec<String> {
+    let mut servers: Vec<String> = dns.to_vec();
+    if !servers.iter().any(|d| d == FALLBACK_DNS) {
+        servers.push(FALLBACK_DNS.to_owned());
+    }
+    vec!["autorun".to_owned(), "-d".to_owned(), servers.join(",")]
+}
+
+/// What a test of the phone asks. The relay carries TCP and UDP, not the ICMP of `ping`, so the test opens a real
+/// connection from the phone, as an app would: by address (does it reach the internet) and by name (can it look names
+/// up). The page asked is the one Android itself uses to tell whether a network reaches the internet.
+#[derive(Debug, Clone, Copy, PartialEq, Eq)]
+pub enum Probe {
+    Address,
+    Name,
+}
+
+/// By address: Cloudflare's, which answers any request on port 80 and does not move.
+pub const PROBE_ADDRESS: &str = "1.1.1.1";
+pub const PROBE_NAME: &str = "connectivitycheck.gstatic.com";
+
+/// The arguments for `adb` that make the phone ask the page with the `nc` of its toybox and print the answer.
+pub fn probe_args(serial: &str, probe: Probe) -> Option<Vec<String>> {
+    if !valid_serial(serial) {
+        return None;
+    }
+    let host = match probe {
+        Probe::Address => PROBE_ADDRESS,
+        Probe::Name => PROBE_NAME,
+    };
+    let script = format!(
+        "printf 'GET /generate_204 HTTP/1.0\\r\\nHost: {PROBE_NAME}\\r\\n\\r\\n' | toybox nc -w 6 {host} 80 2>&1 | head -c 200"
+    );
+    Some(vec!["-s".into(), serial.into(), "shell".into(), script])
+}
+
+/// What the phone printed: the page answered (`Some(true)`), it did not (`Some(false)`), or the phone has no `nc` to
+/// ask with (`None`).
+pub fn read_probe(text: &str) -> Option<bool> {
+    let lower = text.to_ascii_lowercase();
+    if lower.contains("not found") && lower.contains("nc") {
+        return None;
+    }
+    Some(text.starts_with("HTTP/") || text.lines().any(|l| l.starts_with("HTTP/1.")))
 }
 
 #[cfg(test)]
@@ -142,19 +177,24 @@ mod tests {
     }
 
     #[test]
-    fn a_ping_from_the_phone_is_asked_and_read() {
-        assert_eq!(
-            ping_args("R58", PING_ADDRESS, 4).unwrap(),
-            ["-s", "R58", "shell", "ping", "-c", "4", "-W", "2", "1.1.1.1"]
-        );
-        assert!(ping_args("R58", "a;reboot", 1).is_none() && ping_args("-x", "1.1.1.1", 1).is_none());
-        let android = "PING 1.1.1.1 (1.1.1.1) 56(84) bytes of data.\n64 bytes from 1.1.1.1: icmp_seq=1 ttl=57 time=21.4 ms\n\n--- 1.1.1.1 ping statistics ---\n4 packets transmitted, 3 received, 25% packet loss, time 3004ms\nrtt min/avg/max/mdev = 18.120/22.517/27.301/3.402 ms\n";
-        assert_eq!(parse_ping(android), Some(Ping { sent: 4, received: 3, average_ms: Some(22.517) }));
-        let none = "PING google.com (142.250.1.1) 56(84) bytes of data.\n\n--- google.com ping statistics ---\n2 packets transmitted, 0 received, 100% packet loss, time 1001ms\n";
-        assert_eq!(parse_ping(none), Some(Ping { sent: 2, received: 0, average_ms: None }));
-        let bsd = "--- 1.1.1.1 ping statistics ---\n3 packets transmitted, 3 packets received, 0.0% packet loss\nround-trip min/avg/max/stddev = 9.1/10.5/12.0/1.2 ms\n";
-        assert_eq!(parse_ping(bsd).unwrap().average_ms, Some(10.5));
-        assert_eq!(parse_ping("ping: unknown host google.com"), None);
+    fn the_phone_asks_the_dns_of_the_mac_first() {
+        let scutil = "DNS configuration\n\nresolver #1\n  search domain[0] : corp.vn\n  nameserver[0] : 10.161.70.200\n  nameserver[1] : 127.0.0.1\n  nameserver[2] : fe80::1%en0\n  nameserver[3] : 10.161.70.200\n  flags    : Request A records\n\nresolver #2\n  nameserver[0] : 169.254.1.1\n  nameserver[1] : 1.0.0.1\n";
+        assert_eq!(dns_servers(scutil), ["10.161.70.200", "1.0.0.1"]);
+        assert_eq!(autorun_args(&dns_servers(scutil)), ["autorun", "-d", "10.161.70.200,1.0.0.1,8.8.8.8"]);
+        assert_eq!(autorun_args(&[]), ["autorun", "-d", "8.8.8.8"]);
+    }
+
+    #[test]
+    fn the_phone_opens_a_real_connection_to_test() {
+        let args = probe_args("R58", Probe::Name).unwrap();
+        assert_eq!(&args[..3], ["-s", "R58", "shell"]);
+        assert!(args[3].contains("toybox nc -w 6 connectivitycheck.gstatic.com 80") && args[3].contains("generate_204"));
+        assert!(probe_args("R58", Probe::Address).unwrap()[3].contains(PROBE_ADDRESS));
+        assert!(probe_args("-x", Probe::Name).is_none());
+        assert_eq!(read_probe("HTTP/1.0 204 No Content\r\nContent-Length: 0\r\n"), Some(true));
+        assert_eq!(read_probe(""), Some(false), "no answer in time");
+        assert_eq!(read_probe("nc: bad address 'connectivitycheck.gstatic.com'"), Some(false), "a name that does not resolve");
+        assert_eq!(read_probe("/system/bin/sh: toybox nc: not found"), None);
     }
 
     #[test]

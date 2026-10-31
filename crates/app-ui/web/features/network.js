@@ -37,8 +37,10 @@
     'network.tether.start': 'Start sharing', 'network.tether.stop': 'Stop sharing', 'network.tether.vpnoff': 'Turn off the phone\'s VPN',
     'network.tether.down': 'Down', 'network.tether.up': 'Up', 'network.tether.used': 'Used',
     'network.tether.test': 'Test the connection', 'network.tether.testing': 'Testing the phone\'s connection...',
-    'network.tether.test.good': 'The phone reaches the internet: {ms} ms, nothing lost.', 'network.tether.test.slow': 'The phone reaches the internet, but slowly: {ms} ms, {loss}% lost.',
-    'network.tether.test.dns': 'The phone reaches the internet by address, but cannot look up names. Stop and start sharing again.', 'network.tether.test.none': 'The phone does not reach the internet. Check that it allowed the VPN, or unplug and plug it in again.',
+    'network.tether.test.good': 'The phone reaches the internet and looks names up: {ms} ms.', 'network.tether.test.slow': 'The phone reaches the internet, but slowly: {ms} ms.',
+    'network.tether.test.dns': 'The phone reaches the internet by address, but cannot look names up. Stop and start sharing again, so that it asks the DNS of this Mac.', 'network.tether.test.none': 'The phone does not reach the internet. Check that it allowed the VPN, or unplug and plug it in again.',
+    'network.tether.test.untested': 'This phone has no tool to run the test. Open a website on it to check.',
+    'network.tether.apps': 'The phone asks this Mac\'s DNS servers, so names resolve as they do here. A few apps only trust Wi-Fi or mobile data and may still say there is no connection.',
     'network.tether.iphone': 'An iPhone cannot take a Mac\'s connection over USB this way. Use Internet Sharing in System Settings, General, Sharing.',
   },
   vi: {
@@ -75,8 +77,10 @@
     'network.tether.start': 'Bắt đầu chia mạng', 'network.tether.stop': 'Dừng chia mạng', 'network.tether.vpnoff': 'Tắt VPN trên điện thoại',
     'network.tether.down': 'Tải về', 'network.tether.up': 'Tải lên', 'network.tether.used': 'Đã dùng',
     'network.tether.test': 'Kiểm tra kết nối', 'network.tether.testing': 'Đang kiểm tra kết nối của điện thoại...',
-    'network.tether.test.good': 'Điện thoại vào được internet: {ms} ms, không mất gói nào.', 'network.tether.test.slow': 'Điện thoại vào được internet nhưng chậm: {ms} ms, mất {loss}% gói.',
-    'network.tether.test.dns': 'Điện thoại ra được internet bằng địa chỉ IP nhưng không phân giải được tên miền. Hãy dừng rồi bắt đầu chia mạng lại.', 'network.tether.test.none': 'Điện thoại không vào được internet. Kiểm tra điện thoại đã cho phép VPN chưa, hoặc rút cáp rồi cắm lại.',
+    'network.tether.test.good': 'Điện thoại vào được internet và phân giải được tên miền: {ms} ms.', 'network.tether.test.slow': 'Điện thoại vào được internet nhưng chậm: {ms} ms.',
+    'network.tether.test.dns': 'Điện thoại ra được internet bằng địa chỉ IP nhưng không phân giải được tên miền. Hãy dừng rồi bắt đầu chia mạng lại để điện thoại dùng DNS của máy Mac.', 'network.tether.test.none': 'Điện thoại không vào được internet. Kiểm tra điện thoại đã cho phép VPN chưa, hoặc rút cáp rồi cắm lại.',
+    'network.tether.test.untested': 'Điện thoại này không có công cụ để kiểm tra. Mở một trang web trên điện thoại để thử.',
+    'network.tether.apps': 'Điện thoại hỏi tên miền qua DNS của máy Mac, nên phân giải giống hệt trên máy này. Một vài app chỉ tin Wi-Fi hoặc dữ liệu di động và vẫn có thể báo không có mạng.',
     'network.tether.iphone': 'iPhone không nhận mạng của Mac qua USB theo cách này. Dùng Chia sẻ Internet trong Cài đặt hệ thống, Cài đặt chung, Chia sẻ.',
   },
   build() {
@@ -183,7 +187,7 @@
         row(status, null, null, when), restoreRow),
       sectionTitle(t('sec.network.tether')),
       card(h('div', { class: 'row block' }, phoneCard),
-        h('p', { class: 'network-note', text: t('network.tether.desc') + ' ' + t('network.tether.iphone') })),
+        h('p', { class: 'network-note', text: t('network.tether.desc') + ' ' + t('network.tether.apps') + ' ' + t('network.tether.iphone') })),
     ];
   },
 

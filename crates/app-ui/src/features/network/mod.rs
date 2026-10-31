@@ -594,9 +594,15 @@ impl Feature {
         if let Some(dir) = adb.parent() {
             path = format!("{}:{path}", dir.display());
         }
+        // The phone asks the Mac's own DNS servers, through the relay: the public one gnirehtet uses by itself is often
+        // not let through by a company network, and then apps could not look up a name while a browser that asks over
+        // HTTPS still could.
+        let scutil = run_bounded("/usr/sbin/scutil", &["--dns"], 3).unwrap_or_default();
+        let dns = tether::dns_servers(&scutil);
+        trace::log(&format!("network: the phone will ask {} for names", tether::autorun_args(&dns)[2]));
         let mut command = Command::new(&gnirehtet);
         command
-            .arg("autorun")
+            .args(tether::autorun_args(&dns))
             .env("PATH", path)
             .env("ADB", &adb)
             .stdin(Stdio::null())
@@ -744,14 +750,17 @@ impl Feature {
         let shared = Arc::clone(&self.phone_test);
         thread::spawn(move || {
             let adb = adb.to_string_lossy().into_owned();
-            let ping = |host: &str, count: u32| {
-                let args = tether::ping_args(&phone.serial, host, count)?;
+            // Each probe is a real connection from the phone; the time is the whole round, as an app would wait it.
+            let probe = |which| {
+                let args = tether::probe_args(&phone.serial, which)?;
                 let args: Vec<&str> = args.iter().map(String::as_str).collect();
+                let started = Instant::now();
                 let (_, text) = run_bounded_output(&adb, &args, &[], 15).ok()?;
-                tether::parse_ping(&text)
+                let ms = started.elapsed().as_secs_f64() * 1000.0;
+                Some((tether::read_probe(&text), ms))
             };
-            let address = ping(tether::PING_ADDRESS, 4);
-            let name = ping(tether::PING_NAME, 2);
+            let address = probe(tether::Probe::Address);
+            let name = probe(tether::Probe::Name);
             let result = phone_test_result(&phone.model, address, name);
             trace::log(&format!("network: the phone's connection was tested: {}", result["verdict"]));
             *shared.lock().unwrap_or_else(PoisonError::into_inner) = result;
@@ -774,20 +783,20 @@ pub fn phone_meter(usage: &[Usage]) -> Value {
     json!({ "down": down, "up": up, "received": received, "sent": sent })
 }
 
-/// The verdict of a test: `good` (answers by address and by name), `slow` (they come back, but late or some lost),
-/// `dns` (by address only: the phone cannot look names up), or `none` (nothing came back).
-pub fn phone_test_result(phone: &str, address: Option<tether::Ping>, name: Option<tether::Ping>) -> Value {
-    let reached = address.is_some_and(|p| p.received > 0);
-    let named = name.is_some_and(|p| p.received > 0);
-    let loss = address.map_or(100.0, |p| if p.sent == 0 { 100.0 } else { 100.0 * f64::from(p.sent - p.received.min(p.sent)) / f64::from(p.sent) });
-    let ms = address.and_then(|p| p.average_ms);
-    let verdict = match (reached, named) {
-        (false, _) => "none",
-        (true, false) => "dns",
-        (true, true) if loss > 0.0 || ms.is_some_and(|m| m > 250.0) => "slow",
-        _ => "good",
+/// The verdict of a test, from the probe by address and the one by name (each: whether the page answered, `None` when
+/// the phone has no `nc`, and the milliseconds it took): `good`, `slow` (over a second and a half by name), `dns` (by
+/// address only: names are not looked up), `none` (nothing answered), or `untested` (the phone cannot run the test).
+pub fn phone_test_result(phone: &str, address: Option<(Option<bool>, f64)>, name: Option<(Option<bool>, f64)>) -> Value {
+    let answered = |p: Option<(Option<bool>, f64)>| p.and_then(|(ok, _)| ok);
+    let ms = name.filter(|(ok, _)| *ok == Some(true)).map(|(_, ms)| ms.round());
+    let verdict = match (answered(address), answered(name)) {
+        (None, None) => "untested",
+        (_, Some(true)) if ms.is_some_and(|m| m > 1500.0) => "slow",
+        (_, Some(true)) => "good",
+        (Some(true), _) => "dns",
+        _ => "none",
     };
-    json!({ "state": "done", "phone": phone, "verdict": verdict, "loss": loss.round(), "ms": ms.map(|m| (m * 10.0).round() / 10.0) })
+    json!({ "state": "done", "phone": phone, "verdict": verdict, "loss": 0, "ms": ms })
 }
 
 /// The links and the apps for the page: what `nettop` saw, with what went through the proxy added to its app.
@@ -928,14 +937,14 @@ mod tests {
 
     #[test]
     fn the_phone_test_says_what_it_found_and_the_meter_counts_the_relay() {
-        use core_netcontrol::tether::Ping;
-        let ok = Some(Ping { sent: 4, received: 4, average_ms: Some(23.0) });
-        assert_eq!(phone_test_result("Pixel", ok, ok)["verdict"], json!("good"));
-        let lossy = Some(Ping { sent: 4, received: 3, average_ms: Some(23.0) });
-        let r = phone_test_result("Pixel", lossy, ok);
-        assert_eq!((r["verdict"].clone(), r["loss"].clone()), (json!("slow"), json!(25.0)));
-        assert_eq!(phone_test_result("Pixel", ok, Some(Ping { sent: 2, received: 0, average_ms: None }))["verdict"], json!("dns"));
-        assert_eq!(phone_test_result("Pixel", None, None)["verdict"], json!("none"));
+        let ok = Some((Some(true), 180.0));
+        let r = phone_test_result("Pixel", ok, ok);
+        assert_eq!((r["verdict"].clone(), r["ms"].clone()), (json!("good"), json!(180.0)));
+        assert_eq!(phone_test_result("Pixel", ok, Some((Some(true), 2400.0)))["verdict"], json!("slow"));
+        assert_eq!(phone_test_result("Pixel", ok, Some((Some(false), 6000.0)))["verdict"], json!("dns"), "by address but not by name");
+        assert_eq!(phone_test_result("Pixel", Some((Some(false), 6000.0)), Some((Some(false), 6000.0)))["verdict"], json!("none"));
+        assert_eq!(phone_test_result("Pixel", Some((None, 10.0)), Some((None, 10.0)))["verdict"], json!("untested"));
+        assert_eq!(phone_test_result("Pixel", None, None)["verdict"], json!("untested"), "adb could not be run");
         let relay = Usage { name: "gnirehtet".into(), down: 500, up: 40, received: 9000, sent: 700, ..Usage::default() };
         let other = usage("Safari", 100, "en0");
         assert_eq!(phone_meter(&[relay, other]), json!({ "down": 500, "up": 40, "received": 9000, "sent": 700 }));
