@@ -1,0 +1,9 @@
+{
+  "enabled": true,
+  "items": [
+    { "name": "Build", "command": "cd ~/Desktop/figghost && cargo build" },
+    { "name": "Disk free", "command": "df -h /" }
+  ],
+  "max": 8,
+  "running": false
+}

@@ -33,6 +33,7 @@
       'notifications.mode.system': 'Through the system', 'notifications.mode.notch': 'Through the notch',
       'notifications.banners.title': 'Turn off macOS\'s banners', 'notifications.banners.desc': 'So that a notification does not show twice: in System Settings, Notifications, set the alert style of each app whose notifications should come through the notch to None. They still reach Notification Center, and so the notch. Do Not Disturb does the same for every app at once.', 'notifications.banners.open': 'Open Notifications',
       'notifications.seconds.title': 'Time on the notch', 'notifications.seconds.desc': 'How long a notification stays on the closed notch; a newer one takes its place.', 'notifications.seconds.n': '{n} seconds',
+      'notifications.badge.title': 'Count the unread', 'notifications.badge.desc': 'A red number beside the closed notch shows how many came since you last looked at this tab. Opening the tab clears it.',
       'notifications.preview.title': 'Show what they say', 'notifications.preview.desc': 'Off shows only the app and New notification, for a notch that others can see.',
       'sec.notifications.privacy': 'Privacy',
       'notifications.privacy.title': 'Read, never written or sent', 'notifications.privacy.desc': 'Figghost only reads the store macOS keeps, and only when it changes. Nothing is written to it, nothing is kept on disk and nothing leaves this Mac; the list goes when Figghost quits.',
@@ -47,6 +48,7 @@
       'notifications.mode.system': 'Qua hệ thống', 'notifications.mode.notch': 'Qua notch',
       'notifications.banners.title': 'Tắt banner của macOS', 'notifications.banners.desc': 'Để một thông báo không hiện hai lần: trong Cài đặt hệ thống, mục Thông báo, đặt kiểu thông báo của từng ứng dụng muốn nhận qua notch là Không có. Thông báo vẫn vào Trung tâm thông báo, nên vẫn lên notch. Bật Không làm phiền thì có tác dụng tương tự cho mọi ứng dụng cùng lúc.', 'notifications.banners.open': 'Mở mục Thông báo',
       'notifications.seconds.title': 'Thời gian hiện trên notch', 'notifications.seconds.desc': 'Một thông báo nằm trên notch đóng bao lâu; thông báo mới hơn sẽ thế chỗ.', 'notifications.seconds.n': '{n} giây',
+      'notifications.badge.title': 'Đếm thông báo chưa xem', 'notifications.badge.desc': 'Một con số đỏ cạnh notch đang đóng cho biết có bao nhiêu thông báo đến từ lần cuối bạn xem tab này. Mở tab là số được xóa.',
       'notifications.preview.title': 'Hiện nội dung', 'notifications.preview.desc': 'Tắt thì notch chỉ hiện tên ứng dụng và chữ Thông báo mới, phù hợp khi người khác nhìn thấy màn hình.',
       'sec.notifications.privacy': 'Riêng tư',
       'notifications.privacy.title': 'Chỉ đọc, không ghi, không gửi đi', 'notifications.privacy.desc': 'Figghost chỉ đọc kho thông báo của macOS, và chỉ khi kho thay đổi. Không ghi gì vào đó, không lưu gì xuống ổ đĩa và không gửi gì ra khỏi máy; danh sách mất khi Figghost thoát.',
@@ -62,7 +64,8 @@
           segRow('notifications.mode', t('notifications.mode.title'), t('notifications.mode.desc'), ['system', 'notch'], { when: on }),
           row(t('notifications.banners.title'), t('notifications.banners.desc'), banners, { when: onNotch }),
           selectRow({ path: 'notifications.seconds', title: t('notifications.seconds.title'), desc: t('notifications.seconds.desc'), options: seconds, when: onNotch }),
-          toggleRow('notifications.preview', t('notifications.preview.title'), t('notifications.preview.desc'), { when: onNotch })),
+          toggleRow('notifications.preview', t('notifications.preview.title'), t('notifications.preview.desc'), { when: onNotch }),
+          toggleRow('notifications.badge', t('notifications.badge.title'), t('notifications.badge.desc'), { when: on })),
         sectionTitle(t('sec.notifications.privacy')),
         card(infoRow(t('notifications.privacy.title'), t('notifications.privacy.desc'))),
       ];
@@ -71,7 +74,7 @@
       go('notifications');
       const page = document.querySelector('#scroller');
       const switches = [...page.querySelectorAll('.switch')];
-      expect(switches.length === 2, 'notifications: a switch for the feature and one for what they say');
+      expect(switches.length === 3, 'notifications: a switch for the feature, one for what they say and one for the count of the unread');
       sent.length = 0;
       const was = S.notifications.enabled;
       switches[0].click();

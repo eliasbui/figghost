@@ -42,8 +42,11 @@ export default function (pi) {
   const asking = new Map(); // toolCallId -> the open connection that waits for the notch's answer
   let queue = Promise.resolve();
 
+  // Where this session runs, so that the app can bring that terminal to the front: Orca's handle for it, and the terminal program.
+  const terminal = { orca: process.env.ORCA_TERMINAL_HANDLE, program: process.env.TERM_PROGRAM };
+
   function line(kind, more = {}) {
-    return JSON.stringify({ agent: "pi", kind, session_id: session.id, cwd: session.cwd, at_ms: Date.now(), ...more }) + "\n";
+    return JSON.stringify({ agent: "pi", kind, session_id: session.id, cwd: session.cwd, terminal, at_ms: Date.now(), ...more }) + "\n";
   }
 
   // One event, acknowledged by the app; resolves when that is over, however it went.

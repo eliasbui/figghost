@@ -7,4 +7,5 @@
 pub mod format;
 pub mod links;
 pub mod model;
+pub mod quick;
 pub mod schedule;

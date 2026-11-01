@@ -12,8 +12,8 @@ use objc2_app_kit::{
     NSEventModifierFlags, NSMenu, NSMenuItem,
 };
 use objc2_foundation::{
-    NSAppleEventManager, NSNotification, NSNotificationCenter, NSObject, NSObjectProtocol,
-    NSRunLoop, NSRunLoopCommonModes, NSString, NSTimer,
+    NSAppleEventManager, NSArray, NSNotification, NSNotificationCenter, NSObject, NSObjectProtocol,
+    NSRunLoop, NSRunLoopCommonModes, NSString, NSTimer, NSURL,
 };
 use std::{cell::RefCell, collections::HashMap, ptr::NonNull, rc::Rc, time::Instant};
 
@@ -223,8 +223,12 @@ pub fn launched_at_login() -> bool {
     }
 }
 
+type UrlHandler = Box<dyn Fn(String)>;
+
 pub struct DelegateIvars {
     on_reopen: Box<dyn Fn()>,
+    /// What to do with an address of the app's own scheme (`figghost://...`), set once the app can take it.
+    on_url: std::cell::RefCell<Option<UrlHandler>>,
 }
 
 define_class!(
@@ -244,6 +248,18 @@ define_class!(
             (self.ivars().on_reopen)();
             false
         }
+
+        // An address of the app's own scheme was opened, from a browser, Shortcuts or a script.
+        #[unsafe(method(application:openURLs:))]
+        fn open_urls(&self, _app: &NSApplication, urls: &NSArray<NSURL>) {
+            if let Some(handler) = self.ivars().on_url.borrow().as_ref() {
+                for url in urls.iter() {
+                    if let Some(text) = url.absoluteString() {
+                        handler(text.to_string());
+                    }
+                }
+            }
+        }
     }
 );
 
@@ -252,10 +268,18 @@ pub struct ReopenHandler {
     _delegate: Retained<AppDelegate>,
 }
 
+impl ReopenHandler {
+    /// Calls `handler` with each address of the app's own scheme that is opened.
+    pub fn on_url(&self, handler: impl Fn(String) + 'static) {
+        *self._delegate.ivars().on_url.borrow_mut() = Some(Box::new(handler));
+    }
+}
+
 /// Calls `on_reopen` when the user opens the already-running app again.
 pub fn on_reopen(mtm: MainThreadMarker, on_reopen: impl Fn() + 'static) -> ReopenHandler {
     let this = mtm.alloc::<AppDelegate>().set_ivars(DelegateIvars {
         on_reopen: Box::new(on_reopen),
+        on_url: std::cell::RefCell::default(),
     });
     // SAFETY: NSObject's designated initializer.
     let delegate: Retained<AppDelegate> = unsafe { msg_send![super(this), init] };

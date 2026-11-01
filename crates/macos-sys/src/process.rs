@@ -48,6 +48,30 @@ pub fn kill_group(group: u32) {
     }
 }
 
+/// The number of the user this program runs as.
+pub fn user_id() -> u32 {
+    // SAFETY: `getuid` reads the process's own user number and cannot fail.
+    unsafe { libc::getuid() }
+}
+
+/// Whether a process with this number exists (a signal of 0 only asks).
+pub fn is_alive(pid: i32) -> bool {
+    pid > 0 && {
+        // SAFETY: signal 0 sends nothing; it only asks whether the process can be signalled.
+        unsafe { libc::kill(pid, 0) == 0 }
+    }
+}
+
+/// Asks a process to end (`force` false) or makes it (`force` true). The numbers up to 1, which would reach this
+/// app's own group or every process there is, are never signalled.
+pub fn terminate(pid: i32, force: bool) {
+    if pid > 1 {
+        let signal = if force { libc::SIGKILL } else { libc::SIGTERM };
+        // SAFETY: a plain system call with a process number and a signal number; it touches no memory of ours.
+        unsafe { libc::kill(pid, signal) };
+    }
+}
+
 #[cfg(test)]
 mod tests {
     use super::*;

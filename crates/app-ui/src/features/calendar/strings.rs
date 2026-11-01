@@ -12,6 +12,27 @@ impl Language {
         }
     }
 
+    pub fn calendar_reminder_no_access(self) -> &'static str {
+        match self {
+            Language::English => "Reminders cannot be added: turn on the Calendar tab and allow access to Reminders.",
+            Language::Vietnamese => "Không thêm được nhắc việc: hãy bật tab Lịch và cho phép truy cập Nhắc việc.",
+        }
+    }
+
+    pub fn calendar_reminder_empty(self) -> &'static str {
+        match self {
+            Language::English => "Write what to be reminded of.",
+            Language::Vietnamese => "Hãy viết điều cần nhắc.",
+        }
+    }
+
+    pub fn calendar_reminder_failed(self) -> &'static str {
+        match self {
+            Language::English => "The reminder could not be saved",
+            Language::Vietnamese => "Không lưu được nhắc việc",
+        }
+    }
+
     pub fn calendar_tab(self) -> &'static str {
         match self {
             Language::English => "Calendar",

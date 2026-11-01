@@ -4,7 +4,7 @@
 //! as if they did not exist.
 
 use crate::{
-    event::{Agent, EventKind, parse_event},
+    event::{Agent, EventKind, Terminal, parse_event},
     sock::UnixStream,
     usage::{self, CLAUDE_USAGE_FILE},
     wire,
@@ -46,7 +46,7 @@ pub fn run_hook(
     now_ms: i64,
     env: impl Fn(&str) -> Option<String>,
 ) -> i32 {
-    if driven_by_pi(env) {
+    if driven_by_pi(&env) {
         return 0;
     }
     let mut raw = Vec::new();
@@ -56,9 +56,10 @@ pub fn run_hook(
     let Ok(value) = serde_json::from_slice::<Value>(&raw) else {
         return 0;
     };
-    let Some(event) = parse_event(agent, &value, now_ms) else {
+    let Some(mut event) = parse_event(agent, &value, now_ms) else {
         return 0;
     };
+    event.terminal = Terminal::from_env(&env);
     let Ok(mut stream) = UnixStream::connect(socket) else {
         // The app is not running: the agent asks the user itself.
         return 0;
@@ -369,6 +370,37 @@ mod tests {
             assert!(out.is_empty());
         }
         assert!(seen.lock().unwrap().is_empty());
+        drop(server);
+        let _ = fs::remove_dir_all(&dir);
+    }
+
+    #[test]
+    fn the_hook_says_which_terminal_it_runs_in_and_a_handle_that_is_not_one_is_dropped() {
+        let dir = scratch("terminal");
+        let socket = dir.join("a.sock");
+        let seen: Arc<Mutex<Vec<Option<crate::event::Terminal>>>> = Arc::default();
+        let log = Arc::clone(&seen);
+        let handler: Arc<Handler> = Arc::new(move |event, _ticket: Option<Ticket>| {
+            log.lock().unwrap().push(event.terminal);
+        });
+        let server = Server::start(&socket, 5, handler).unwrap();
+        let stop = json!({ "session_id": "s", "cwd": "/w", "hook_event_name": "Stop" }).to_string();
+        let orca = |key: &str| match key {
+            "ORCA_TERMINAL_HANDLE" => Some("term_abc-123".to_owned()),
+            "TERM_PROGRAM" => Some("ghostty".to_owned()),
+            _ => None,
+        };
+        run_hook(Agent::Claude, stop.as_bytes(), &mut Vec::new(), &socket, 1, orca);
+        let hostile = |key: &str| (key == "ORCA_TERMINAL_HANDLE").then(|| "--version".to_owned());
+        run_hook(Agent::Claude, stop.as_bytes(), &mut Vec::new(), &socket, 2, hostile);
+        let deadline = Instant::now() + Duration::from_secs(2);
+        while seen.lock().unwrap().len() < 2 && Instant::now() < deadline {
+            thread::sleep(Duration::from_millis(10));
+        }
+        let seen = seen.lock().unwrap();
+        let first = seen[0].as_ref().unwrap();
+        assert_eq!((first.orca.as_deref(), first.program.as_deref()), (Some("term_abc-123"), Some("ghostty")));
+        assert!(seen[1].is_none(), "a handle of no known shape is not passed on");
         drop(server);
         let _ = fs::remove_dir_all(&dir);
     }

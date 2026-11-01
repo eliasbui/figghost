@@ -23,7 +23,7 @@ use macos_sys::{
     power,
     status_item::{Entry, Item},
     style::Tone,
-    volume, volumes,
+    volume, volumes, workspace,
 };
 use serde::{Deserialize, Serialize};
 use serde_json::{Value, json};
@@ -643,7 +643,11 @@ impl Feature {
                 right,
                 detail: Some(Detail {
                     title: title.to_owned(),
-                    subtitle: String::new(),
+                    // The app in front is only a guess at who has it, and is said to be no more than that.
+                    subtitle: workspace::frontmost_app()
+                        .filter(|a| !a.name.is_empty() && Some(&a.bundle_id) != workspace::own_bundle_id().as_ref())
+                        .map(|a| language.island_front_app(&a.name))
+                        .unwrap_or_default(),
                 }),
                 page: None,
                 priority: PRIORITY_PRIVACY,

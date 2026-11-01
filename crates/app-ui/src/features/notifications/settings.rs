@@ -14,6 +14,7 @@ pub fn state(config: &Config, runtime: &Value) -> Value {
         "mode": config.mode,
         "seconds": config.seconds,
         "preview": config.preview,
+        "badge": config.badge,
         // Null until the feature is on: the store is not touched before.
         "access": runtime.get("access").and_then(Value::as_bool),
         "count": runtime.get("count").and_then(Value::as_u64).unwrap_or(0),
@@ -31,6 +32,10 @@ pub fn set(config: &mut Config, path: &str, value: &Value) -> Option<Result<(), 
         "preview" => value
             .as_bool()
             .map(|on| config.preview = on)
+            .ok_or_else(bad),
+        "badge" => value
+            .as_bool()
+            .map(|on| config.badge = on)
             .ok_or_else(bad),
         "mode" => value
             .as_str()
@@ -88,7 +93,7 @@ mod tests {
     #[test]
     fn only_what_is_offered_is_taken() {
         let mut config = Config::default();
-        for path in ["enabled", "preview"] {
+        for path in ["enabled", "preview", "badge"] {
             assert!(
                 set(&mut config, path, &json!("yes")).unwrap().is_err(),
                 "{path}"

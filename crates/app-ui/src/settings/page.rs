@@ -12,6 +12,10 @@ const SCRIPT: &str = include_str!("../../web/app.js");
 const FEATURE_SCRIPTS: &[&str] = &[
     include_str!("../../web/features/smart.js"),
     include_str!("../../web/features/translate.js"),
+    include_str!("../../web/features/rewrite.js"),
+    include_str!("../../web/features/palette.js"),
+    include_str!("../../web/features/mirror.js"),
+    include_str!("../../web/features/commands.js"),
     include_str!("../../web/features/capture.js"),
     include_str!("../../web/features/vision.js"),
     include_str!("../../web/features/lyrics.js"),
@@ -54,6 +58,8 @@ const FEATURE_SCRIPTS: &[&str] = &[
 const FEATURE_STYLES: &[&str] = &[
     include_str!("../../web/features/smart.css"),
     include_str!("../../web/features/translate.css"),
+    include_str!("../../web/features/palette.css"),
+    include_str!("../../web/features/commands.css"),
     include_str!("../../web/features/capture.css"),
     include_str!("../../web/features/vision.css"),
     include_str!("../../web/features/lyrics.css"),
@@ -131,6 +137,22 @@ const FEATURE_FIXTURES: &[(&str, &str)] = &[
     (
         "translate",
         include_str!("../../web/features/translate.fixture.json"),
+    ),
+    (
+        "rewrite",
+        include_str!("../../web/features/rewrite.fixture.json"),
+    ),
+    (
+        "palette",
+        include_str!("../../web/features/palette.fixture.json"),
+    ),
+    (
+        "mirror",
+        include_str!("../../web/features/mirror.fixture.json"),
+    ),
+    (
+        "commands",
+        include_str!("../../web/features/commands.fixture.json"),
     ),
     (
         "islands",
@@ -296,6 +318,9 @@ const SYMBOLS: &[&str] = &[
     "rectangle.split.2x1.fill",
     "info.circle.fill",
     "sparkles",
+    "pencil.line",
+    "command.square",
+    "person.crop.rectangle",
     "network",
     // The Network diagram and Phone sharing.
     "wifi",

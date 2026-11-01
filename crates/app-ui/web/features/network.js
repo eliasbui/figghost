@@ -30,6 +30,53 @@
     'network.card.save': 'Save', 'network.card.unwire': 'Remove the wire', 'network.card.held': 'Held to {speed} for the apps above it',
     'network.priority.high': 'Main', 'network.priority.normal': 'Normal', 'network.priority.low': 'Below',
     'network.close': 'Close',
+    'sec.network.metered': 'Save data',
+    'network.metered.title': 'Save data on metered connections', 'network.metered.desc': 'On a connection you pay for by the byte, such as a phone\'s, only the apps you allow use it, and a cap can stop the rest. It applies to apps that follow the proxy settings, so Apply the wires must be on; other apps are only counted.',
+    'network.metered.auto.title': 'Take a phone\'s connection for metered', 'network.metered.auto.desc': 'A connection named iPhone or Android, or with the address a phone gives when it shares its data, counts as metered. It is a guess: mark a connection by hand under Connections to correct it.',
+    'network.metered.allow.title': 'Apps allowed on a metered connection', 'network.metered.allow.desc': 'Figghost itself is always allowed.', 'network.metered.allow.none': 'No app is allowed: every app that follows the proxy is held back.',
+    'network.metered.allow.add': 'Add an app', 'network.metered.allow.remove': 'Remove {app}',
+    'network.metered.cap.title': 'Data cap', 'network.metered.cap.desc': 'What the metered connections may move in a period, counted by Figghost. At the cap every app that follows the proxy is refused until the period ends.', 'network.metered.cap.none': 'No cap',
+    'network.metered.period.title': 'Counted over', 'network.period.day': 'A day', 'network.period.month': 'A month',
+    'network.metered.now': 'On a metered connection now ({link}): only the allowed apps go on.', 'network.metered.not': 'Not on a metered connection now.',
+    'network.metered.cap.used': 'Used on metered connections this period: {used} of {cap}.', 'network.metered.cap.over': 'The cap is reached: every app that follows the proxy is refused.',
+    'network.metered.mark': 'Metered', 'network.metered.mark.auto': 'Automatic', 'network.metered.mark.metered': 'Metered', 'network.metered.mark.not': 'Not metered',
+    'network.hub.block': 'Nowhere (block)', 'network.blocked': 'Blocked', 'network.refused': '{n} refused',
+    'network.card.quota': 'Data quota (MB)', 'network.card.quota.period': 'Counted over',
+    'network.card.quota.used': 'Used {used} of {quota} this period',
+    'network.card.hosts': 'Sites and addresses it talks to', 'network.card.hosts.none': 'Nothing seen yet. Apps that follow the proxy show the site name, the others show the address.',
+    'network.card.block.note': 'Blocked: every connection this app opens through the proxy is refused.',
+    'sec.network.anomaly': 'Sudden uploads',
+    'network.anomaly.title': 'Tell me when an app uploads a lot', 'network.anomaly.desc': 'The notch says so when an app sends in five minutes more than 50 MB and more than ten times what it usually sends in an hour. Needs a day of history for the app, which Figghost counts for it.',
+    'network.anomaly.ignore.title': 'Apps never reported', 'network.anomaly.ignore.desc': 'A backup or a sync is meant to send a lot.', 'network.anomaly.ignore.none': 'Every app is watched.',
+    'sec.network.online': 'Connection notices',
+    'network.watch.title': 'Tell me when the internet goes away', 'network.watch.desc': 'The notch says so when the internet is lost, when it is back, and when a network such as a hotel\'s asks you to sign in. Every five seconds it opens one small connection and, once, asks Apple\'s page for such checks. Works with the rest of this page off.',
+    'network.login.title': 'Open the sign-in page', 'network.login.desc': 'Opens the page a network that asks for a login shows in the browser.', 'network.login.open': 'Open',
+    'sec.network.dns': 'Encrypted DNS',
+    'network.dns.title': 'Encrypt the names this Mac looks up', 'network.dns.desc': 'Websites and apps ask a DNS server for the address of every name, and anyone on the way can read those questions. This makes a profile that sends them encrypted (DNS over HTTPS) to the server you choose. macOS asks you to approve it in System Settings, General, Device Management, and you can remove it there at any time.',
+    'network.dns.server': 'Server', 'network.dns.cloudflare': 'Cloudflare (1.1.1.1, fast)', 'network.dns.quad9': 'Quad9 (blocks known malicious sites)', 'network.dns.adguard': 'AdGuard (also blocks ads)', 'network.dns.google': 'Google Public DNS',
+    'network.dns.nextdns': 'NextDNS (your own configuration)', 'network.dns.custom': 'Another server',
+    'network.dns.nextdns.id': 'NextDNS configuration id', 'network.dns.nextdns.hint': 'The six letters and digits of your configuration, such as a1b2c3',
+    'network.dns.custom.url': 'Server address', 'network.dns.custom.hint': 'https://dns.example.com/dns-query',
+    'network.dns.install': 'Make the profile', 'network.dns.settings': 'Open Device Management',
+    'network.dns.warn': 'On a company network or a VPN that has its own names, an outside server cannot look them up: remove the profile if work sites stop opening. Phone sharing asks the DNS of the Mac, so stop and start it again after changing this.',
+    'sec.network.links': 'Connections',
+    'network.links.desc': 'Each connection of this Mac, how well it answers, and a test of its speed. A test downloads and uploads for about fifteen seconds and uses data, so on a phone or a metered network leave it alone.',
+    'network.speed.test': 'Test speed', 'network.speed.running': 'Testing...', 'network.speed.again': 'Test again',
+    'network.speed.done': 'Down {down}, up {up}, {rtt} ms idle, holds up {grade} under load ({rpm} RPM)',
+    'network.speed.done.short': 'Down {down}, up {up}',
+    'network.speed.grade.low': 'poorly', 'network.speed.grade.medium': 'fairly', 'network.speed.grade.high': 'well',
+    'network.speed.failed.error': 'The test could not finish: this network may block it, or the connection is down.', 'network.speed.failed.empty': 'The test measured nothing.', 'network.speed.failed.unreadable': 'The test gave no result.', 'network.speed.failed.slow': 'The test took too long and was stopped.',
+    'network.wifi.line': '{standard}, channel {channel} ({band} GHz, {width} MHz), signal {rssi} dBm, noise {noise} dBm, link {rate} Mbps',
+    'network.wifi.grade.good': 'Strong signal', 'network.wifi.grade.fair': 'Fair signal', 'network.wifi.grade.poor': 'Weak signal',
+    'sec.network.history': 'History',
+    'network.history.title': 'Keep the history', 'network.history.desc': 'Adds up what each app sends and receives, by connection, for 90 days, also while this page is closed. Only the name of the app and the bytes are kept, on this Mac. An app that opens and closes a connection between two looks may be missed in part.',
+    'network.history.pace.title': 'Look every', 'network.history.pace.desc': 'Shorter is more exact and costs a little more. While this page is open it looks every second anyway.', 'network.history.pace.n': '{n} seconds',
+    'network.history.range.today': 'Today', 'network.history.range.week': '7 days', 'network.history.range.month': '30 days',
+    'network.history.none': 'Nothing counted yet. Leave Keep the history on for a few minutes.', 'network.history.daily': 'Each day, last 14 days',
+    'network.history.col.total': 'Total', 'network.history.unknown': 'mixed', 'network.history.all': 'All apps',
+    'network.history.export.title': 'Export', 'network.history.export.desc': 'Writes a file into Downloads and shows it in Finder: one line for each day or month, app and connection.',
+    'network.history.export.days': '{n} days', 'network.history.export.day': 'By day', 'network.history.export.month': 'By month', 'network.history.export.go': 'Export',
+    'network.history.clear': 'Clear the history', 'network.history.clear.sure': 'Click again to clear', 'network.history.clear.desc': 'Forgets every day counted.',
     'sec.network.tether': 'Phone sharing (Beta)',
     'network.tether.title': 'Phone sharing', 'network.tether.desc': 'An Android phone on a USB cable uses this Mac\'s connection. Its Wi-Fi and mobile data can stay off.',
     'network.tether.missing': 'Phone sharing needs two free tools, installed once. Paste this in Terminal:',
@@ -74,6 +121,53 @@
     'network.card.save': 'Lưu', 'network.card.unwire': 'Gỡ dây', 'network.card.held': 'Đang bị giữ ở {speed} để nhường app phía trên',
     'network.priority.high': 'Chính', 'network.priority.normal': 'Thường', 'network.priority.low': 'Xếp sau',
     'network.close': 'Đóng',
+    'sec.network.metered': 'Tiết kiệm data',
+    'network.metered.title': 'Tiết kiệm data trên đường mạng có giới hạn', 'network.metered.desc': 'Trên đường mạng tính tiền theo dung lượng, như mạng của điện thoại, chỉ các app bạn cho phép được dùng, và hạn mức có thể chặn phần còn lại. Chỉ áp dụng cho app theo cài đặt proxy, nên phải bật Áp dụng các dây; app khác chỉ được đếm.',
+    'network.metered.auto.title': 'Coi mạng của điện thoại là có giới hạn', 'network.metered.auto.desc': 'Đường mạng tên iPhone hay Android, hoặc có địa chỉ mà điện thoại cấp khi chia sẻ dữ liệu, được coi là có giới hạn. Đây chỉ là phỏng đoán: đánh dấu bằng tay ở mục Đường mạng để sửa.',
+    'network.metered.allow.title': 'App được dùng trên đường mạng có giới hạn', 'network.metered.allow.desc': 'Bản thân Figghost luôn được phép.', 'network.metered.allow.none': 'Chưa cho app nào: mọi app theo proxy đều bị giữ lại.',
+    'network.metered.allow.add': 'Thêm app', 'network.metered.allow.remove': 'Bỏ {app}',
+    'network.metered.cap.title': 'Hạn mức dữ liệu', 'network.metered.cap.desc': 'Lượng dữ liệu các đường mạng có giới hạn được dùng trong một kỳ, do Figghost đếm. Khi chạm hạn mức, mọi app theo proxy bị từ chối cho đến hết kỳ.', 'network.metered.cap.none': 'Không giới hạn',
+    'network.metered.period.title': 'Tính theo', 'network.period.day': 'Ngày', 'network.period.month': 'Tháng',
+    'network.metered.now': 'Đang dùng đường mạng có giới hạn ({link}): chỉ các app được phép chạy tiếp.', 'network.metered.not': 'Hiện không dùng đường mạng có giới hạn.',
+    'network.metered.cap.used': 'Đã dùng trên các đường mạng có giới hạn trong kỳ này: {used} trên {cap}.', 'network.metered.cap.over': 'Đã chạm hạn mức: mọi app theo proxy bị từ chối.',
+    'network.metered.mark': 'Có giới hạn', 'network.metered.mark.auto': 'Tự động', 'network.metered.mark.metered': 'Có giới hạn', 'network.metered.mark.not': 'Không giới hạn',
+    'network.hub.block': 'Không đi đâu (chặn)', 'network.blocked': 'Đã chặn', 'network.refused': 'Đã từ chối {n}',
+    'network.card.quota': 'Hạn mức dữ liệu (MB)', 'network.card.quota.period': 'Tính theo',
+    'network.card.quota.used': 'Đã dùng {used} trên {quota} trong kỳ này',
+    'network.card.hosts': 'Trang web và địa chỉ nó kết nối tới', 'network.card.hosts.none': 'Chưa thấy gì. App theo proxy hiện tên trang, app khác hiện địa chỉ.',
+    'network.card.block.note': 'Đã chặn: mọi kết nối app này mở qua proxy đều bị từ chối.',
+    'sec.network.anomaly': 'Tải lên đột biến',
+    'network.anomaly.title': 'Báo khi một app tải lên rất nhiều', 'network.anomaly.desc': 'Notch báo khi một app gửi đi trong năm phút nhiều hơn 50 MB và nhiều hơn mười lần lượng nó thường gửi trong một giờ. Cần app đã có dữ liệu một ngày, Figghost đếm sẵn cho nó.',
+    'network.anomaly.ignore.title': 'App không bao giờ báo', 'network.anomaly.ignore.desc': 'Sao lưu hay đồng bộ thì vốn gửi nhiều.', 'network.anomaly.ignore.none': 'Mọi app đều được theo dõi.',
+    'sec.network.online': 'Thông báo kết nối',
+    'network.watch.title': 'Báo khi mất internet', 'network.watch.desc': 'Notch báo khi mất internet, khi có lại, và khi một mạng như Wi-Fi khách sạn yêu cầu đăng nhập. Cứ năm giây mở một kết nối nhỏ và hỏi trang kiểm tra của Apple. Hoạt động cả khi phần còn lại của trang này tắt.',
+    'network.login.title': 'Mở trang đăng nhập', 'network.login.desc': 'Mở trên trình duyệt trang mà mạng yêu cầu đăng nhập hiển thị.', 'network.login.open': 'Mở',
+    'sec.network.dns': 'DNS mã hóa',
+    'network.dns.title': 'Mã hóa các tên miền máy Mac tra cứu', 'network.dns.desc': 'Trang web và app hỏi máy chủ DNS địa chỉ của từng tên miền, và bất kỳ ai trên đường đi đều đọc được các câu hỏi đó. Mục này tạo một hồ sơ gửi chúng đã mã hóa (DNS over HTTPS) tới máy chủ bạn chọn. macOS sẽ yêu cầu bạn duyệt trong Cài đặt hệ thống, Cài đặt chung, Quản lý thiết bị, và bạn gỡ được ở đó bất cứ lúc nào.',
+    'network.dns.server': 'Máy chủ', 'network.dns.cloudflare': 'Cloudflare (1.1.1.1, nhanh)', 'network.dns.quad9': 'Quad9 (chặn các trang độc hại đã biết)', 'network.dns.adguard': 'AdGuard (chặn cả quảng cáo)', 'network.dns.google': 'Google Public DNS',
+    'network.dns.nextdns': 'NextDNS (cấu hình riêng của bạn)', 'network.dns.custom': 'Máy chủ khác',
+    'network.dns.nextdns.id': 'Mã cấu hình NextDNS', 'network.dns.nextdns.hint': 'Sáu chữ và số của cấu hình, như a1b2c3',
+    'network.dns.custom.url': 'Địa chỉ máy chủ', 'network.dns.custom.hint': 'https://dns.example.com/dns-query',
+    'network.dns.install': 'Tạo hồ sơ', 'network.dns.settings': 'Mở Quản lý thiết bị',
+    'network.dns.warn': 'Trên mạng công ty hoặc VPN có tên miền riêng, máy chủ bên ngoài không tra được chúng: hãy gỡ hồ sơ nếu các trang công việc không mở được. Phone sharing hỏi DNS của máy Mac, nên hãy dừng rồi bật lại sau khi đổi mục này.',
+    'sec.network.links': 'Đường mạng',
+    'network.links.desc': 'Từng đường mạng của máy Mac này, mức phản hồi của nó, và phép đo tốc độ. Mỗi lần đo tải xuống và tải lên khoảng mười lăm giây và tốn dữ liệu, nên đừng đo trên mạng điện thoại hay mạng có giới hạn.',
+    'network.speed.test': 'Đo tốc độ', 'network.speed.running': 'Đang đo...', 'network.speed.again': 'Đo lại',
+    'network.speed.done': 'Tải xuống {down}, tải lên {up}, trễ {rtt} ms khi rảnh, {grade} khi đang tải nặng ({rpm} RPM)',
+    'network.speed.done.short': 'Tải xuống {down}, tải lên {up}',
+    'network.speed.grade.low': 'giữ kém', 'network.speed.grade.medium': 'giữ tạm được', 'network.speed.grade.high': 'giữ tốt',
+    'network.speed.failed.error': 'Phép đo không hoàn thành: mạng này có thể chặn nó, hoặc đường mạng đang mất kết nối.', 'network.speed.failed.empty': 'Phép đo không đo được gì.', 'network.speed.failed.unreadable': 'Phép đo không cho kết quả.', 'network.speed.failed.slow': 'Phép đo quá lâu nên đã bị dừng.',
+    'network.wifi.line': '{standard}, kênh {channel} ({band} GHz, {width} MHz), tín hiệu {rssi} dBm, nhiễu {noise} dBm, liên kết {rate} Mbps',
+    'network.wifi.grade.good': 'Sóng mạnh', 'network.wifi.grade.fair': 'Sóng vừa', 'network.wifi.grade.poor': 'Sóng yếu',
+    'sec.network.history': 'Lịch sử',
+    'network.history.title': 'Lưu lịch sử', 'network.history.desc': 'Cộng dồn lượng dữ liệu mỗi app gửi và nhận, theo từng đường mạng, trong 90 ngày, cả khi trang này đóng. Chỉ giữ tên app và số byte, trên máy này. App mở rồi đóng kết nối giữa hai lần đọc có thể bị tính thiếu một phần.',
+    'network.history.pace.title': 'Đọc mỗi', 'network.history.pace.desc': 'Ngắn hơn thì chính xác hơn và tốn thêm một chút. Khi trang này đang mở thì vẫn đọc mỗi giây.', 'network.history.pace.n': '{n} giây',
+    'network.history.range.today': 'Hôm nay', 'network.history.range.week': '7 ngày', 'network.history.range.month': '30 ngày',
+    'network.history.none': 'Chưa tính được gì. Hãy để Lưu lịch sử bật vài phút.', 'network.history.daily': 'Từng ngày, 14 ngày gần nhất',
+    'network.history.col.total': 'Tổng', 'network.history.unknown': 'nhiều đường', 'network.history.all': 'Mọi app',
+    'network.history.export.title': 'Xuất dữ liệu', 'network.history.export.desc': 'Ghi một tệp vào thư mục Downloads và hiện nó trong Finder: mỗi dòng là một ngày hoặc một tháng, một app, một đường mạng.',
+    'network.history.export.days': '{n} ngày', 'network.history.export.day': 'Theo ngày', 'network.history.export.month': 'Theo tháng', 'network.history.export.go': 'Xuất',
+    'network.history.clear': 'Xóa lịch sử', 'network.history.clear.sure': 'Bấm lần nữa để xóa', 'network.history.clear.desc': 'Quên hết các ngày đã tính.',
     'sec.network.tether': 'Phone sharing (Beta)',
     'network.tether.title': 'Phone sharing', 'network.tether.desc': 'Điện thoại Android cắm cáp USB dùng mạng của máy Mac này. Wi-Fi và dữ liệu di động của điện thoại có thể tắt.',
     'network.tether.missing': 'Phone sharing cần hai công cụ miễn phí, chỉ cài một lần. Dán lệnh này vào Terminal:',
@@ -115,6 +209,182 @@
         h('span', { class: 'network-via', text: (a.interfaces || []).map((i) => linkName(i.name)).join(', ') || '-' })));
       table.replaceChildren(head, ...rows);
     });
+
+
+    // ---- encrypted DNS: the choice, what it needs, and the buttons that make the profile and open its place
+    const dnsOptions = () => ['cloudflare', 'quad9', 'adguard', 'google', 'nextdns', 'custom'].map((v) => ({ value: v, label: t('network.dns.' + v) }));
+    const dnsText = (path, label, hint, shown) => {
+      const input = h('input', { type: 'text', class: 'text-field network-dns-input', placeholder: hint, 'aria-label': label, spellcheck: 'false', autocomplete: 'off' });
+      input.addEventListener('change', () => change(path, input.value.trim()));
+      const el = row(label, null, input);
+      reg(() => { if (document.activeElement !== input) input.value = get(path) || ''; el.hidden = !shown(); });
+      return el;
+    };
+    const dnsNext = dnsText('network.dns_nextdns', t('network.dns.nextdns.id'), t('network.dns.nextdns.hint'), () => N().dns === 'nextdns');
+    const dnsCustom = dnsText('network.dns_custom', t('network.dns.custom.url'), t('network.dns.custom.hint'), () => N().dns === 'custom');
+    const dnsInstall = button(t('network.dns.install'), () => act('network_dns_install'), { primary: true, small: true });
+    reg(() => {
+      const d = N().dns;
+      dnsInstall.disabled = (d === 'nextdns' && !N().dns_nextdns) || (d === 'custom' && !N().dns_custom);
+    });
+
+    // ---- save data: what is allowed on a metered connection, and the cap
+    const sizeMb = (mb) => (mb >= 1000 ? (mb / 1000) + ' GB' : mb + ' MB');
+    const capOptions = () => [0, 500, 1000, 2000, 5000, 10000, 20000, 50000].map((v) => ({ value: v, label: v ? sizeMb(v) : t('network.metered.cap.none') }));
+    const periodOptions = () => ['day', 'month'].map((v) => ({ value: v, label: t('network.period.' + v) }));
+    // A list of app names kept as chips, with a menu of the apps seen to add one: the allowed apps, the apps left alone.
+    const chipEditor = ({ path, list, none, add, remove }) => {
+      const chips = h('div', { class: 'network-chips' });
+      const sel = h('select', { class: 'pick', 'aria-label': add });
+      const write = (names) => send({ t: 'set', path, value: names });
+      const addBtn = button(add, () => { if (sel.value) write([...list(), sel.value]); }, { small: true });
+      reg(() => {
+        const names = list();
+        chips.replaceChildren(...(names.length
+          ? names.map((name) => h('span', { class: 'network-chip' }, name,
+            h('button', { class: 'network-chip-x', 'aria-label': remove.replace('{app}', name), onclick: () => write(names.filter((n) => n !== name)) }, '\u00d7')))
+          : [h('span', { class: 'row-desc', text: none })]));
+        const seen = [...new Set([...(N().known_apps || []).map((a) => a.name), ...(N().apps || []).map((a) => a.name)])]
+          .filter((n) => !names.some((x) => x.toLowerCase() === n.toLowerCase())).sort((a, b) => a.localeCompare(b));
+        const key = seen.join('|');
+        if (sel.dataset.key !== key) {
+          sel.dataset.key = key;
+          sel.replaceChildren(...seen.map((n) => h('option', { value: n, text: n })));
+        }
+        addBtn.disabled = !seen.length;
+      });
+      return { chips, controls: h('div', { class: 'network-allow' }, sel, addBtn) };
+    };
+    const allowEd = chipEditor({ path: 'network.metered.allow', list: () => N().metered.allow || [], none: t('network.metered.allow.none'), add: t('network.metered.allow.add'), remove: t('network.metered.allow.remove', { app: '{app}' }) });
+    const ignoreEd = chipEditor({ path: 'network.anomaly_ignore', list: () => N().anomaly_ignore || [], none: t('network.anomaly.ignore.none'), add: t('network.metered.allow.add'), remove: t('network.metered.allow.remove', { app: '{app}' }) });
+    const meteredStatus = h('div', { class: 'row-desc network-status' });
+    reg(() => {
+      const p = N().policy || {};
+      const m = N().metered || {};
+      const cap = (m.cap_mb || 0) * 1e6;
+      const lines = [p.metered_now ? t('network.metered.now', { link: p.link || '' }) : t('network.metered.not')];
+      if (cap) lines.push(t('network.metered.cap.used', { used: size(p.cap_used || 0), cap: size(cap) }));
+      if (p.cap_level === 'over') lines.push(t('network.metered.cap.over'));
+      meteredStatus.textContent = lines.join(' ');
+      meteredStatus.dataset.state = p.cap_level === 'over' ? 'failed' : p.metered_now ? 'on' : 'off';
+    });
+    const meteredRow = (el) => { reg(() => el.classList.toggle('disabled', !(on() && N().metered.enabled))); return el; };
+
+    // ---- connections: each link with how well it answers, the radio of the Wi-Fi one, and a test of its speed
+    const mbps = (bps) => {
+      const n = Number(bps) || 0;
+      return n >= 1e9 ? (n / 1e9).toFixed(2) + ' Gbps' : (n / 1e6).toFixed(1) + ' Mbps';
+    };
+    const linkRows = new Map();
+    const linksBox = h('div', { class: 'network-linklist' });
+    const makeLinkRow = (name) => {
+      const title = h('div', { class: 'row-title' });
+      const line = h('div', { class: 'row-desc' });
+      const wifiLine = h('div', { class: 'row-desc network-wifi' });
+      const result = h('div', { class: 'row-desc network-speed-result' });
+      const btn = button(t('network.speed.test'), () => act('network_speed_test:' + name), { small: true });
+      const mark = h('select', { class: 'pick network-mark', 'aria-label': t('network.metered.mark') },
+        ...['auto', 'metered', 'not'].map((v) => h('option', { value: v, text: t('network.metered.mark.' + v) })));
+      mark.addEventListener('change', () => send({ t: 'set', path: 'network.metered.mark', value: { name, state: mark.value } }));
+      const el = h('div', { class: 'row' }, h('div', { class: 'row-text' }, title, line, wifiLine, result), h('div', { class: 'row-control network-link-control' }, mark, btn));
+      return { el, title, line, wifiLine, result, btn, mark };
+    };
+    reg(() => {
+      const links = (N().links || []).filter((l) => l.name);
+      const names = links.map((l) => l.name);
+      for (const [name, r] of linkRows) if (!names.includes(name)) { r.el.remove(); linkRows.delete(name); }
+      for (const l of links) {
+        let r = linkRows.get(l.name);
+        if (!r) { r = makeLinkRow(l.name); linkRows.set(l.name, r); }
+        linksBox.append(r.el);
+        r.title.textContent = l.label + ' (' + l.name + ')';
+        const q = l.quality && l.quality !== 'unknown' ? (l.quality === 'down' ? t('network.q.down') : t('network.q.' + l.quality, { ms: l.rtt, loss: Math.round((l.loss || 0) * 100) })) : '';
+        r.line.textContent = [l.ip, q].filter(Boolean).join(' - ');
+        const w = l.wifi;
+        r.wifiLine.hidden = !w;
+        if (w) r.wifiLine.textContent = t('network.wifi.grade.' + w.grade) + ': ' + t('network.wifi.line', { standard: w.standard || '802.11', channel: w.channel, band: w.band, width: w.width, rssi: w.rssi, noise: w.noise, rate: w.rate });
+        const m = N().metered || {};
+        r.mark.value = (m.marked || []).includes(l.name) ? 'metered' : (m.unmarked || []).includes(l.name) ? 'not' : 'auto';
+        r.mark.hidden = !m.enabled;
+        const test = l.speed_test;
+        r.btn.textContent = test && test.state === 'running' ? t('network.speed.running') : test ? t('network.speed.again') : t('network.speed.test');
+        r.btn.disabled = !!(test && test.state === 'running');
+        r.result.hidden = !test || test.state === 'running';
+        if (test && test.state === 'done') {
+          r.result.textContent = test.rpm == null
+            ? t('network.speed.done.short', { down: mbps(test.down), up: mbps(test.up) })
+            : t('network.speed.done', { down: mbps(test.down), up: mbps(test.up), rtt: test.rtt == null ? '-' : test.rtt, grade: t('network.speed.grade.' + test.grade), rpm: test.rpm });
+        } else if (test && test.state === 'failed') {
+          r.result.textContent = t('network.speed.failed.' + test.reason);
+        }
+        r.result.dataset.state = test ? test.state : '';
+      }
+      if (!links.length) linksBox.replaceChildren(h('div', { class: 'row-desc network-empty', text: t('network.links.none') }));
+      else linksBox.querySelector('.network-empty')?.remove();
+    });
+
+    // ---- history: what each app moved over the days, with the choice of range, the bars of each day and the way out
+    const range = { v: 'today' };
+    const exp = { format: 'csv', days: 7, grain: 'day' };
+    const rangeSeg = segmented({
+      label: t('sec.network.history'),
+      options: ['today', 'week', 'month'].map((k) => ({ value: k, label: t('network.history.range.' + k) })),
+      value: () => range.v,
+      onPick: (v) => { range.v = v; runSyncs(); },
+    });
+    const histTable = h('div', { class: 'network-table network-history-table', role: 'table' });
+    const bars = h('div', { class: 'network-bars', role: 'img' });
+    const barsTitle = h('div', { class: 'row-desc', text: t('network.history.daily') });
+    const viaOf = (a) => (a.interfaces || []).map((i) => (i.name === '?' ? t('network.history.unknown') : linkName(i.name))).join(', ') || '-';
+    reg(() => {
+      const view = N().history_view || {};
+      const list = view[range.v] || [];
+      if (!list.length) {
+        histTable.replaceChildren(h('div', { class: 'row-desc network-empty', text: t('network.history.none') }));
+      } else {
+        const head = h('div', { class: 'network-tr head', role: 'row' },
+          ...['app', 'down', 'up', 'total', 'via'].map((k) => h('span', { role: 'columnheader', text: t(k === 'total' ? 'network.history.col.total' : 'network.col.' + k) })));
+        histTable.replaceChildren(head, ...list.map((a) => h('div', { class: 'network-tr', role: 'row' },
+          h('span', { class: 'network-app', text: a.app }),
+          h('span', { text: size(a.down) }),
+          h('span', { text: size(a.up) }),
+          h('span', { text: size(a.down + a.up) }),
+          h('span', { class: 'network-via', text: viaOf(a) }))));
+      }
+      const daily = view.daily || [];
+      const most = Math.max(1, ...daily.map((d) => d.down + d.up));
+      bars.replaceChildren(...daily.map((d) => {
+        const bar = h('span', { class: 'network-bar-fill', style: `height:${Math.max(2, Math.round((d.down + d.up) / most * 100))}%` });
+        return h('span', { class: 'network-bar', title: `${d.day}: ${size(d.down)} / ${size(d.up)}` }, bar, h('span', { class: 'network-bar-day', text: d.day.slice(0, 2) }));
+      }));
+      bars.setAttribute('aria-label', t('network.history.daily'));
+      bars.hidden = barsTitle.hidden = view.empty !== false;
+    });
+    const pick = (opts, current, onChange, label) => {
+      const el = h('select', { class: 'pick', 'aria-label': label }, ...opts.map((o) => h('option', { value: String(o.value), text: o.label })));
+      el.value = String(current);
+      el.addEventListener('change', () => onChange(el.value));
+      return el;
+    };
+    const exportControls = h('div', { class: 'network-export' },
+      pick([{ value: 'csv', label: 'CSV' }, { value: 'json', label: 'JSON' }], exp.format, (v) => { exp.format = v; }, 'format'),
+      pick([7, 30, 90].map((n) => ({ value: n, label: t('network.history.export.days', { n }) })), exp.days, (v) => { exp.days = +v; }, 'days'),
+      pick(['day', 'month'].map((k) => ({ value: k, label: t('network.history.export.' + k) })), exp.grain, (v) => { exp.grain = v; }, 'grain'),
+      button(t('network.history.export.go'), () => act(`network_history_export:${exp.format}:${exp.days}:${exp.grain}`), { small: true, primary: true }));
+    let armed = false, armTimer = 0;
+    const wipe = button(t('network.history.clear'), () => {
+      if (!armed) {
+        armed = true;
+        wipe.textContent = t('network.history.clear.sure');
+        armTimer = setTimeout(() => { armed = false; wipe.textContent = t('network.history.clear'); }, 4000);
+        return;
+      }
+      clearTimeout(armTimer);
+      armed = false;
+      wipe.textContent = t('network.history.clear');
+      act('network_history_clear');
+    }, { small: true, danger: true });
+    const paceOptions = () => [2, 5, 10].map((n) => ({ value: n, label: t('network.history.pace.n', { n }) }));
 
     // ---- wiring: the switch, where it stands, the way back
     const status = h('span', { class: 'row-desc network-status' });
@@ -190,6 +460,36 @@
         row(t('network.open'), t('network.open.desc'), button(t('network.open'), () => act('network_canvas_open'), { primary: true, small: true }), when)),
       sectionTitle(t('sec.network.summary')),
       card(row(total, null, null, when), h('div', { class: 'row block network-table-row' }, table)),
+      sectionTitle(t('sec.network.metered')),
+      card(toggleRow('network.metered.enabled', t('network.metered.title'), t('network.metered.desc'), when),
+        meteredRow(toggleRow('network.metered.auto', t('network.metered.auto.title'), t('network.metered.auto.desc'))),
+        meteredRow(row(t('network.metered.allow.title'), t('network.metered.allow.desc'), allowEd.controls)),
+        meteredRow(h('div', { class: 'row block' }, allowEd.chips)),
+        selectRow({ path: 'network.metered.cap_mb', title: t('network.metered.cap.title'), desc: t('network.metered.cap.desc'), options: capOptions, when: () => on() && N().metered.enabled }),
+        selectRow({ path: 'network.metered.period', title: t('network.metered.period.title'), desc: null, options: periodOptions, when: () => on() && N().metered.enabled && N().metered.cap_mb > 0 }),
+        row(meteredStatus, null, null, when)),
+      sectionTitle(t('sec.network.online')),
+      card(toggleRow('network.watch', t('network.watch.title'), t('network.watch.desc')),
+        row(t('network.login.title'), t('network.login.desc'), button(t('network.login.open'), () => act('network_open_login'), { small: true }))),
+      sectionTitle(t('sec.network.dns')),
+      card(row(t('network.dns.title'), t('network.dns.desc'), null),
+        selectRow({ path: 'network.dns', title: t('network.dns.server'), desc: null, options: dnsOptions }),
+        dnsNext, dnsCustom,
+        row(t('network.dns.install'), t('network.dns.warn'), h('div', { class: 'network-allow' }, dnsInstall, button(t('network.dns.settings'), () => act('network_dns_settings'), { small: true })))),
+      sectionTitle(t('sec.network.anomaly')),
+      card(toggleRow('network.anomaly', t('network.anomaly.title'), t('network.anomaly.desc'), when),
+        row(t('network.anomaly.ignore.title'), t('network.anomaly.ignore.desc'), ignoreEd.controls, { when: () => on() && N().anomaly }),
+        h('div', { class: 'row block' }, ignoreEd.chips)),
+      sectionTitle(t('sec.network.links')),
+      card(h('div', { class: 'row block' }, linksBox), h('p', { class: 'network-note', text: t('network.links.desc') })),
+      sectionTitle(t('sec.network.history')),
+      card(toggleRow('network.history', t('network.history.title'), t('network.history.desc'), when),
+        selectRow({ path: 'network.history_seconds', title: t('network.history.pace.title'), desc: t('network.history.pace.desc'), options: paceOptions, when: () => on() && N().history }),
+        row(rangeSeg, null, null, when),
+        h('div', { class: 'row block network-table-row' }, histTable),
+        h('div', { class: 'row block network-bars-row' }, barsTitle, bars),
+        row(t('network.history.export.title'), t('network.history.export.desc'), exportControls, when),
+        row(t('network.history.clear'), t('network.history.clear.desc'), wipe, when)),
       sectionTitle(t('sec.network.control')),
       card(toggleRow('network.control', t('network.control.title'), t('network.control.desc'), when),
         row(status, null, null, when), restoreRow),
@@ -204,7 +504,7 @@
   canvas() {
     const N = () => S.network;
     const send1 = (path, value) => send({ t: 'set', path, value });
-    const { speed, linkName } = netHelpers();
+    const { speed, size, linkName } = netHelpers();
     // D: a connection on its own; C: one inside the Combined circle, smaller so that it can move about in there.
     const GRID = 20, D = 96, C = 70, APP_W = 184, APP_H = 54;
     const MERGE_MIN = 200, MERGE_MAX = 640;
@@ -484,7 +784,7 @@
           h('span', { class: 'network-app-icon' }, icon('app.dashed', 'network-app-glyph'), a.bundle ? iconImg(a.bundle) : null),
           h('div', { class: 'network-app-text' },
             h('div', { class: 'network-node-title', text: a.name }),
-            h('div', { class: 'network-node-sub', text: speed(a.down) + ' / ' + speed(a.up) + (a.wire ? '  ' + t('network.priority.' + a.wire.priority) : '') })));
+            h('div', { class: 'network-node-sub', text: speed(a.down) + ' / ' + speed(a.up) + (a.wire ? '  ' + (a.wire.target === 'block' ? t('network.blocked') : t('network.priority.' + a.wire.priority)) : '') + (a.refused ? '  ' + t('network.refused', { n: a.refused }) : '') })));
         put(el, at[id]);
         seen.add(id);
       }
@@ -849,18 +1149,28 @@
     for (const p of ['high', 'normal', 'low']) prioSel.append(h('option', { value: p, text: t('network.priority.' + p) }));
     const downIn = h('input', { type: 'number', min: '0', max: '1000000', step: '64', class: 'text-field network-limit', placeholder: t('network.card.limit.none'), 'aria-label': t('network.card.down') });
     const upIn = h('input', { type: 'number', min: '0', max: '1000000', step: '64', class: 'text-field network-limit', placeholder: t('network.card.limit.none'), 'aria-label': t('network.card.up') });
+    const quotaIn = h('input', { type: 'number', min: '0', max: '10000000', step: '50', class: 'text-field network-limit', placeholder: t('network.card.limit.none'), 'aria-label': t('network.card.quota') });
+    const quotaPeriod = h('select', { class: 'select', 'aria-label': t('network.card.quota.period') },
+      ...['day', 'month'].map((v) => h('option', { value: v, text: t('network.period.' + v) })));
+    const quotaUsed = h('p', { class: 'network-note' });
+    const hostsTitle = h('div', { class: 'network-hosts-title', text: t('network.card.hosts') });
+    const hostsBox = h('div', { class: 'network-hosts' });
     const field = (label, control) => h('label', { class: 'network-field' }, h('span', { text: label }), control);
     const limit = (input) => { const v = Math.round(Number(input.value)); return v > 0 ? Math.min(v, 1000000) : 0; };
     const save = button(t('network.card.save'), () => {
       if (!picked) return;
-      send1('network.rule', { app: picked, target: targetSel.value, priority: prioSel.value, down_kbps: limit(downIn), up_kbps: limit(upIn) });
+      const quota = Math.round(Number(quotaIn.value));
+      send1('network.rule', { app: picked, target: targetSel.value, priority: prioSel.value, down_kbps: limit(downIn), up_kbps: limit(upIn),
+        quota_mb: quota > 0 ? Math.min(quota, 10000000) : 0, quota_period: quotaPeriod.value });
     }, { primary: true, small: true });
     const unwire = button(t('network.card.unwire'), () => { if (picked) send1('network.unwire', picked); }, { small: true });
     const shut = button(t('network.close'), () => unpick(), { small: true });
     detail.append(cardTitle, held,
       h('div', { class: 'network-fields' },
         field(t('network.card.target'), targetSel), field(t('network.card.priority'), prioSel),
-        field(t('network.card.down'), downIn), field(t('network.card.up'), upIn)),
+        field(t('network.card.down'), downIn), field(t('network.card.up'), upIn),
+        field(t('network.card.quota'), quotaIn), field(t('network.card.quota.period'), quotaPeriod)),
+      quotaUsed, hostsTitle, hostsBox,
       h('div', { class: 'network-actions' }, shut, unwire, save));
     function pick(app) {
       picked = app;
@@ -879,16 +1189,27 @@
       const a = (n.apps || []).find((x) => x.name === app);
       cardTitle.textContent = app;
       held.textContent = a && a.held_to ? t('network.card.held', { speed: speed(a.held_to) }) : '';
+      const blocked = wire && wire.target === 'block';
+      if (blocked) held.textContent = t('network.card.block.note');
       held.hidden = !held.textContent;
+      const q = ((n.policy || {}).quotas || []).find((x) => x.app.toLowerCase() === app.toLowerCase());
+      quotaUsed.textContent = q ? t('network.card.quota.used', { used: size(q.used), quota: size(q.quota) }) : '';
+      quotaUsed.hidden = !quotaUsed.textContent;
+      const hosts = (a && a.hosts) || [];
+      hostsBox.replaceChildren(...(hosts.length
+        ? hosts.slice(0, 8).map((x) => h('div', { class: 'network-host' }, h('span', { class: 'network-host-name', text: x.name }), h('span', { class: 'network-host-size', text: size((x.received || 0) + (x.sent || 0)) })))
+        : [h('div', { class: 'row-desc', text: t('network.card.hosts.none') })]));
       if (!fresh) return;
       const links = current ? current.m.links : [];
-      const options = [['system', t('network.hub.system')], ['merge', (n.merge || []).length >= 2 ? t('network.hub.merge') + ' (' + n.merge.map(linkName).join(' + ') + ')' : t('network.hub.merge.all')],
+      const options = [['system', t('network.hub.system')], ['block', t('network.hub.block')], ['merge', (n.merge || []).length >= 2 ? t('network.hub.merge') + ' (' + n.merge.map(linkName).join(' + ') + ')' : t('network.hub.merge.all')],
         ...links.map((l) => ['link:' + l.name, (l.label || l.name) + ' (' + l.name + ')'])];
       targetSel.replaceChildren(...options.map(([v, label]) => h('option', { value: v, text: label })));
       targetSel.value = wire ? wire.target : 'system';
       prioSel.value = wire ? wire.priority : 'normal';
       downIn.value = wire && wire.down_kbps ? wire.down_kbps : '';
       upIn.value = wire && wire.up_kbps ? wire.up_kbps : '';
+      quotaIn.value = wire && wire.quota_mb ? wire.quota_mb : '';
+      quotaPeriod.value = wire ? wire.quota_period : 'month';
       unwire.hidden = !wire;
     }
 

@@ -829,7 +829,7 @@ const PAGE_SYMBOLS = {
   sound: 'speaker.wave.2', musicwidget: 'music.quarternote.3',
   scroll: 'computermouse', cursor: 'cursorarrow.rays', wheel: 'chart.pie', tiling: 'rectangle.split.2x1', pin: 'pin',
   clipboard: 'list.clipboard', typing: 'keyboard', snippets: 'text.cursor', dictation: 'mic', jarvis: 'sparkles', smart: 'text.magnifyingglass',
-  translate: 'character.bubble',
+  translate: 'character.bubble', rewrite: 'pencil.line', palette: 'command.square', mirror: 'person.crop.rectangle', commands: 'terminal',
   capture: 'camera.viewfinder', vision: 'eyedropper.halffull', download: 'arrow.down.circle', browser: 'safari',
   utilities: 'slider.horizontal.3', network: 'network', breaks: 'eye', menubar: 'menubar.rectangle', mole: 'wand.and.stars',
   agents: 'terminal', prs: 'arrow.triangle.pull', calendar: 'calendar', outlook: 'envelope', pomodoro: 'timer',
@@ -1848,11 +1848,11 @@ const NAV = [
   { sec: 'overview', pages: ['general', 'keys'] },
   { sec: 'notch', pages: ['notch', 'islands', 'notifications', 'volume', 'musicwidget'] },
   { sec: 'mouse', pages: ['scroll', 'cursor', 'wheel', 'tiling', 'pin'] },
-  { sec: 'text', pages: ['clipboard', 'typing', 'snippets', 'dictation', 'jarvis', 'smart', 'translate'] },
-  { sec: 'capture', pages: ['capture', 'vision', 'download', 'browser'] },
+  { sec: 'text', pages: ['clipboard', 'typing', 'snippets', 'dictation', 'jarvis', 'smart', 'translate', 'rewrite', 'palette'] },
+  { sec: 'capture', pages: ['capture', 'vision', 'mirror', 'download', 'browser'] },
   { sec: 'mac', pages: ['utilities', 'network', 'breaks', 'menubar', 'mole'] },
 ];
-const TAB_PAGES = ['agents', 'prs', 'calendar', 'outlook', 'pomodoro', 'dayprogress', 'screentime', 'notes', 'launcher', 'weather', 'video', 'system', 'updates', 'devices', 'displays', 'present', 'shelf', 'media'];
+const TAB_PAGES = ['agents', 'prs', 'calendar', 'outlook', 'pomodoro', 'dayprogress', 'screentime', 'notes', 'launcher', 'weather', 'video', 'system', 'updates', 'devices', 'displays', 'present', 'commands', 'shelf', 'media'];
 /** The page the sidebar marks while `id` is open: itself, or the Notch page for the page of one of its tabs. */
 function navPageOf(id) { return TAB_PAGES.includes(id) ? 'notch' : id; }
 /** The heading a page is found under, for the search. */
@@ -2311,6 +2311,8 @@ window.__fig = {
       case 'icons': onIcons(message.icons); break;
       case 'update': onUpdate(message); break;
       case 'go': go(message.page); break;
+      // What a feature's own window is told besides the state: its plugin takes it.
+      default: for (const p of PLUGINS) if (p.onMessage) p.onMessage(message);
     }
   },
 };

@@ -45,6 +45,10 @@ use std::{
 };
 
 const SLOT: &str = "notifications";
+/// The count of what has not been looked at, beside the closed notch.
+const BADGE_SLOT: &str = "notifications_badge";
+/// Under everything else that is live, so that it only fills a notch that has nothing to say.
+const BADGE_PRIORITY: u8 = 2;
 /// How often the times of the store's files are looked at; the store itself only when they changed.
 const POLL: Duration = Duration::from_millis(500);
 /// Without access, how often the store is tried again.
@@ -66,6 +70,8 @@ pub struct Config {
     pub seconds: u32,
     /// The words of a notification are shown, not only its app and title.
     pub preview: bool,
+    /// A red count of the notifications that came since the tab was last looked at, beside the closed notch.
+    pub badge: bool,
 }
 
 impl Default for Config {
@@ -75,6 +81,7 @@ impl Default for Config {
             mode: "notch".into(),
             seconds: 5,
             preview: true,
+            badge: false,
         }
     }
 }
@@ -109,6 +116,11 @@ pub struct Notice {
     pub(crate) body: String,
     /// The category the app gave it.
     pub(crate) category: String,
+}
+
+/// What the badge says: the count, and `9+` from ten, so that it stays small.
+pub(crate) fn badge_text(count: usize) -> String {
+    if count > 9 { "9+".to_owned() } else { count.to_string() }
 }
 
 impl Notice {
@@ -238,6 +250,8 @@ pub struct Feature {
     /// Which notification the closed notch shows, so that the end of an older one does not take a newer one away.
     on_notch: Cell<u64>,
     showing: Cell<bool>,
+    /// How many came since the tab was last shown.
+    unread: Cell<usize>,
     me: Weak<Feature>,
 }
 
@@ -274,6 +288,7 @@ pub fn attach(env: &AttachEnv) -> Option<Rc<Feature>> {
             apps: RefCell::default(),
             on_notch: Cell::new(0),
             showing: Cell::new(false),
+            unread: Cell::new(0),
             me: me.clone(),
         }
     });
@@ -286,6 +301,8 @@ pub fn attach(env: &AttachEnv) -> Option<Rc<Feature>> {
         move || {
             if let Some(f) = shown.upgrade() {
                 f.showing.set(true);
+                f.unread.set(0);
+                f.refresh_badge();
                 f.render();
             }
         },
@@ -314,6 +331,7 @@ impl Feature {
         if !config.on_notch() {
             self.clear_notch();
         }
+        self.refresh_badge();
         self.render();
         Ok(())
     }
@@ -371,7 +389,9 @@ impl Feature {
         self.generation.set(self.generation.get() + 1);
         self.notices.borrow_mut().clear();
         self.readable.set(None);
+        self.unread.set(0);
         self.clear_notch();
+        self.refresh_badge();
         trace::log("notifications: stopped");
     }
 
@@ -388,6 +408,10 @@ impl Feature {
             }
             Event::Arrived(arrived) => {
                 trace::log(&format!("notifications: {} arrived", arrived.len()));
+                // One that comes while the tab is in front is seen already.
+                if !self.showing.get() {
+                    self.unread.set(self.unread.get() + arrived.len());
+                }
                 let newest = arrived.last().cloned();
                 let more = arrived.len().saturating_sub(1);
                 {
@@ -404,6 +428,7 @@ impl Feature {
                 }
             }
         }
+        self.refresh_badge();
         self.render();
     }
 
@@ -479,6 +504,31 @@ impl Feature {
         });
     }
 
+    /// The red count beside the closed notch: there while the badge is on and something has not been looked at.
+    fn refresh_badge(&self) {
+        let Some(notch) = self.notch.upgrade() else {
+            return;
+        };
+        let count = self.unread.get();
+        let show = {
+            let config = self.config.borrow();
+            config.enabled && config.badge && count > 0
+        };
+        notch.set_activity(
+            BADGE_SLOT,
+            show.then(|| Activity {
+                left: Ear::Empty,
+                right: Ear::Text {
+                    text: badge_text(count),
+                    tone: Tone::Red,
+                },
+                detail: None,
+                page: Some(self.page),
+                priority: BADGE_PRIORITY,
+            }),
+        );
+    }
+
     fn clear_notch(&self) {
         if let Some(notch) = self.notch.upgrade() {
             notch.set_activity(SLOT, None);
@@ -528,7 +578,9 @@ impl Feature {
             return;
         }
         self.notices.borrow_mut().clear();
+        self.unread.set(0);
         self.clear_notch();
+        self.refresh_badge();
         self.render();
     }
 }
@@ -640,6 +692,12 @@ fn display(
 #[cfg(test)]
 mod tests {
     use super::*;
+
+    #[test]
+    fn the_badge_says_the_count_and_stays_small() {
+        let said: Vec<String> = [1, 9, 10, 50].iter().map(|n| badge_text(*n)).collect();
+        assert_eq!(said, ["1", "9", "9+", "9+"]);
+    }
 
     fn notice(id: i64, title: &str, subtitle: &str, body: &str) -> Notice {
         Notice {

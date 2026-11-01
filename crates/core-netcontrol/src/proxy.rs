@@ -9,7 +9,7 @@ use crate::{
 };
 use core_netmerge::Link;
 use std::{
-    collections::HashMap,
+    collections::{HashMap, HashSet},
     io::{self, ErrorKind, Read, Write},
     net::{IpAddr, Ipv4Addr, Shutdown, SocketAddr, TcpListener, TcpStream, ToSocketAddrs},
     sync::{
@@ -50,6 +50,25 @@ pub struct LinkView {
     pub sent: u64,
 }
 
+/// A site an app connected to through the proxy: the name it asked for, or the address when it asked by address.
+#[derive(Debug, Clone, PartialEq, Eq)]
+pub struct HostView {
+    pub name: String,
+    pub connections: u64,
+    pub received: u64,
+    pub sent: u64,
+}
+
+/// The most sites kept for an app, and listed on the page.
+const MAX_HOSTS: usize = 60;
+pub const LISTED_HOSTS: usize = 20;
+
+struct HostSlot {
+    connections: u64,
+    down: Arc<Counter>,
+    up: Arc<Counter>,
+}
+
 /// What the page shows of an app that went through the proxy.
 #[derive(Debug, Clone, PartialEq)]
 pub struct AppView {
@@ -64,6 +83,10 @@ pub struct AppView {
     pub links: Vec<String>,
     /// What its priority leaves it now, in bytes a second; `None` while nothing holds it back.
     pub held_to: Option<u64>,
+    /// The sites it connected to through the proxy, the busiest first.
+    pub hosts: Vec<HostView>,
+    /// Connections the proxy refused for it: by its wire to Block, by a quota that ran out, or on a metered link.
+    pub refused: u64,
 }
 
 #[derive(Debug, Clone, PartialEq, Default)]
@@ -151,6 +174,14 @@ struct State {
     rescanned: Option<Instant>,
     /// Links given by a test: never listed again.
     fixed: bool,
+    /// Apps (lower case) whose connections are refused now, by a quota that ran out.
+    blocked: HashSet<String>,
+    /// While set, only these apps (lower case) are let through: a metered link, or the cap of one reached.
+    only: Option<HashSet<String>>,
+    /// Connections refused so far, by app.
+    refused: HashMap<String, u64>,
+    /// The sites each app connected to through the proxy, by app and then by name or address (lower case).
+    hosts: HashMap<String, HashMap<String, HostSlot>>,
 }
 
 struct Shared {
@@ -193,6 +224,10 @@ impl Control {
             apps: HashMap::new(),
             rescanned: None,
             fixed: fixed.is_some(),
+            blocked: HashSet::new(),
+            only: None,
+            refused: HashMap::new(),
+            hosts: HashMap::new(),
         };
         let now = Instant::now();
         match fixed {
@@ -231,6 +266,15 @@ impl Control {
         self.shared.state().rules = rules;
     }
 
+    /// Who is refused beside the apps wired to Block: `blocked` always, and everyone not in `only` while it is set. The
+    /// names are compared without regard to case.
+    pub fn set_policy(&self, blocked: &[String], only: Option<&[String]>) {
+        let lower = |names: &[String]| names.iter().map(|n| n.to_lowercase()).collect::<HashSet<_>>();
+        let mut state = self.shared.state();
+        state.blocked = lower(blocked);
+        state.only = only.map(lower);
+    }
+
     /// The links Combined spreads over; empty is every link.
     pub fn set_merge(&self, links: Vec<String>) {
         self.shared.state().merge = links;
@@ -253,6 +297,66 @@ impl Drop for Control {
 }
 
 impl State {
+    /// The counters of a site of an app, counting one more connection to it. An app that has `MAX_HOSTS` sites already
+    /// forgets the quietest one to make room.
+    fn host_counters(&mut self, app: &str, host: &Host) -> (Arc<Counter>, Arc<Counter>) {
+        let name = match host {
+            Host::Name(name) => name.to_lowercase(),
+            Host::Ip(ip) => ip.to_string(),
+        };
+        let sites = self.hosts.entry(app.to_owned()).or_default();
+        if !sites.contains_key(&name) && sites.len() >= MAX_HOSTS {
+            let quietest = sites
+                .iter()
+                .min_by_key(|(_, s)| s.down.total.load(Relaxed) + s.up.total.load(Relaxed))
+                .map(|(n, _)| n.clone());
+            if let Some(quietest) = quietest {
+                sites.remove(&quietest);
+            }
+        }
+        let slot = sites.entry(name).or_insert_with(|| HostSlot {
+            connections: 0,
+            down: Arc::default(),
+            up: Arc::default(),
+        });
+        slot.connections += 1;
+        (Arc::clone(&slot.down), Arc::clone(&slot.up))
+    }
+
+    fn host_views(&self, app: &str) -> Vec<HostView> {
+        let mut views: Vec<HostView> = self
+            .hosts
+            .get(app)
+            .into_iter()
+            .flatten()
+            .map(|(name, s)| HostView {
+                name: name.clone(),
+                connections: s.connections,
+                received: s.down.total.load(Relaxed),
+                sent: s.up.total.load(Relaxed),
+            })
+            .collect();
+        views.sort_by(|a, b| (b.received + b.sent).cmp(&(a.received + a.sent)).then(a.name.cmp(&b.name)));
+        views.truncate(LISTED_HOSTS);
+        views
+    }
+
+    /// Whether a connection of `app` is refused, and counted when it is. A connection whose app is not known is
+    /// never refused: it may be the system's own.
+    fn refuses(&mut self, app: &str) -> bool {
+        if app == UNKNOWN_APP {
+            return false;
+        }
+        let key = app.to_lowercase();
+        let no = rule_for(&self.rules, app).is_some_and(|r| r.target == Target::Block)
+            || self.blocked.contains(&key)
+            || self.only.as_ref().is_some_and(|only| !only.contains(&key));
+        if no {
+            *self.refused.entry(app.to_owned()).or_default() += 1;
+        }
+        no
+    }
+
     fn update(&mut self, links: Vec<Link>, now: Instant) {
         for slot in &mut self.slots {
             slot.present = false;
@@ -305,7 +409,7 @@ impl State {
             return Vec::new();
         }
         match target {
-            Target::System => Vec::new(),
+            Target::System | Target::Block => Vec::new(),
             Target::Link(name) => self
                 .slots
                 .iter()
@@ -431,9 +535,28 @@ impl State {
                     sent: a.up.total.load(Relaxed),
                     links,
                     held_to: a.held_to.map(|h| h as u64),
+                    hosts: self.host_views(name),
+                    refused: self.refused.get(name).copied().unwrap_or(0),
                 }
             })
             .collect();
+        for (name, n) in &self.refused {
+            if !apps.iter().any(|a| &a.name == name) {
+                apps.push(AppView {
+                    name: name.clone(),
+                    bundle: String::new(),
+                    connections: 0,
+                    down: 0,
+                    up: 0,
+                    received: 0,
+                    sent: 0,
+                    links: Vec::new(),
+                    held_to: None,
+                    hosts: Vec::new(),
+                    refused: *n,
+                });
+            }
+        }
         apps.sort_by(|a, b| {
             b.down
                 .cmp(&a.down)
@@ -511,6 +634,8 @@ struct Lane {
     link_open: Option<Arc<AtomicUsize>>,
     bucket_down: Arc<Mutex<Bucket>>,
     bucket_up: Arc<Mutex<Bucket>>,
+    /// What moves to and from the site, counted for the page.
+    host: Option<(Arc<Counter>, Arc<Counter>)>,
 }
 
 fn serve(shared: &Arc<Shared>, mut client: TcpStream) {
@@ -529,10 +654,15 @@ fn serve(shared: &Arc<Shared>, mut client: TcpStream) {
             name: UNKNOWN_APP.into(),
             bundle: String::new(),
         });
-    let Some((server, lane)) = dial(shared, &app, &request.host, request.port) else {
+    if shared.state().refuses(&app.name) {
+        let _ = handshake::answer(&mut client, request.kind, false);
+        return;
+    }
+    let Some((server, mut lane)) = dial(shared, &app, &request.host, request.port) else {
         let _ = handshake::answer(&mut client, request.kind, false);
         return;
     };
+    lane.host = Some(shared.state().host_counters(&app.name, &request.host));
     if !handshake::answer(&mut client, request.kind, true) || client.set_read_timeout(None).is_err()
     {
         close(shared, &lane);
@@ -666,6 +796,7 @@ fn open_lane(
         link_open,
         bucket_down: Arc::clone(&entry.bucket_down),
         bucket_up: Arc::clone(&entry.bucket_up),
+        host: None,
     }
 }
 
@@ -691,13 +822,17 @@ fn relay(client: TcpStream, server: TcpStream, lane: &Lane) {
         Arc::clone(&lane.app_up),
         lane.link_up.clone(),
         Arc::clone(&lane.bucket_up),
+        lane.host.as_ref().map(|h| Arc::clone(&h.1)),
     );
     let up = thread::spawn(move || {
-        let (app, link, bucket) = up_counters;
+        let (app, link, bucket, host) = up_counters;
         copy(&mut from_client, &mut to_server, &bucket, |n| {
             app.add(n);
             if let Some(link) = &link {
                 link.add(n);
+            }
+            if let Some(host) = &host {
+                host.add(n);
             }
         });
         let _ = to_server.shutdown(Shutdown::Both);
@@ -711,6 +846,9 @@ fn relay(client: TcpStream, server: TcpStream, lane: &Lane) {
         }
         if let Some(tiers) = &lane.link_tiers {
             tiers[tier].add(n);
+        }
+        if let Some((down, _)) = &lane.host {
+            down.add(n);
         }
     });
     if whole {
@@ -846,6 +984,43 @@ mod tests {
         );
     }
 
+    /// Opens a SOCKS5 connection to `site` and says whether the proxy made it.
+    fn refused(control: &Control, site: SocketAddr) -> bool {
+        let mut s = TcpStream::connect(("127.0.0.1", control.port())).unwrap();
+        let port = site.port().to_be_bytes();
+        s.write_all(&[5, 1, 0, 5, 1, 0, 1, 127, 0, 0, 1, port[0], port[1]]).unwrap();
+        let mut head = [0u8; 12];
+        s.read_exact(&mut head).unwrap();
+        head[3] != 0
+    }
+
+    #[test]
+    fn a_wire_to_block_a_quota_and_a_metered_link_each_refuse_and_the_refusals_are_counted() {
+        let rule = |target| Rule { app: me(), target, priority: Priority::Normal, down_kbps: 0, up_kbps: 0 };
+        let control = Control::launch(0, vec![rule(Target::Block)], Some((Vec::new(), None))).unwrap();
+        assert!(refused(&control, site(10)), "an app wired to Block gets nowhere");
+        assert!(refused(&control, site(10)));
+        let snapshot = control.snapshot();
+        let mine = snapshot.apps.iter().find(|a| a.name == me()).unwrap();
+        assert_eq!((mine.refused, mine.connections), (2, 0));
+        control.set_rules(vec![rule(Target::System)]);
+        let (got, _) = through(&control, site(1000));
+        assert_eq!(got, 1000, "the wire changed, so it goes through again");
+        let snapshot = control.snapshot();
+        let mine = snapshot.apps.iter().find(|a| a.name == me()).unwrap();
+        assert_eq!(mine.hosts.len(), 1, "the site it went to is listed");
+        assert_eq!(mine.hosts[0].name, "127.0.0.1");
+        assert_eq!((mine.hosts[0].connections, mine.hosts[0].received), (1, 1000));
+        control.set_policy(&[me().to_uppercase()], None);
+        assert!(refused(&control, site(10)), "a quota that ran out refuses, whatever the case of the name");
+        control.set_policy(&[], Some(&["Someone Else".to_owned()]));
+        assert!(refused(&control, site(10)), "an app not in the list is refused on a metered link");
+        control.set_policy(&[], Some(&[me()]));
+        assert_eq!(through(&control, site(500)).0, 500, "an app in the list goes through");
+        control.set_policy(&[], None);
+        assert_eq!(through(&control, site(500)).0, 500);
+    }
+
     #[test]
     fn a_wire_to_a_link_that_is_not_there_takes_the_systems_way() {
         let rule = Rule {
@@ -877,6 +1052,10 @@ mod tests {
             apps: HashMap::new(),
             rescanned: None,
             fixed: true,
+            blocked: HashSet::new(),
+            only: None,
+            refused: HashMap::new(),
+            hosts: HashMap::new(),
         };
         state.update(vec![link("en0", 1), link("en7", 2)], now);
         state.slots[0].open.store(3, Relaxed);

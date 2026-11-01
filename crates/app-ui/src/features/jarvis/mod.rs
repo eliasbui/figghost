@@ -453,6 +453,23 @@ enum Block {
     SignIn(codex::SignIn),
 }
 
+/// The model Jarvis is set to ask, lent to another feature that wants to put a question to it: who to ask, made ready on
+/// the thread that asks, since a ChatGPT sign-in may have to be renewed first.
+pub(crate) struct Lent {
+    source: Source,
+    codex: bool,
+    ended: String,
+}
+
+impl Lent {
+    pub(crate) fn ready(mut self) -> Result<Source, Failure> {
+        if self.codex {
+            codex_ready(&mut self.source, &self.ended)?;
+        }
+        Ok(self.source)
+    }
+}
+
 /// What the thread that asks hands to the panel.
 enum Update {
     Text(String),
@@ -594,6 +611,22 @@ impl Feature {
     }
 
     /// Facts only the running app knows, for the settings page: whether it is open, and the access it has.
+    /// The model that Jarvis is set to ask, for a feature that puts one question to it; the words say what is missing
+    /// when it cannot be asked yet.
+    pub(crate) fn lend(&self) -> Result<Lent, String> {
+        let language = self.language();
+        let config = self.config.borrow().clone();
+        match config.source() {
+            Ok(source) => Ok(Lent {
+                source,
+                codex: config.provider == Provider::Codex,
+                ended: language.jarvis_codex(codex::SignIn::Expired).to_owned(),
+            }),
+            Err(Block::NoKey) => Err(language.jarvis_no_key(config.provider.name())),
+            Err(Block::SignIn(why)) => Err(language.jarvis_codex(why).to_owned()),
+        }
+    }
+
     pub fn runtime(&self) -> Value {
         json!({
             "open": self.panel.borrow().as_ref().is_some_and(|p| p.is_visible()),

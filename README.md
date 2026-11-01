@@ -54,7 +54,7 @@ The settings window lists its pages in the sidebar under six headings, the tabs 
 | Page | Vietnamese | What it does |
 | --- | --- | --- |
 | General | Chung | Launch at login, the hello from the ghost, theme and language, a one-press check of every permission, and a tile to switch each main feature |
-| Mole | Mole | Health score of the Mac and clean-up of caches, old build folders, installers and apps with their leftovers, in lists that fill in by themselves and are removed from together (off by default) |
+| Mole | Mole | Health score of the Mac and clean-up of caches, old build folders, installers and apps with their leftovers, in lists that fill in by themselves and are removed from together, and the servers and test browsers an agent left running (off by default) |
 | About | Giới thiệu | Version, a daily look for a new version with install in the app, what is new, privacy, the data folder and the licences |
 
 ### Chuột & Thao tác (Mouse & Cursor)
@@ -71,7 +71,7 @@ The settings window lists its pages in the sidebar under six headings, the tabs 
 | --- | --- | --- |
 | Notch | Notch | The shape that grows out of the top edge: size, material, opening rule, behaviour over full-screen apps, the tabs it shows, window snapping and the volume indicator in seven styles |
 | Live islands | Đảo trạng thái | Small notices out of the closed notch: Caps Lock, charger, battery, drives, downloads, camera and microphone (off by default) |
-| Notifications | Thông báo | The notifications of your apps on the notch: through the system as before, with a tab keeping the list, or through the notch, each one shown at once ahead of the music and the date and time (off by default) |
+| Notifications | Thông báo | The notifications of your apps on the notch: through the system as before, with a tab keeping the list, or through the notch, each one shown at once ahead of the music and the date and time and an optional red count of the unread beside the closed notch (off by default) |
 | Outlook | Outlook | New mail and calendar reminders of the Outlook app on a tab of the notch, a card to read one in the middle of the screen, and an optional drop that falls from the notch when one comes (off by default) |
 | Music widget | Widget nhạc | A floating Liquid Glass player on the desktop in five styles, optionally above the lock screen (off by default) |
 
@@ -84,6 +84,7 @@ The notch always has Clipboard, Shelf, Media (with lyrics), Focus and Sound; the
 | Calendar | Lịch | Today's events and reminders, and an alert before a meeting with a button that joins the Zoom, Meet, Teams or Webex link (off by default) |
 | Day progress | Tiến độ ngày | How much of the day has gone, with today's events along a line (off by default) |
 | AI agents | Tác tử AI | Claude Code, Codex and pi sessions, usage limits, tokens and cost, and Allow or Deny and choices answered on the notch; Orca accounts and switching |
+| Commands | Lệnh | A few saved commands, each run by a press, with what it prints scrolling in the tab; one at a time, no keyboard (off by default) |
 | Notes | Ghi chú | A scratchpad of plain text files (off by default) |
 | Launcher | Mở nhanh | A grid of up to twelve apps, folders and Shortcuts (off by default) |
 | Weather | Thời tiết | Up to eight cities: now, the next hours and days, a moving sky behind them and details on season, wind, rain and air quality (off by default) |
@@ -102,13 +103,16 @@ The notch always has Clipboard, Shelf, Media (with lyrics), Focus and Sound; the
 | Clipboard | Clipboard | History of text, links, code, images and files with instant search, pinning, Copy Stack, boards, sensitive data kept out, and an MCP server for AI assistants (off by default) |
 | Smart Select | Chọn thông minh | What the selected text means: units, money, times in other zones, a translation (off by default) |
 | Translate | Dịch | Select text anywhere and a glass window next to the pointer translates it (off by default) |
+| Rewrite | Viết lại | Select text anywhere and a glass window next to the pointer shows it fixed, more formal, shorter or in English, written by the model that Jarvis asks; Return copies it or pastes it over the selection (off by default) |
+| Command palette | Bảng lệnh | One shortcut and a field to type in: open a tab or a page, turn a feature on or off, go to the agent that waits, test a connection, add a reminder written in a few words; the same few things by `figghost://` addresses (off by default) |
 | Vietnamese typing | Gõ tiếng Việt | Telex or VNI in every app, VI or EN or a flag on the notch and in the menu bar, a waving flag when switching to Vietnamese, a shortcut to switch, apps left alone (off by default) |
 | Snippets | Gõ tắt | Type an abbreviation in any app and it becomes the text you saved, with Vietnamese typing on or off; a list with previews, an editor and clear errors (off by default) |
 | Capture | Chụp màn hình | Screenshots, scrolling capture, recordings as MP4 or GIF, an editor and text recognition in Vietnamese and English (off by default) |
 | Colour picker | Chọn màu | A loupe on a frozen screen that copies HEX, RGB, HSL or HSB (off by default) |
 | Video download | Tải video | Paste a link and yt-dlp, which you install yourself, saves the video to Downloads with the progress on the closed notch; net-merge, in beta, fetches it over every connection of the Mac at once (off by default) |
-| Browser | Trình duyệt | An extension for Chrome, Edge, Brave, Vivaldi and Arc that blocks the sites you list during Pomodoro work and sends a video to Video download (off by default) |
-| Network | Mạng | A diagram of Wi-Fi, Ethernet and a phone on USB wired to the apps that use them, with what each app moves; wire an app to one connection or to all of them at once, with a speed limit and a priority (wiring in beta), and share the Mac's connection with an Android phone over USB (beta) (off by default) |
+| Browser | Trình duyệt | An extension for Chrome, Edge, Brave, Vivaldi and Arc that blocks the sites you list during Pomodoro work and sends a video to Video download and sets the speed of the videos that play (off by default) |
+| Network | Mạng | A diagram of Wi-Fi, Ethernet and a phone on USB wired to the apps that use them, with what each app moves; wire an app to one connection or to all of them at once, with a speed limit and a priority (wiring in beta); a history of what each app moved over 90 days with export, a speed test and the Wi-Fi signal of each connection, data quotas and a block for an app, saving data on a phone's connection, sudden uploads, no-internet and sign-in notices, and encrypted DNS; and share the Mac's connection with an Android phone over USB (beta) (off by default) |
+| Mirror | Gương | The camera, mirrored, in a window under the notch, and a teleprompter that scrolls your last note in a strip just under the menu bar, near the lens, out of screenshots and recordings (off by default) |
 | Utilities | Tiện ích | Keep the Mac awake, mute the microphone for every app, lock the keyboard while you clean it, snooze the notch, switch the dark appearance, hide the desktop icons, copy the link of a browser tab (off by default) |
 | Breaks | Nghỉ mắt | A short break for the eyes after a while at the Mac, held back during meetings and full-screen apps, with reminders to blink and to sit up (off by default) |
 

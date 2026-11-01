@@ -11,7 +11,7 @@ use crate::{
 use core_agents::{
     Agent, HookEvent, Reply,
     cli::CHAIN_FILE,
-    event::Question,
+    event::{Question, Terminal},
     install::{self, Report},
     server::{Handler, Server, Ticket},
     socket_path,
@@ -1363,6 +1363,17 @@ impl AgentsFeature {
             .map_err(|e| e.to_string())
     }
 
+    /// Brings the terminal of the session that has waited longest to the front; false when none waits or its place is
+    /// not known. A session of Orca is found by the handle Orca gave its terminal, any other by its terminal program.
+    pub fn jump_to_waiting(&self) -> bool {
+        let terminal = self
+            .tracker
+            .borrow()
+            .longest_waiting()
+            .and_then(|s| s.terminal.clone());
+        terminal.is_some_and(|t| jump_to(&t))
+    }
+
     pub fn status(&self) -> Status {
         self.want_counts(now_ms());
         Status {
@@ -1473,6 +1484,42 @@ fn write_private(path: &Path, bytes: &[u8]) -> io::Result<()> {
 
 /// `Figghost --figghost-hook claude|codex`, or `agy <event>`: what an agent runs for each event. Returns the exit
 /// status.
+/// The bundle of Orca, whose own program switches the tab of a terminal.
+const ORCA_BUNDLE: &str = "com.stablyai.orca";
+
+/// Where Orca's command line program may be: inside the app, and where it is usually linked.
+fn orca_programs() -> Vec<PathBuf> {
+    let mut found = vec![PathBuf::from("/Applications/Orca.app/Contents/Resources/bin/orca")];
+    if let Some(home) = std::env::var_os("HOME") {
+        found.push(PathBuf::from(home).join(".local/bin/orca"));
+    }
+    found.extend(["/opt/homebrew/bin/orca", "/usr/local/bin/orca"].map(PathBuf::from));
+    found
+}
+
+/// Brings a terminal to the front: through Orca when the session ran in one of its terminals, else the terminal
+/// program by name. Nothing is run through a shell.
+fn jump_to(terminal: &Terminal) -> bool {
+    if let Some(args) = terminal.orca_switch_args()
+        && let Some(orca) = orca_programs().into_iter().find(|p| p.is_file())
+    {
+        let args: Vec<&str> = args.iter().map(String::as_str).collect();
+        let switched = crate::features::run_bounded(&orca.to_string_lossy(), &args, 5).is_ok();
+        if let Some(path) = workspace::app_path(ORCA_BUNDLE) {
+            workspace::open_path(&path);
+        }
+        trace::log(&format!("agents: a jump to a terminal of Orca {}", if switched { "worked" } else { "did not work" }));
+        return switched;
+    }
+    match terminal.bundle().and_then(workspace::app_path) {
+        Some(path) => {
+            workspace::open_path(&path);
+            true
+        }
+        None => false,
+    }
+}
+
 pub fn run_hook_cli(home: &Path, agent: Option<&str>, event: Option<&str>) -> i32 {
     let Some(agent) = agent.and_then(Agent::from_id) else {
         return 0;
@@ -1516,6 +1563,7 @@ mod tests {
             detail: Some("rm -rf build".into()),
             message: None,
             questions: Vec::new(),
+            terminal: None,
             at_ms: 1_000,
         }
     }

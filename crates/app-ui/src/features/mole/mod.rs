@@ -4,6 +4,7 @@
 //! what is chosen in a list is removed together.
 
 mod docker;
+mod procs;
 mod scan;
 mod strings;
 
@@ -45,6 +46,8 @@ struct Inner {
     seen: BTreeMap<PathBuf, Vec<Found>>,
     /// What Docker keeps, as the page shows it; null until read.
     docker: Value,
+    /// The programs agents left running, as the page shows them; null until read.
+    procs: Value,
     /// What the last removal did; `seq` tells the page it is new.
     result: Value,
     seq: u64,
@@ -102,6 +105,7 @@ impl Feature {
             "apps": list(Kind::Apps),
             "analyze": analyze,
             "docker": inner.docker,
+            "procs": inner.procs,
             "result": inner.result,
         })
     }
@@ -136,9 +140,13 @@ impl Feature {
                 if all || lock(&self.inner).docker.is_null() {
                     self.docker_scan();
                 }
+                if all || lock(&self.inner).procs.is_null() {
+                    self.procs_scan();
+                }
             }
             "mole_status" => self.status(),
             "mole_scan" if arg == "docker" => self.docker_scan(),
+            "mole_scan" if arg == "procs" => self.procs_scan(),
             "mole_scan" => match Kind::parse(arg) {
                 Some(kind) => self.scan(kind),
                 None => return Some(Err(Fault::new("invalid_value", "unknown list"))),
@@ -152,6 +160,7 @@ impl Feature {
             }
             "mole_remove" => return Some(self.remove(arg)),
             "mole_docker" => return Some(self.docker_act(arg)),
+            "mole_procs" => return Some(self.procs_act(arg)),
             "mole_docker_prune" => {
                 if !matches!(arg, "unused" | "cache") {
                     return Some(Err(Fault::new("invalid_value", "unknown prune")));
@@ -244,6 +253,42 @@ impl Feature {
             inner.seen.insert(folder, list.clone());
             inner.lists.insert(Kind::Analyze, list);
         });
+    }
+
+    fn procs_scan(&self) {
+        self.spawn("procs", procs::scan, |inner, v| inner.procs = v);
+    }
+
+    /// `arg` is `stop` and then pids, one per line; only those the last look listed are stopped.
+    fn procs_act(&self, arg: &str) -> Result<(), Fault> {
+        let mut lines = arg.lines();
+        if lines.next() != Some("stop") {
+            return Err(Fault::new("invalid_value", "unknown action"));
+        }
+        let wanted: BTreeSet<&str> = lines.collect();
+        let pids: Vec<i32> = {
+            let inner = lock(&self.inner);
+            inner.procs["items"]
+                .as_array()
+                .into_iter()
+                .flatten()
+                .filter(|row| row["path"].as_str().is_some_and(|p| wanted.contains(p)))
+                .filter_map(|row| row["pid"].as_i64().and_then(|p| i32::try_from(p).ok()))
+                .collect()
+        };
+        if pids.is_empty() {
+            return Err(Fault::new("invalid_value", "nothing to do"));
+        }
+        self.spawn(
+            "procs_act",
+            move || (procs::stop(&pids), procs::scan()),
+            |inner, ((done, failed), state)| {
+                inner.procs = state;
+                inner.seq += 1;
+                inner.result = json!({ "seq": inner.seq, "procs": "stop", "removed": done, "failed": failed });
+            },
+        );
+        Ok(())
     }
 
     fn docker_scan(&self) {
@@ -385,6 +430,7 @@ pub mod settings {
             "apps": array("apps"),
             "analyze": object("analyze"),
             "docker": object("docker"),
+            "procs": object("procs"),
             "result": object("result"),
         })
     }
@@ -594,6 +640,10 @@ mod tests {
         assert!(feature.action("mole_other").is_none());
         lock(&feature.inner).docker =
             json!({ "ok": true, "containers": [{ "path": "abc" }], "images": [] });
+        lock(&feature.inner).procs = json!({ "ok": true, "items": [{ "path": "123", "pid": 123 }] });
+        for bad in ["mole_procs:kill\n123", "mole_procs:stop\n999", "mole_procs:stop"] {
+            assert!(feature.action(bad).unwrap().is_err(), "{bad}");
+        }
         for bad in [
             "mole_docker:nope\nabc",
             "mole_docker:rmi\nabc",

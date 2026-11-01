@@ -1,0 +1,6 @@
+/* Commands: the rows of the saved commands, a name and a line each. */
+.commands-list { display: flex; flex-direction: column; gap: 8px; width: 100%; }
+.commands-item { display: grid; grid-template-columns: 160px 1fr auto; gap: 8px; align-items: center; }
+.commands-name, .commands-line { width: 100%; box-sizing: border-box; }
+.commands-line { font-family: ui-monospace, SFMono-Regular, Menlo, monospace; font-size: 12px; }
+.commands-note { color: var(--bad); margin-top: 6px; }

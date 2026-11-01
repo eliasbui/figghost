@@ -99,6 +99,7 @@ mod tests {
             detail: Some("ls".into()),
             message: None,
             questions: Vec::new(),
+            terminal: None,
             at_ms: 5,
         }
     }

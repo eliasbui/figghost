@@ -54,7 +54,7 @@ Cửa sổ cài đặt liệt kê các trang ở thanh bên dưới sáu tiêu �
 | Trang | Tiếng Anh | Chức năng |
 | --- | --- | --- |
 | Chung | General | Mở khi đăng nhập, lời chào của chú ma, giao diện sáng tối và ngôn ngữ, kiểm tra mọi quyền bằng một lần bấm, và ô bật tắt cho từng tính năng chính |
-| Mole | Mole | Điểm sức khỏe máy Mac và dọn bộ nhớ đệm, thư mục build cũ, tệp cài đặt, ứng dụng cùng phần còn sót, trong các danh sách tự hiện ra và xóa nhiều mục cùng lúc (tắt mặc định) |
+| Mole | Mole | Điểm sức khỏe máy Mac và dọn bộ nhớ đệm, thư mục build cũ, tệp cài đặt, ứng dụng cùng phần còn sót, trong các danh sách tự hiện ra và xóa nhiều mục cùng lúc, cùng các server và trình duyệt kiểm thử mà agent đã bỏ lại (tắt mặc định) |
 | Giới thiệu | About | Phiên bản, mỗi ngày tìm bản mới và cài ngay trong ứng dụng, có gì mới, riêng tư, thư mục dữ liệu và giấy phép |
 
 ### Chuột & Thao tác (Mouse & Cursor)
@@ -71,7 +71,7 @@ Cửa sổ cài đặt liệt kê các trang ở thanh bên dưới sáu tiêu �
 | --- | --- | --- |
 | Notch | Notch | Hình khối mọc ra từ mép trên màn hình: kích thước, chất liệu, quy tắc mở, hành vi trên ứng dụng toàn màn hình, các tab hiển thị, chia cửa sổ và chỉ báo âm lượng bảy kiểu |
 | Đảo trạng thái | Live islands | Thông báo nhỏ ló ra từ notch đóng: Caps Lock, sạc, pin, ổ đĩa, tải xuống, camera và micro (tắt mặc định) |
-| Thông báo | Notifications | Thông báo của các ứng dụng trên notch: qua hệ thống như cũ, có tab giữ danh sách, hoặc qua notch, mỗi thông báo hiện ngay, lấn cả nhạc lẫn ngày giờ (tắt mặc định) |
+| Thông báo | Notifications | Thông báo của các ứng dụng trên notch: qua hệ thống như cũ, có tab giữ danh sách, hoặc qua notch, mỗi thông báo hiện ngay, lấn cả nhạc lẫn ngày giờ, và có thể đếm số chưa xem bằng con số đỏ cạnh notch đóng (tắt mặc định) |
 | Outlook | Outlook | Thư mới và nhắc lịch của app Outlook trong một tab của notch, thẻ đọc nhanh ở giữa màn hình, và tuỳ chọn giọt nước rơi từ notch khi có thư mới (tắt mặc định) |
 | Widget nhạc | Music widget | Trình phát Liquid Glass nổi trên màn hình nền, năm kiểu, có thể đặt trên màn hình khóa (tắt mặc định) |
 
@@ -84,6 +84,7 @@ Notch luôn có Clipboard, Khay tệp, Media (kèm lời bài hát), Tập trung
 | Lịch | Calendar | Sự kiện và lời nhắc hôm nay, và báo trước cuộc họp với nút vào liên kết Zoom, Meet, Teams hoặc Webex (tắt mặc định) |
 | Tiến độ ngày | Day progress | Ngày đã trôi qua bao nhiêu, với các sự kiện hôm nay nằm dọc một đường (tắt mặc định) |
 | Tác tử AI | AI agents | Phiên Claude Code, Codex và pi, giới hạn sử dụng, token và chi phí, trả lời Cho phép hoặc Từ chối và lựa chọn ngay trên notch; tài khoản Orca và chuyển tài khoản |
+| Lệnh | Commands | Vài lệnh đã lưu, bấm là chạy, những gì chúng in ra cuộn ngay trong tab; mỗi lần một lệnh, không có bàn phím (tắt mặc định) |
 | Ghi chú | Notes | Nơi nháp bằng các tệp văn bản thuần (tắt mặc định) |
 | Mở nhanh | Launcher | Lưới tối đa mười hai ứng dụng, thư mục và Phím tắt Shortcuts (tắt mặc định) |
 | Thời tiết | Weather | Tối đa tám thành phố: hiện tại, những giờ và ngày sắp tới, bầu trời chuyển động phía sau và phần chi tiết về mùa, gió, mưa, chất lượng không khí (tắt mặc định) |
@@ -102,13 +103,16 @@ Notch luôn có Clipboard, Khay tệp, Media (kèm lời bài hát), Tập trung
 | Clipboard | Clipboard | Lịch sử văn bản, liên kết, mã, ảnh và tệp với tìm kiếm tức thì, ghim, Copy Stack, bảng, dữ liệu nhạy cảm bị giữ ngoài, và máy chủ MCP cho trợ lý AI (tắt mặc định) |
 | Chọn thông minh | Smart Select | Hiểu chữ đang chọn: đơn vị, tiền tệ, giờ ở các múi khác, bản dịch (tắt mặc định) |
 | Dịch | Translate | Chọn chữ ở bất kỳ đâu và một cửa sổ kính cạnh con trỏ dịch nó (tắt mặc định) |
+| Viết lại | Rewrite | Chọn chữ ở bất kỳ đâu và một cửa sổ kính cạnh con trỏ cho thấy nó đã sửa lỗi, trang trọng hơn, ngắn hơn hoặc sang tiếng Anh, do mô hình mà Jarvis đang dùng viết; Enter để sao chép hoặc dán đè lên phần đang chọn (tắt mặc định) |
+| Bảng lệnh | Command palette | Một phím tắt và một ô để gõ: mở tab hay trang, bật tắt tính năng, tới agent đang chờ, đo một đường mạng, thêm nhắc việc viết bằng vài chữ; vài việc đó cũng làm được qua địa chỉ `figghost://` (tắt mặc định) |
 | Gõ tiếng Việt | Vietnamese typing | Telex hoặc VNI ở mọi ứng dụng, VI hoặc EN hay lá cờ trên notch và ở thanh menu, cờ tung bay khi chuyển sang tiếng Việt, phím tắt để chuyển, các ứng dụng giữ nguyên (tắt mặc định) |
 | Gõ tắt | Snippets | Gõ một viết tắt ở mọi ứng dụng và nó thành đoạn văn bạn đã lưu, khi gõ tiếng Việt bật hay tắt; danh sách có xem trước, trình sửa và báo lỗi rõ ràng (tắt mặc định) |
 | Chụp màn hình | Capture | Chụp màn hình, chụp cuộn, quay màn hình ra MP4 hoặc GIF, trình chỉnh sửa và nhận dạng chữ tiếng Việt, tiếng Anh (tắt mặc định) |
 | Chọn màu | Colour picker | Kính lúp trên màn hình đóng băng, chép màu dạng HEX, RGB, HSL hoặc HSB (tắt mặc định) |
 | Tải video | Video download | Dán link, yt-dlp do bạn tự cài sẽ lưu video vào Downloads, tiến độ hiện trên notch đóng; net-merge, bản beta, tải qua mọi đường mạng của Mac cùng lúc (tắt mặc định) |
-| Trình duyệt | Browser | Extension cho Chrome, Edge, Brave, Vivaldi và Arc, chặn các trang bạn liệt kê trong phiên làm việc Pomodoro và gửi video sang Tải video (tắt mặc định) |
-| Mạng | Network | Sơ đồ nối Wi-Fi, Ethernet và điện thoại cắm USB với các ứng dụng đang dùng, kèm lượng dữ liệu mỗi ứng dụng dùng; nối một ứng dụng vào một đường hoặc gộp mọi đường cùng lúc, với giới hạn tốc độ và mức ưu tiên (nối dây đang thử nghiệm), và chia mạng của Mac cho điện thoại Android qua USB (thử nghiệm) (tắt mặc định) |
+| Trình duyệt | Browser | Extension cho Chrome, Edge, Brave, Vivaldi và Arc, chặn các trang bạn liệt kê trong phiên làm việc Pomodoro và gửi video sang Tải video, và đặt tốc độ phát cho video đang chạy (tắt mặc định) |
+| Mạng | Network | Sơ đồ nối Wi-Fi, Ethernet và điện thoại cắm USB với các ứng dụng đang dùng, kèm lượng dữ liệu mỗi ứng dụng dùng; nối một ứng dụng vào một đường hoặc gộp mọi đường cùng lúc, với giới hạn tốc độ và mức ưu tiên (nối dây đang thử nghiệm), kèm lịch sử dữ liệu mỗi ứng dụng đã dùng trong 90 ngày có xuất tệp, đo tốc độ và sóng Wi-Fi của từng đường mạng, hạn mức dữ liệu và chặn một ứng dụng, tiết kiệm data trên mạng điện thoại, báo tải lên đột biến, mất mạng và yêu cầu đăng nhập, DNS mã hóa; và chia mạng của Mac cho điện thoại Android qua USB (thử nghiệm) (tắt mặc định) |
+| Gương | Mirror | Camera lật gương trong một cửa sổ dưới notch, và máy nhắc chữ cuộn ghi chú gần nhất của bạn trong một dải ngay dưới thanh menu, gần ống kính, không vào ảnh chụp và bản ghi (tắt mặc định) |
 | Tiện ích | Utilities | Giữ máy thức, tắt tiếng micro cho mọi ứng dụng, khóa bàn phím khi lau, tạm ẩn notch, chuyển giao diện tối, ẩn biểu tượng màn hình nền, sao chép liên kết của tab trình duyệt (tắt mặc định) |
 | Nghỉ mắt | Breaks | Cho mắt nghỉ một lát sau một quãng dùng máy, chờ khi đang họp hoặc có ứng dụng toàn màn hình, kèm nhắc chớp mắt và ngồi thẳng (tắt mặc định) |
 

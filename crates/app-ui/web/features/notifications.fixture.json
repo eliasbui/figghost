@@ -3,6 +3,7 @@
   "mode": "notch",
   "seconds": 5,
   "preview": true,
+  "badge": false,
   "access": null,
   "count": 0
 }

@@ -27,6 +27,7 @@ pub mod jarvis;
 pub mod network;
 pub mod browser;
 pub mod calendar;
+pub mod commands;
 pub mod capture;
 pub mod cursor;
 pub mod dayprogress;
@@ -38,11 +39,13 @@ pub mod launcher;
 pub mod lyrics;
 pub mod mascot;
 pub mod menubar;
+pub mod mirror;
 pub mod mole;
 pub mod musicwidget;
 pub mod notes;
 pub mod notifications;
 pub mod outlook;
+pub mod palette;
 pub mod pin;
 pub mod pomodoro;
 pub mod present;
@@ -53,6 +56,7 @@ pub mod snap;
 pub mod snippets;
 pub mod stack;
 pub mod system;
+pub mod rewrite;
 pub mod translate;
 pub mod typing;
 pub mod updates;
@@ -64,7 +68,7 @@ pub mod wheel;
 
 /// The tabs of the notch that have a place in the strip only while their feature is on, so that a tab which would only
 /// say "this is off" is not there to be opened. Each follows the `enabled` of its own feature.
-pub(crate) const OPT_IN_TABS: [&str; 15] = [
+pub(crate) const OPT_IN_TABS: [&str; 16] = [
     "notes",
     "launcher",
     "weather",
@@ -80,6 +84,7 @@ pub(crate) const OPT_IN_TABS: [&str; 15] = [
     "notifications",
     "outlook",
     "video",
+    "commands",
 ];
 
 /// Whether this tab is out of the strip for now because its feature is off.
@@ -100,6 +105,7 @@ pub fn tab_waits(id: &str, config: &Config) -> bool {
         "notifications" => !config.notifications.enabled,
         "outlook" => !config.outlook.enabled,
         "video" => !config.video.enabled,
+        "commands" => !config.commands.enabled,
         _ => false,
     }
 }
@@ -288,6 +294,10 @@ pub struct Features {
     pub wheel: Option<Rc<wheel::Feature>>,
     pub mole: Option<Rc<mole::Feature>>,
     pub translate: Option<Rc<translate::Feature>>,
+    pub rewrite: Option<Rc<rewrite::Feature>>,
+    pub palette: Option<Rc<palette::Feature>>,
+    pub mirror: Option<Rc<mirror::Feature>>,
+    pub commands: Option<Rc<commands::Feature>>,
     pub pin: Option<Rc<pin::Feature>>,
     pub cursor: Option<Rc<cursor::Feature>>,
     pub musicwidget: Option<Rc<musicwidget::Feature>>,
@@ -347,6 +357,10 @@ impl Features {
             breaks: breaks::attach(env),
             dictation: dictation::attach(env),
             jarvis: jarvis::attach(env),
+            rewrite: None,
+            palette: palette::attach(env),
+            mirror: mirror::attach(env),
+            commands: commands::attach(env),
             network: network::attach(env),
             browser: None,
             notes: notes::attach(env),
@@ -372,6 +386,8 @@ impl Features {
         // The browser blocks while a Pomodoro work stage runs and hands addresses to the download.
         features.browser =
             browser::attach(env, features.pomodoro.as_ref(), features.download.as_ref());
+        // Rewrite asks the model that Jarvis is set to ask.
+        features.rewrite = rewrite::attach(env, features.jarvis.as_ref());
         if let Some(notch) = env.notch {
             for id in OPT_IN_TABS {
                 notch.set_page_dormant(id, tab_waits(id, env.config));
@@ -418,6 +434,15 @@ impl Features {
         }
         if let Some(f) = &self.translate {
             out.insert("translate", f.runtime());
+        }
+        if let Some(f) = &self.rewrite {
+            out.insert("rewrite", f.runtime());
+        }
+        if let Some(f) = &self.mirror {
+            out.insert("mirror", f.runtime());
+        }
+        if let Some(f) = &self.commands {
+            out.insert("commands", f.runtime());
         }
         if let Some(f) = &self.pin {
             out.insert("pin", f.runtime());
@@ -549,6 +574,22 @@ impl Features {
                 .wheel
                 .as_ref()
                 .map_or(Ok(()), |f| f.configure(&config.wheel)),
+            "rewrite" => self
+                .rewrite
+                .as_ref()
+                .map_or(Ok(()), |f| f.configure(&config.rewrite)),
+            "palette" => self
+                .palette
+                .as_ref()
+                .map_or(Ok(()), |f| f.configure(&config.palette)),
+            "mirror" => self
+                .mirror
+                .as_ref()
+                .map_or(Ok(()), |f| f.configure(&config.mirror)),
+            "commands" => self
+                .commands
+                .as_ref()
+                .map_or(Ok(()), |f| f.configure(&config.commands)),
             "translate" => self
                 .translate
                 .as_ref()
@@ -704,6 +745,15 @@ impl Features {
         if let Some(f) = &self.translate {
             f.suspend_hotkeys();
         }
+        if let Some(f) = &self.rewrite {
+            f.suspend_hotkeys();
+        }
+        if let Some(f) = &self.palette {
+            f.suspend_hotkeys();
+        }
+        if let Some(f) = &self.mirror {
+            f.suspend_hotkeys();
+        }
         if let Some(f) = &self.pin {
             f.suspend_hotkeys();
         }
@@ -763,6 +813,15 @@ impl Features {
         }
         if let Some(f) = &self.translate {
             f.resume_hotkeys(&config.translate);
+        }
+        if let Some(f) = &self.rewrite {
+            f.resume_hotkeys(&config.rewrite);
+        }
+        if let Some(f) = &self.palette {
+            f.resume_hotkeys(&config.palette);
+        }
+        if let Some(f) = &self.mirror {
+            f.resume_hotkeys(&config.mirror);
         }
         if let Some(f) = &self.pin {
             f.resume_hotkeys(&config.pin);
@@ -844,6 +903,16 @@ impl Features {
         }
         if let Some(f) = &self.translate
             && let Some(result) = f.action(name, &mut config.translate)
+        {
+            return Some(result);
+        }
+        if let Some(f) = &self.rewrite
+            && let Some(result) = f.action(name)
+        {
+            return Some(result);
+        }
+        if let Some(f) = &self.mirror
+            && let Some(result) = f.action(name)
         {
             return Some(result);
         }
@@ -1001,6 +1070,9 @@ impl Features {
         if let Some(f) = &self.translate {
             entries.extend(translate::Feature::menu_entries(f));
         }
+        if let Some(f) = &self.rewrite {
+            entries.extend(rewrite::Feature::menu_entries(f));
+        }
         if let Some(f) = &self.pin {
             entries.extend(pin::Feature::menu_entries(f));
         }
@@ -1082,6 +1154,19 @@ pub fn state(
     root.insert(
         "translate".into(),
         translate::settings::state(&config.translate, runtime.get("translate").unwrap_or(&none)),
+    );
+    root.insert("palette".into(), palette::settings::state(&config.palette));
+    root.insert(
+        "commands".into(),
+        commands::settings::state(&config.commands, runtime.get("commands").unwrap_or(&none)),
+    );
+    root.insert(
+        "mirror".into(),
+        mirror::settings::state(&config.mirror, runtime.get("mirror").unwrap_or(&none)),
+    );
+    root.insert(
+        "rewrite".into(),
+        rewrite::settings::state(&config.rewrite, runtime.get("rewrite").unwrap_or(&none)),
     );
     root.insert(
         "pin".into(),
@@ -1235,6 +1320,14 @@ pub fn set(config: &mut Config, path: &str, value: &Value) -> Option<Result<&'st
         }
         "translate" => translate::settings::set(&mut config.translate, rest, value)
             .map(|r| r.map(|()| "translate")),
+        "rewrite" => rewrite::settings::set(&mut config.rewrite, rest, value)
+            .map(|r| r.map(|()| "rewrite")),
+        "palette" => palette::settings::set(&mut config.palette, rest, value)
+            .map(|r| r.map(|()| "palette")),
+        "mirror" => mirror::settings::set(&mut config.mirror, rest, value)
+            .map(|r| r.map(|()| "mirror")),
+        "commands" => commands::settings::set(&mut config.commands, rest, value)
+            .map(|r| r.map(|()| "commands")),
         "pin" => pin::settings::set(&mut config.pin, rest, value).map(|r| r.map(|()| "pin")),
         "cursor" => {
             cursor::settings::set(&mut config.cursor, rest, value).map(|r| r.map(|()| "cursor"))
@@ -1321,6 +1414,9 @@ pub fn shortcut_owner(target: &str) -> Option<&'static str> {
         "mascot",
         "wheel",
         "translate",
+        "rewrite",
+        "palette",
+        "mirror",
         "pin",
         "utilities",
         "breaks",
@@ -1348,6 +1444,9 @@ pub fn shortcuts(config: &Config) -> Vec<(String, String)> {
     all.extend(mascot::settings::shortcuts(&config.mascot));
     all.extend(wheel::settings::shortcuts(&config.wheel));
     all.extend(translate::settings::shortcuts(&config.translate));
+    all.extend(rewrite::settings::shortcuts(&config.rewrite));
+    all.extend(palette::settings::shortcuts(&config.palette));
+    all.extend(mirror::settings::shortcuts(&config.mirror));
     all.extend(pin::settings::shortcuts(&config.pin));
     all.extend(utilities::settings::shortcuts(&config.utilities));
     all.extend(breaks::settings::shortcuts(&config.breaks));
@@ -1388,6 +1487,12 @@ pub fn set_shortcut(
             .map(|r| r.map(|()| "wheel")),
         "translate" => translate::settings::set_shortcut(&mut config.translate, target, value)
             .map(|r| r.map(|()| "translate")),
+        "rewrite" => rewrite::settings::set_shortcut(&mut config.rewrite, target, value)
+            .map(|r| r.map(|()| "rewrite")),
+        "palette" => palette::settings::set_shortcut(&mut config.palette, target, value)
+            .map(|r| r.map(|()| "palette")),
+        "mirror" => mirror::settings::set_shortcut(&mut config.mirror, target, value)
+            .map(|r| r.map(|()| "mirror")),
         "pin" => {
             pin::settings::set_shortcut(&mut config.pin, target, value).map(|r| r.map(|()| "pin"))
         }

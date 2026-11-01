@@ -1,7 +1,12 @@
 //! This feature's part of the settings model: the JSON the page renders and the changes it may make.
 //! Pure data with no AppKit, so every rule is covered by plain unit tests.
 
-use super::{CANVAS_EDGE, Config, KnownLink, MAX_KNOWN_LINKS, MAX_MERGE, MAX_PLACES, Wire, valid_text};
+use super::{
+    CANVAS_EDGE, Config, HISTORY_SECONDS, KnownLink, MAX_ALLOWED, MAX_KNOWN_LINKS, MAX_MERGE, MAX_PLACES, MAX_QUOTA_MB, Wire,
+    sanitized_names, valid_text,
+};
+use super::dns;
+use core_netcontrol::policy::Period;
 use crate::settings::model::Fault;
 use core_netcontrol::rules::{
     self, MAX_KBPS, MAX_RULES, Priority, Target, priority_for_new_wire, valid_app,
@@ -23,10 +28,30 @@ pub fn state(config: &Config, runtime: &Value) -> Value {
     json!({
         "enabled": config.enabled,
         "control": config.control,
+        "history": config.history,
+        "history_seconds": config.history_seconds,
+        "history_view": runtime.get("history").filter(|v| v.is_object()).cloned().unwrap_or_else(|| json!({
+            "empty": true, "today": [], "week": [], "month": [], "daily": [],
+        })),
         "port": runtime["port"].as_u64().unwrap_or(u64::from(config.port)),
         "wires": config.wires.iter().map(|w| json!({
             "app": w.app, "target": w.target, "priority": w.priority, "down_kbps": w.down_kbps, "up_kbps": w.up_kbps,
+            "quota_mb": w.quota_mb, "quota_period": w.quota_period,
         })).collect::<Vec<_>>(),
+        "watch": config.watch,
+        "dns": config.dns,
+        "dns_nextdns": config.dns_nextdns,
+        "dns_custom": config.dns_custom,
+        "anomaly": config.anomaly,
+        "anomaly_ignore": config.anomaly_ignore,
+        "metered": {
+            "enabled": config.metered.enabled, "auto": config.metered.auto, "marked": config.metered.marked,
+            "unmarked": config.metered.unmarked, "allow": config.metered.allow, "cap_mb": config.metered.cap_mb,
+            "period": config.metered.period,
+        },
+        "policy": runtime.get("policy").filter(|v| v.is_object()).cloned().unwrap_or_else(|| json!({
+            "metered_now": false, "link": "", "cap_used": 0, "cap_level": "ok", "refusing": false, "quotas": [],
+        })),
         "merge": config.merge,
         "known_links": config.links.iter().map(|l| json!({ "name": l.name, "label": l.label })).collect::<Vec<_>>(),
         "layout": config.layout,
@@ -54,6 +79,18 @@ fn app_of(value: &Value) -> Option<String> {
         .map(str::to_owned)
 }
 
+/// A quota or a cap in megabytes: nothing (0) or up to ten terabytes.
+fn megabytes(value: &Value) -> Option<u32> {
+    match value {
+        Value::Null => Some(0),
+        v => v.as_u64().filter(|n| *n <= u64::from(MAX_QUOTA_MB)).map(|n| n as u32),
+    }
+}
+
+fn names(value: &Value, valid: impl Fn(&str) -> bool) -> Option<Vec<String>> {
+    value.as_array()?.iter().map(|v| v.as_str().filter(|n| valid(n.trim())).map(|n| n.trim().to_owned())).collect()
+}
+
 fn kbps(value: &Value) -> Option<u32> {
     match value {
         Value::Null => Some(0),
@@ -76,6 +113,69 @@ pub fn set(config: &mut Config, path: &str, value: &Value) -> Option<Result<(), 
             "control" => value
                 .as_bool()
                 .map(|on| config.control = on)
+                .ok_or_else(bad),
+            "dns" => value
+                .as_str()
+                .filter(|d| dns::PROVIDERS.iter().any(|p| p.key == *d) || matches!(*d, "nextdns" | "custom"))
+                .map(|d| config.dns = d.to_owned())
+                .ok_or_else(bad),
+            // An empty text clears it; anything else must be of the right shape.
+            "dns_nextdns" => value
+                .as_str()
+                .map(str::trim)
+                .filter(|t| t.is_empty() || dns::valid_nextdns(t))
+                .map(|t| config.dns_nextdns = t.to_owned())
+                .ok_or_else(bad),
+            "dns_custom" => value
+                .as_str()
+                .map(str::trim)
+                .filter(|t| t.is_empty() || dns::valid_https_url(t))
+                .map(|t| config.dns_custom = t.to_owned())
+                .ok_or_else(bad),
+            "watch" => value.as_bool().map(|on| config.watch = on).ok_or_else(bad),
+            "anomaly" => value.as_bool().map(|on| config.anomaly = on).ok_or_else(bad),
+            "anomaly_ignore" => names(value, rules::valid_app)
+                .filter(|list| list.len() <= MAX_ALLOWED)
+                .map(|list| config.anomaly_ignore = sanitized_names(&list))
+                .ok_or_else(bad),
+            "metered.enabled" => value.as_bool().map(|on| config.metered.enabled = on).ok_or_else(bad),
+            "metered.auto" => value.as_bool().map(|on| config.metered.auto = on).ok_or_else(bad),
+            // One connection said to be metered, not metered, or left to the guess.
+            "metered.mark" => (|| {
+                let name = value["name"].as_str().filter(|n| rules::valid_interface(n))?.to_owned();
+                config.metered.marked.retain(|n| *n != name);
+                config.metered.unmarked.retain(|n| *n != name);
+                match value["state"].as_str()? {
+                    "metered" => config.metered.marked.push(name),
+                    "not" => config.metered.unmarked.push(name),
+                    "auto" => {}
+                    _ => return None,
+                }
+                config.metered = std::mem::take(&mut config.metered).sanitized();
+                Some(())
+            })()
+            .ok_or_else(bad),
+            "metered.allow" => names(value, rules::valid_app)
+                .filter(|list| list.len() <= MAX_ALLOWED)
+                .map(|list| {
+                    config.metered.allow = list;
+                    config.metered = std::mem::take(&mut config.metered).sanitized();
+                })
+                .ok_or_else(bad),
+            "metered.cap_mb" => megabytes(value).map(|n| config.metered.cap_mb = n).ok_or_else(bad),
+            "metered.period" => value
+                .as_str()
+                .and_then(Period::from_id)
+                .map(|p| config.metered.period = p.id().into())
+                .ok_or_else(bad),
+            "history" => value
+                .as_bool()
+                .map(|on| config.history = on)
+                .ok_or_else(bad),
+            "history_seconds" => value
+                .as_u64()
+                .filter(|s| HISTORY_SECONDS.contains(s))
+                .map(|s| config.history_seconds = s)
                 .ok_or_else(bad),
             "port" => value
                 .as_u64()
@@ -119,6 +219,8 @@ pub fn set(config: &mut Config, path: &str, value: &Value) -> Option<Result<(), 
                     priority: Priority::from_id(value["priority"].as_str()?)?.id().into(),
                     down_kbps: kbps(&value["down_kbps"])?,
                     up_kbps: kbps(&value["up_kbps"])?,
+                    quota_mb: megabytes(&value["quota_mb"])?,
+                    quota_period: Period::from_id(value["quota_period"].as_str().unwrap_or("month"))?.id().into(),
                 };
                 let count = config.wires.len();
                 match config
@@ -185,10 +287,7 @@ pub fn set(config: &mut Config, path: &str, value: &Value) -> Option<Result<(), 
             _ => return None,
         }
         .map(|()| {
-            config.wires = rules::sanitized(config.rules())
-                .iter()
-                .map(Wire::from_rule)
-                .collect();
+            config.wires = Wire::sanitized(&config.wires);
         }),
     )
 }
@@ -211,6 +310,110 @@ mod tests {
         let state = state(&Config::default(), &Value::Null);
         assert_eq!(keys(&fixture), keys(&state));
         assert_eq!(keys(&fixture["tether"]), keys(&state["tether"]));
+        assert_eq!(keys(&fixture["metered"]), keys(&state["metered"]));
+        assert_eq!(keys(&fixture["policy"]), keys(&state["policy"]));
+        assert_eq!(keys(&fixture["wires"][0]), keys(&json!({
+            "app": "", "target": "", "priority": "", "down_kbps": 0, "up_kbps": 0, "quota_mb": 0, "quota_period": ""
+        })));
+    }
+
+    #[test]
+    fn a_quota_and_a_wire_to_block_are_kept_with_the_rule_and_survive_the_next_change() {
+        let mut c = Config::default();
+        let rule = json!({ "app": "Dropbox", "target": "block", "priority": "low", "down_kbps": 0, "up_kbps": 0, "quota_mb": 500, "quota_period": "day" });
+        assert!(set(&mut c, "rule", &rule).unwrap().is_ok());
+        assert_eq!((c.wires[0].target.as_str(), c.wires[0].quota_mb, c.wires[0].quota_period.as_str()), ("block", 500, "day"));
+        assert!(set(&mut c, "wire", &json!({ "app": "Steam", "target": "merge" })).unwrap().is_ok());
+        assert_eq!(c.wires[0].quota_mb, 500, "wiring another app leaves the quota of this one");
+        assert!(set(&mut c, "unwire", &json!("steam")).unwrap().is_ok());
+        assert_eq!(c.wires.len(), 1);
+        for bad in [
+            json!({ "app": "A", "target": "merge", "priority": "low", "down_kbps": 0, "up_kbps": 0, "quota_mb": -1, "quota_period": "day" }),
+            json!({ "app": "A", "target": "merge", "priority": "low", "down_kbps": 0, "up_kbps": 0, "quota_mb": MAX_QUOTA_MB + 1, "quota_period": "day" }),
+            json!({ "app": "A", "target": "merge", "priority": "low", "down_kbps": 0, "up_kbps": 0, "quota_mb": 5, "quota_period": "week" }),
+        ] {
+            assert!(set(&mut c, "rule", &bad).unwrap().is_err(), "{bad}");
+        }
+        let odd = Config { wires: vec![Wire { app: "X".into(), quota_mb: u32::MAX, quota_period: "year".into(), ..Wire::default() }], ..Config::default() }.sanitized();
+        assert_eq!((odd.wires[0].quota_mb, odd.wires[0].quota_period.as_str()), (MAX_QUOTA_MB, "month"));
+        assert_eq!(c.wires[0].quota().unwrap().bytes, 500_000_000);
+    }
+
+    #[test]
+    fn the_choice_of_encrypted_dns_is_validated() {
+        let mut c = Config::default();
+        assert_eq!(c.dns, "cloudflare");
+        assert!(set(&mut c, "dns", &json!("quad9")).unwrap().is_ok() && c.dns == "quad9");
+        assert!(set(&mut c, "dns", &json!("evil")).unwrap().is_err());
+        assert!(set(&mut c, "dns_nextdns", &json!(" a1b2c3 ")).unwrap().is_ok() && c.dns_nextdns == "a1b2c3");
+        assert!(set(&mut c, "dns_nextdns", &json!("../x")).unwrap().is_err());
+        assert!(set(&mut c, "dns_nextdns", &json!("")).unwrap().is_ok() && c.dns_nextdns.is_empty());
+        assert!(set(&mut c, "dns_custom", &json!("https://dns.example.com/q")).unwrap().is_ok());
+        assert!(set(&mut c, "dns_custom", &json!("http://dns.example.com/q")).unwrap().is_err());
+        assert_eq!(c.dns_custom, "https://dns.example.com/q", "a refused change leaves it as it was");
+        let odd = Config { dns: "x".into(), dns_nextdns: "no good".into(), dns_custom: "ftp://x".into(), ..Config::default() }.sanitized();
+        assert_eq!((odd.dns.as_str(), odd.dns_nextdns.as_str(), odd.dns_custom.as_str()), ("cloudflare", "", ""));
+    }
+
+    #[test]
+    fn the_upload_alert_and_the_apps_it_leaves_alone_are_validated() {
+        let mut c = Config::default();
+        assert!(!c.anomaly && c.anomaly_ignore.is_empty() && !c.watch);
+        assert!(set(&mut c, "watch", &json!(1)).unwrap().is_err());
+        assert!(set(&mut c, "watch", &json!(true)).unwrap().is_ok() && c.watch);
+        assert!(set(&mut c, "anomaly", &json!(2)).unwrap().is_err());
+        assert!(set(&mut c, "anomaly", &json!(true)).unwrap().is_ok() && c.anomaly);
+        assert!(set(&mut c, "anomaly_ignore", &json!(["Backblaze", " backblaze", "Time Machine"])).unwrap().is_ok());
+        assert_eq!(c.anomaly_ignore, ["Backblaze", "Time Machine"]);
+        assert!(set(&mut c, "anomaly_ignore", &json!(["a/b"])).unwrap().is_err());
+        assert_eq!(c.anomaly_ignore.len(), 2, "a refused change leaves the list as it was");
+        let s = state(&c, &Value::Null);
+        assert_eq!((s["anomaly"].clone(), s["anomaly_ignore"][1].clone()), (json!(true), json!("Time Machine")));
+    }
+
+    #[test]
+    fn the_metered_settings_are_validated() {
+        let mut c = Config::default();
+        assert!(c.metered.auto && !c.metered.enabled);
+        assert!(set(&mut c, "metered.enabled", &json!(true)).unwrap().is_ok() && c.metered.enabled);
+        assert!(set(&mut c, "metered.auto", &json!("no")).unwrap().is_err());
+        assert!(set(&mut c, "metered.mark", &json!({ "name": "en7", "state": "metered" })).unwrap().is_ok());
+        assert!(set(&mut c, "metered.mark", &json!({ "name": "en1", "state": "not" })).unwrap().is_ok());
+        assert_eq!((c.metered.marked.clone(), c.metered.unmarked.clone()), (vec!["en7".to_owned()], vec!["en1".to_owned()]));
+        assert!(set(&mut c, "metered.mark", &json!({ "name": "en7", "state": "not" })).unwrap().is_ok());
+        assert_eq!((c.metered.marked.len(), c.metered.unmarked.len()), (0, 2), "a connection is marked one way only");
+        assert!(set(&mut c, "metered.mark", &json!({ "name": "en7", "state": "auto" })).unwrap().is_ok());
+        assert_eq!(c.metered.unmarked, ["en1"]);
+        for bad in [json!({ "name": "../x", "state": "auto" }), json!({ "name": "en0", "state": "maybe" })] {
+            assert!(set(&mut c, "metered.mark", &bad).unwrap().is_err(), "{bad}");
+        }
+        assert!(set(&mut c, "metered.allow", &json!(["Mail", " Slack ", "mail"])).unwrap().is_ok());
+        assert_eq!(c.metered.allow, ["Mail", "Slack"], "trimmed, and a name twice is one");
+        assert!(set(&mut c, "metered.allow", &json!(["a/b"])).unwrap().is_err());
+        assert!(set(&mut c, "metered.allow", &json!("Mail")).unwrap().is_err());
+        assert_eq!(c.metered.allow.len(), 2, "a refused change leaves the list as it was");
+        assert!(set(&mut c, "metered.cap_mb", &json!(2000)).unwrap().is_ok() && c.metered.cap_mb == 2000);
+        assert!(set(&mut c, "metered.cap_mb", &json!(MAX_QUOTA_MB + 1)).unwrap().is_err());
+        assert!(set(&mut c, "metered.period", &json!("day")).unwrap().is_ok() && c.metered.period == "day");
+        assert!(set(&mut c, "metered.period", &json!("year")).unwrap().is_err());
+        let s = state(&c, &json!({ "policy": { "metered_now": true, "link": "Wi-Fi", "cap_used": 5, "cap_level": "warn", "refusing": true, "quotas": [] } }));
+        assert_eq!((s["metered"]["cap_mb"].clone(), s["policy"]["metered_now"].clone()), (json!(2000), json!(true)));
+        assert_eq!(state(&c, &Value::Null)["policy"]["metered_now"], json!(false));
+    }
+
+    #[test]
+    fn the_history_switch_and_its_pace_are_validated() {
+        let mut c = Config::default();
+        assert!(!c.history && c.history_seconds == 5);
+        assert!(set(&mut c, "history", &json!("yes")).unwrap().is_err());
+        assert!(set(&mut c, "history", &json!(true)).unwrap().is_ok() && c.history);
+        assert!(set(&mut c, "history_seconds", &json!(3)).unwrap().is_err());
+        assert!(set(&mut c, "history_seconds", &json!(10)).unwrap().is_ok() && c.history_seconds == 10);
+        let odd = Config { history_seconds: 0, ..Config::default() }.sanitized();
+        assert_eq!(odd.history_seconds, 5, "a pace that is not offered is read as the usual one");
+        let s = state(&c, &json!({ "history": { "empty": false, "today": [{ "app": "Safari" }], "week": [], "month": [], "daily": [] } }));
+        assert_eq!(s["history_view"]["today"][0]["app"], json!("Safari"));
+        assert_eq!(state(&c, &Value::Null)["history_view"]["empty"], json!(true));
     }
 
     #[test]

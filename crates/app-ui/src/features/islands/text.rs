@@ -105,6 +105,15 @@ impl Language {
         }
     }
 
+    /// What the notch says under "Camera in use": the app in front, which is a guess, since macOS does not say which app
+    /// has the camera.
+    pub fn island_front_app(self, app: &str) -> String {
+        match self {
+            Language::English => format!("App in front: {app}"),
+            Language::Vietnamese => format!("App đang ở trước: {app}"),
+        }
+    }
+
     pub fn island_mic(self) -> &'static str {
         match self {
             Language::English => "Microphone in use",

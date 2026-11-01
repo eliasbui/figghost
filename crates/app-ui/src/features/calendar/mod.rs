@@ -511,6 +511,39 @@ impl Feature {
         self.dismiss(key);
     }
 
+    /// Adds the reminder a person wrote in a few words ("call mom tomorrow 9h"): what names a day or an hour becomes
+    /// when it is due. Returns what was made, to be said back; `Err` says why it could not be made.
+    pub fn add_reminder(&self, text: &str) -> Result<String, String> {
+        let language = i18n::current();
+        let lang = language.calendar_lang();
+        if !self.config.borrow().enabled || eventkit::access(Kind::Reminders) != Access::Granted {
+            return Err(language.calendar_reminder_no_access().to_owned());
+        }
+        let quick = core_calendar::quick::parse(text, eventkit::now(), &eventkit::utc_offset);
+        if quick.title.trim().is_empty() {
+            return Err(language.calendar_reminder_empty().to_owned());
+        }
+        let store = self.store.borrow();
+        let store = store.as_ref().ok_or_else(|| language.calendar_reminder_no_access().to_owned())?;
+        store
+            .add_reminder(&quick.title, quick.due.map(|d| (d.at, d.date_only)))
+            .map_err(|e| format!("{} ({e})", language.calendar_reminder_failed()))?;
+        trace::log("calendar: a reminder was added");
+        self.queue_refresh();
+        Ok(match quick.due {
+            Some(d) if d.date_only => {
+                format!("{}: {}", quick.title, core_calendar::format::date(lang, core_calendar::format::day_index(d.at, &eventkit::utc_offset)))
+            }
+            Some(d) => format!(
+                "{}: {} {}",
+                quick.title,
+                core_calendar::format::date(lang, core_calendar::format::day_index(d.at, &eventkit::utc_offset)),
+                core_calendar::format::clock(lang, d.at, &eventkit::utc_offset)
+            ),
+            None => quick.title,
+        })
+    }
+
     fn complete(&self, id: &str) {
         let done = self
             .store

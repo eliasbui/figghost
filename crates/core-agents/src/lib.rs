@@ -21,7 +21,7 @@ mod sock {
     pub use uds_windows::{UnixListener, UnixStream};
 }
 
-pub use event::{Agent, EventKind, HookEvent, parse_event};
+pub use event::{Agent, EventKind, HookEvent, Terminal, parse_event};
 pub use wire::Reply;
 
 use std::path::{Path, PathBuf};

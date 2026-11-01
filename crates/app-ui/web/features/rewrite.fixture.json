@@ -1,0 +1,9 @@
+{
+  "enabled": true,
+  "shortcut": "ctrl+opt+cmd+r",
+  "mode": "fix",
+  "replace": false,
+  "material": "glass",
+  "accessibility": true,
+  "model": { "ready": true, "note": "" }
+}

@@ -9,6 +9,8 @@ pub enum Target {
     Merge,
     /// One link only, by its interface name (`en0`). While it is not there, the system's way is taken.
     Link(String),
+    /// Nowhere: every connection the app opens through the proxy is refused.
+    Block,
 }
 
 impl Target {
@@ -17,6 +19,7 @@ impl Target {
             Target::System => "system".into(),
             Target::Merge => "merge".into(),
             Target::Link(name) => format!("link:{name}"),
+            Target::Block => "block".into(),
         }
     }
 
@@ -25,6 +28,7 @@ impl Target {
         match id {
             "system" => Some(Target::System),
             "merge" => Some(Target::Merge),
+            "block" => Some(Target::Block),
             _ => id
                 .strip_prefix("link:")
                 .filter(|name| valid_interface(name))
@@ -172,6 +176,7 @@ mod tests {
             Target::Merge,
             Target::Link("en0".into()),
             Target::Link("bridge100".into()),
+            Target::Block,
         ] {
             assert_eq!(Target::from_id(&t.id()), Some(t));
         }

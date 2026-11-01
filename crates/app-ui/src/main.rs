@@ -257,6 +257,8 @@ impl Shell {
         });
         let on_reopen = Rc::clone(&settings);
         let reopen = app::on_reopen(mtm, move || on_reopen.show());
+        // `figghost://...` opens the palette or one of a few pages and tabs; anything else is left alone.
+        reopen.on_url(|url| settings::open_address(&url));
         let status = Rc::new(menu::build(&ctx, &settings));
         // The three dots of the notch show the menu of the menu bar item.
         if let Some(notch) = ctx.clipboard.as_ref().and_then(|c| c.notch.as_ref()) {

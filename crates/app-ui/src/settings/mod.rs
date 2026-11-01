@@ -63,12 +63,28 @@ pub fn show_page(id: &str) {
     });
 }
 
+/// Opens the command palette, from its shortcut.
+pub fn open_palette() {
+    with_feature(SettingsFeature::open_palette);
+}
+
+/// What an address of the app's own scheme (`figghost://...`) asks, when it is one of the few things it may ask.
+pub fn open_address(url: &str) {
+    let Some(command) = crate::features::palette::url::parse(url) else {
+        trace::log("palette: an address that is not one of the few that are taken was left alone");
+        return;
+    };
+    with_feature(|this| this.run_address(command));
+}
+
 pub struct SettingsFeature {
     ctx: Rc<AppContext>,
     me: Weak<SettingsFeature>,
     window: RefCell<Option<Rc<WebWindow>>>,
     /// The diagram of the Network feature, in a window of its own: the same page, showing only the canvas.
     canvas: RefCell<Option<Rc<WebWindow>>>,
+    /// The command palette: a small window with a field to type in.
+    palette: RefCell<Option<Rc<WebWindow>>>,
     refresh: RefCell<Option<app::Timer>>,
     names: RefCell<HashMap<String, String>>,
     icons: RefCell<HashMap<String, String>>,
@@ -90,6 +106,7 @@ impl SettingsFeature {
             me: me.clone(),
             window: RefCell::default(),
             canvas: RefCell::default(),
+            palette: RefCell::default(),
             refresh: RefCell::default(),
             names: RefCell::default(),
             icons: RefCell::default(),
@@ -128,7 +145,7 @@ impl SettingsFeature {
             "dark" => Some(true),
             _ => None,
         };
-        for window in [&self.window, &self.canvas] {
+        for window in [&self.window, &self.canvas, &self.palette] {
             if let Some(window) = window.borrow().as_ref() {
                 window.set_dark(dark);
             }
@@ -220,12 +237,130 @@ impl SettingsFeature {
         self.push_state(true);
     }
 
+    fn open_palette(&self) {
+        let mtm = self.ctx.mtm;
+        if !self.ctx.features.palette.as_ref().is_some_and(|p| p.enabled()) {
+            return;
+        }
+        let existing = self.palette.borrow().clone();
+        if let Some(window) = existing {
+            // The shortcut again closes it, as it does the other small windows.
+            window.close();
+            return;
+        }
+        app::set_regular(mtm, true);
+        let (on_message, on_close) = (self.me.clone(), self.me.clone());
+        let window = WebWindow::new(
+            mtm,
+            &WindowSpec { title: "Figghost", width: 640.0, height: 460.0, min_width: 480.0, min_height: 320.0 },
+            &page::html_canvas("palette"),
+            move |text| {
+                if let Some(this) = on_message.upgrade() {
+                    this.handle(&text);
+                }
+            },
+            move || {
+                if let Some(this) = on_close.upgrade() {
+                    this.palette_closed();
+                }
+            },
+        );
+        *self.palette.borrow_mut() = Some(Rc::clone(&window));
+        self.apply_theme();
+        self.keep_refreshing();
+        window.show(mtm);
+        self.push_state(true);
+    }
+
+    fn palette_closed(&self) {
+        let weak = self.me.clone();
+        app::after(0.0, move || {
+            let Some(this) = weak.upgrade() else { return };
+            this.palette.borrow_mut().take();
+            if this.window.borrow().is_none() && this.canvas.borrow().is_none() {
+                this.refresh.borrow_mut().take();
+                app::set_regular(this.ctx.mtm, false);
+            }
+        });
+    }
+
+    /// Takes a few things from outside the app: from the palette's own address, or from a link.
+    fn run_address(&self, command: crate::features::palette::url::Command) {
+        use crate::features::palette::url::Command;
+        match command {
+            Command::Palette => self.open_palette(),
+            Command::Page(id) => show_page(&id),
+            Command::Tab(id) => self.open_tab(&id),
+            Command::Jump => {
+                if let Some(agents) = self.ctx.agents.as_ref() {
+                    agents.jump_to_waiting();
+                }
+            }
+            Command::Remind(text) => {
+                let said = self.add_reminder(&text);
+                trace::log(&format!("palette: a reminder from an address: {}", if said.is_ok() { "added" } else { "refused" }));
+            }
+        }
+    }
+
+    /// Opens the notch on a tab, by the id of the tab.
+    fn open_tab(&self, id: &str) {
+        let Some(notch) = self.ctx.clipboard.as_ref().and_then(|c| c.notch.clone()) else { return };
+        if let Some(index) = notch.page_ids().iter().position(|(page, _)| *page == id) {
+            notch.open_page(index);
+        }
+    }
+
+    fn add_reminder(&self, text: &str) -> Result<String, String> {
+        match self.ctx.features.calendar.as_ref() {
+            Some(calendar) => calendar.add_reminder(text),
+            None => Err(i18n::current().calendar_reminder_no_access().to_owned()),
+        }
+    }
+
+    /// The actions of the palette's window; `None` when the name is not one of them.
+    fn palette_action(&self, name: &str) -> bool {
+        let close = || {
+            let window = self.palette.borrow().clone();
+            if let Some(window) = window {
+                window.close();
+            }
+        };
+        let valid = |id: &str| !id.is_empty() && id.len() <= 24 && id.bytes().all(|b| b.is_ascii_lowercase() || b.is_ascii_digit() || b == b'_');
+        match name {
+            "palette_close" => close(),
+            "palette_jump" => {
+                close();
+                self.run_address(crate::features::palette::url::Command::Jump);
+            }
+            _ => {
+                if let Some(id) = name.strip_prefix("palette_page:").filter(|id| valid(id)) {
+                    close();
+                    show_page(id);
+                } else if let Some(id) = name.strip_prefix("palette_tab:").filter(|id| valid(id)) {
+                    close();
+                    self.open_tab(id);
+                } else if let Some(text) = name.strip_prefix("palette_remind:") {
+                    let result = self.add_reminder(text.trim());
+                    let (ok, said) = match result {
+                        Ok(said) => (true, said),
+                        Err(why) => (false, why),
+                    };
+                    self.post(&json!({ "t": "palette_result", "ok": ok, "text": said }));
+                } else {
+                    return false;
+                }
+            }
+        }
+        true
+    }
+
     fn canvas_closed(&self) {
         let weak = self.me.clone();
         app::after(0.0, move || {
             let Some(this) = weak.upgrade() else { return };
             this.canvas.borrow_mut().take();
-            if this.window.borrow().is_none() {
+            if this.window.borrow().is_none() && this.palette.borrow().is_none() {
                 this.refresh.borrow_mut().take();
                 app::set_regular(this.ctx.mtm, false);
             }
@@ -238,7 +373,7 @@ impl SettingsFeature {
     }
 
     fn closed(&self) {
-        if self.canvas.borrow().is_none() {
+        if self.canvas.borrow().is_none() && self.palette.borrow().is_none() {
             self.refresh.borrow_mut().take();
         }
         // The page may have been capturing a shortcut when it went away.
@@ -256,7 +391,7 @@ impl SettingsFeature {
                 .is_some_and(|w| w.is_visible());
             if !reopened {
                 this.window.borrow_mut().take();
-                if this.canvas.borrow().is_none() {
+                if this.canvas.borrow().is_none() && this.palette.borrow().is_none() {
                     app::set_regular(this.ctx.mtm, false);
                 }
             }
@@ -342,7 +477,7 @@ impl SettingsFeature {
 
     /// Sends the state to the page; `force` sends it even when it has not changed since the last time.
     fn push_state(&self, force: bool) {
-        if self.window.borrow().is_none() && self.canvas.borrow().is_none() {
+        if self.window.borrow().is_none() && self.canvas.borrow().is_none() && self.palette.borrow().is_none() {
             return;
         }
         let json = state(&self.ctx.config.borrow(), &self.env());
@@ -552,6 +687,9 @@ impl SettingsFeature {
 
     fn action(&self, name: &str) {
         let mtm = self.ctx.mtm;
+        if name.starts_with("palette_") && self.palette_action(name) {
+            return;
+        }
         match name {
             "network_canvas_open" => self.open_canvas(),
             "network_canvas_close" => {
@@ -599,6 +737,11 @@ impl SettingsFeature {
             "agents_remove_pi" => self.agent_hooks(Agent::Pi, false),
             "agents_install_agy" => self.agent_hooks(Agent::Agy, true),
             "agents_remove_agy" => self.agent_hooks(Agent::Agy, false),
+            "agents_jump" => {
+                if !self.ctx.agents.as_ref().is_some_and(|a| a.jump_to_waiting()) {
+                    self.fault(&Fault::new("agents_failed", "no session is waiting in a terminal that is known"));
+                }
+            }
             "agents_usage_on" => self.agent_usage(true),
             "agents_usage_off" => self.agent_usage(false),
             name if name.starts_with("accounts_") => {

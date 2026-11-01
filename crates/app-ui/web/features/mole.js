@@ -69,6 +69,11 @@
     'mole.docker.rmi.body': 'The chosen images are removed. An image a container uses cannot be removed.',
     'mole.docker.volume_rm.body': 'The chosen volumes and the data in them are deleted for good. A volume in use cannot be removed.',
     'mole.docker.network_rm.body': 'The chosen networks are removed. A network in use cannot be removed.',
+    'mole.sec.procs': 'Left running', 'mole.procs.title': 'Programs left running', 'mole.procs.desc': 'Servers and browsers that a coding agent started and that outlived it: their parent is gone, they are over ten minutes old, and they are of a known kind. Nothing is stopped by itself. The size is the memory each takes.', 'mole.procs.empty': 'Nothing an agent left running.',
+    'mole.procs.stop': 'Stop', 'mole.procs.stop.body': 'The chosen programs are asked to end, and made to if they do not, with the programs they started. Anything they had not saved is lost.',
+    'mole.procs.kind.mcp': 'MCP server', 'mole.procs.kind.dev': 'Dev server', 'mole.procs.kind.browser': 'Test browser', 'mole.procs.kind.npx': 'npx tool',
+    'mole.procs.ports': 'port {ports}', 'mole.procs.age': 'running {n}',
+    'mole.procs.done': 'Stopped {n} programs.', 'mole.procs.done.partial': 'Stopped {n} programs, {failed} could not be stopped.',
     'mole.sec.docker_containers': 'Docker containers', 'mole.docker_containers.title': 'Containers', 'mole.docker_containers.desc': 'Start, stop, restart, clear the logs of or remove the chosen containers.', 'mole.docker_containers.empty': 'No containers.',
     'mole.sec.docker_images': 'Docker images', 'mole.docker_images.title': 'Images', 'mole.docker_images.desc': 'The size is what removing an image frees: the layers no other image shares.', 'mole.docker_images.empty': 'No images.',
     'mole.sec.docker_volumes': 'Docker volumes', 'mole.docker_volumes.title': 'Volumes', 'mole.docker_volumes.desc': 'Volumes hold data; removing one deletes it.', 'mole.docker_volumes.empty': 'No volumes.',
@@ -157,6 +162,11 @@
     'mole.docker.rmi.body': 'Các image đã chọn bị xóa. Image đang có container dùng thì không xóa được.',
     'mole.docker.volume_rm.body': 'Các volume đã chọn và dữ liệu trong đó bị xóa hẳn. Volume đang dùng thì không xóa được.',
     'mole.docker.network_rm.body': 'Các network đã chọn bị xóa. Network đang dùng thì không xóa được.',
+    'mole.sec.procs': 'Còn chạy sót', 'mole.procs.title': 'Chương trình còn chạy sót', 'mole.procs.desc': 'Server và trình duyệt mà một agent lập trình đã mở rồi bỏ lại: chương trình cha không còn, đã chạy hơn mười phút, và thuộc loại đã biết. Không có gì tự bị dừng. Dung lượng là bộ nhớ mỗi cái đang chiếm.', 'mole.procs.empty': 'Không có gì agent bỏ lại.',
+    'mole.procs.stop': 'Dừng', 'mole.procs.stop.body': 'Các chương trình đã chọn được yêu cầu kết thúc, và bị buộc kết thúc nếu không chịu, cùng các chương trình chúng đã mở. Những gì chưa lưu sẽ mất.',
+    'mole.procs.kind.mcp': 'Server MCP', 'mole.procs.kind.dev': 'Dev server', 'mole.procs.kind.browser': 'Trình duyệt kiểm thử', 'mole.procs.kind.npx': 'Công cụ npx',
+    'mole.procs.ports': 'cổng {ports}', 'mole.procs.age': 'đã chạy {n}',
+    'mole.procs.done': 'Đã dừng {n} chương trình.', 'mole.procs.done.partial': 'Đã dừng {n} chương trình, {failed} chương trình không dừng được.',
     'mole.sec.docker_containers': 'Docker container', 'mole.docker_containers.title': 'Container', 'mole.docker_containers.desc': 'Chạy, dừng, khởi động lại, xóa log hoặc xóa các container đã chọn.', 'mole.docker_containers.empty': 'Không có container nào.',
     'mole.sec.docker_images': 'Docker image', 'mole.docker_images.title': 'Image', 'mole.docker_images.desc': 'Dung lượng là phần được giải phóng khi xóa: các lớp không image nào khác dùng chung.', 'mole.docker_images.empty': 'Không có image nào.',
     'mole.sec.docker_volumes': 'Docker volume', 'mole.docker_volumes.title': 'Volume', 'mole.docker_volumes.desc': 'Volume chứa dữ liệu; xóa volume là xóa dữ liệu trong đó.', 'mole.docker_volumes.empty': 'Không có volume nào.',
@@ -360,13 +370,16 @@
     return [sectionTitle(t('mole.sec.health')), card(hero, tiles, freeBox)];
   }
 
+  // How long, in the words of a person: minutes under an hour, then hours, then days.
+  const agoMinutes = (m) => (m < 60 ? m + ' ' + (lang === 'vi' ? 'phút' : 'min') : m < 1440 ? Math.floor(m / 60) + ' ' + (lang === 'vi' ? 'giờ' : 'h') : Math.floor(m / 1440) + ' ' + (lang === 'vi' ? 'ngày' : 'd'));
+
   /**
    * A list whose rows are chosen with a checkbox and removed together. `detail` is the second line of a row,
    * `lead` an element before its name, `open` makes a folder row open; `head` goes above the toolbar.
    */
-  function pickList({ kind, read, detail, lead, open, head, filter, tint, scan, actions }) {
+  function pickList({ kind, read, detail, lead, open, head, filter, tint, scan, actions, ns = 'docker' }) {
     const key = scan || kind;
-    const working = () => busy(actions ? 'docker_act' : 'remove');
+    const working = () => busy(actions ? ns + '_act' : 'remove');
     const chosen = new Set();
     const items = () => read() || [];
     const all = h('input', { type: 'checkbox', 'aria-label': t('mole.pick.all') });
@@ -378,11 +391,11 @@
         () => act('mole_remove:' + kind + '\n' + picked.map((i) => i.path).join('\n')));
     }, { icon: 'trash', small: true, danger: true });
     // Docker's lists do things to their rows besides removing them, each its own button.
-    const verbs = (actions || []).map(({ verb, label, danger }) => button(t('mole.docker.' + label), () => {
+    const verbs = (actions || []).map(({ verb, label, danger }) => button(t('mole.' + ns + '.' + label), () => {
       const picked = items().filter((i) => chosen.has(i.path));
-      const go = () => act('mole_docker:' + verb + '\n' + picked.map((i) => i.path).join('\n'));
+      const go = () => act('mole_' + ns + ':' + verb + '\n' + picked.map((i) => i.path).join('\n'));
       if (!danger) { go(); return; }
-      confirmDialog({ title: t('mole.confirm', { n: picked.length, size: size(sum(picked)) }), body: t('mole.docker.' + verb + '.body'), confirm: t('mole.docker.' + label) }, go);
+      confirmDialog({ title: t('mole.confirm', { n: picked.length, size: size(sum(picked)) }), body: t('mole.' + ns + '.' + verb + '.body'), confirm: t('mole.' + ns + '.' + label) }, go);
     }, { small: true, danger }));
     const refresh = button('', () => act('mole_scan:' + key), { icon: 'refresh', small: true, aria: t('mole.refresh') });
     refresh.title = t('mole.refresh');
@@ -635,7 +648,8 @@
         const r = mole().result;
         if (!r || r.seq === seen) return;
         seen = r.seq;
-        if (r.docker) toast(t(r.failed ? 'mole.docker.done.partial' : 'mole.docker.done', { n: r.removed, failed: r.failed }));
+        if (r.procs) toast(t(r.failed ? 'mole.procs.done.partial' : 'mole.procs.done', { n: r.removed, failed: r.failed }));
+        else if (r.docker) toast(t(r.failed ? 'mole.docker.done.partial' : 'mole.docker.done', { n: r.removed, failed: r.failed }));
         else toast(t(r.failed ? 'mole.result.partial' : 'mole.result', { n: r.removed, size: size(r.freed), failed: r.failed }));
       });
       act('mole_open');
@@ -648,6 +662,9 @@
           detail: (i) => (i.extra ? i.note + ' / ' + t('mole.apps.extra', { n: i.extra }) : i.note) }),
         ...dockerCard(),
         dockerLists(),
+        ...pickList({ kind: 'procs', ns: 'procs', scan: 'procs', read: () => (mole().procs && mole().procs.ok ? mole().procs.items : null), filter: true,
+          detail: (i) => [t('mole.procs.kind.' + i.kind), i.ports && i.ports.length ? t('mole.procs.ports', { ports: i.ports.join(', ') }) : '', t('mole.procs.age', { n: agoMinutes(i.minutes) })].filter(Boolean).join(' / '),
+          actions: [{ verb: 'stop', label: 'stop', danger: true }] }),
         ...pickList({ kind: 'analyze', read: () => mole().analyze && mole().analyze.entries, head: analyzeHead(), detail: () => '',
           open: (i) => act('mole_analyze:' + i.path), tint: (k) => (k < MAX_SLICES - 1 ? PALETTE[k % PALETTE.length] : 'var(--text-2)') }),
       ];
@@ -773,6 +790,19 @@
       S.mole.busy = ['docker_act']; runSyncs();
       expect(btn(dsec, t('mole.docker.stop')).disabled, 'mole: no second Docker action while one runs');
       S.mole.busy = []; S.mole.docker = null;
+
+      // Programs an agent left running: listed with their kind and port, stopped only after asking.
+      S.mole.procs = { ok: true, items: [{ path: '4321', pid: 4321, name: 'node vite', note: 'dev', kind: 'dev', ports: [5173], minutes: 125, size: 81234 * 1024, dir: false, age: 0, extra: 0, command: 'node vite' }] };
+      runSyncs();
+      const psec = document.querySelector('.mole-list[data-kind=procs]').closest('.card');
+      expect(psec.textContent.includes('node vite') && psec.textContent.includes(t('mole.procs.kind.dev')) && psec.textContent.includes(t('mole.procs.ports', { ports: '5173' })), 'mole: a dev server left running is listed with its kind and port');
+      psec.querySelector('.mole-all input').click();
+      sent.length = 0;
+      btn(psec, t('mole.procs.stop')).click();
+      expect(!sent.length, 'mole: stopping a program asks first');
+      document.querySelector('#modal .btn.primary').click();
+      expect(sent.some((m) => m.name === 'mole_procs:stop\n4321'), 'mole: the chosen program is stopped: ' + JSON.stringify(sent));
+      S.mole.procs = null;
       S.mole.status = null; S.mole.clean = null; S.mole.purge = null; S.mole.apps = null; S.mole.analyze = null; runSyncs();
     },
   });

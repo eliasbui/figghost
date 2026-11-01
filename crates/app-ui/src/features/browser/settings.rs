@@ -1,7 +1,7 @@
 //! This feature's part of the settings model: the JSON the page renders and the changes it may make.
 //! Pure data with no AppKit, so every rule is covered by plain unit tests.
 
-use super::{Config, logic};
+use super::{Config, SPEEDS, logic};
 use crate::settings::model::Fault;
 use serde_json::{Value, json};
 
@@ -14,6 +14,8 @@ pub fn state(config: &Config, runtime: &Value) -> Value {
         "block": config.block,
         "sites": config.sites.join("\n"),
         "download": config.download,
+        "speed_control": config.speed_control,
+        "speed": config.speed,
         "browsers": runtime.get("browsers").cloned().unwrap_or_else(|| json!([])),
         "connected": runtime.get("connected").and_then(Value::as_bool).unwrap_or(false),
         "blocking": runtime.get("blocking").and_then(Value::as_bool).unwrap_or(false),
@@ -31,6 +33,12 @@ pub fn set(config: &mut Config, path: &str, value: &Value) -> Option<Result<(), 
         "enabled" => switch(&mut config.enabled),
         "block" => switch(&mut config.block),
         "download" => switch(&mut config.download),
+        "speed_control" => switch(&mut config.speed_control),
+        "speed" => value
+            .as_f64()
+            .filter(|s| SPEEDS.contains(s))
+            .map(|s| config.speed = s)
+            .ok_or_else(bad),
         // The list as typed: whatever is not a site is dropped, and the page shows what was kept.
         "sites" => value
             .as_str()
@@ -74,6 +82,22 @@ mod tests {
                 .starts_with("youtube.com\nfacebook.com")
         );
         assert_eq!(s["extension_id"], json!(logic::EXTENSION_ID));
+    }
+
+    #[test]
+    fn the_speed_is_one_that_is_offered_and_off_by_default() {
+        let mut config = Config::default();
+        assert!(!config.speed_control && config.speed == 1.0);
+        assert!(set(&mut config, "speed_control", &json!("yes")).unwrap().is_err());
+        assert!(set(&mut config, "speed_control", &json!(true)).unwrap().is_ok() && config.speed_control);
+        assert!(set(&mut config, "speed", &json!(1.5)).unwrap().is_ok() && config.speed == 1.5);
+        for bad in [json!(3.0), json!(0), json!("1.5"), json!(1.3)] {
+            assert!(set(&mut config, "speed", &bad).unwrap().is_err(), "{bad}");
+        }
+        assert_eq!(config.speed, 1.5, "a refused speed changes nothing");
+        let odd = Config { speed: 9.0, ..Config::default() }.sanitized();
+        assert_eq!(odd.speed, 1.0);
+        assert_eq!(state(&config, &Value::Null)["speed"], json!(1.5));
     }
 
     #[test]

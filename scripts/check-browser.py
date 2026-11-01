@@ -54,7 +54,7 @@ try:
     host = subprocess.Popen([program, ORIGIN], env=env, stdin=subprocess.PIPE, stdout=subprocess.PIPE)
     send(host, {"type": "hello"})
     state = read(host)
-    check(state == {"type": "state", "block": False, "sites": ["youtube.com", "facebook.com"], "app": True},
+    check(state == {"type": "state", "block": False, "sites": ["youtube.com", "facebook.com"], "speed": None, "app": True},
           f"hello is answered with what to block: {state}")
     send(host, {"type": "download", "url": "https://www.youtube.com/watch?v=dQw4w9WgXcQ"})
     reply = read(host)
@@ -72,7 +72,7 @@ try:
     host = subprocess.Popen([program, ORIGIN], env=env, stdin=subprocess.PIPE, stdout=subprocess.PIPE)
     send(host, {"type": "hello"})
     state = read(host)
-    check(state == {"type": "state", "block": False, "sites": [], "app": False}, f"without the app nothing is blocked: {state}")
+    check(state == {"type": "state", "block": False, "sites": [], "speed": None, "app": False}, f"without the app nothing is blocked: {state}")
     host.stdin.close()
     host.wait(timeout=10)
     log = open(os.path.join(work, "app.log")).read()

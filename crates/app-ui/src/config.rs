@@ -45,7 +45,7 @@ impl TilingConfig {
 }
 
 /// The tabs of the notch, in their default order.
-pub const NOTCH_PAGES: [&str; 21] = [
+pub const NOTCH_PAGES: [&str; 22] = [
     "clipboard",
     "shelf",
     "media",
@@ -66,6 +66,7 @@ pub const NOTCH_PAGES: [&str; 21] = [
     "notifications",
     "outlook",
     "video",
+    "commands",
     "sound",
 ];
 
@@ -488,6 +489,10 @@ pub struct Config {
     pub dictation: crate::features::dictation::Config,
     #[serde(deserialize_with = "lenient_section")]
     pub jarvis: crate::features::jarvis::Config,
+    pub rewrite: crate::features::rewrite::Config,
+    pub palette: crate::features::palette::Config,
+    pub mirror: crate::features::mirror::Config,
+    pub commands: crate::features::commands::Config,
     #[serde(deserialize_with = "lenient_section")]
     pub network: crate::features::network::Config,
     #[serde(deserialize_with = "lenient_section")]
@@ -566,6 +571,10 @@ impl Default for Config {
             pomodoro: crate::features::pomodoro::Config::default(),
             dictation: crate::features::dictation::Config::default(),
             jarvis: crate::features::jarvis::Config::default(),
+            rewrite: crate::features::rewrite::Config::default(),
+            palette: crate::features::palette::Config::default(),
+            mirror: crate::features::mirror::Config::default(),
+            commands: crate::features::commands::Config::default(),
             network: crate::features::network::Config::default(),
             screentime: crate::features::screentime::Config::default(),
             dayprogress: crate::features::dayprogress::Config::default(),
@@ -636,6 +645,10 @@ impl Config {
                 cfg.pomodoro = cfg.pomodoro.sanitized();
                 cfg.dictation = cfg.dictation.sanitized();
                 cfg.jarvis = cfg.jarvis.sanitized();
+                cfg.rewrite = cfg.rewrite.sanitized();
+                cfg.palette = cfg.palette.sanitized();
+                cfg.mirror = cfg.mirror.sanitized();
+                cfg.commands = cfg.commands.sanitized();
                 cfg.network = cfg.network.sanitized();
                 cfg.screentime = cfg.screentime.sanitized();
                 cfg.dayprogress = cfg.dayprogress.sanitized();

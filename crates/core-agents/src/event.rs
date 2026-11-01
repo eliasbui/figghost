@@ -98,7 +98,67 @@ pub struct HookEvent {
     /// The questions of a `Question` event.
     #[serde(default, skip_serializing_if = "Vec::is_empty")]
     pub questions: Vec<Question>,
+    /// Where the session runs, when its hook knew.
+    #[serde(default, skip_serializing_if = "Option::is_none")]
+    pub terminal: Option<Terminal>,
     pub at_ms: i64,
+}
+
+/// Where a session runs, as far as its hook can tell from its environment: enough to bring that terminal to the front.
+#[derive(Debug, Clone, Default, PartialEq, Eq, Serialize, Deserialize)]
+pub struct Terminal {
+    /// The handle Orca gave the terminal (`term_...`).
+    #[serde(default, skip_serializing_if = "Option::is_none")]
+    pub orca: Option<String>,
+    /// `TERM_PROGRAM`: `Apple_Terminal`, `iTerm.app`, `ghostty`, `vscode`...
+    #[serde(default, skip_serializing_if = "Option::is_none")]
+    pub program: Option<String>,
+}
+
+impl Terminal {
+    /// What a hook says of its terminal, from an environment: `None` when it says nothing usable.
+    pub fn from_env(env: impl Fn(&str) -> Option<String>) -> Option<Terminal> {
+        Terminal {
+            orca: env("ORCA_TERMINAL_HANDLE"),
+            program: env("TERM_PROGRAM"),
+        }
+        .sanitized()
+    }
+
+    /// Only what can be passed on safely is kept: a handle of Orca's shape, a program that is a plain word. The socket
+    /// takes lines from anything of this user, and the handle ends up as an argument of a command.
+    pub fn sanitized(self) -> Option<Terminal> {
+        let orca = self.orca.filter(|h| {
+            h.strip_prefix("term_")
+                .is_some_and(|rest| !rest.is_empty() && rest.len() <= 64 && rest.bytes().all(|b| b.is_ascii_alphanumeric() || b == b'_' || b == b'-'))
+        });
+        let program = self.program.filter(|p| {
+            !p.is_empty() && p.len() <= 40 && p.bytes().all(|b| b.is_ascii_alphanumeric() || b == b'.' || b == b'_' || b == b'-')
+        });
+        (orca.is_some() || program.is_some()).then_some(Terminal { orca, program })
+    }
+
+    /// The bundle identifier of the terminal program the person runs, when it is one that is known.
+    pub fn bundle(&self) -> Option<&'static str> {
+        Some(match self.program.as_deref()? {
+            "Apple_Terminal" => "com.apple.Terminal",
+            "iTerm.app" => "com.googlecode.iterm2",
+            "ghostty" => "com.mitchellh.ghostty",
+            "WezTerm" => "com.github.wez.wezterm",
+            "vscode" => "com.microsoft.VSCode",
+            "Hyper" => "co.zeit.hyper",
+            "kitty" => "net.kovidgoyal.kitty",
+            "Alacritty" => "org.alacritty",
+            "WarpTerminal" => "dev.warp.Warp-Stable",
+            _ => return None,
+        })
+    }
+
+    /// The command that brings the terminal of Orca to the front: the arguments of `orca`, none of them from a shell.
+    pub fn orca_switch_args(&self) -> Option<Vec<String>> {
+        let handle = self.orca.as_ref()?;
+        Some(vec!["terminal".into(), "switch".into(), "--terminal".into(), handle.clone()])
+    }
 }
 
 /// One question of AskUserQuestion with the labels of its choices.
@@ -265,6 +325,7 @@ pub fn parse_event(agent: Agent, raw: &Value, now_ms: i64) -> Option<HookEvent> 
         } else {
             None
         },
+        terminal: None,
         at_ms: now_ms,
     })
 }
@@ -273,6 +334,41 @@ pub fn parse_event(agent: Agent, raw: &Value, now_ms: i64) -> Option<HookEvent> 
 mod tests {
     use super::*;
     use serde_json::json;
+
+    #[test]
+    fn a_terminal_is_read_from_the_environment_and_only_safe_things_are_kept() {
+        let env = |pairs: &'static [(&'static str, &'static str)]| {
+            move |key: &str| pairs.iter().find(|(k, _)| *k == key).map(|(_, v)| (*v).to_owned())
+        };
+        let t = Terminal::from_env(env(&[("ORCA_TERMINAL_HANDLE", "term_15e6ccf3-2e42-453a-b15e-6c8a28b26987"), ("TERM_PROGRAM", "Orca")])).unwrap();
+        assert_eq!(t.orca.as_deref(), Some("term_15e6ccf3-2e42-453a-b15e-6c8a28b26987"));
+        assert_eq!(
+            t.orca_switch_args().unwrap(),
+            ["terminal", "switch", "--terminal", "term_15e6ccf3-2e42-453a-b15e-6c8a28b26987"]
+        );
+        assert_eq!(t.bundle(), None, "Orca is not one of the terminal programs known by name");
+        assert!(Terminal::from_env(env(&[])).is_none(), "an environment that says nothing");
+        for bad in ["--help", "term_", "term_a b", "term_;rm", "TERM_x", "term_\u{7}", "x"] {
+            let t = Terminal { orca: Some(bad.to_owned()), program: None };
+            assert!(t.sanitized().is_none(), "{bad:?}");
+        }
+        let long = Terminal { orca: Some(format!("term_{}", "a".repeat(65))), program: Some("p".repeat(41)) };
+        assert!(long.sanitized().is_none());
+        let kept = Terminal { orca: Some("--x".into()), program: Some("iTerm.app".into()) }.sanitized().unwrap();
+        assert_eq!((kept.orca.clone(), kept.bundle()), (None, Some("com.googlecode.iterm2")));
+        assert!(Terminal { orca: Some("term_a".into()), program: None }.bundle().is_none());
+    }
+
+    #[test]
+    fn an_event_without_a_terminal_is_what_old_hooks_send_and_still_reads() {
+        let old = r#"{"agent":"claude","kind":"stop","session_id":"s","cwd":"/w","at_ms":1}"#;
+        let event: HookEvent = serde_json::from_str(old).unwrap();
+        assert!(event.terminal.is_none());
+        assert!(!serde_json::to_string(&event).unwrap().contains("terminal"));
+        let with = r#"{"agent":"pi","kind":"stop","session_id":"s","cwd":"/w","at_ms":1,"terminal":{"orca":"term_a1","program":"ghostty"}}"#;
+        let event: HookEvent = serde_json::from_str(with).unwrap();
+        assert_eq!(event.terminal.unwrap().orca.as_deref(), Some("term_a1"));
+    }
 
     #[test]
     fn a_claude_permission_request_keeps_the_command_and_drops_the_rest() {

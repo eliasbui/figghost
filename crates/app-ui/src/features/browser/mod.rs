@@ -9,7 +9,8 @@
 //! extension itself is written to the folder `browser-extension` of the data directory, to be loaded by the person.
 //! Remove all, which works while the feature is off too, takes the file away from every browser and the folder with it;
 //! the extension loaded in a browser is removed there, by the person.
-//! The extension reads no page, blocks with the browser's own rules (no access to any site is asked), and nothing
+//! The extension reads no page and blocks with the browser's own rules. Only when the person chooses a playback speed does
+//! it ask, once, for access to pages, to set the speed of the videos that play; without that nothing is asked, and nothing
 //! leaves the Mac.
 
 use super::{AttachEnv, download, islands, pomodoro, write_atomically};
@@ -103,7 +104,14 @@ pub struct Config {
     pub sites: Vec<String>,
     /// The extension's button and menu send a page to the video download.
     pub download: bool,
+    /// The extension sets the speed of the videos that play to `speed`. Off, it leaves them alone.
+    pub speed_control: bool,
+    /// 1, 1.25, 1.5, 1.75 or 2.
+    pub speed: f64,
 }
+
+/// The speeds the page offers.
+pub const SPEEDS: [f64; 5] = [1.0, 1.25, 1.5, 1.75, 2.0];
 
 impl Default for Config {
     fn default() -> Self {
@@ -112,13 +120,19 @@ impl Default for Config {
             block: true,
             sites: logic::DEFAULT_SITES.map(String::from).to_vec(),
             download: true,
+            speed_control: false,
+            speed: 1.0,
         }
     }
 }
 
 impl Config {
-    /// A config file can say anything; only sites that are sites are kept, once each.
+    /// A config file can say anything; only sites that are sites are kept, once each, and a speed that is not offered is
+    /// the normal one.
     pub fn sanitized(mut self) -> Self {
+        if !SPEEDS.contains(&self.speed) {
+            self.speed = 1.0;
+        }
         self.sites = logic::sites(&self.sites.join("\n"));
         self
     }
@@ -130,6 +144,8 @@ struct Shared {
     block: bool,
     sites: Vec<String>,
     download: bool,
+    /// The speed the extension sets the videos to; `None` leaves them alone.
+    speed: Option<f64>,
     asked: Option<Instant>,
 }
 
@@ -267,6 +283,7 @@ impl Feature {
         shared.block = config.enabled && config.block && working;
         shared.sites.clone_from(&config.sites);
         shared.download = config.enabled && config.download;
+        shared.speed = (config.enabled && config.speed_control).then_some(config.speed);
     }
 
     /// An address from the extension, on the main thread: the video download takes it, or says why not on the notch.
@@ -445,7 +462,7 @@ fn answer(stream: UnixStream, shared: &Mutex<Shared>) {
         Some(Ask::State) => {
             let mut s = shared.lock().unwrap_or_else(|e| e.into_inner());
             s.asked = Some(Instant::now());
-            json!({ "block": s.block, "sites": s.sites })
+            json!({ "block": s.block, "sites": s.sites, "speed": s.speed })
         }
         Some(Ask::Download(url)) => {
             if shared.lock().unwrap_or_else(|e| e.into_inner()).download {
@@ -533,6 +550,7 @@ mod tests {
             block: true,
             sites: vec!["x.com".into()],
             download: false,
+            speed: Some(1.5),
             asked: None,
         }));
         let stop = Arc::new(AtomicBool::new(false));
@@ -543,7 +561,7 @@ mod tests {
         let (flag, state) = (Arc::clone(&stop), Arc::clone(&shared));
         let thread = thread::spawn(move || serve(&listener, &flag, &state));
         let answer = host::ask(&path, &Ask::State).unwrap();
-        assert_eq!(answer, json!({ "block": true, "sites": ["x.com"] }));
+        assert_eq!(answer, json!({ "block": true, "sites": ["x.com"], "speed": 1.5 }));
         assert!(
             shared.lock().unwrap().asked.is_some(),
             "a host that asks is seen"

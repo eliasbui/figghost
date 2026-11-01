@@ -7,7 +7,7 @@ use std::{
     process::{Command, Stdio},
     sync::{
         Arc, Mutex, PoisonError,
-        atomic::{AtomicBool, Ordering::Relaxed},
+        atomic::{AtomicBool, AtomicU64, Ordering::Relaxed},
     },
     thread,
     time::{Duration, Instant},
@@ -91,6 +91,10 @@ pub struct Usage {
     /// Bytes a second received by interface, the busiest first.
     pub interfaces: Vec<(String, u64)>,
     pub sockets: usize,
+    /// The addresses its sockets talked to since watching began, the busiest first: (address, bytes in, bytes out).
+    pub hosts: Vec<(String, u64, u64)>,
+    /// What moved in this one step, by interface: (interface, bytes in, bytes out). What `History` adds up.
+    pub delta: Vec<(String, u64, u64)>,
 }
 
 /// Turns samples into speeds: what each socket moved since the last sample. A socket new since then counts whole,
@@ -101,6 +105,24 @@ pub struct Meter {
     started: bool,
     apps: HashMap<i32, App>,
     totals: HashMap<String, (u64, u64)>,
+    /// What each app moved to each address, since watching began.
+    remotes: HashMap<String, HashMap<String, (u64, u64)>>,
+}
+
+/// The most addresses kept for an app, and listed.
+const MAX_REMOTES: usize = 60;
+pub const LISTED_REMOTES: usize = 20;
+
+/// The address at the far end of a socket, as `nettop` names it (`tcp4 10.0.0.2:5000<->1.1.1.1:443`, or with a dot before
+/// the port for IPv6), without its port; `None` for a socket that talks to no one in particular (`*:*`).
+pub fn remote_of(key: &str) -> Option<String> {
+    let far = key.split_once("<->")?.1.trim();
+    let address = if far.matches(':').count() == 1 {
+        far.split_once(':')?.0
+    } else {
+        far.rsplit_once('.')?.0
+    };
+    (!address.is_empty() && address != "*" && !address.contains('*')).then(|| address.to_owned())
 }
 
 /// The interface of this computer's own connections to itself: the proxy's, among others. Never counted.
@@ -145,6 +167,27 @@ impl Meter {
                 usage.received += got;
                 usage.sent += gave;
                 usage.sockets += 1;
+                if (got > 0 || gave > 0)
+                    && let Some(remote) = remote_of(&socket.key)
+                {
+                    let sites = self.remotes.entry(app.name.clone()).or_default();
+                    if !sites.contains_key(&remote) && sites.len() >= MAX_REMOTES {
+                        let quietest = sites.iter().min_by_key(|(_, (a, b))| a + b).map(|(n, _)| n.clone());
+                        if let Some(quietest) = quietest {
+                            sites.remove(&quietest);
+                        }
+                    }
+                    let pair = sites.entry(remote).or_default();
+                    pair.0 += got;
+                    pair.1 += gave;
+                }
+                if got > 0 || gave > 0 {
+                    let name = if socket.interface.is_empty() { "?" } else { socket.interface.as_str() };
+                    match usage.delta.iter_mut().find(|(i, _, _)| i == name) {
+                        Some((_, i, o)) => (*i, *o) = (*i + got, *o + gave),
+                        None => usage.delta.push((name.to_owned(), got, gave)),
+                    }
+                }
                 if got > 0 {
                     let iface = if socket.interface.is_empty() {
                         "?".to_owned()
@@ -175,6 +218,16 @@ impl Meter {
                 }
                 u.interfaces.sort_by_key(|i| std::cmp::Reverse(i.1));
                 (u.received, u.sent) = *total;
+                let mut hosts: Vec<(String, u64, u64)> = self
+                    .remotes
+                    .get(&u.name)
+                    .into_iter()
+                    .flatten()
+                    .map(|(n, (a, b))| (n.clone(), *a, *b))
+                    .collect();
+                hosts.sort_by(|a, b| (b.1 + b.2).cmp(&(a.1 + a.2)).then(a.0.cmp(&b.0)));
+                hosts.truncate(LISTED_REMOTES);
+                u.hosts = hosts;
                 u
             })
             .filter(|u| u.sockets > 0 || u.received > 0)
@@ -212,8 +265,14 @@ struct Watch {
     usage: Mutex<Vec<Usage>>,
     asked: Mutex<Instant>,
     running: AtomicBool,
+    /// Seconds between steps while only the history watches; 0 when it does not.
+    background: AtomicU64,
     meter: Mutex<Meter>,
+    sink: Mutex<Option<Sink>>,
 }
+
+/// What is handed every step that is measured.
+type Sink = Box<dyn Fn(&[Usage]) + Send + Sync>;
 
 /// How long the thread keeps going after the last `usage`.
 const KEEP_FOR: Duration = Duration::from_secs(6);
@@ -232,7 +291,9 @@ impl Monitor {
                 usage: Mutex::new(Vec::new()),
                 asked: Mutex::new(Instant::now()),
                 running: AtomicBool::new(false),
+                background: AtomicU64::new(0),
                 meter: Mutex::new(Meter::default()),
+                sink: Mutex::new(None),
             }),
         }
     }
@@ -244,15 +305,32 @@ impl Monitor {
             .asked
             .lock()
             .unwrap_or_else(PoisonError::into_inner) = Instant::now();
-        if !self.shared.running.swap(true, Relaxed) {
-            let shared = Arc::clone(&self.shared);
-            thread::spawn(move || watch(&shared));
-        }
+        self.ensure_running();
         self.shared
             .usage
             .lock()
             .unwrap_or_else(PoisonError::into_inner)
             .clone()
+    }
+
+    /// Hands every step to `sink` as it is measured, for as long as the watching goes on (`History`).
+    pub fn on_step(&self, sink: impl Fn(&[Usage]) + Send + Sync + 'static) {
+        *self.shared.sink.lock().unwrap_or_else(PoisonError::into_inner) = Some(Box::new(sink));
+    }
+
+    /// Watches every `seconds` even when nobody asks for the usage, for the history; 0 stops that.
+    pub fn background(&self, seconds: u64) {
+        self.shared.background.store(seconds, Relaxed);
+        if seconds > 0 {
+            self.ensure_running();
+        }
+    }
+
+    fn ensure_running(&self) {
+        if !self.shared.running.swap(true, Relaxed) {
+            let shared = Arc::clone(&self.shared);
+            thread::spawn(move || watch(&shared));
+        }
     }
 }
 
@@ -260,7 +338,9 @@ fn watch(shared: &Watch) {
     let mut last = Instant::now();
     loop {
         let asked = *shared.asked.lock().unwrap_or_else(PoisonError::into_inner);
-        if asked.elapsed() > KEEP_FOR {
+        let background = shared.background.load(Relaxed);
+        let watched = asked.elapsed() <= KEEP_FOR;
+        if !watched && background == 0 {
             break;
         }
         if let Some(text) = sample() {
@@ -281,9 +361,12 @@ fn watch(shared: &Watch) {
                     },
                 );
             last = now;
+            if let Some(sink) = shared.sink.lock().unwrap_or_else(PoisonError::into_inner).as_ref() {
+                sink(&usage);
+            }
             *shared.usage.lock().unwrap_or_else(PoisonError::into_inner) = usage;
         }
-        thread::sleep(EVERY);
+        thread::sleep(if watched { EVERY } else { Duration::from_secs(background) });
     }
     shared.running.store(false, Relaxed);
 }
@@ -356,6 +439,29 @@ tcp4 10.0.0.2:6000<->8.8.8.8:443,en0,10,10,
             s.is_none_or(|s| s.sent == 0),
             "what goes over lo0 is never counted"
         );
+    }
+
+    #[test]
+    fn the_far_end_of_a_socket_is_its_address_without_the_port() {
+        assert_eq!(remote_of("tcp4 10.0.0.2:5000<->1.1.1.1:443").as_deref(), Some("1.1.1.1"));
+        assert_eq!(remote_of("tcp6 2001:db8::2.5000<->2606:4700::1111.443").as_deref(), Some("2606:4700::1111"));
+        assert_eq!(remote_of("udp4 *:56076<->*:*"), None);
+        assert_eq!(remote_of("udp4 10.0.0.2:5353<->*:*"), None, "no one in particular");
+        assert_eq!(remote_of("no arrow"), None);
+    }
+
+    #[test]
+    fn the_addresses_an_app_talked_to_are_added_up_busiest_first() {
+        let mut meter = Meter::default();
+        meter.step(&parse(ONE), 1.0, edge);
+        let two = ONE
+            .replace("en0,4000,500", "en0,14000,1500")
+            .replace("en7,1000,200", "en7,1100,200")
+            .replace("8.8.8.8:443,en0,10,10", "8.8.8.8:443,en0,50,10");
+        let usage = meter.step(&parse(&two), 1.0, edge);
+        let e = usage.iter().find(|u| u.name == "Microsoft Edge").unwrap();
+        assert_eq!(e.hosts[0], ("1.1.1.1".to_owned(), 10_100, 1000), "both sockets of Edge to 1.1.1.1");
+        assert!(e.hosts.len() == 1);
     }
 
     #[test]

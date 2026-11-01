@@ -3,5 +3,6 @@
   "description": { "message": "Chặn các trang gây xao nhãng khi Figghost đang trong phiên làm việc Pomodoro, và gửi video sang Figghost để tải." },
   "action": { "message": "Tải trang này bằng Figghost" },
   "downloadLink": { "message": "Tải liên kết này bằng Figghost" },
-  "downloadPage": { "message": "Tải trang này bằng Figghost" }
+  "downloadPage": { "message": "Tải trang này bằng Figghost" },
+  "allowSpeed": { "message": "Cho phép Figghost đổi tốc độ phát video" }
 }

@@ -62,10 +62,15 @@ pub fn state_of(answer: Option<&Value>) -> Value {
         .and_then(|a| a["sites"].as_array())
         .map(|s| s.iter().filter(|v| v.is_string()).cloned().collect())
         .unwrap_or_default();
+    // A speed the extension would not take is no speed.
+    let speed = answer
+        .and_then(|a| a["speed"].as_f64())
+        .filter(|s| (0.25..=4.0).contains(s));
     json!({
         "type": "state",
         "block": answer.is_some_and(|a| a["block"] == true) && !sites.is_empty(),
         "sites": sites,
+        "speed": speed,
         "app": answer.is_some(),
     })
 }
@@ -118,11 +123,16 @@ mod tests {
     fn without_the_app_nothing_is_blocked_and_an_empty_list_blocks_nothing() {
         assert_eq!(
             state_of(None),
-            json!({ "type": "state", "block": false, "sites": [], "app": false })
+            json!({ "type": "state", "block": false, "sites": [], "speed": null, "app": false })
         );
         let on = json!({ "block": true, "sites": ["youtube.com", 5] });
         assert_eq!(state_of(Some(&on))["sites"], json!(["youtube.com"]));
         assert_eq!(state_of(Some(&on))["block"], json!(true));
+        assert_eq!(state_of(Some(&on))["speed"], json!(null), "no speed asked, none set");
+        assert_eq!(state_of(Some(&json!({ "speed": 1.5 })))["speed"], json!(1.5));
+        for bad in [json!(9.0), json!(0.0), json!("fast"), json!(-1.0)] {
+            assert_eq!(state_of(Some(&json!({ "speed": bad })))["speed"], json!(null), "{bad}");
+        }
         assert_eq!(
             state_of(Some(&json!({ "block": true, "sites": [] })))["block"],
             json!(false)

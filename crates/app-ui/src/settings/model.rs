@@ -1110,14 +1110,26 @@ mod tests {
         e.runtime.insert(
             "network",
             json!({ "links": [{ "name": "en0", "label": "Wi-Fi", "ip": "10.0.0.2", "primary": true, "down": 1, "up": 1,
-                "connections": 1, "rtt": 20, "loss": 0.0, "quality": "good" }],
+                "connections": 1, "rtt": 20, "loss": 0.0, "quality": "good",
+                "wifi": { "rssi": -50, "noise": -90, "snr": 40, "channel": 36, "band": 5.0, "width": 80, "rate": 866.0,
+                    "standard": "802.11ax", "grade": "good" },
+                "speed_test": { "state": "done", "down": 1, "up": 1, "rpm": 1, "rtt": 1, "grade": "low", "at": 1 } }],
                 "apps": [{ "name": "Safari", "bundle": "", "down": 1, "up": 1, "received": 1, "sent": 1,
-                "interfaces": [{ "name": "en0", "down": 1 }], "proxied": false, "held_to": null }],
+                "interfaces": [{ "name": "en0", "down": 1 }], "proxied": false, "held_to": null, "refused": 0,
+                "hosts": [{ "name": "example.com", "received": 1, "sent": 1 }] }],
+                "history": { "empty": false,
+                    "today": [{ "app": "Safari", "down": 1, "up": 1, "interfaces": [{ "name": "en0", "down": 1, "up": 1 }] }],
+                    "week": [{ "app": "Safari", "down": 1, "up": 1, "interfaces": [{ "name": "en0", "down": 1, "up": 1 }] }],
+                    "month": [{ "app": "Safari", "down": 1, "up": 1, "interfaces": [{ "name": "en0", "down": 1, "up": 1 }] }],
+                    "daily": [{ "day": "01/11", "down": 1, "up": 1 }] },
+                "policy": { "metered_now": false, "link": "Wi-Fi", "cap_used": 0, "cap_level": "ok", "refusing": false,
+                    "quotas": [{ "app": "Safari", "used": 1, "quota": 2, "level": "ok" }] },
                 "known_apps": [{ "name": "Safari", "bundle": "/Applications/Safari.app" }],
                 "tether": { "gnirehtet": true, "adb": true, "running": false, "phones": [{ "serial": "X1", "model": "Pixel" }], "unauthorized": 0,
                     "meter": { "down": 1, "up": 1, "received": 1, "sent": 1 },
                     "test": { "state": "done", "phone": "Pixel", "verdict": "good", "loss": 0, "ms": 1.0 } } }),
         );
+        config.commands.items = vec![crate::features::commands::logic::Item { name: "Build".into(), command: "ls".into() }];
         config.network.wires = vec![crate::features::network::Wire { app: "Safari".into(), ..Default::default() }];
         config.network.links = vec![crate::features::network::KnownLink { name: "en0".into(), label: "Wi-Fi".into() }];
         config.network.layout.insert("app:Steam".into(), [560, 80]);
@@ -1667,6 +1679,10 @@ mod tests {
             "stack",
             "wheel",
             "translate",
+            "rewrite",
+            "palette",
+            "mirror",
+            "commands",
             "pin",
             "cursor",
             "musicwidget",

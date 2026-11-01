@@ -15,7 +15,7 @@ use objc2_event_kit::{
     EKEventStoreChangedNotification, EKParticipantStatus, EKReminder,
 };
 use objc2_foundation::{
-    NSArray, NSBundle, NSCalendar, NSDate, NSDateComponentUndefined, NSDateComponents, NSError,
+    NSArray, NSBundle, NSCalendar, NSCalendarUnit, NSDate, NSDateComponentUndefined, NSDateComponents, NSError,
     NSNotification, NSNotificationCenter, NSNotificationName, NSOperationQueue, NSString,
     NSSystemClockDidChangeNotification, NSSystemTimeZoneDidChangeNotification, NSTimeZone,
 };
@@ -373,7 +373,30 @@ impl Store {
         }
     }
 
-    /// Marks one reminder completed. This is the only thing this module ever writes.
+    /// Adds a reminder to the list the system uses for new ones, due at `due` (an instant, and whether it has no time of
+    /// day), or with no date. Together with `complete_reminder`, this is all this module ever writes.
+    pub fn add_reminder(&self, title: &str, due: Option<(i64, bool)>) -> Result<(), String> {
+        // SAFETY: the reminder is made in, changed through and saved to this one store.
+        unsafe {
+            let list = self.store.defaultCalendarForNewReminders().ok_or("there is no list for new reminders")?;
+            let item = EKReminder::reminderWithEventStore(&self.store);
+            item.setTitle(Some(&NSString::from_str(title)));
+            item.setCalendar(Some(&list));
+            if let Some((at, date_only)) = due {
+                let mut units = NSCalendarUnit::Year | NSCalendarUnit::Month | NSCalendarUnit::Day;
+                if !date_only {
+                    units |= NSCalendarUnit::Hour | NSCalendarUnit::Minute;
+                }
+                let components = NSCalendar::currentCalendar().components_fromDate(units, &date(at));
+                item.setDueDateComponents(Some(&components));
+            }
+            self.store
+                .saveReminder_commit_error(&item, true)
+                .map_err(|e| e.localizedDescription().to_string())
+        }
+    }
+
+    /// Marks one reminder completed.
     pub fn complete_reminder(&self, id: &str) -> Result<(), String> {
         // SAFETY: the item is looked up in, changed through and saved to this one store.
         unsafe {

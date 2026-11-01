@@ -1,6 +1,6 @@
 //! Which sessions exist and what each is doing, built from the events the hooks report.
 
-use crate::event::{Agent, EventKind, HookEvent, Question};
+use crate::event::{Agent, EventKind, HookEvent, Question, Terminal};
 use std::cmp::Reverse;
 
 /// A session that reports nothing for this long while "working" is more likely stuck or closed than busy.
@@ -31,6 +31,8 @@ pub struct Session {
     pub note: Option<String>,
     pub started_ms: i64,
     pub updated_ms: i64,
+    /// Where it runs, as its hook last said.
+    pub terminal: Option<Terminal>,
 }
 
 impl Session {
@@ -108,12 +110,16 @@ impl Tracker {
                 note: None,
                 started_ms: event.at_ms,
                 updated_ms: event.at_ms,
+                terminal: None,
             });
             self.sessions.len() - 1
         });
         let session = &mut self.sessions[index];
         if !event.cwd.is_empty() {
             session.cwd.clone_from(&event.cwd);
+        }
+        if let Some(terminal) = event.terminal.clone().and_then(Terminal::sanitized) {
+            session.terminal = Some(terminal);
         }
         session.updated_ms = event.at_ms;
         session
@@ -252,6 +258,14 @@ impl Tracker {
         sessions
     }
 
+    /// The session that has waited for the user the longest: where to go first.
+    pub fn longest_waiting(&self) -> Option<&Session> {
+        self.sessions
+            .iter()
+            .filter(|s| s.state == State::Waiting)
+            .min_by_key(|s| s.updated_ms)
+    }
+
     pub fn is_empty(&self) -> bool {
         self.sessions.is_empty() && self.approvals.is_empty()
     }
@@ -310,8 +324,42 @@ mod tests {
             detail: None,
             message: None,
             questions: Vec::new(),
+            terminal: None,
             at_ms,
         }
+    }
+
+    #[test]
+    fn the_session_that_has_waited_the_longest_is_the_one_to_go_to() {
+        let mut t = Tracker::default();
+        assert!(t.longest_waiting().is_none());
+        t.apply(&event(EventKind::PromptSubmit, "busy", 1));
+        let ask = |session: &str, at: i64| {
+            let mut e = event(EventKind::PermissionRequest, session, at);
+            e.tool = Some("Bash".into());
+            e.detail = Some("ls".into());
+            e
+        };
+        t.apply(&ask("late", 50));
+        t.apply(&ask("early", 20));
+        assert_eq!(t.longest_waiting().unwrap().id, "early");
+        t.apply(&event(EventKind::SessionEnd, "early", 60));
+        assert_eq!(t.longest_waiting().unwrap().id, "late");
+    }
+
+    #[test]
+    fn a_session_keeps_the_terminal_its_hook_last_named_and_one_that_says_nothing_does_not_erase_it() {
+        let mut t = Tracker::default();
+        let mut first = event(EventKind::PromptSubmit, "s", 1);
+        first.terminal = Some(Terminal { orca: Some("term_a1".into()), program: Some("ghostty".into()) });
+        t.apply(&first);
+        t.apply(&event(EventKind::Stop, "s", 2));
+        let session = &t.sessions()[0];
+        assert_eq!(session.terminal.as_ref().unwrap().orca.as_deref(), Some("term_a1"));
+        let mut other = event(EventKind::Stop, "s", 3);
+        other.terminal = Some(Terminal { orca: Some("--x".into()), program: None });
+        t.apply(&other);
+        assert_eq!(t.sessions()[0].terminal.as_ref().unwrap().orca.as_deref(), Some("term_a1"), "a bad handle changes nothing");
     }
 
     #[test]

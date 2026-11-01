@@ -40,6 +40,8 @@ const KEY_SECONDS: f64 = 1.6;
 const KEY_BOTTOM: f64 = 48.0;
 const CAMERA_SIZE: f64 = 180.0;
 const CAMERA_MARGIN: f64 = 24.0;
+/// The corners of a mirror that is not round.
+const MIRROR_RADIUS: f64 = 18.0;
 
 pub struct KeyViewIvars {
     text: RefCell<String>,
@@ -231,6 +233,19 @@ pub struct CameraBubble {
 impl CameraBubble {
     /// `None` when there is no camera or it cannot be opened; ask with [`camera_access`] first.
     pub fn show(mtm: MainThreadMarker, area: NSRect) -> Option<Self> {
+        let size = CAMERA_SIZE.min(area.size.width.min(area.size.height) / 2.0);
+        let frame = NSRect::new(
+            NSPoint::new(
+                area.origin.x + area.size.width - size - CAMERA_MARGIN,
+                area.origin.y + CAMERA_MARGIN,
+            ),
+            NSSize::new(size, size),
+        );
+        Self::show_in(mtm, frame, true)
+    }
+
+    /// The camera in a window at `frame`, round or with rounded corners. The mirror of the notch uses this.
+    pub fn show_in(mtm: MainThreadMarker, frame: NSRect, round: bool) -> Option<Self> {
         // SAFETY: AVFoundation calls with framework constants and live objects on the main thread.
         let (session, preview) = unsafe {
             let device = AVCaptureDevice::defaultDeviceWithMediaType(AVMediaTypeVideo?)?;
@@ -255,17 +270,9 @@ impl CameraBubble {
             }
             (session, preview)
         };
-        let size = CAMERA_SIZE.min(area.size.width.min(area.size.height) / 2.0);
-        let frame = NSRect::new(
-            NSPoint::new(
-                area.origin.x + area.size.width - size - CAMERA_MARGIN,
-                area.origin.y + CAMERA_MARGIN,
-            ),
-            NSSize::new(size, size),
-        );
         let panel = panel(mtm, frame, NSStatusWindowLevel);
         panel.setMovableByWindowBackground(true);
-        preview.setCornerRadius(size / 2.0);
+        preview.setCornerRadius(if round { frame.size.width.min(frame.size.height) / 2.0 } else { MIRROR_RADIUS });
         preview.setMasksToBounds(true);
         let view =
             NSView::initWithFrame(NSView::alloc(mtm), NSRect::new(NSPoint::ZERO, frame.size));

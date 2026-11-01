@@ -7,10 +7,14 @@
 //! system's way, one link pinned by its interface, or every link in turn (net-merge, from `core-netmerge`). Apps that
 //! ignore the system's proxy are only watched, through `nettop`.
 
+pub mod anomaly;
 pub mod bucket;
 pub mod handshake;
+pub mod history;
 pub mod monitor;
+pub mod online;
 pub mod owner;
+pub mod policy;
 pub mod proxy;
 pub mod rules;
 pub mod sysproxy;

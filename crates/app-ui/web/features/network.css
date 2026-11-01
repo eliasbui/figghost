@@ -171,3 +171,36 @@
 @keyframes net-breathe { 0%, 100% { opacity: 0.35; transform: scale(1); } 50% { opacity: 0.9; transform: scale(1.06); } }
 @keyframes net-flicker { 0% { opacity: 0.9; } 18% { opacity: 0.15; } 27% { opacity: 0.8; } 45% { opacity: 0.25; } 60% { opacity: 0.95; } 82% { opacity: 0.1; } }
 @media (prefers-reduced-motion: reduce) { .network-node.link::after { animation: none !important; opacity: 0.8; } }
+
+/* History: the bars of the last days and the controls of the export. */
+.network-bars-row { padding-top: 0; }
+.network-bars { display: flex; align-items: flex-end; gap: 4px; height: 64px; width: 100%; margin-top: 6px; }
+.network-bar { position: relative; flex: 1; height: 100%; display: flex; align-items: flex-end; }
+.network-bar-fill { display: block; width: 100%; background: var(--accent); border-radius: 3px 3px 0 0; min-height: 2px; }
+.network-bar-day { position: absolute; left: 0; right: 0; bottom: -14px; text-align: center; font-size: 10px; color: var(--text-3); }
+.network-bars { margin-bottom: 16px; }
+.network-export { display: flex; gap: 8px; align-items: center; flex-wrap: wrap; justify-content: flex-end; }
+
+/* Connections: the rows of the links with their speed test. */
+.network-linklist { width: 100%; }
+.network-linklist .row { padding-left: 0; padding-right: 0; }
+.network-speed-result[data-state="failed"] { color: var(--bad); }
+.network-speed-result[data-state="done"] { color: var(--text); }
+.network-wifi { font-variant-numeric: tabular-nums; }
+
+/* Save data: the apps allowed on a metered connection, and the mark of a connection. */
+.network-chips { display: flex; flex-wrap: wrap; gap: 6px; width: 100%; }
+.network-chip { display: inline-flex; align-items: center; gap: 4px; padding: 2px 4px 2px 10px; border-radius: 999px; background: var(--fill, rgba(127,127,127,.16)); font-size: var(--fs-small); }
+.network-chip-x { border: 0; background: transparent; color: var(--text-2); cursor: pointer; font-size: 14px; line-height: 1; padding: 2px 6px; border-radius: 999px; }
+.network-chip-x:hover { color: var(--text); }
+.network-allow { display: flex; gap: 8px; align-items: center; }
+.network-link-control { display: flex; gap: 8px; align-items: center; }
+
+/* The sites an app talks to, in the card of the app. */
+.network-hosts-title { margin-top: 10px; font-size: var(--fs-small); color: var(--text-2); }
+.network-hosts { max-height: 140px; overflow: auto; margin-top: 4px; }
+.network-host { display: flex; justify-content: space-between; gap: 12px; padding: 3px 0; font-size: var(--fs-small); border-top: 1px solid var(--stroke); font-variant-numeric: tabular-nums; }
+.network-host-name { overflow: hidden; text-overflow: ellipsis; white-space: nowrap; }
+.network-host-size { color: var(--text-2); white-space: nowrap; }
+
+.network-dns-input { width: 280px; max-width: 100%; }
