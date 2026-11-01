@@ -19,12 +19,17 @@
 .network-canvas-head { display: flex; align-items: center; gap: 14px; padding: 12px 16px 10px 84px; border-bottom: 1px solid var(--stroke); min-height: 28px; }
 .network-canvas-head h1 { margin: 0; font-size: 15px; font-weight: 600; }
 .network-total-head { color: var(--text-2); font-size: var(--fs-small); font-variant-numeric: tabular-nums; white-space: nowrap; }
-.network-canvas-note { flex: 1; color: var(--text-2); font-size: 11.5px; line-height: 1.35; }
-.network-canvas-scroll { flex: 1; overflow: auto; position: relative; }
-.network-canvas-board { position: relative; min-width: 100%; min-height: 100%;
+.network-canvas-note { flex: 1; min-width: 0; color: var(--text-2); font-size: 11.5px; white-space: nowrap; overflow: hidden; text-overflow: ellipsis; }
+.network-canvas-head h1 { cursor: help; }
+/* The window is the viewport: the board inside is moved and scaled by the view, the dotted grid follows it. */
+.network-canvas-scroll { flex: 1; overflow: hidden; position: relative; cursor: default;
   background-color: var(--solid);
   background-image: radial-gradient(circle at 1px 1px, var(--text-3) 1px, transparent 1.6px);
   background-size: 20px 20px; }
+.network-canvas-scroll.space, .network-canvas-scroll.space .network-node { cursor: grab; }
+.network-canvas-scroll.panning, .network-canvas-scroll.panning .network-node { cursor: grabbing; }
+.network-canvas-board { position: absolute; left: 0; top: 0; transform-origin: 0 0; }
+.network-arrange { width: auto; }
 .network-wires { position: absolute; inset: 0; width: 100%; height: 100%; pointer-events: none; overflow: visible; }
 .network-nodes { position: absolute; inset: 0; }
 .network-node { position: absolute; box-sizing: border-box; font-size: var(--fs-small); user-select: none; -webkit-user-select: none; cursor: grab; touch-action: none; }
@@ -68,6 +73,22 @@
 .network-wire.normal { stroke: var(--accent-2); }
 .network-wire.low { stroke: var(--warn); }
 .network-wire.dragging { stroke: var(--good); stroke-dasharray: 4 4; }
+/* The edge of a node starts a wire; its dot shows only then, so it does not hide the head of a wire. */
+.network-node.edge { cursor: crosshair; }
+.network-port { opacity: 0; transition: opacity 0.12s; }
+.network-node:hover .network-port, .network-node.drop .network-port { opacity: 1; }
+
+/* What moves: dots along each wire, full ones down (connection to app), small hollow ones up. */
+.network-wire.seen, .network-wire.planned, .network-wire.high, .network-wire.normal, .network-wire.low { opacity: 0.55; }
+.network-flow { stroke: none; fill: var(--text-2); }
+.network-flow.up { fill: var(--solid); stroke: var(--text-2); stroke-width: 1.4px; }
+.network-flow.high { fill: var(--accent); } .network-flow.up.high { fill: var(--solid); stroke: var(--accent); }
+.network-flow.normal { fill: var(--accent-2); } .network-flow.up.normal { fill: var(--solid); stroke: var(--accent-2); }
+.network-flow.low { fill: var(--warn); } .network-flow.up.low { fill: var(--solid); stroke: var(--warn); }
+.network-arrow { fill: var(--text-3); }
+.network-arrow.high { fill: var(--accent); }
+.network-arrow.normal { fill: var(--accent-2); }
+.network-arrow.low { fill: var(--warn); }
 
 .network-card.floating { position: absolute; right: 16px; bottom: 16px; width: min(560px, calc(100% - 32px)); z-index: 10; box-shadow: 0 12px 40px var(--shadow), 0 0 0 1px var(--stroke); }
 .network-card { margin-top: 12px; padding: 12px 14px; border-radius: 10px; background: var(--solid-2); box-shadow: 0 0 0 1px var(--stroke); }
@@ -134,3 +155,19 @@
 .phone-test[data-verdict="none"] { color: var(--bad); }
 .phone-test[data-verdict="running"] { color: var(--text-2); }
 @media (prefers-reduced-motion: reduce) { .phone-gauge-fill { transition: none; } }
+
+/* How well a connection answers. Strong: a calm green glow that breathes. Fair: amber, slower. Weak: red, a ring
+   that flickers out of step. No answer: grey and dashed, and its wires go still. */
+.network-node.link::after { content: ''; position: absolute; inset: -5px; border-radius: 50%; pointer-events: none; border: 2px solid transparent; }
+.network-node.link.q-good::after { border-color: var(--good); animation: net-breathe 3.2s ease-in-out infinite; }
+.network-node.link.q-fair::after { border-color: var(--warn); animation: net-breathe 4.5s ease-in-out infinite; }
+.network-node.link.q-poor::after { border-color: var(--bad); animation: net-flicker 1.6s steps(1, end) infinite; }
+.network-node.link.q-down { opacity: 0.6; }
+.network-node.link.q-down::after { border: 2px dashed var(--text-3); }
+.network-node.link.q-poor .network-node-speed { color: var(--bad); }
+.network-node.link.q-fair .network-node-speed { color: var(--warn); }
+.network-wire.q-poor { stroke-dasharray: 10 4 2 4; }
+.network-wire.q-down { stroke-dasharray: 2 6; opacity: 0.35; }
+@keyframes net-breathe { 0%, 100% { opacity: 0.35; transform: scale(1); } 50% { opacity: 0.9; transform: scale(1.06); } }
+@keyframes net-flicker { 0% { opacity: 0.9; } 18% { opacity: 0.15; } 27% { opacity: 0.8; } 45% { opacity: 0.25; } 60% { opacity: 0.95; } 82% { opacity: 0.1; } }
+@media (prefers-reduced-motion: reduce) { .network-node.link::after { animation: none !important; opacity: 0.8; } }

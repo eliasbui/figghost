@@ -20,7 +20,11 @@
     'network.links': 'Connections', 'network.meet': 'Single or combined', 'network.apps': 'Apps',
     'network.link.primary': 'macOS uses this one', 'network.links.none': 'No connection with an address.',
     'network.watching': 'Wires are kept now and take effect once Apply the wires is on in Settings. An app without a wire goes the way macOS chooses, drawn dashed.',
-    'network.drag': 'Drag from the dot of a connection to an app, or from an app to a connection. Wire Wi-Fi to Ethernet to combine them: an app wired to the big circle uses both, to a small one only that one. Drag a box or a circle to move it.',
+    'network.drag': 'Drag from the ring of a connection to an app, or from the edge of an app to a connection. Wire Wi-Fi to Ethernet to combine them: an app wired to the big circle uses both, to a small one only that one. Drag the middle of a box or a circle to move it. Hold Space and drag to move around, hold Control and scroll to zoom.',
+    'network.arrange': 'Arrange', 'network.arrange.link': 'By connection', 'network.arrange.traffic': 'By traffic', 'network.arrange.name': 'By name',
+    'network.zoom.fit': 'Fit', 'network.zoom.reset': 'Zoom to 100%',
+    'network.q.good': 'Strong: answers in {ms} ms', 'network.q.fair': 'Fair: answers in {ms} ms, {loss}% lost',
+    'network.q.poor': 'Weak: answers in {ms} ms, {loss}% lost', 'network.q.down': 'No answer from the internet through it',
     'network.merge.split': 'Separate', 'network.merge.resize': 'Drag to make the circle larger or smaller', 'network.link.away': 'Not connected', 'network.app.idle': 'Not using the network now', 'network.hub.merge.all': 'Combined (every connection)',
     'network.card.target': 'Leaves by', 'network.card.priority': 'Priority', 'network.card.down': 'Most down (KB/s)', 'network.card.up': 'Most up (KB/s)', 'network.card.limit.none': 'No limit',
     'network.card.save': 'Save', 'network.card.unwire': 'Remove the wire', 'network.card.held': 'Held to {speed} for the apps above it',
@@ -60,7 +64,11 @@
     'network.links': 'Đường mạng', 'network.meet': 'Đơn hay gộp', 'network.apps': 'App',
     'network.link.primary': 'macOS đang dùng đường này', 'network.links.none': 'Chưa có đường mạng nào có địa chỉ.',
     'network.watching': 'Dây được lưu ngay và có hiệu lực khi bật Áp dụng các dây trong Cài đặt. App chưa nối dây đi đường macOS tự chọn, vẽ bằng nét đứt.',
-    'network.drag': 'Kéo từ chấm của một đường mạng sang một app, hoặc từ app sang đường mạng. Nối Wi-Fi sang Ethernet để gộp: app nối vào vòng tròn lớn dùng cả hai, nối vào vòng tròn nhỏ chỉ dùng mạng đó. Kéo ô hoặc vòng tròn để di chuyển.',
+    'network.drag': 'Kéo từ viền vòng tròn của một đường mạng sang một app, hoặc từ viền ô app sang đường mạng. Nối Wi-Fi sang Ethernet để gộp: app nối vào vòng tròn lớn dùng cả hai, nối vào vòng tròn nhỏ chỉ dùng mạng đó. Kéo phần giữa ô hoặc vòng tròn để di chuyển. Giữ Space rồi kéo để di chuyển sơ đồ, giữ Control rồi cuộn để phóng to thu nhỏ.',
+    'network.arrange': 'Sắp xếp', 'network.arrange.link': 'Theo đường mạng', 'network.arrange.traffic': 'Theo lưu lượng', 'network.arrange.name': 'Theo tên',
+    'network.zoom.fit': 'Vừa khung', 'network.zoom.reset': 'Về 100%',
+    'network.q.good': 'Mạng khoẻ: phản hồi trong {ms} ms', 'network.q.fair': 'Mạng tạm được: phản hồi trong {ms} ms, mất {loss}%',
+    'network.q.poor': 'Mạng yếu: phản hồi trong {ms} ms, mất {loss}%', 'network.q.down': 'Không ra được internet qua đường này',
     'network.merge.split': 'Tách ra', 'network.merge.resize': 'Kéo để phóng to hoặc thu nhỏ vòng tròn', 'network.link.away': 'Chưa kết nối', 'network.app.idle': 'Hiện không dùng mạng', 'network.hub.merge.all': 'Gộp (mọi đường mạng)',
     'network.card.target': 'Đi qua', 'network.card.priority': 'Ưu tiên', 'network.card.down': 'Tải về tối đa (KB/s)', 'network.card.up': 'Tải lên tối đa (KB/s)', 'network.card.limit.none': 'Không giới hạn',
     'network.card.save': 'Lưu', 'network.card.unwire': 'Gỡ dây', 'network.card.held': 'Đang bị giữ ở {speed} để nhường app phía trên',
@@ -215,7 +223,15 @@
     const totals = h('span', { class: 'network-total-head' });
     const note = h('span', { class: 'network-canvas-note' });
     const close = button(t('network.close'), () => send({ t: 'action', name: 'network_canvas_close' }), { small: true });
-    head.append(title, totals, note, close);
+    // Arrange is a one-shot: the choice lays the boxes out, then the menu goes back to its title.
+    const arrangeSel = h('select', { class: 'select network-arrange', 'aria-label': t('network.arrange') },
+      h('option', { value: '', text: t('network.arrange') }),
+      ...['link', 'traffic', 'name'].map((k) => h('option', { value: k, text: t('network.arrange.' + k) })));
+    arrangeSel.addEventListener('change', () => { if (arrangeSel.value) arrange(arrangeSel.value); arrangeSel.value = ''; });
+    const zoomBtn = button('100%', () => zoomTo(1), { small: true });
+    zoomBtn.title = t('network.zoom.reset');
+    const fitBtn = button(t('network.zoom.fit'), () => fit(), { small: true });
+    head.append(title, totals, note, arrangeSel, fitBtn, zoomBtn, close);
     const scroller = h('div', { class: 'network-canvas-scroll' });
     const board = h('div', { class: 'network-canvas-board' });
     const NS = 'http://www.w3.org/2000/svg';
@@ -226,6 +242,82 @@
     scroller.append(board);
     const detail = h('div', { class: 'network-card floating', hidden: true });
     const root = h('div', { class: 'network-canvas' }, head, scroller, detail);
+
+    // The view: the board is moved and scaled inside the window; the dotted grid on the window follows it.
+    const view = { x: 0, y: 0, z: 1 };
+    const Z_MIN = 0.3, Z_MAX = 2.5;
+    function applyView() {
+      board.style.transform = `translate(${view.x}px, ${view.y}px) scale(${view.z})`;
+      scroller.style.backgroundSize = `${GRID * view.z}px ${GRID * view.z}px`;
+      scroller.style.backgroundPosition = `${view.x}px ${view.y}px`;
+      zoomBtn.textContent = Math.round(view.z * 100) + '%';
+    }
+    // Zooms about a point of the window, so what is under the pointer stays under it.
+    function zoomAt(z, px, py) {
+      const nz = Math.min(Z_MAX, Math.max(Z_MIN, z));
+      view.x = px - (px - view.x) * nz / view.z;
+      view.y = py - (py - view.y) * nz / view.z;
+      view.z = nz;
+      applyView();
+    }
+    function zoomTo(z) { zoomAt(z, scroller.clientWidth / 2, scroller.clientHeight / 2); }
+    // Everything on the board in sight, never larger than 100%.
+    function fit() {
+      if (!current) return;
+      let x0 = Infinity, y0 = Infinity, x1 = -Infinity, y1 = -Infinity;
+      for (const [id, p] of Object.entries(current.at)) {
+        const w = p.size || p.d || (id.startsWith('app:') ? APP_W : D), hh = p.size || p.d || (id.startsWith('app:') ? APP_H : D);
+        x0 = Math.min(x0, p.x); y0 = Math.min(y0, p.y); x1 = Math.max(x1, p.x + w); y1 = Math.max(y1, p.y + hh);
+      }
+      if (!isFinite(x0)) return;
+      const W = scroller.clientWidth || 900, H = scroller.clientHeight || 600, pad = 40;
+      const z = Math.min(1, Math.max(Z_MIN, Math.min((W - pad * 2) / (x1 - x0), (H - pad * 2) / (y1 - y0))));
+      view.z = z;
+      view.x = (W - (x1 - x0) * z) / 2 - x0 * z;
+      view.y = (H - (y1 - y0) * z) / 2 - y0 * z;
+      applyView();
+    }
+    // Control and the wheel (a pinch on a trackpad comes as the same) zooms; the wheel alone moves the view.
+    scroller.addEventListener('wheel', (e) => {
+      e.preventDefault();
+      const b = scroller.getBoundingClientRect();
+      if (e.ctrlKey || e.metaKey) zoomAt(view.z * Math.exp(-e.deltaY * 0.01), e.clientX - b.left, e.clientY - b.top);
+      else { view.x -= e.deltaX; view.y -= e.deltaY; applyView(); }
+    }, { passive: false });
+    // Space held, the middle button, or a drag on the empty board moves the view; nodes are left alone meanwhile.
+    let spaceDown = false;
+    scroller.addEventListener('pointerdown', (e) => {
+      const onNode = e.target.closest && e.target.closest('[data-node]');
+      if (!(spaceDown || e.button === 1 || (e.button === 0 && !onNode))) return;
+      e.preventDefault();
+      e.stopPropagation();
+      const start = { x: e.clientX - view.x, y: e.clientY - view.y };
+      scroller.classList.add('panning');
+      scroller.setPointerCapture(e.pointerId);
+      const move = (ev) => { view.x = ev.clientX - start.x; view.y = ev.clientY - start.y; applyView(); };
+      const up = () => {
+        scroller.classList.remove('panning');
+        scroller.removeEventListener('pointermove', move);
+        scroller.removeEventListener('pointerup', up);
+        scroller.removeEventListener('pointercancel', up);
+      };
+      scroller.addEventListener('pointermove', move);
+      scroller.addEventListener('pointerup', up);
+      scroller.addEventListener('pointercancel', up);
+    }, true);
+    const typing = (e) => e.target.closest && e.target.closest('input, select, textarea, button');
+    function onKey(e) {
+      if (e.code === 'Space' && !typing(e)) {
+        e.preventDefault();
+        spaceDown = e.type === 'keydown';
+        scroller.classList.toggle('space', spaceDown);
+        return;
+      }
+      if (e.type !== 'keydown' || !(e.ctrlKey || e.metaKey)) return;
+      if (e.key === '=' || e.key === '+') { e.preventDefault(); zoomTo(view.z * 1.2); }
+      else if (e.key === '-') { e.preventDefault(); zoomTo(view.z / 1.2); }
+      else if (e.key === '0') { e.preventDefault(); zoomTo(1); }
+    }
 
     // Where each node is: what the person put there (kept in the settings), else a place of its own on the grid.
     const local = new Map();
@@ -305,10 +397,17 @@
         const port = h('span', { class: 'network-port', 'aria-hidden': 'true' });
         el.append(h('div', { class: 'network-node-body' }), port);
         port.addEventListener('pointerdown', (e) => startWire(e, id));
-        el.addEventListener('pointerdown', (e) => { if (!e.target.closest('.network-port, button')) startMove(e, id); });
+        // The ring of a circle or the edge of a box starts a wire, its middle moves it.
+        el.addEventListener('pointerdown', (e) => {
+          if (e.target.closest('.network-port, button, .network-grip')) return;
+          if (onEdge(e, el)) startWire(e, id); else startMove(e, id);
+        });
+        el.addEventListener('pointermove', (e) => { if (!moving && !wiring) el.classList.toggle('edge', onEdge(e, el)); });
+        el.addEventListener('pointerleave', () => el.classList.remove('edge'));
         if (kind === 'app') {
           el.tabIndex = 0;
-          el.addEventListener('keydown', (e) => { if (e.key === 'Enter' || e.key === ' ') { e.preventDefault(); pick(id.slice(4)); } });
+          // Enter only: Space is held to move the view.
+          el.addEventListener('keydown', (e) => { if (e.key === 'Enter') { e.preventDefault(); pick(id.slice(4)); } });
         }
         layer.append(el);
         els.set(id, el);
@@ -316,6 +415,19 @@
       el.className = 'network-node ' + kind + ' ' + cls;
       return el;
     };
+    // Within this many pixels of the screen of a node's rim counts as its rim, whatever the zoom.
+    const RIM = 14;
+    function onEdge(e, el) {
+      const r = el.getBoundingClientRect();
+      if (el.dataset.kind === 'app') {
+        const d = Math.min(e.clientX - r.left, r.right - e.clientX, e.clientY - r.top, r.bottom - e.clientY);
+        return d <= Math.min(RIM, r.height / 3);
+      }
+      const R = r.width / 2;
+      const d = Math.hypot(e.clientX - (r.left + R), e.clientY - (r.top + R));
+      // The Combined circle is large, so only a band along its line; a connection's whole outer ring.
+      return d <= R + 2 && R - d <= (el.dataset.kind === 'merge' ? RIM + 4 : Math.max(RIM, R * 0.32));
+    }
     const put = (el, p, size) => {
       el.style.left = p.x + 'px';
       el.style.top = p.y + 'px';
@@ -327,7 +439,10 @@
       if (moving || wiring) return;
       const n = N();
       const control = n.control && n.running;
-      note.textContent = n.paused ? t('network.paused') : control ? t('network.drag') : t('network.watching') + ' ' + t('network.drag');
+      // The header stays one short line: the how-to is the title's tooltip, and only a paused state is said in it.
+      title.title = control ? t('network.drag') : t('network.watching') + ' ' + t('network.drag');
+      note.textContent = n.paused ? t('network.paused') : '';
+      note.title = note.textContent;
       totals.textContent = t('network.total') + ': ' + speed(n.total_down) + ' / ' + speed(n.total_up);
       const m = model();
       const at = layout(m);
@@ -348,13 +463,15 @@
       }
       for (const l of m.links) {
         const id = 'link:' + l.name;
-        const el = node(id, 'link', (l.primary ? 'primary ' : '') + (l.away ? 'away ' : '') + (at[id].inside ? 'inside' : ''));
-        el.title = l.primary ? t('network.link.primary') : l.away ? t('network.link.away') : '';
+        const q = l.away ? 'unknown' : l.quality || 'unknown';
+        const el = node(id, 'link', (l.primary ? 'primary ' : '') + (l.away ? 'away ' : '') + (at[id].inside ? 'inside ' : '') + 'q-' + q);
+        const said = q === 'unknown' ? '' : t('network.q.' + q, { ms: l.rtt, loss: Math.round((l.loss || 0) * 100) });
+        el.title = [l.primary ? t('network.link.primary') : l.away ? t('network.link.away') : '', said].filter(Boolean).join('\n');
         el.firstChild.replaceChildren(
           icon(linkSymbol(l), 'network-link-glyph'),
           h('div', { class: 'network-node-title', text: l.label || l.name }),
           h('div', { class: 'network-node-sub', text: l.away ? t('network.link.away') : l.name }),
-          h('div', { class: 'network-node-speed', text: l.away ? '' : speed(l.down) }));
+          h('div', { class: 'network-node-speed', text: l.away ? '' : speed(l.down) + (l.rtt && !at[id].inside ? ', ' + l.rtt + ' ms' : '') }));
         put(el, at[id], at[id].d);
         seen.add(id);
       }
@@ -403,8 +520,40 @@
       svg.append(p);
       return p;
     };
+    // What moves on each wire: its path, how fast down (connection to app) and up (app to connection), its colour.
+    let flows = [];
+    const reduced = window.matchMedia && window.matchMedia('(prefers-reduced-motion: reduce)').matches;
+    // The quality of where a wire comes from: a connection's own, the best of those in the Combined circle.
+    const RANK = { good: 3, fair: 2, poor: 1, down: 0 };
+    const qOf = (id) => {
+      const links = current.m.links;
+      const of = (name) => { const l = links.find((x) => x.name === name); return l && !l.away && l.quality in RANK ? l.quality : null; };
+      if (id === 'merge') return current.m.merge.map(of).filter(Boolean).sort((a, b) => RANK[b] - RANK[a])[0] || 'unknown';
+      return of(id.slice(5)) || 'unknown';
+    };
+    const flowLine = (fromId, to, cls, width, a) => {
+      const q = qOf(fromId);
+      const p = line(out(fromId), to, cls + ' q-' + q, width, true);
+      arrow(p, cls);
+      // Nothing moves on a wire whose connection gets no answer.
+      if ((a.down || 0) + (a.up || 0) > 500 && q !== 'down') flows.push({ path: p, down: a.down || 0, up: a.up || 0, width, cls, q, dots: [] });
+      return p;
+    };
+    // A small head at the app's end, so the way a wire goes reads even when nothing moves on it.
+    function arrow(p, cls) {
+      const len = p.getTotalLength ? p.getTotalLength() : 0;
+      if (len < 24) return;
+      const tip = p.getPointAtLength(len), back = p.getPointAtLength(len - 9);
+      const ang = Math.atan2(tip.y - back.y, tip.x - back.x), s = 6;
+      const pt = (r, k) => (tip.x + Math.cos(ang + r) * k) + ',' + (tip.y + Math.sin(ang + r) * k);
+      const head = document.createElementNS(NS, 'polygon');
+      head.setAttribute('points', [pt(0, 0), pt(Math.PI - 0.5, s * 1.6), pt(Math.PI + 0.5, s * 1.6)].join(' '));
+      head.setAttribute('class', 'network-arrow ' + cls.replace('network-wire', '').trim());
+      svg.append(head);
+    }
     function wires() {
       svg.replaceChildren();
+      flows = [];
       const { m, at } = current;
       const control = N().control && N().running;
       // The straight wire between the connections of the Combined circle.
@@ -420,8 +569,8 @@
         const to = into('app:' + a.name);
         if (!to) continue;
         if (a.wire && a.wire.target !== 'system') {
-          const from = out(a.wire.target === 'merge' ? (m.merge.length ? 'merge' : null) : a.wire.target);
-          if (from) line(from, to, 'network-wire ' + (control ? a.wire.priority : 'planned'), control ? thick(a.down) : 1.8, true);
+          const fromId = a.wire.target === 'merge' ? (m.merge.length ? 'merge' : null) : a.wire.target;
+          if (fromId && out(fromId)) flowLine(fromId, to, 'network-wire ' + (control ? a.wire.priority : 'planned'), control ? thick(a.down) : 1.8, a);
           continue;
         }
         if (a.idle) continue;
@@ -429,7 +578,56 @@
         const seen = (a.interfaces || []).map((x) => 'link:' + x.name).filter((id) => at[id]);
         const primary = m.links.find((l) => l.primary);
         const froms = seen.length ? seen : primary ? ['link:' + primary.name] : [];
-        for (const id of froms) line(out(id), to, 'network-wire seen', thick(a.down), true);
+        for (const id of froms) flowLine(id, to, 'network-wire seen', thick(a.down), a);
+      }
+      // The dots: made here, moved by the clock in tick(), so a redraw every second does not make them jump.
+      for (const f of flows) {
+        f.len = f.path.getTotalLength();
+        const make = (dir, rate) => {
+          if (rate <= 500) return;
+          const gap = dir > 0 ? 34 : 46;
+          const n = Math.max(1, Math.floor(f.len / gap));
+          // Faster with more traffic: from a slow walk to a run, on a log scale.
+          const v = 28 + 34 * Math.log10(1 + rate / 2e3);
+          for (let i = 0; i < n; i++) {
+            const c = document.createElementNS(NS, 'circle');
+            c.setAttribute('r', dir > 0 ? Math.max(2.2, f.width * 0.75) : 1.9);
+            c.setAttribute('class', 'network-flow ' + (dir > 0 ? 'down ' : 'up ') + f.cls.replace('network-wire', '').trim());
+            svg.append(c);
+            f.dots.push({ c, dir, gap, v, i });
+          }
+        };
+        make(1, f.down);
+        make(-1, f.up);
+      }
+      tick();
+      if (flows.length && !reduced && !ticking) { ticking = true; requestAnimationFrame(loop); }
+    }
+    let ticking = false;
+    function loop() {
+      if (!flows.length || !root.isConnected) { ticking = false; return; }
+      tick();
+      requestAnimationFrame(loop);
+    }
+    function tick() {
+      const now = performance.now() / 1000;
+      for (const f of flows) for (const d of f.dots) {
+        const span = Math.max(f.len, d.gap);
+        // Strong: smooth. Fair: slower. Weak: it stalls and lurches, each dot on a beat of its own, and flickers.
+        let time = now;
+        if (f.q === 'fair') time = now * 0.7;
+        else if (f.q === 'poor') time = now * 0.55 + 0.35 * Math.sin(now * 4.2 + d.i * 1.9) + 0.2 * Math.sin(now * 9.7 + d.i);
+        // Evenly spaced along the wire, moving along it; down from the connection's end, up from the app's.
+        let s = (((reduced ? 0 : time * d.v) + d.i * d.gap) % span + span) % span;
+        if (d.dir < 0) s = span - s;
+        const pt = f.path.getPointAtLength(Math.min(s, f.len));
+        d.c.setAttribute('cx', pt.x);
+        d.c.setAttribute('cy', pt.y);
+        // Faded in at the start and out at the end, so dots do not pop.
+        const edge = Math.min(s, f.len - s);
+        let o = Math.max(0, Math.min(1, edge / 18));
+        if (f.q === 'poor' && !reduced) o *= 0.35 + 0.65 * Math.abs(Math.sin(now * 7.3 + d.i * 2.3));
+        d.c.style.opacity = o;
       }
     }
 
@@ -445,8 +643,8 @@
       moving = id;
       el.setPointerCapture(e.pointerId);
       const move = (ev) => {
-        const dx = ev.clientX - start.x, dy = ev.clientY - start.y;
-        if (!moved && Math.abs(dx) + Math.abs(dy) < 4) return;
+        const dx = (ev.clientX - start.x) / view.z, dy = (ev.clientY - start.y) / view.z;
+        if (!moved && Math.abs(dx) + Math.abs(dy) < 4 / view.z) return;
         moved = true;
         const M = current.at.merge;
         if (inside) {
@@ -506,7 +704,7 @@
       // Each connection keeps its place relative to the middle of the circle as it grows.
       const offsets = names.map((n) => { const r = current.at['link:' + n].rel; return { x: r.x + C / 2 - M.size / 2, y: r.y + C / 2 - M.size / 2 }; });
       const move = (ev) => {
-        const grow = Math.max(ev.clientX - start.x, ev.clientY - start.y);
+        const grow = Math.max(ev.clientX - start.x, ev.clientY - start.y) / view.z;
         const size = Math.round(Math.min(MERGE_MAX, Math.max(MERGE_MIN, start.size + grow)));
         M.size = size;
         put(els.get('merge'), M, size);
@@ -544,15 +742,24 @@
       const box = () => board.getBoundingClientRect();
       const from = id.startsWith('app:') ? into(id) : out(id);
       wiring = { id, line: null };
+      // The node under the pointer, else the nearest one within a little of it: a wire need not land on a point.
       const target = (ev) => {
         const over = document.elementFromPoint(ev.clientX, ev.clientY);
         const el = over && over.closest && over.closest('[data-node]');
-        return el && el.dataset.node !== id ? el : null;
+        if (el && el.dataset.node !== id) return el;
+        let best = null, bestD = 24;
+        for (const [nid, n] of els) {
+          if (nid === id) continue;
+          const r = n.getBoundingClientRect();
+          const d = Math.hypot(Math.max(r.left - ev.clientX, 0, ev.clientX - r.right), Math.max(r.top - ev.clientY, 0, ev.clientY - r.bottom));
+          if (d < bestD) { best = n; bestD = d; }
+        }
+        return best;
       };
       const move = (ev) => {
         if (wiring.line) wiring.line.remove();
         const b = box();
-        wiring.line = line(from, { x: ev.clientX - b.left, y: ev.clientY - b.top }, 'network-wire dragging', 2.5, false);
+        wiring.line = line(from, { x: (ev.clientX - b.left) / view.z, y: (ev.clientY - b.top) / view.z }, 'network-wire dragging', 2.5, false);
         const over = target(ev);
         for (const el of els.values()) el.classList.toggle('drop', el === over);
       };
@@ -583,6 +790,55 @@
       const joined = merge.length && (names.some((x) => merge.includes(x)) || a === 'merge' || b === 'merge') ? merge : [];
       for (const x of names) if (!joined.includes(x)) joined.push(x);
       if (joined.length >= 2) send1('network.merge', joined.slice(0, 4));
+    }
+
+    // Arrange: the connections down the left, the apps in columns to their right, in the order asked for; each box
+    // is put there and kept, as if moved by hand.
+    function arrange(by) {
+      if (!current) return;
+      const { m, at } = current;
+      const rate = (a) => (a.down || 0) + (a.up || 0);
+      const via = (a) => a.wire && a.wire.target !== 'system' ? a.wire.target
+        : (a.interfaces || []).length ? 'link:' + a.interfaces[0].name : a.idle ? '~idle' : 'system';
+      const places = [];
+      let y = 40;
+      if (m.merge.length) { places.push(['merge', 40, y]); y += at.merge.size + 40; }
+      const order = [];
+      if (m.merge.length) order.push('merge');
+      for (const l of m.links) {
+        if (m.merge.includes(l.name)) { order.push('link:' + l.name); continue; }
+        places.push(['link:' + l.name, 60, y]);
+        order.push('link:' + l.name);
+        y += D + 50;
+      }
+      const left = 60 + Math.max(D, m.merge.length ? at.merge.size - 20 : 0) + 140;
+      const byName = (a, b) => a.name.localeCompare(b.name);
+      const byRate = (a, b) => rate(b) - rate(a) || byName(a, b);
+      let groups;
+      if (by === 'link') {
+        const rank = (k) => k === '~idle' ? 1e3 : k === 'system' ? 999 : Math.max(0, order.indexOf(k));
+        const map = new Map();
+        for (const a of m.apps) { const k = via(a); if (!map.has(k)) map.set(k, []); map.get(k).push(a); }
+        groups = [...map.entries()].sort((p, q) => rank(p[0]) - rank(q[0])).map(([, list]) => list.sort(byRate));
+      } else {
+        groups = [m.apps.slice().sort(by === 'name' ? byName : byRate)];
+      }
+      const ROWS = 9;
+      let col = 0;
+      for (const list of groups) {
+        list.forEach((a, i) => {
+          if (i && i % ROWS === 0) col++;
+          places.push(['app:' + a.name, left + col * 220, 40 + (i % ROWS) * 80]);
+        });
+        col++;
+      }
+      for (const [id, x, py] of places) {
+        const p = { x: snap(x), y: snap(py) };
+        local.set(id, p);
+        send1('network.place', { id, x: p.x, y: p.y });
+      }
+      sync();
+      fit();
     }
 
     // ---- the card of one app
@@ -638,12 +894,16 @@
 
     // Only the canvas window listens to the whole window; the self-test draws the canvas inside the settings page.
     if (window.__canvas) {
+      window.addEventListener('keydown', onKey);
+      window.addEventListener('keyup', onKey);
+      window.addEventListener('blur', () => { spaceDown = false; scroller.classList.remove('space'); });
       window.addEventListener('keydown', (e) => {
         if (e.key !== 'Escape') return;
         if (!detail.hidden) unpick(); else send({ t: 'action', name: 'network_canvas_close' });
       });
       window.addEventListener('resize', () => sync());
     }
+    applyView();
     reg(sync);
     return root;
   },
@@ -686,6 +946,17 @@
     expect(inner.every(inRect), 'network: they sit inside the circle');
     expect(merge.querySelector('.network-grip'), 'network: the circle has a grip to resize it');
     expect(canvas.querySelectorAll('.network-wire').length >= 4, 'network: the apps are wired');
+    expect(canvas.querySelectorAll('.network-flow.down').length > 0 && canvas.querySelectorAll('.network-flow.up').length > 0, 'network: dots go down and up the wires that carry traffic');
+    expect(canvas.querySelectorAll('.network-arrow').length >= 4, 'network: each wire shows which way it goes');
+    const scroll = canvas.querySelector('.network-canvas-scroll');
+    const sb = scroll.getBoundingClientRect();
+    scroll.dispatchEvent(new WheelEvent('wheel', { deltaY: -50, ctrlKey: true, clientX: sb.left + 100, clientY: sb.top + 100, bubbles: true, cancelable: true }));
+    expect(/scale\((1\.[1-9]|[2-9])/.test(canvas.querySelector('.network-canvas-board').style.transform), 'network: Control and the wheel zoom in');
+    sent.length = 0;
+    const arrangeSel = canvas.querySelector('.network-arrange');
+    arrangeSel.value = 'name';
+    arrangeSel.dispatchEvent(new Event('change'));
+    expect(sent.some((m) => m.path === 'network.place' && m.value.id === 'app:Steam') && arrangeSel.value === '', 'network: Arrange puts every box and the menu goes back to its title');
     sent.length = 0;
     canvas.querySelector('.network-node.merge .btn').click();
     expect(sent.some((m) => m.path === 'network.merge' && Array.isArray(m.value) && m.value.length === 0), 'network: the circle can be taken apart');

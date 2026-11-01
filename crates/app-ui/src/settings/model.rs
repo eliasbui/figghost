@@ -1110,7 +1110,7 @@ mod tests {
         e.runtime.insert(
             "network",
             json!({ "links": [{ "name": "en0", "label": "Wi-Fi", "ip": "10.0.0.2", "primary": true, "down": 1, "up": 1,
-                "connections": 1 }],
+                "connections": 1, "rtt": 20, "loss": 0.0, "quality": "good" }],
                 "apps": [{ "name": "Safari", "bundle": "", "down": 1, "up": 1, "received": 1, "sent": 1,
                 "interfaces": [{ "name": "en0", "down": 1 }], "proxied": false, "held_to": null }],
                 "known_apps": [{ "name": "Safari", "bundle": "/Applications/Safari.app" }],

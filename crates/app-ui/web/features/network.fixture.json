@@ -22,8 +22,8 @@
   "running": true,
   "paused": false,
   "links": [
-    { "name": "en0", "label": "Wi-Fi", "ip": "192.168.1.20", "primary": true, "down": 1850000, "up": 120000, "connections": 14 },
-    { "name": "en7", "label": "USB 10/100/1000 LAN", "ip": "10.0.0.5", "primary": false, "down": 5200000, "up": 300000, "connections": 9 }
+    { "name": "en0", "label": "Wi-Fi", "ip": "192.168.1.20", "primary": true, "down": 1850000, "up": 120000, "connections": 14, "rtt": 18, "loss": 0, "quality": "good" },
+    { "name": "en7", "label": "USB 10/100/1000 LAN", "ip": "10.0.0.5", "primary": false, "down": 5200000, "up": 300000, "connections": 9, "rtt": 320, "loss": 0.33, "quality": "poor" }
   ],
   "apps": [
     { "name": "Steam", "bundle": "/Applications/Steam.app", "down": 4100000, "up": 90000, "received": 912000000, "sent": 4000000, "interfaces": [{ "name": "en7", "down": 4100000 }], "proxied": true, "held_to": null },

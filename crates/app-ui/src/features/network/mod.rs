@@ -27,7 +27,7 @@ use serde::{Deserialize, Serialize};
 use serde_json::{Value, json};
 use std::{
     cell::RefCell,
-    collections::{BTreeMap, HashMap},
+    collections::{BTreeMap, HashMap, VecDeque},
     fs,
     os::unix::process::CommandExt,
     path::{Path, PathBuf},
@@ -35,7 +35,7 @@ use std::{
     rc::{Rc, Weak},
     sync::{Arc, Mutex, PoisonError},
     thread,
-    time::Instant,
+    time::{Duration, Instant},
 };
 
 pub mod settings;
@@ -52,6 +52,17 @@ const MAX_APPS: usize = 40;
 const PHONES_EVERY_SECONDS: u64 = 4;
 /// How often the links are listed while the proxy is off; listing may run `networksetup`, so never on the main thread.
 const LINKS_EVERY_SECONDS: u64 = 3;
+/// How often each link is timed: a TCP handshake through it to a well-known address, off the main thread.
+const QUALITY_EVERY_SECONDS: u64 = 5;
+/// The handshakes kept a link, so that one slow answer does not paint it weak.
+const QUALITY_SAMPLES: usize = 6;
+/// A handshake slower than this counts as lost.
+const QUALITY_TIMEOUT_MS: u64 = 1500;
+/// Answered by anycast close to everyone; port 443 because some networks let little else out.
+const QUALITY_TARGET: ([u8; 4], u16) = ([1, 1, 1, 1], 443);
+/// Round trips (ms) up to which a link is good, and from which it is weak.
+const QUALITY_GOOD_MS: u32 = 80;
+const QUALITY_POOR_MS: u32 = 250;
 /// Every app seen using the network stays on the diagram; this file keeps them across runs, one a line: the name, then
 /// after a tab the path of its bundle when it has one (for its icon).
 const APPS_FILE: &str = "network-apps.txt";
@@ -247,6 +258,38 @@ pub struct Feature {
     idle_links: Arc<Mutex<IdleLinks>>,
     /// The last test of the phone's connection: `{ "state": "idle" }`, running, or done with its verdict.
     phone_test: Arc<Mutex<Value>>,
+    /// How well each link answers, timed on another thread.
+    quality: Arc<Mutex<Quality>>,
+}
+
+/// The last handshake times of each link, by interface: `None` for one that got no answer in time.
+#[derive(Default)]
+struct Quality {
+    samples: HashMap<String, VecDeque<Option<u32>>>,
+    asked: Option<Instant>,
+    busy: bool,
+}
+
+/// What the samples of a link say: its usual round trip, the share lost, and a grade the diagram draws.
+pub fn grade(samples: &VecDeque<Option<u32>>) -> (Option<u32>, f64, &'static str) {
+    if samples.is_empty() {
+        return (None, 0.0, "unknown");
+    }
+    let mut ok: Vec<u32> = samples.iter().flatten().copied().collect();
+    let loss = (samples.len() - ok.len()) as f64 / samples.len() as f64;
+    if ok.is_empty() {
+        return (None, 1.0, "down");
+    }
+    ok.sort_unstable();
+    let rtt = ok[ok.len() / 2];
+    let grade = if rtt > QUALITY_POOR_MS || loss >= 0.34 {
+        "poor"
+    } else if rtt <= QUALITY_GOOD_MS && loss == 0.0 {
+        "good"
+    } else {
+        "fair"
+    };
+    (Some(rtt), loss, grade)
 }
 
 /// The links of the system, listed off the main thread (naming them may run `networksetup`).
@@ -322,6 +365,7 @@ pub fn attach(env: &AttachEnv) -> Option<Rc<Feature>> {
             .unwrap_or_default(),
         known_apps: RefCell::new(read_known_apps(&fs::read_to_string(env.home.join(APPS_FILE)).unwrap_or_default())),
         idle_links: Arc::default(),
+        quality: Arc::default(),
         phone_test: Arc::new(Mutex::new(json!({ "state": "idle" }))),
     });
     FEATURE.with(|slot| *slot.borrow_mut() = Rc::downgrade(&feature));
@@ -638,6 +682,47 @@ impl Feature {
         idle.links.clone()
     }
 
+    /// The grade of each link from the handshakes timed so far; new ones are timed on another thread when due.
+    fn quality(&self) -> HashMap<String, (Option<u32>, f64, &'static str)> {
+        let mut q = self.quality.lock().unwrap_or_else(PoisonError::into_inner);
+        let due = q.asked.is_none_or(|at| at.elapsed().as_secs() >= QUALITY_EVERY_SECONDS);
+        if due && !q.busy {
+            q.busy = true;
+            q.asked = Some(Instant::now());
+            let shared = Arc::clone(&self.quality);
+            thread::spawn(move || {
+                let links = core_netmerge::links();
+                let to = std::net::SocketAddr::from(QUALITY_TARGET);
+                // All links at once, so a dead one does not hold the others up.
+                let times: Vec<(String, Option<u32>)> = thread::scope(|scope| {
+                    let jobs: Vec<_> = links
+                        .iter()
+                        .map(|link| {
+                            scope.spawn(move || {
+                                let start = Instant::now();
+                                let ok = core_netmerge::connect_by(Some(link), to, Duration::from_millis(QUALITY_TIMEOUT_MS)).is_ok();
+                                let ms = start.elapsed().as_millis().min(u128::from(u32::MAX)) as u32;
+                                (link.name.clone(), ok.then_some(ms.max(1)))
+                            })
+                        })
+                        .collect();
+                    jobs.into_iter().filter_map(|j| j.join().ok()).collect()
+                });
+                let mut q = shared.lock().unwrap_or_else(PoisonError::into_inner);
+                q.samples.retain(|name, _| times.iter().any(|(n, _)| n == name));
+                for (name, ms) in times {
+                    let list = q.samples.entry(name).or_default();
+                    list.push_back(ms);
+                    while list.len() > QUALITY_SAMPLES {
+                        list.pop_front();
+                    }
+                }
+                q.busy = false;
+            });
+        }
+        q.samples.iter().map(|(name, list)| (name.clone(), grade(list))).collect()
+    }
+
     /// Asks `adb` for the phones now and then, off the main thread.
     fn phones(&self) -> (Vec<tether::Phone>, usize) {
         let mut phones = self.phones.lock().unwrap_or_else(PoisonError::into_inner);
@@ -695,6 +780,15 @@ impl Feature {
         let (ready, unauthorized) = self.phones();
         let idle = if snapshot.is_none() { self.idle_links() } else { Vec::new() };
         let mut out = view(&usage, snapshot.as_ref(), &self.me, &idle);
+        let quality = self.quality();
+        if let Some(links) = out["links"].as_array_mut() {
+            for link in links {
+                let Some(&(rtt, loss, grade)) = link["name"].as_str().and_then(|n| quality.get(n)) else { continue };
+                link["rtt"] = json!(rtt);
+                link["loss"] = json!((loss * 100.0).round() / 100.0);
+                link["quality"] = json!(grade);
+            }
+        }
         // Every app seen stays on the diagram, also once it stops using the network.
         let seen = out["apps"]
             .as_array()
@@ -1046,5 +1140,18 @@ mod tests {
             "without the proxy Figghost is an app like the others"
         );
         assert_eq!(v["running"], json!(false));
+    }
+
+    #[test]
+    fn grades_a_link_by_its_handshakes() {
+        let q = |v: &[Option<u32>]| grade(&v.iter().copied().collect());
+        assert_eq!(q(&[]), (None, 0.0, "unknown"));
+        assert_eq!(q(&[Some(20), Some(30), Some(25)]), (Some(25), 0.0, "good"));
+        assert_eq!(q(&[Some(20), Some(900), Some(30), Some(25)]).2, "good", "one slow answer is not the link");
+        assert_eq!(q(&[Some(120), Some(140), Some(130)]).2, "fair");
+        assert_eq!(q(&[Some(20), None, Some(30), Some(25), Some(25), Some(25)]).2, "fair", "a loss keeps it from good");
+        assert_eq!(q(&[Some(400), Some(500), Some(450)]).2, "poor");
+        assert_eq!(q(&[Some(20), None, None]).2, "poor");
+        assert_eq!(q(&[None, None]), (None, 1.0, "down"));
     }
 }
