@@ -204,3 +204,5 @@
 .network-host-size { color: var(--text-2); white-space: nowrap; }
 
 .network-dns-input { width: 280px; max-width: 100%; }
+
+.network-web[data-state="failed"] { color: var(--bad); }

@@ -56,9 +56,11 @@
   "links": [
     { "name": "en0", "label": "Wi-Fi", "ip": "192.168.1.20", "primary": true, "down": 1850000, "up": 120000, "connections": 14, "rtt": 18, "loss": 0, "quality": "good",
       "wifi": { "rssi": -52, "noise": -95, "snr": 43, "channel": 36, "band": 5, "width": 80, "rate": 866, "standard": "802.11ax", "grade": "good" },
-      "speed_test": { "state": "done", "down": 93814760, "up": 21022520, "rpm": 412, "rtt": 18, "grade": "medium", "at": 1793500000000 } },
+      "web": { "http": "ok", "https": "ok" },
+      "speed_test": { "state": "done", "down": 260724112, "up": 105126216, "rtt": 40, "web": "ok", "https": "ok", "plain": false, "at": 1793500000000 } },
     { "name": "en7", "label": "USB 10/100/1000 LAN", "ip": "10.0.0.5", "primary": false, "down": 5200000, "up": 300000, "connections": 9, "rtt": 320, "loss": 0.33, "quality": "poor",
-      "speed_test": { "state": "failed", "reason": "error" } }
+      "web": { "http": "ok", "https": "tls" },
+      "speed_test": { "state": "failed", "reason": "tls", "web": "ok", "https": "tls" } }
   ],
   "apps": [
     { "name": "Steam", "bundle": "/Applications/Steam.app", "down": 4100000, "up": 90000, "received": 912000000, "sent": 4000000, "interfaces": [{ "name": "en7", "down": 4100000 }], "proxied": true, "held_to": null,

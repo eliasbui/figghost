@@ -89,8 +89,12 @@ const HISTORY_FILE: &str = "network-history.txt";
 const HISTORY_SAVE_SECONDS: u64 = 60;
 /// How often the history is read while it counts, in seconds: the choices of the page.
 pub const HISTORY_SECONDS: [u64; 3] = [2, 5, 10];
-/// A speed test fills the line for up to a minute; this is the longest it is let run.
-const SPEED_TEST_SECONDS: u64 = 75;
+/// The longest each part of a test of a connection is let run: the pages, the download and the upload.
+const WEB_CHECK_SECONDS: u64 = 6;
+const DOWNLOAD_SECONDS: u64 = 12;
+const UPLOAD_SECONDS: u64 = 12;
+/// How often the web is checked through each connection while the page is open, in seconds.
+const WEB_EVERY_SECONDS: u64 = 60;
 /// What the notch says of a quota or a cap: the slot, how long and how urgent.
 const SLOT_QUOTA: &str = "network_quota";
 const SLOT_METERED: &str = "network_metered";
@@ -542,17 +546,77 @@ impl Ledger {
     }
 }
 
-/// One look at the internet: a connection to a well-known address, then the page that tells a network that wants a
-/// login from one that does not.
+/// One look at the internet. The page that tells a network that wants a sign-in from one that does not decides when it
+/// answers; with no answer, a connection to a well-known address of either of two services says the line is there, so that
+/// a network that lets the web through but not one of them is not taken for being off.
 fn probe() -> Reach {
-    let to = std::net::SocketAddr::from(QUALITY_TARGET);
-    if core_netmerge::connect_by(None, to, Duration::from_millis(2500)).is_err() {
-        return Reach::Fail;
-    }
+    let reaches = |to: ([u8; 4], u16)| {
+        core_netmerge::connect_by(None, std::net::SocketAddr::from(to), Duration::from_millis(2500)).is_ok()
+    };
     // `--noproxy` so that the check does not go through this program's own proxy.
-    let captive = run_bounded("/usr/bin/curl", &["-s", "--max-time", "5", "--noproxy", "*", CAPTIVE_URL], 8)
-        .is_ok_and(|body| online::captive_from(&body));
-    Reach::Ok { captive }
+    let page = run_bounded("/usr/bin/curl", &["-s", "--max-time", "5", "--noproxy", "*", CAPTIVE_URL], 8).ok().filter(|body| !body.trim().is_empty());
+    match page {
+        Some(body) => Reach::Ok { captive: online::captive_from(&body) },
+        None if reaches(QUALITY_TARGET) || reaches(([8, 8, 8, 8], 443)) => Reach::Ok { captive: false },
+        None => Reach::Fail,
+    }
+}
+
+/// One run of the system's `curl` bound to `interface`: the page it got and what it says of the run.
+fn curl_run(interface: &str, url: &str, extra: &[&str], seconds: u64) -> Option<(String, speedtest::Run)> {
+    let args = speedtest::args(interface, seconds, extra, url);
+    let args: Vec<&str> = args.iter().map(String::as_str).collect();
+    // A few seconds more than curl is given, so that it ends itself and says how.
+    let (_, output) = run_bounded_output("/usr/bin/curl", &args, &[], seconds + 4).ok()?;
+    speedtest::read(&output)
+}
+
+/// What the web is like through a connection: the plain page and a secure one, asked together.
+fn check_web(interface: &str) -> (speedtest::Http, speedtest::Https) {
+    thread::scope(|scope| {
+        let http = scope.spawn(|| curl_run(interface, speedtest::HTTP_CHECK, &[], WEB_CHECK_SECONDS));
+        let https = scope.spawn(|| curl_run(interface, speedtest::HTTPS_CHECK, &["-o", "/dev/null"], WEB_CHECK_SECONDS));
+        let http = http.join().ok().flatten();
+        let https = https.join().ok().flatten();
+        (
+            speedtest::http_of(http.as_ref().map_or("", |(body, _)| body), http.as_ref().map(|(_, run)| run)),
+            speedtest::https_of(https.as_ref().map(|(_, run)| run)),
+        )
+    })
+}
+
+/// The whole test of a connection, in the order that tells most at the least cost: the plain web, secure sites, a download
+/// and then an upload of a file of zeros. What cannot be measured says why.
+fn measure(interface: &str) -> Value {
+    let (http, https) = check_web(interface);
+    if http != speedtest::Http::Open {
+        return speedtest::failed(speedtest::why(http, None), Some(http), None);
+    }
+    // Where secure sites do not open the line is measured without TLS, and the result says so.
+    let plain = https != speedtest::Https::Open;
+    let (down_url, up_url) = if plain { (speedtest::DOWNLOAD_PLAIN, speedtest::UPLOAD_PLAIN) } else { (speedtest::DOWNLOAD, speedtest::UPLOAD) };
+    let download = curl_run(interface, down_url, &["-o", "/dev/null"], DOWNLOAD_SECONDS);
+    let Some(down_bps) = download.as_ref().and_then(|(_, run)| speedtest::down_of(run)) else {
+        let reason = speedtest::why(http, download.as_ref().map(|(_, run)| run));
+        return speedtest::failed(reason, Some(http), Some(https));
+    };
+    let rtt_ms = download.as_ref().map_or(0.0, |(_, run)| run.connect_ms).round() as u32;
+    let up_bps = upload(interface, up_url);
+    speedtest::done(&speedtest::Speed { down_bps, up_bps, rtt_ms, http, https, plain }, now_ms())
+}
+
+/// The speed of sending a file of zeros: the file is sparse, so it costs no room on the disk, and it is taken away
+/// after.
+fn upload(interface: &str, url: &str) -> Option<u64> {
+    let file = std::env::temp_dir().join(format!("figghost-upload-{}-{interface}", std::process::id()));
+    let made = fs::File::create(&file).and_then(|f| f.set_len(speedtest::UPLOAD_BYTES));
+    let result = made.ok().and_then(|()| {
+        let data = format!("@{}", file.display());
+        curl_run(interface, url, &["-o", "/dev/null", "--data-binary", &data], UPLOAD_SECONDS)
+            .and_then(|(_, run)| speedtest::up_of(&run))
+    });
+    let _ = fs::remove_file(&file);
+    result
 }
 
 fn level_id(level: Level) -> &'static str {
@@ -618,6 +682,9 @@ struct Quality {
     samples: HashMap<String, VecDeque<Option<u32>>>,
     asked: Option<Instant>,
     busy: bool,
+    /// What the web is like through each connection, from the last time it was checked.
+    web: HashMap<String, (speedtest::Http, speedtest::Https)>,
+    web_asked: Option<Instant>,
 }
 
 /// What the samples of a link say: its usual round trip, the share lost, and a grade the diagram draws.
@@ -1265,6 +1332,10 @@ impl Feature {
         if due && !q.busy {
             q.busy = true;
             q.asked = Some(Instant::now());
+            let web_due = q.web_asked.is_none_or(|at| at.elapsed().as_secs() >= WEB_EVERY_SECONDS);
+            if web_due {
+                q.web_asked = Some(Instant::now());
+            }
             let shared = Arc::clone(&self.quality);
             thread::spawn(move || {
                 let links = core_netmerge::links();
@@ -1284,8 +1355,23 @@ impl Feature {
                         .collect();
                     jobs.into_iter().filter_map(|j| j.join().ok()).collect()
                 });
+                // The plain and the secure web through each connection that answers, now and then and all at once.
+                let webs: Vec<(String, (speedtest::Http, speedtest::Https))> = if web_due {
+                    thread::scope(|scope| {
+                        let jobs: Vec<_> = times
+                            .iter()
+                            .filter(|(_, ms)| ms.is_some())
+                            .map(|(name, _)| scope.spawn(move || (name.clone(), check_web(name))))
+                            .collect();
+                        jobs.into_iter().filter_map(|j| j.join().ok()).collect()
+                    })
+                } else {
+                    Vec::new()
+                };
                 let mut q = shared.lock().unwrap_or_else(PoisonError::into_inner);
                 q.samples.retain(|name, _| times.iter().any(|(n, _)| n == name));
+                q.web.retain(|name, _| times.iter().any(|(n, ms)| n == name && ms.is_some()));
+                q.web.extend(webs);
                 for (name, ms) in times {
                     let list = q.samples.entry(name).or_default();
                     list.push_back(ms);
@@ -1297,6 +1383,11 @@ impl Feature {
             });
         }
         q.samples.iter().map(|(name, list)| (name.clone(), grade(list))).collect()
+    }
+
+    /// What the web was last found to be like through each connection that answers.
+    fn webs(&self) -> HashMap<String, (speedtest::Http, speedtest::Https)> {
+        self.quality.lock().unwrap_or_else(PoisonError::into_inner).web.clone()
     }
 
     /// Asks `adb` for the phones now and then, off the main thread.
@@ -1384,12 +1475,16 @@ impl Feature {
             }
         }
         let speeds = self.speeds.lock().unwrap_or_else(PoisonError::into_inner).clone();
+        let webs = self.webs();
         let radio = macos_sys::wifi::read();
         if let Some(links) = out["links"].as_array_mut() {
             for link in links {
                 let name = link["name"].as_str().unwrap_or_default().to_owned();
                 if let Some(test) = speeds.get(&name) {
                     link["speed_test"] = test.clone();
+                }
+                if let Some((http, https)) = webs.get(&name) {
+                    link["web"] = speedtest::web(*http, *https);
                 }
                 if let Some(r) = radio.as_ref().filter(|r| r.interface == name) {
                     link["wifi"] = wifi_json(r);
@@ -1440,8 +1535,9 @@ impl Feature {
         out
     }
 
-    /// Measures one connection with `networkQuality -c -I <interface>`, off the main thread; one test runs at a time,
-    /// since each one fills the line.
+    /// Tests one connection, off the main thread, with `curl` bound to it: whether the web opens through it, whether
+    /// secure sites do, how long it takes to connect, and how fast a download and an upload go. One test runs at a time,
+    /// since each fills the line.
     fn speed_test(&self, interface: String) -> Result<(), Fault> {
         if !rules::valid_interface(&interface) {
             return Err(Fault::new("invalid_value", interface));
@@ -1455,14 +1551,8 @@ impl Feature {
         }
         let shared = Arc::clone(&self.speeds);
         thread::spawn(move || {
-            let result = match run_bounded_output("/usr/bin/networkQuality", &["-c", "-I", &interface], &[], SPEED_TEST_SECONDS) {
-                Ok((_, text)) => match speedtest::parse(&text) {
-                    Ok(speed) => speedtest::done(&speed, now_ms()),
-                    Err(reason) => speedtest::failed(reason),
-                },
-                Err(_) => speedtest::failed("slow"),
-            };
-            trace::log(&format!("network: a speed test of {interface} ended: {}", result["state"]));
+            let result = measure(&interface);
+            trace::log(&format!("network: a test of {interface} ended: {}", result["state"]));
             shared.lock().unwrap_or_else(PoisonError::into_inner).insert(interface, result);
         });
         Ok(())
@@ -1962,5 +2052,30 @@ mod tests {
         assert_eq!(daily.len(), 14, "quiet days are listed too");
         assert_eq!(daily[13]["down"], json!(1000));
         assert_eq!(history_view(&History::default(), 100)["empty"], json!(true));
+    }
+
+    /// Runs the test of a connection against the real internet, for every connection of this Mac:
+    /// `cargo test -p app-ui -- --ignored --nocapture the_connections_of_this_mac`.
+    #[test]
+    #[ignore = "uses the network and takes about a minute"]
+    fn the_connections_of_this_mac_are_tested_for_real() {
+        for link in core_netmerge::links() {
+            let started = Instant::now();
+            let web = check_web(&link.name);
+            println!("{} ({}) web {:?} secure {:?} in {:.1}s", link.name, link.label, web.0, web.1, started.elapsed().as_secs_f64());
+            let started = Instant::now();
+            let result = measure(&link.name);
+            println!("{} test {result} in {:.1}s", link.name, started.elapsed().as_secs_f64());
+        }
+    }
+
+    /// `cargo test -p app-ui -- --ignored --nocapture the_probe_of_the_internet`
+    #[test]
+    #[ignore = "uses the network"]
+    fn the_probe_of_the_internet_says_what_this_mac_has() {
+        let started = Instant::now();
+        let reach = probe();
+        println!("probe: {reach:?} in {:.1}s", started.elapsed().as_secs_f64());
+        assert_eq!(reach, Reach::Ok { captive: false });
     }
 }

@@ -60,12 +60,20 @@
     'network.dns.install': 'Make the profile', 'network.dns.settings': 'Open Device Management',
     'network.dns.warn': 'On a company network or a VPN that has its own names, an outside server cannot look them up: remove the profile if work sites stop opening. Phone sharing asks the DNS of the Mac, so stop and start it again after changing this.',
     'sec.network.links': 'Connections',
-    'network.links.desc': 'Each connection of this Mac, how well it answers, and a test of its speed. A test downloads and uploads for about fifteen seconds and uses data, so on a phone or a metered network leave it alone.',
-    'network.speed.test': 'Test speed', 'network.speed.running': 'Testing...', 'network.speed.again': 'Test again',
-    'network.speed.done': 'Down {down}, up {up}, {rtt} ms idle, holds up {grade} under load ({rpm} RPM)',
-    'network.speed.done.short': 'Down {down}, up {up}',
-    'network.speed.grade.low': 'poorly', 'network.speed.grade.medium': 'fairly', 'network.speed.grade.high': 'well',
-    'network.speed.failed.error': 'The test could not finish: this network may block it, or the connection is down.', 'network.speed.failed.empty': 'The test measured nothing.', 'network.speed.failed.unreadable': 'The test gave no result.', 'network.speed.failed.slow': 'The test took too long and was stopped.',
+    'network.links.desc': 'Each connection of this Mac, how well it answers, whether the web and secure sites open through it, and a test of its speed. A test takes a few seconds and moves up to 40 MB down and 12 MB up through that connection alone, so on a phone or a metered network leave it alone.',
+    'network.speed.test': 'Test the connection', 'network.speed.running': 'Testing...', 'network.speed.again': 'Test again',
+    'network.speed.done': 'Down {down}, up {up}, {rtt} ms to connect',
+    'network.speed.done.noup': 'Down {down}, upload could not be measured, {rtt} ms to connect',
+    'network.speed.plain': 'Measured without TLS, since secure sites do not open through this connection.',
+    'network.speed.failed.offline': 'Nothing gets through this connection to the internet.',
+    'network.speed.failed.login': 'This network asks for a sign-in before it lets anything through.',
+    'network.speed.failed.tls': 'Secure connections through it were refused for their certificate, and the speed could not be measured.',
+    'network.speed.failed.slow': 'It moved nothing in the time, so the speed could not be measured.',
+    'network.speed.failed.failed': 'The test could not finish.',
+    'network.web.none': 'The web does not open through this connection.',
+    'network.web.login': 'This connection asks for a sign-in.',
+    'network.web.tls': 'Secure sites (HTTPS) fail the certificate check here: the network may be opening secure traffic and signing it again with a certificate this Mac does not trust.',
+    'network.web.fail': 'Secure sites (HTTPS) do not open through this connection.',
     'network.wifi.line': '{standard}, channel {channel} ({band} GHz, {width} MHz), signal {rssi} dBm, noise {noise} dBm, link {rate} Mbps',
     'network.wifi.grade.good': 'Strong signal', 'network.wifi.grade.fair': 'Fair signal', 'network.wifi.grade.poor': 'Weak signal',
     'sec.network.history': 'History',
@@ -151,12 +159,20 @@
     'network.dns.install': 'Tạo hồ sơ', 'network.dns.settings': 'Mở Quản lý thiết bị',
     'network.dns.warn': 'Trên mạng công ty hoặc VPN có tên miền riêng, máy chủ bên ngoài không tra được chúng: hãy gỡ hồ sơ nếu các trang công việc không mở được. Phone sharing hỏi DNS của máy Mac, nên hãy dừng rồi bật lại sau khi đổi mục này.',
     'sec.network.links': 'Đường mạng',
-    'network.links.desc': 'Từng đường mạng của máy Mac này, mức phản hồi của nó, và phép đo tốc độ. Mỗi lần đo tải xuống và tải lên khoảng mười lăm giây và tốn dữ liệu, nên đừng đo trên mạng điện thoại hay mạng có giới hạn.',
-    'network.speed.test': 'Đo tốc độ', 'network.speed.running': 'Đang đo...', 'network.speed.again': 'Đo lại',
-    'network.speed.done': 'Tải xuống {down}, tải lên {up}, trễ {rtt} ms khi rảnh, {grade} khi đang tải nặng ({rpm} RPM)',
-    'network.speed.done.short': 'Tải xuống {down}, tải lên {up}',
-    'network.speed.grade.low': 'giữ kém', 'network.speed.grade.medium': 'giữ tạm được', 'network.speed.grade.high': 'giữ tốt',
-    'network.speed.failed.error': 'Phép đo không hoàn thành: mạng này có thể chặn nó, hoặc đường mạng đang mất kết nối.', 'network.speed.failed.empty': 'Phép đo không đo được gì.', 'network.speed.failed.unreadable': 'Phép đo không cho kết quả.', 'network.speed.failed.slow': 'Phép đo quá lâu nên đã bị dừng.',
+    'network.links.desc': 'Từng đường mạng của máy Mac này, mức phản hồi của nó, web thường và web bảo mật có mở được qua nó không, và phép đo tốc độ. Mỗi lần đo mất vài giây và chuyển tối đa 40 MB xuống và 12 MB lên chỉ qua đường mạng đó, nên đừng đo trên mạng điện thoại hay mạng có giới hạn.',
+    'network.speed.test': 'Kiểm tra kết nối', 'network.speed.running': 'Đang kiểm tra...', 'network.speed.again': 'Kiểm tra lại',
+    'network.speed.done': 'Tải xuống {down}, tải lên {up}, {rtt} ms để kết nối',
+    'network.speed.done.noup': 'Tải xuống {down}, không đo được tải lên, {rtt} ms để kết nối',
+    'network.speed.plain': 'Đo không qua TLS, vì các trang bảo mật không mở được qua đường mạng này.',
+    'network.speed.failed.offline': 'Không có gì ra được internet qua đường mạng này.',
+    'network.speed.failed.login': 'Mạng này yêu cầu đăng nhập trước khi cho gì đi qua.',
+    'network.speed.failed.tls': 'Kết nối bảo mật qua nó bị từ chối vì chứng chỉ, nên không đo được tốc độ.',
+    'network.speed.failed.slow': 'Nó không chuyển được gì trong thời gian cho phép, nên không đo được tốc độ.',
+    'network.speed.failed.failed': 'Phép kiểm tra không hoàn thành.',
+    'network.web.none': 'Web không mở được qua đường mạng này.',
+    'network.web.login': 'Đường mạng này yêu cầu đăng nhập.',
+    'network.web.tls': 'Các trang bảo mật (HTTPS) không qua được bước kiểm tra chứng chỉ ở đây: mạng có thể đang mở gói tin bảo mật rồi ký lại bằng một chứng chỉ mà máy Mac này không tin.',
+    'network.web.fail': 'Các trang bảo mật (HTTPS) không mở được qua đường mạng này.',
     'network.wifi.line': '{standard}, kênh {channel} ({band} GHz, {width} MHz), tín hiệu {rssi} dBm, nhiễu {noise} dBm, liên kết {rate} Mbps',
     'network.wifi.grade.good': 'Sóng mạnh', 'network.wifi.grade.fair': 'Sóng vừa', 'network.wifi.grade.poor': 'Sóng yếu',
     'sec.network.history': 'Lịch sử',
@@ -281,13 +297,14 @@
       const title = h('div', { class: 'row-title' });
       const line = h('div', { class: 'row-desc' });
       const wifiLine = h('div', { class: 'row-desc network-wifi' });
+      const webLine = h('div', { class: 'row-desc network-web' });
       const result = h('div', { class: 'row-desc network-speed-result' });
       const btn = button(t('network.speed.test'), () => act('network_speed_test:' + name), { small: true });
       const mark = h('select', { class: 'pick network-mark', 'aria-label': t('network.metered.mark') },
         ...['auto', 'metered', 'not'].map((v) => h('option', { value: v, text: t('network.metered.mark.' + v) })));
       mark.addEventListener('change', () => send({ t: 'set', path: 'network.metered.mark', value: { name, state: mark.value } }));
-      const el = h('div', { class: 'row' }, h('div', { class: 'row-text' }, title, line, wifiLine, result), h('div', { class: 'row-control network-link-control' }, mark, btn));
-      return { el, title, line, wifiLine, result, btn, mark };
+      const el = h('div', { class: 'row' }, h('div', { class: 'row-text' }, title, line, wifiLine, webLine, result), h('div', { class: 'row-control network-link-control' }, mark, btn));
+      return { el, title, line, wifiLine, webLine, result, btn, mark };
     };
     reg(() => {
       const links = (N().links || []).filter((l) => l.name);
@@ -303,6 +320,12 @@
         const w = l.wifi;
         r.wifiLine.hidden = !w;
         if (w) r.wifiLine.textContent = t('network.wifi.grade.' + w.grade) + ': ' + t('network.wifi.line', { standard: w.standard || '802.11', channel: w.channel, band: w.band, width: w.width, rssi: w.rssi, noise: w.noise, rate: w.rate });
+        // What is wrong with the web through the connection, found by asking it and not by the answer of a handshake.
+        const web = l.web || (l.speed_test && l.speed_test.web ? { http: l.speed_test.web, https: l.speed_test.https } : null);
+        const problem = !web ? '' : web.http === 'none' ? 'none' : web.http === 'login' ? 'login' : web.https === 'tls' ? 'tls' : web.https === 'fail' ? 'fail' : '';
+        r.webLine.hidden = !problem;
+        r.webLine.textContent = problem ? t('network.web.' + problem) : '';
+        r.webLine.dataset.state = problem ? 'failed' : '';
         const m = N().metered || {};
         r.mark.value = (m.marked || []).includes(l.name) ? 'metered' : (m.unmarked || []).includes(l.name) ? 'not' : 'auto';
         r.mark.hidden = !m.enabled;
@@ -311,9 +334,10 @@
         r.btn.disabled = !!(test && test.state === 'running');
         r.result.hidden = !test || test.state === 'running';
         if (test && test.state === 'done') {
-          r.result.textContent = test.rpm == null
-            ? t('network.speed.done.short', { down: mbps(test.down), up: mbps(test.up) })
-            : t('network.speed.done', { down: mbps(test.down), up: mbps(test.up), rtt: test.rtt == null ? '-' : test.rtt, grade: t('network.speed.grade.' + test.grade), rpm: test.rpm });
+          const text = test.up == null
+            ? t('network.speed.done.noup', { down: mbps(test.down), rtt: test.rtt })
+            : t('network.speed.done', { down: mbps(test.down), up: mbps(test.up), rtt: test.rtt });
+          r.result.textContent = test.plain ? text + ' ' + t('network.speed.plain') : text;
         } else if (test && test.state === 'failed') {
           r.result.textContent = t('network.speed.failed.' + test.reason);
         }
