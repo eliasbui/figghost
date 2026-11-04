@@ -33,6 +33,13 @@ const fn quick(event: &'static str, matcher: Option<&'static str>) -> Subscripti
     }
 }
 
+/// Codex clamps an Interrupt hook to 3 seconds and warns about any longer timeout in its hooks file.
+const CODEX_INTERRUPT: Subscription = Subscription {
+    event: "Interrupt",
+    matcher: None,
+    timeout: 3,
+};
+
 const REQUEST: Subscription = Subscription {
     event: "PermissionRequest",
     matcher: Some("*"),
@@ -64,7 +71,7 @@ const CODEX: &[Subscription] = &[
     REQUEST,
     quick("PostToolUse", Some("*")),
     quick("Stop", None),
-    quick("Interrupt", None),
+    CODEX_INTERRUPT,
     quick("SessionEnd", None),
 ];
 
@@ -777,6 +784,11 @@ mod tests {
         install_hooks(&mut doc, Agent::Codex, EXE).unwrap();
         let events: Vec<&String> = doc["hooks"].as_object().unwrap().keys().collect();
         assert!(events.contains(&&"Interrupt".to_owned()));
+        assert_eq!(doc["hooks"]["Interrupt"][0]["hooks"][0]["timeout"], 3);
+        assert_eq!(
+            doc["hooks"]["Stop"][0]["hooks"][0]["timeout"],
+            QUICK_TIMEOUT_SECONDS
+        );
         assert!(!events.contains(&&"Notification".to_owned()));
         assert_eq!(
             doc["hooks"]["PermissionRequest"][0]["hooks"][0]["command"],
@@ -784,6 +796,17 @@ mod tests {
         );
         assert!(status(&doc, Agent::Codex).complete());
         assert!(!status(&doc, Agent::Claude).complete());
+    }
+
+    #[test]
+    fn reinstall_brings_an_old_codex_interrupt_timeout_down_to_three_seconds() {
+        let command = format!("'{EXE}' --figghost-hook codex");
+        let mut doc = json!({ "hooks": { "Interrupt": [
+            { "hooks": [ { "type": "command", "command": command, "timeout": 10 } ] }
+        ] } });
+        install_hooks(&mut doc, Agent::Codex, EXE).unwrap();
+        assert_eq!(doc["hooks"]["Interrupt"][0]["hooks"][0]["timeout"], 3);
+        assert_eq!(doc["hooks"]["Interrupt"].as_array().unwrap().len(), 1);
     }
 
     #[test]
