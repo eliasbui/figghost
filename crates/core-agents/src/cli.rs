@@ -36,10 +36,12 @@ pub fn driven_by_pi(env: impl Fn(&str) -> Option<String>) -> bool {
         && env("CLAUDE_CODE_ENTRYPOINT").is_some_and(|entry| entry.starts_with("sdk"))
 }
 
-/// Whether this hook runs inside a Claude Code that OpenBot drives for its bots. OpenBot answers their permission
-/// prompts itself, so of their events only the questions with choices come to the notch.
+/// Whether this hook runs inside an agent that OpenBot drives for its bots: a Claude Code through the SDK, or any
+/// agent it starts, such as Codex, which carries `OPENBOT_AGENT_PROCESS`. OpenBot answers their permission prompts
+/// itself, so of their events only the questions with choices come to the notch.
 pub fn driven_by_openbot(env: impl Fn(&str) -> Option<String>) -> bool {
-    env("CLAUDE_AGENT_SDK_CLIENT_APP").is_some_and(|app| app.starts_with("openbot"))
+    env("OPENBOT_AGENT_PROCESS").is_some()
+        || env("CLAUDE_AGENT_SDK_CLIENT_APP").is_some_and(|app| app.starts_with("openbot"))
 }
 
 /// Reads the hook's input, tells the app, and for a permission request prints its answer. Always returns 0.
@@ -227,6 +229,8 @@ mod tests {
             "CLAUDE_AGENT_SDK_CLIENT_APP",
             "other"
         )])));
+        // A Codex that OpenBot starts has no Claude SDK variables, only OpenBot's own.
+        assert!(driven_by_openbot(env(&[("OPENBOT_AGENT_PROCESS", "1")])));
         assert!(!driven_by_openbot(no_env));
     }
 
