@@ -103,6 +103,9 @@ pub struct NotchConfig {
     pub rest_clock: bool,
     /// The previous and next buttons beside them: they skip a track while music plays, else change the tab.
     pub rest_steps: bool,
+    /// Where a notification goes on the closed notch: `auto` (below the camera on a screen with a cutout), `yes`
+    /// (always below a cutout's row) or `no` (from the top edge).
+    pub cutout: String,
     pub haptics: bool,
     /// Which screen: `auto` (the built-in one with a notch, else the main one), `main` or `pointer`.
     pub display: String,
@@ -146,6 +149,7 @@ impl Default for NotchConfig {
             show_in_fullscreen: true,
             rest_clock: true,
             rest_steps: false,
+            cutout: "auto".into(),
             haptics: true,
             display: "auto".into(),
             open_page: "activity".into(),
@@ -243,6 +247,7 @@ impl From<serde_json::Value> for NotchConfig {
             show_in_fullscreen: flag("show_in_fullscreen", d.show_in_fullscreen),
             rest_clock: flag("rest_clock", d.rest_clock),
             rest_steps: flag("rest_steps", d.rest_steps),
+            cutout: word(&v["cutout"], &["auto", "yes", "no"], &d.cutout),
             haptics: flag("haptics", d.haptics),
             display: screen_choice(&v["display"], &d.display),
             open_page,
@@ -290,7 +295,7 @@ impl From<serde_json::Value> for NotchConfig {
 impl NotchConfig {
     /// What the notch itself needs to know.
     pub fn style(&self) -> macos_sys::notch::Style {
-        use macos_sys::notch::{Display, Material, Motion, OpenPage, Rest, Style};
+        use macos_sys::notch::{Cutout, Display, Material, Motion, OpenPage, Rest, Style};
         Style {
             material: match self.material.as_str() {
                 "clear" => Material::ClearGlass,
@@ -336,6 +341,11 @@ impl NotchConfig {
             show_in_fullscreen: self.show_in_fullscreen,
             rest_clock: self.rest_clock,
             rest_steps: self.rest_steps,
+            cutout: match self.cutout.as_str() {
+                "yes" => Cutout::Yes,
+                "no" => Cutout::No,
+                _ => Cutout::Auto,
+            },
         }
     }
 

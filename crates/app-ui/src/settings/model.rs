@@ -374,6 +374,7 @@ fn notch_state(config: &Config, env: &Env) -> Value {
         "show_in_fullscreen": n.show_in_fullscreen,
         "rest_clock": n.rest_clock,
         "rest_steps": n.rest_steps,
+        "cutout": n.cutout,
         "haptics": n.haptics,
         "display": n.display,
         "open_page": n.open_page,
@@ -633,6 +634,10 @@ fn set(config: &mut Config, path: &str, value: &Value) -> Outcome {
         }
         "notch.rest" => {
             config.notch.rest = one_of(value, &["notch", "hidden"])?;
+            Ok(Effect::Notch)
+        }
+        "notch.cutout" => {
+            config.notch.cutout = one_of(value, &["auto", "yes", "no"])?;
             Ok(Effect::Notch)
         }
         "notch.display" => {

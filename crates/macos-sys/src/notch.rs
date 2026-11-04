@@ -114,6 +114,13 @@ const DETAIL_DROP: f64 = 34.0;
 const DETAIL_PAD: f64 = 16.0;
 /// The widest the two lines make the closed shape; longer text ends in an ellipsis.
 const DETAIL_MAX: f64 = 420.0;
+/// A notice (an urgent activity with two lines, such as a notification) is one row: its icon at the left and its two
+/// lines beside it, under the cutout where there is a camera and from the top edge where there is not.
+const NOTICE_ROW: f64 = 48.0;
+const NOTICE_ICON: f64 = 32.0;
+const NOTICE_GAP: f64 = 10.0;
+const NOTICE_MIN: f64 = 260.0;
+const NOTICE_RADIUS: f64 = 22.0;
 /// How long a shape takes to fade in or out when nothing may move.
 const DISSOLVE_SECONDS: f64 = 0.18;
 
@@ -179,6 +186,36 @@ pub enum Rest {
     Hidden,
 }
 
+/// Whether the closed notch keeps its top clear for a camera cutout.
+#[derive(Debug, Clone, Copy, PartialEq, Eq)]
+pub enum Cutout {
+    /// As the screen the notch is on says: whether it has a cutout.
+    Auto,
+    Yes,
+    No,
+}
+
+impl Cutout {
+    /// Whether a notice goes below the cutout's row, on a screen that has a cutout (`hardware`) or not.
+    pub fn below_camera(self, hardware: bool) -> bool {
+        match self {
+            Cutout::Auto => hardware,
+            Cutout::Yes => true,
+            Cutout::No => false,
+        }
+    }
+}
+
+/// How far a notice makes the closed shape grow below the cutout's row: a row of its own below a camera, else only
+/// what the row needs beyond the height of the resting shape, which it then covers.
+fn notice_drop(below_camera: bool, notch_height: f64) -> f64 {
+    if below_camera {
+        NOTICE_ROW
+    } else {
+        (NOTICE_ROW - notch_height).max(0.0)
+    }
+}
+
 /// Which screen the notch lives on.
 #[derive(Debug, Clone, PartialEq, Eq)]
 pub enum Display {
@@ -236,6 +273,8 @@ pub struct Style {
     pub rest_clock: bool,
     /// The previous and next buttons at the two ends of the resting date and time.
     pub rest_steps: bool,
+    /// Where a notice goes on the closed notch: below a camera cutout, or from the top edge.
+    pub cutout: Cutout,
 }
 
 impl Default for Style {
@@ -259,6 +298,7 @@ impl Default for Style {
             show_in_fullscreen: true,
             rest_clock: true,
             rest_steps: false,
+            cutout: Cutout::Auto,
         }
     }
 }
@@ -463,6 +503,15 @@ impl Ear {
             _ => least,
         }
     }
+
+    /// The room it takes at the right of a notice's row: none when empty.
+    fn reserve(&self, height: f64) -> f64 {
+        if matches!(self, Ear::Empty) {
+            0.0
+        } else {
+            self.width(height)
+        }
+    }
 }
 
 fn text_size(height: f64) -> f64 {
@@ -478,29 +527,48 @@ pub struct Detail {
 }
 
 impl Detail {
-    fn fonts() -> (
+    /// The two fonts, larger in a notice's row.
+    fn fonts(
+        notice: bool,
+    ) -> (
         Retained<objc2_app_kit::NSFont>,
         Retained<objc2_app_kit::NSFont>,
     ) {
-        (
-            style::font(12.5, Weight::Semibold),
-            style::font(10.5, Weight::Regular),
-        )
+        if notice {
+            (
+                style::font(14.0, Weight::Semibold),
+                style::font(13.0, Weight::Regular),
+            )
+        } else {
+            (
+                style::font(12.5, Weight::Semibold),
+                style::font(10.5, Weight::Regular),
+            )
+        }
     }
 
-    /// How wide the shape has to be to show both lines.
-    fn width(&self) -> f64 {
-        let (title, subtitle) = Self::fonts();
+    /// How wide the longer of the two lines is.
+    fn text_width(&self, notice: bool) -> f64 {
+        let (title, subtitle) = Self::fonts(notice);
         let measure = |text: &str, font: &objc2_app_kit::NSFont| {
             let attrs = text_attributes(font, &white(1.0), Fit::Clip, false);
             // SAFETY: the attributes dictionary holds valid attribute objects.
             unsafe { NSString::from_str(text).sizeWithAttributes(Some(&attrs)) }.width
         };
-        (measure(&self.title, &title)
+        measure(&self.title, &title)
             .max(measure(&self.subtitle, &subtitle))
             .ceil()
-            + 2.0 * DETAIL_PAD)
-            .min(DETAIL_MAX)
+    }
+
+    /// How wide the shape has to be to show both lines.
+    fn width(&self) -> f64 {
+        (self.text_width(false) + 2.0 * DETAIL_PAD).min(DETAIL_MAX)
+    }
+
+    /// How wide a notice's shape has to be for its icon and both lines, and `reserve` at the right.
+    fn notice_width(&self, reserve: f64) -> f64 {
+        (self.text_width(true) + 2.0 * DETAIL_PAD + NOTICE_ICON + NOTICE_GAP + reserve)
+            .clamp(NOTICE_MIN, DETAIL_MAX)
     }
 }
 
@@ -521,6 +589,13 @@ pub struct Activity {
 /// The priority of what has to be seen at once and goes again by itself, such as a notification: it comes before
 /// everything else that is live, and before the date and time.
 pub const URGENT: u8 = 100;
+
+impl Activity {
+    /// Whether it shows as a notice: one row with the left ear as its icon beside the two lines.
+    fn is_notice(&self) -> bool {
+        self.priority >= URGENT && self.detail.is_some()
+    }
+}
 
 type Signal = Rc<dyn Fn()>;
 type DragSignal = Rc<dyn Fn(bool)>;
@@ -927,6 +1002,11 @@ impl RestBar {
 
 pub struct DetailIvars {
     detail: RefCell<Option<Detail>>,
+    /// A notice's icon, which makes the two lines a notice's row; its picture once decoded, by its id.
+    icon: RefCell<Option<Ear>>,
+    image: RefCell<Option<(u64, Retained<NSImage>)>>,
+    /// What the row leaves free at its right, for the count of a notice where there is no camera above it.
+    reserve: Cell<f64>,
 }
 
 define_class!(
@@ -949,6 +1029,9 @@ impl DetailView {
     fn new(mtm: MainThreadMarker) -> Retained<Self> {
         let this = mtm.alloc::<Self>().set_ivars(DetailIvars {
             detail: RefCell::new(None),
+            icon: RefCell::new(None),
+            image: RefCell::new(None),
+            reserve: Cell::new(0.0),
         });
         // SAFETY: designated initializer with valid arguments on the main thread.
         let this: Retained<Self> = unsafe { msg_send![super(this), initWithFrame: NSRect::ZERO] };
@@ -956,37 +1039,75 @@ impl DetailView {
         this
     }
 
-    fn set(&self, detail: Option<Detail>) {
-        if *self.ivars().detail.borrow() == detail {
+    /// The two lines, and with `icon` the row of a notice.
+    fn set(&self, detail: Option<Detail>, icon: Option<Ear>) {
+        let iv = self.ivars();
+        let same_icon = match (&*iv.icon.borrow(), &icon) {
+            (None, None) => true,
+            (Some(a), Some(b)) => same_look(a, b),
+            _ => false,
+        };
+        if *iv.detail.borrow() == detail && same_icon {
             return;
         }
-        let was_shown = self.ivars().detail.borrow().is_some();
-        *self.ivars().detail.borrow_mut() = detail;
+        if let Some(Ear::Artwork { id, bytes }) = &icon
+            && iv
+                .image
+                .borrow()
+                .as_ref()
+                .is_none_or(|(have, _)| have != id)
+        {
+            let image = NSImage::initWithData(NSImage::alloc(), &NSData::with_bytes(bytes));
+            *iv.image.borrow_mut() = image.map(|image| (*id, image));
+        }
+        let was_shown = iv.detail.borrow().is_some();
+        *iv.detail.borrow_mut() = detail;
+        *iv.icon.borrow_mut() = icon;
         if was_shown {
             fade_up(self);
         }
         self.setNeedsDisplay(true);
     }
 
+    fn set_reserve(&self, reserve: f64) {
+        if self.ivars().reserve.replace(reserve) != reserve {
+            self.setNeedsDisplay(true);
+        }
+    }
+
     fn paint(&self) {
         let Some(detail) = self.ivars().detail.borrow().clone() else {
             return;
         };
+        let icon = self.ivars().icon.borrow().clone();
+        let notice = icon.is_some();
         let bounds = self.bounds();
-        let (title_font, subtitle_font) = Detail::fonts();
-        let (title_h, subtitle_h) = (15.0, 13.0);
-        let bottom = (bounds.size.height - title_h - subtitle_h) / 2.0 - 1.0;
+        let (title_font, subtitle_font) = Detail::fonts(notice);
+        // A notice's row is at the bottom; its lines start after the icon and leave the reserve free at the right.
+        let row = bounds.size.height.min(NOTICE_ROW);
+        let (x, right, (title_h, subtitle_h), alpha) = if notice {
+            (
+                DETAIL_PAD + NOTICE_ICON + NOTICE_GAP,
+                DETAIL_PAD.max(self.ivars().reserve.get()),
+                (18.0, 16.0),
+                0.72,
+            )
+        } else {
+            (DETAIL_PAD / 2.0, DETAIL_PAD / 2.0, (15.0, 13.0), 0.62)
+        };
+        let height = if notice { row } else { bounds.size.height };
+        let bottom = (height - title_h - subtitle_h) / 2.0 - if notice { 0.0 } else { 1.0 };
         let line = |text: &str, y: f64, height: f64, font: &objc2_app_kit::NSFont, alpha: f64| {
             draw_text(
                 text,
                 NSRect::new(
-                    NSPoint::new(DETAIL_PAD / 2.0, y),
-                    NSSize::new(bounds.size.width - DETAIL_PAD, height),
+                    NSPoint::new(x, y),
+                    NSSize::new((bounds.size.width - x - right).max(0.0), height),
                 ),
-                &text_attributes(font, &white(alpha), Fit::Tail, true),
+                &text_attributes(font, &white(alpha), Fit::Tail, !notice),
             );
         };
-        line(&detail.subtitle, bottom, subtitle_h, &subtitle_font, 0.62);
+        line(&detail.subtitle, bottom, subtitle_h, &subtitle_font, alpha);
         line(
             &detail.title,
             bottom + subtitle_h,
@@ -994,6 +1115,35 @@ impl DetailView {
             &title_font,
             1.0,
         );
+        if let Some(icon) = icon {
+            let rect = NSRect::new(
+                NSPoint::new(DETAIL_PAD, (row - NOTICE_ICON) / 2.0),
+                NSSize::new(NOTICE_ICON, NOTICE_ICON),
+            );
+            let path = NSBezierPath::bezierPathWithRoundedRect_xRadius_yRadius(rect, 7.0, 7.0);
+            match (&icon, &*self.ivars().image.borrow()) {
+                (Ear::Artwork { .. }, Some((_, image))) => {
+                    objc2_app_kit::NSGraphicsContext::saveGraphicsState_class();
+                    path.addClip();
+                    draw_filled(image, rect);
+                    objc2_app_kit::NSGraphicsContext::restoreGraphicsState_class();
+                }
+                // Without the app's icon: its symbol in white on a tile of its colour.
+                (Ear::Symbol { name, tone, .. }, _) => {
+                    tone.color().setFill();
+                    path.fill();
+                    let centre = NSPoint::new(
+                        rect.origin.x + NOTICE_ICON / 2.0,
+                        rect.origin.y + NOTICE_ICON / 2.0,
+                    );
+                    style::draw_symbol(name, centre, 17.0, &white(1.0));
+                }
+                _ => {
+                    white(0.16).setFill();
+                    path.fill();
+                }
+            }
+        }
     }
 }
 
@@ -1331,10 +1481,12 @@ pub struct Page {
 #[derive(Debug, Clone, Copy, PartialEq)]
 enum Shape {
     Rest,
-    /// Widened by `ear` on each side of the cutout, for something live, and `drop` taller to hold two lines of text.
+    /// Widened by `ear` on each side of the cutout, for something live, and `drop` taller to hold two lines of text;
+    /// `notice` when the two lines are a notice's row.
     Compact {
         ear: f64,
         drop: f64,
+        notice: bool,
     },
     Open,
 }
@@ -1664,6 +1816,14 @@ impl Inner {
         self.shape.get() == Shape::Open
     }
 
+    /// Whether a notice goes below a camera cutout on the notch's screen, as the user chose.
+    fn below_camera(&self) -> bool {
+        self.style
+            .borrow()
+            .cutout
+            .below_camera(self.geometry.get().hardware)
+    }
+
     fn page_visible(&self, index: usize) -> bool {
         self.order.borrow().contains(&index)
     }
@@ -1673,7 +1833,7 @@ impl Inner {
         let geometry = self.geometry.get();
         match shape {
             Shape::Rest => geometry.rest_size(self.style.borrow().rest),
-            Shape::Compact { ear, drop } => NSSize::new(
+            Shape::Compact { ear, drop, .. } => NSSize::new(
                 geometry.notch.width + 2.0 * ear,
                 geometry.notch.height + drop,
             ),
@@ -1684,8 +1844,15 @@ impl Inner {
     fn radius_of(&self, shape: Shape) -> f64 {
         match shape {
             Shape::Rest => COLLAPSED_RADIUS,
-            Shape::Compact { drop, .. } => ((self.geometry.get().notch.height + drop) / 2.0)
-                .min(if drop > 0.0 { 20.0 } else { 13.0 }),
+            Shape::Compact { drop, notice, .. } => {
+                ((self.geometry.get().notch.height + drop) / 2.0).min(if notice {
+                    NOTICE_RADIUS
+                } else if drop > 0.0 {
+                    20.0
+                } else {
+                    13.0
+                })
+            }
             Shape::Open => PANEL_RADIUS,
         }
     }
@@ -1758,10 +1925,26 @@ impl Inner {
             Shape::Compact { ear, .. } => ear,
             _ => self.left.frame().size.width,
         };
+        // A notice without a camera above it covers the whole shape, and leaves the right ear's count free.
+        let over_ears =
+            matches!(self.shape.get(), Shape::Compact { notice: true, .. }) && !self.below_camera();
         self.detail.setFrame(NSRect::new(
             NSPoint::ZERO,
-            NSSize::new(size.width, (size.height - ear_height).max(0.0)),
+            NSSize::new(
+                size.width,
+                if over_ears {
+                    size.height
+                } else {
+                    (size.height - ear_height).max(0.0)
+                },
+            ),
         ));
+        let reserve = if over_ears {
+            self.right.ivars().state.borrow().ear.reserve(ear_height)
+        } else {
+            0.0
+        };
+        self.detail.set_reserve(reserve);
         let top = size.height - ear_height;
         // On a pill with something live the ears are at the two ends and the date and time take the middle.
         let (bar_x, bar_width) = match self.shape.get() {
@@ -1786,10 +1969,18 @@ impl Inner {
             NSPoint::new(0.0, top),
             NSSize::new(ear, ear_height),
         ));
-        self.right.setFrame(NSRect::new(
-            NSPoint::new(size.width - ear, top),
-            NSSize::new(ear, ear_height),
-        ));
+        // Over the ears a notice's count is at the end of its row, in the room the row leaves it.
+        self.right.setFrame(if over_ears {
+            NSRect::new(
+                NSPoint::new(size.width - reserve - DETAIL_PAD / 2.0, 0.0),
+                NSSize::new(reserve, size.height.min(NOTICE_ROW)),
+            )
+        } else {
+            NSRect::new(
+                NSPoint::new(size.width - ear, top),
+                NSSize::new(ear, ear_height),
+            )
+        });
     }
 
     /// Moves the shape to `target`. The window grows to the largest shape at once, the shape moves inside it frame by
@@ -2299,6 +2490,30 @@ impl Inner {
     /// The closed shape: widened for an activity, else at rest.
     fn closed_shape(&self) -> Shape {
         match self.current_activity() {
+            Some(activity) if activity.is_notice() => {
+                let geometry = self.geometry.get();
+                let below = self.below_camera();
+                // Below a camera the count sits in the row above; otherwise it takes room at the right of the row.
+                let reserve = if below {
+                    0.0
+                } else {
+                    activity.right.reserve(geometry.notch.height)
+                };
+                let wide = activity
+                    .detail
+                    .as_ref()
+                    .map_or(NOTICE_MIN, |d| d.notice_width(reserve));
+                let ear = activity
+                    .right
+                    .width(geometry.notch.height)
+                    .max((wide - geometry.notch.width) / 2.0)
+                    .max(0.0);
+                Shape::Compact {
+                    ear: ear.round(),
+                    drop: notice_drop(below, geometry.notch.height),
+                    notice: true,
+                }
+            }
             Some(activity) => {
                 let height = self.geometry.get().notch.height;
                 let ear = activity
@@ -2316,6 +2531,7 @@ impl Inner {
                     } else {
                         0.0
                     },
+                    notice: false,
                 }
             }
             // The middle of a hardware notch is the camera, so the time and the date go in the ears beside it.
@@ -2323,6 +2539,7 @@ impl Inner {
                 Shape::Compact {
                     ear: REST_EAR,
                     drop: 0.0,
+                    notice: false,
                 }
             }
             None => Shape::Rest,
@@ -2335,10 +2552,14 @@ impl Inner {
         let (left, right) = activity.as_ref().map_or((Ear::Empty, Ear::Empty), |a| {
             (a.left.clone(), a.right.clone())
         });
-        self.left.set(&left);
+        // A notice's left ear is the icon of its row instead.
+        let notice = activity.as_ref().is_some_and(Activity::is_notice);
+        self.left.set(if notice { &Ear::Empty } else { &left });
         self.right.set(&right);
-        self.detail
-            .set(activity.as_ref().and_then(|a| a.detail.clone()));
+        self.detail.set(
+            activity.as_ref().and_then(|a| a.detail.clone()),
+            notice.then_some(left),
+        );
         if !self.is_open() && self.shows() {
             let target = self.closed_shape();
             if target != self.shape.get() {
@@ -3839,6 +4060,18 @@ impl Notch {
 #[cfg(test)]
 mod tests {
     use super::*;
+
+    #[test]
+    fn a_notice_goes_below_the_camera_only_where_there_is_one_or_the_user_says_so() {
+        assert!(Cutout::Auto.below_camera(true));
+        assert!(!Cutout::Auto.below_camera(false));
+        assert!(Cutout::Yes.below_camera(false));
+        assert!(!Cutout::No.below_camera(true));
+        // Below the camera the row is added to the cutout's height; without one the shape is the row's height.
+        assert_eq!(notice_drop(true, 32.0), NOTICE_ROW);
+        assert_eq!(32.0 + notice_drop(false, 32.0), NOTICE_ROW);
+        assert_eq!(notice_drop(false, 50.0), 0.0);
+    }
 
     #[test]
     fn many_page_icons_widen_the_strip_and_never_squeeze_the_search_field() {

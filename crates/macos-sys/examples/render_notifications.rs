@@ -7,7 +7,7 @@
 
 use macos_sys::{
     MainThreadMarker, app,
-    notch::{Activity, Detail, Ear, Notch, NotchGeometry, Style, URGENT},
+    notch::{Activity, Cutout, Detail, Ear, Notch, NotchGeometry, Style, URGENT},
     notifications_ui::{
         NoticeRow, NotificationsCallbacks, NotificationsDisplay, NotificationsView, PAGE_SIZE,
     },
@@ -235,20 +235,75 @@ fn main() {
             page: None,
             priority: URGENT,
         };
-        let steps: Vec<(&str, &str, Option<Activity>)> = vec![
-            ("closed_music", "music", Some(music)),
-            ("closed_notification", "notifications", Some(notification)),
-            ("closed_after", "notifications", None),
+        let long = Activity {
+            detail: Some(Detail {
+                title: "Báo cáo tiến độ dự án ABC tháng mười một, bản cập nhật cuối".into(),
+                subtitle:
+                    "Kính gửi anh, em gửi kèm bảng tổng hợp tiến độ và danh sách việc còn lại"
+                        .into(),
+            }),
+            right: Ear::Text {
+                text: "+2".into(),
+                tone: Tone::Gray,
+            },
+            ..notification.clone()
+        };
+        let no_icon = Activity {
+            left: Ear::Symbol {
+                name: "bell.fill",
+                tone: Tone::Blue,
+                pulse: false,
+            },
+            ..notification.clone()
+        };
+        // The notices again as below a camera cutout, which the setting can ask for on a pill too.
+        let steps: Vec<(&str, &str, Option<Activity>, Cutout)> = vec![
+            ("closed_music", "music", Some(music), Cutout::Auto),
+            (
+                "closed_notification",
+                "notifications",
+                Some(notification.clone()),
+                Cutout::Auto,
+            ),
+            (
+                "closed_long",
+                "notifications",
+                Some(long.clone()),
+                Cutout::Auto,
+            ),
+            (
+                "closed_no_icon",
+                "notifications",
+                Some(no_icon),
+                Cutout::Auto,
+            ),
+            (
+                "closed_cutout",
+                "notifications",
+                Some(notification),
+                Cutout::Yes,
+            ),
+            (
+                "closed_cutout_long",
+                "notifications",
+                Some(long),
+                Cutout::Yes,
+            ),
+            ("closed_after", "notifications", None, Cutout::Auto),
         ];
         let step = Cell::new(0_usize);
         let timer = app::every(0.7, move || {
             let n = step.get();
             step.set(n + 1);
             // Two ticks each: the first changes what is live, the second takes the picture once the shape has settled.
-            let Some((name, slot, activity)) = steps.get(n / 2) else {
+            let Some((name, slot, activity, cutout)) = steps.get(n / 2) else {
                 process::exit(0);
             };
             if n % 2 == 0 {
+                notch.configure(&Style {
+                    cutout: *cutout,
+                    ..Style::default()
+                });
                 notch.set_activity(slot, activity.clone());
             } else {
                 write(name, notch.snapshot_closed_png());
