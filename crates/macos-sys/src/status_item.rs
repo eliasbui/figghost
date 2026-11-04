@@ -515,11 +515,6 @@ impl StatusMenu {
         }
     }
 
-    /// The menu itself, for another place to show: the three dots of the notch.
-    pub fn menu(&self) -> Retained<NSMenu> {
-        self._menu.clone()
-    }
-
     /// Shows the icon in the menu bar or takes it out; the menu and the item's place are kept. The system
     /// remembers the choice for the next launch, so the app sets it at every start.
     pub fn set_visible(&self, visible: bool) {

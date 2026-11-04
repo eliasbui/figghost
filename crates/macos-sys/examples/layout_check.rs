@@ -1,6 +1,6 @@
 //! Checks that every page of the notch lands inside the window once it is open, including pages added
 //! while the notch was still collapsed, that the strip of page icons has one icon per page and sits at the right of
-//! the header with the three dots at its left, and that the shape is the size of the page it shows. Exits with
+//! the header, and that the shape is the size of the page it shows. Exits with
 //! status 1 on a failure.
 //! `cargo run -p macos-sys --example layout_check`
 
@@ -107,12 +107,6 @@ fn inspect(mtm: MainThreadMarker, open: NSSize) -> usize {
                     "the page strip ends {gap} short of the shape's right edge, expected about 16"
                 ));
             }
-        }
-        if name.contains("NotchOrb") && !(8.0..=24.0).contains(&(f.origin.x - left)) {
-            fail(format!(
-                "the three dots start {} from the shape's left edge, expected about 16",
-                f.origin.x - left
-            ));
         }
     }
     failures

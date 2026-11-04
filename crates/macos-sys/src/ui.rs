@@ -25,7 +25,7 @@ use objc2_foundation::{
     NSNotification, NSNotificationCenter, NSObjectProtocol, NSPoint, NSRect, NSSize, NSString,
 };
 use std::{
-    cell::RefCell,
+    cell::{Cell, RefCell},
     collections::HashMap,
     path::{Path, PathBuf},
     ptr::NonNull,
@@ -56,10 +56,6 @@ const TILE_INSET: f64 = 4.0;
 const TILE_RADIUS: f64 = 16.0;
 /// How many cards a Page Up or Page Down moves over.
 const STRIP_PAGE: isize = 4;
-/// Where the search field of the strip starts: after the three dots of the notch's header.
-const STRIP_SEARCH_X: f64 = 70.0;
-/// What the strip's search field leaves free at its right for the page icons of the notch's header: up to eight.
-const STRIP_TOOLS: f64 = 16.0 + crate::switcher::width_for(8) + 8.0;
 
 /// How the rows look: the flat list of the cursor popup, the vertical cards of the notch, or the notch's strip of
 /// cards that scrolls sideways.
@@ -975,7 +971,8 @@ struct Chip {
 
 /// Where things sit in the surface, from its size.
 struct Geometry {
-    size: NSSize,
+    /// The strip's width follows the notch's header (`set_width`), so it can change; its height does not.
+    size: Cell<NSSize>,
     search_top: f64,
 }
 
@@ -1000,20 +997,31 @@ impl ClipView {
         self.sync_chips();
     }
 
-    /// The notch strip's search field shares the header row, between the three dots and the page icons; `whole`
-    /// gives it the row to itself, for when the notch puts those beside the cutout instead.
-    pub fn set_search_row(&self, whole: bool) {
+    /// The notch strip's search field shares the header row with the page icons: `beside` is the span left of
+    /// them, from and to an x of the strip. `None` gives it the row to itself, for when the notch puts the icons
+    /// beside the cutout instead.
+    pub fn set_search_row(&self, beside: Option<(f64, f64)>) {
+        let width = self.root.frame().size.width;
+        let (from, to) = beside.unwrap_or((MARGIN + 4.0, width - MARGIN - 4.0));
+        let from = from.max(MARGIN);
         let mut frame = self.search.frame();
-        let (x, right) = if whole {
-            (MARGIN + 4.0, MARGIN + 4.0)
-        } else {
-            (STRIP_SEARCH_X, STRIP_TOOLS)
-        };
-        frame.origin.x = x;
-        frame.size.width = self.root.frame().size.width - x - right;
+        frame.origin.x = from;
+        frame.size.width = (to.min(width - MARGIN) - from).max(0.0);
         if frame != self.search.frame() {
             self.search.setFrame(frame);
         }
+    }
+
+    /// Makes the strip this wide, for a notch header that needs more room than the strip has.
+    pub fn set_width(&self, width: f64) {
+        let mut size = self.geometry.size.get();
+        if size.width == width {
+            return;
+        }
+        size.width = width;
+        self.geometry.size.set(size);
+        self.root.setFrameSize(size);
+        self.relayout();
     }
 
     /// Selects the chip of the filter that is in the search text, or "All" when there is none.
@@ -1080,7 +1088,7 @@ impl ClipView {
     /// to fit; board chips wrap onto rows of their own.
     fn relayout(&self) {
         let chips = self.chips.borrow();
-        let room = self.geometry.size.width - 2.0 * MARGIN;
+        let room = self.geometry.size.get().width - 2.0 * MARGIN;
         let top = self.geometry.search_top - SEARCH_HEIGHT - 8.0;
         let mut rows = 0usize;
         let place = |chip: &Chip, x: f64, row: usize, width: f64| {
@@ -1128,10 +1136,10 @@ impl ClipView {
         let list_height = top - block - FOOTER_HEIGHT;
         self.scroll.setFrame(NSRect::new(
             NSPoint::new(0.0, FOOTER_HEIGHT),
-            NSSize::new(self.geometry.size.width, list_height),
+            NSSize::new(self.geometry.size.get().width, list_height),
         ));
         self.list
-            .set_viewport(self.geometry.size.width, list_height);
+            .set_viewport(self.geometry.size.get().width, list_height);
     }
 
     /// The board after `current` in the order they are shown; after the last comes none.
@@ -1356,7 +1364,7 @@ impl ClipUi {
         let root = PageRoot::new(mtm, frame, hint);
 
         let strip = list_style == ListStyle::Strip;
-        // The strip's search field shares the header row of the notch: after the three dots, before the page icons.
+        // The strip's search field shares the header row of the notch, before the page icons (`set_search_row`).
         let search_top = if strip {
             size.height - top_inset - 2.0
         } else {
@@ -1364,8 +1372,8 @@ impl ClipUi {
         };
         let search_frame = if strip {
             NSRect::new(
-                NSPoint::new(STRIP_SEARCH_X, search_top - SEARCH_HEIGHT),
-                NSSize::new(size.width - STRIP_SEARCH_X - STRIP_TOOLS, SEARCH_HEIGHT),
+                NSPoint::new(MARGIN + 4.0, search_top - SEARCH_HEIGHT),
+                NSSize::new(size.width - 2.0 * (MARGIN + 4.0), SEARCH_HEIGHT),
             )
         } else {
             NSRect::new(
@@ -1431,7 +1439,10 @@ impl ClipUi {
             list,
             scroll,
             mtm,
-            geometry: Rc::new(Geometry { size, search_top }),
+            geometry: Rc::new(Geometry {
+                size: Cell::new(size),
+                search_top,
+            }),
             chips: Rc::new(RefCell::new(chips)),
             boards: Rc::default(),
             extras: Rc::default(),

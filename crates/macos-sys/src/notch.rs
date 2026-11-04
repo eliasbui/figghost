@@ -17,7 +17,7 @@ use crate::{
     pin_ui::{self, Listed},
     silhouette::{self, Outline},
     style::{self, PANEL_RADIUS, Tone, Weight, white},
-    switcher::{self, NotchOrb, PageSwitcher},
+    switcher::{self, PageSwitcher},
     ui::{AppCallbacks, Callbacks, ClipUi, ClipView, ListStyle, handle_key},
     widgets::{Fit, draw_text, text_attributes},
     window::Frame,
@@ -36,8 +36,8 @@ use objc2_app_kit::{
     NSColor, NSCompositingOperation, NSDragOperation, NSDraggingDestination, NSDraggingInfo,
     NSEvent, NSEventMask, NSGlassEffectView, NSGlassEffectViewStyle, NSGraphicsContext,
     NSHapticFeedbackManager, NSHapticFeedbackPattern, NSHapticFeedbackPerformanceTime,
-    NSHapticFeedbackPerformer, NSImage, NSImageInterpolation, NSMenu, NSPasteboardTypeFileURL,
-    NSScreen, NSStatusBar, NSStringDrawing, NSTrackingArea, NSTrackingAreaOptions, NSView,
+    NSHapticFeedbackPerformer, NSImage, NSImageInterpolation, NSPasteboardTypeFileURL, NSScreen,
+    NSStatusBar, NSStringDrawing, NSTrackingArea, NSTrackingAreaOptions, NSView,
     NSVisualEffectBlendingMode, NSVisualEffectMaterial, NSVisualEffectState, NSVisualEffectView,
     NSWindowDidResignKeyNotification, NSWindowSharingType, NSWorkspace,
 };
@@ -73,6 +73,15 @@ pub const TAB_BAR_HEIGHT: f64 = 32.0;
 const SWITCHER_INSET: f64 = 16.0;
 /// Room kept between the header and the cutout when the header sits beside it.
 const BAND_GAP: f64 = 8.0;
+/// The narrowest the clipboard's search field gets beside the page icons; more icons widen the strip instead.
+const MIN_SEARCH: f64 = 160.0;
+
+/// The width of the clipboard strip with this many page icons in the header: wide enough for its search field
+/// beside them.
+fn strip_width(pages: usize) -> f64 {
+    let header = switcher::width_for(pages) + 2.0 * SWITCHER_INSET + BAND_GAP;
+    STRIP_WIDTH.max(header + MIN_SEARCH)
+}
 /// Width of the resting shape on a screen without a hardware notch.
 pub const PILL_WIDTH: f64 = 200.0;
 const HOT_ZONE_HEIGHT: f64 = 4.0;
@@ -1357,9 +1366,6 @@ struct Inner {
     content: Retained<NSView>,
     view: ClipView,
     switcher: Retained<PageSwitcher>,
-    /// The three dots at the left of the header, which show `orb_menu`.
-    orb: Retained<NotchOrb>,
-    orb_menu: RefCell<Option<Retained<NSMenu>>>,
     pages: RefCell<Vec<Page>>,
     /// The visible pages, in tab order (indices into `pages`).
     order: RefCell<Vec<usize>>,
@@ -2617,7 +2623,8 @@ impl Inner {
             .is_some_and(|page| (page.on_key)(key))
     }
 
-    /// Puts the three dots at the left of the header row and the page icons at its right, below the cutout.
+    /// Puts the page icons at the right of the header row, below the cutout, and the clipboard's search field left of
+    /// them.
     fn layout_header(&self) {
         let geometry = self.geometry.get();
         let content = self.content_size.get();
@@ -2632,12 +2639,18 @@ impl Inner {
         } else {
             content.height - geometry.top_inset() - 2.0 - switcher::HEIGHT
         };
-        self.orb
-            .setFrameOrigin(NSPoint::new(left + SWITCHER_INSET, y));
         let width = self.switcher.frame().size.width;
         self.switcher
             .setFrameOrigin(NSPoint::new(left + shape_width - SWITCHER_INSET - width, y));
-        self.view.set_search_row(band);
+        // Laid out for the open shape, not for this frame of its movement, so the field does not resize as it grows.
+        let beside = (!band).then(|| {
+            let open = self.open_width();
+            let root_x = self.page_origin(self.page_size(0)).x;
+            let from = (content.width - open) / 2.0 + SWITCHER_INSET - root_x;
+            let to = (content.width + open) / 2.0 - SWITCHER_INSET - width - BAND_GAP - root_x;
+            (from, to)
+        });
+        self.view.set_search_row(beside);
     }
 
     /// The width of the open shape: the widest visible page's, never narrower than the user chose. The shape keeps
@@ -2657,15 +2670,13 @@ impl Inner {
         widest.max(self.style.borrow().min_width)
     }
 
-    /// Whether the header (the three dots and the page icons) sits in the band beside the cutout of a screen with a
+    /// Whether the header (the page icons, with the clipboard's search field) sits in the band beside the cutout of a screen with a
     /// notch, instead of in a row below it. A page then starts right under the cutout and the open shape has no
     /// empty band across its top, as Apple asks of the Dynamic Island. Only when both fit on their side of it.
     fn header_in_band(&self) -> bool {
         let geometry = self.geometry.get();
         let side = (self.open_width() - geometry.notch.width) / 2.0 - SWITCHER_INSET - BAND_GAP;
-        geometry.hardware
-            && switcher::width_for(self.order.borrow().len()) <= side
-            && switcher::ORB_WIDTH <= side
+        geometry.hardware && switcher::width_for(self.order.borrow().len()) <= side
     }
 
     /// What lies above a page's root: the cutout, and the header row unless the header sits beside the cutout.
@@ -2836,6 +2847,16 @@ impl Inner {
         drop((pages, dormant));
         *self.order.borrow_mut() = order;
         self.sync_switcher();
+        let strip = strip_width(self.order.borrow().len());
+        if let Some(size) = self
+            .pages
+            .borrow_mut()
+            .get_mut(0)
+            .and_then(|p| p.size.as_mut())
+        {
+            size.width = strip;
+        }
+        self.view.set_width(strip);
         // The number of tabs decides whether the header fits beside the cutout, and with it the height of a page.
         self.sync_content();
     }
@@ -3207,12 +3228,9 @@ impl Notch {
         let header_y = EXPANDED_SIZE.height - geometry.top_inset() - 2.0 - switcher::HEIGHT;
         let switcher = PageSwitcher::new(mtm, NSPoint::new(SWITCHER_INSET, header_y));
         content.addSubview(&switcher);
-        let orb = NotchOrb::new(mtm, NSPoint::new(SWITCHER_INSET, header_y));
-        content.addSubview(&orb);
-        // Each in a layer of its own: they ride the edges of the shape on every frame of a movement, and a view drawn
-        // into the content's layer would make the window server ask for the content to be painted again each time.
+        // In a layer of its own: it rides the edge of the shape on every frame of a movement, and a view drawn into
+        // the content's layer would make the window server ask for the content to be painted again each time.
         switcher.setWantsLayer(true);
-        orb.setWantsLayer(true);
         ui.view.root.setHidden(true);
 
         let inner = Rc::new_cyclic(|me| Inner {
@@ -3232,8 +3250,6 @@ impl Notch {
             content,
             view: ui.view.clone(),
             switcher: Retained::clone(&switcher),
-            orb: Retained::clone(&orb),
-            orb_menu: RefCell::new(None),
             pages: RefCell::new(Vec::new()),
             order: RefCell::new(Vec::new()),
             dormant: RefCell::new(Vec::new()),
@@ -3326,17 +3342,6 @@ impl Notch {
                     if let Some(page) = page {
                         inner.select_page(page);
                     }
-                }
-            });
-        }
-        {
-            let weak = Rc::downgrade(&inner);
-            orb.set_on_click(move |view, event| {
-                let menu = weak
-                    .upgrade()
-                    .and_then(|inner| inner.orb_menu.borrow().clone());
-                if let Some(menu) = menu {
-                    NSMenu::popUpContextMenu_withEvent_forView(&menu, event, view);
                 }
             });
         }
@@ -3456,11 +3461,6 @@ impl Notch {
 
     pub fn view(&self) -> &ClipView {
         &self.ui.view
-    }
-
-    /// The menu the three dots at the left of the header show.
-    pub fn set_orb_menu(&self, menu: Retained<NSMenu>) {
-        *self.inner.orb_menu.borrow_mut() = Some(menu);
     }
 
     /// Applies how the notch looks and behaves. Cheap to call again with the same style.
@@ -3839,6 +3839,16 @@ impl Notch {
 #[cfg(test)]
 mod tests {
     use super::*;
+
+    #[test]
+    fn many_page_icons_widen_the_strip_and_never_squeeze_the_search_field() {
+        assert_eq!(strip_width(8), STRIP_WIDTH);
+        for pages in [16, 22, 30] {
+            let room =
+                strip_width(pages) - 2.0 * SWITCHER_INSET - switcher::width_for(pages) - BAND_GAP;
+            assert!(room >= MIN_SEARCH, "{pages} pages leave {room}");
+        }
+    }
 
     fn listed(pid: i32, layer: i32, x: f64, y: f64, w: f64, h: f64, alpha: f64) -> Listed {
         Listed {
