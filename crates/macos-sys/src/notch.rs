@@ -103,6 +103,8 @@ const BAND_DEPTH: f64 = 72.0;
 /// The height a detail line pair adds below the ears, and the room it leaves at the sides of its text.
 const DETAIL_DROP: f64 = 34.0;
 const DETAIL_PAD: f64 = 16.0;
+/// The widest the two lines make the closed shape; longer text ends in an ellipsis.
+const DETAIL_MAX: f64 = 420.0;
 /// How long a shape takes to fade in or out when nothing may move.
 const DISSOLVE_SECONDS: f64 = 0.18;
 
@@ -485,10 +487,11 @@ impl Detail {
             // SAFETY: the attributes dictionary holds valid attribute objects.
             unsafe { NSString::from_str(text).sizeWithAttributes(Some(&attrs)) }.width
         };
-        measure(&self.title, &title)
+        (measure(&self.title, &title)
             .max(measure(&self.subtitle, &subtitle))
             .ceil()
-            + 2.0 * DETAIL_PAD
+            + 2.0 * DETAIL_PAD)
+            .min(DETAIL_MAX)
     }
 }
 
@@ -971,7 +974,7 @@ impl DetailView {
                     NSPoint::new(DETAIL_PAD / 2.0, y),
                     NSSize::new(bounds.size.width - DETAIL_PAD, height),
                 ),
-                &text_attributes(font, &white(alpha), Fit::Clip, true),
+                &text_attributes(font, &white(alpha), Fit::Tail, true),
             );
         };
         line(&detail.subtitle, bottom, subtitle_h, &subtitle_font, 0.62);
@@ -1388,6 +1391,8 @@ struct Inner {
     /// The person asked the notch not to open when the pointer reaches it, for a while.
     snoozed: Cell<bool>,
     activities: RefCell<Vec<(&'static str, Activity, u64)>>,
+    /// What a click on the closed notch does while the activity of a slot is on show, in place of opening the notch.
+    activity_clicks: RefCell<Vec<(&'static str, Signal)>>,
     serial: Cell<u64>,
     /// The ears' bars are redrawn by this while they are on screen; nothing runs otherwise.
     bars: RefCell<Option<app::Timer>>,
@@ -2268,6 +2273,21 @@ impl Inner {
             .iter()
             .max_by_key(|(_, activity, serial)| (activity.priority, *serial))
             .map(|(_, activity, _)| activity.clone())
+    }
+
+    /// The click of the activity on show, when its slot gave one.
+    fn activity_click(&self) -> Option<Signal> {
+        let slot = self
+            .activities
+            .borrow()
+            .iter()
+            .max_by_key(|(_, activity, serial)| (activity.priority, *serial))
+            .map(|(slot, ..)| *slot)?;
+        self.activity_clicks
+            .borrow()
+            .iter()
+            .find(|(s, _)| *s == slot)
+            .map(|(_, click)| Rc::clone(click))
     }
 
     /// The closed shape: widened for an activity, else at rest.
@@ -3237,6 +3257,7 @@ impl Notch {
             suppressed: Cell::new(false),
             snoozed: Cell::new(false),
             activities: RefCell::new(Vec::new()),
+            activity_clicks: RefCell::new(Vec::new()),
             serial: Cell::new(0),
             bars: RefCell::new(None),
             rest_bar,
@@ -3377,7 +3398,11 @@ impl Notch {
             });
         }
         let on_click = Rc::clone(&inner);
-        *root.ivars().on_click.borrow_mut() = Some(Rc::new(move || on_click.expand(true, None)));
+        *root.ivars().on_click.borrow_mut() =
+            Some(Rc::new(move || match on_click.activity_click() {
+                Some(click) => click(),
+                None => on_click.expand(true, None),
+            }));
 
         let center = NSNotificationCenter::defaultCenter();
         let window: &AnyObject = &panel;
@@ -3562,6 +3587,15 @@ impl Notch {
             }
         }
         self.inner.refresh_activity();
+    }
+
+    /// Sets or (with `None`) ends what a click on the closed notch does while the activity of `slot` is on show.
+    pub fn set_activity_click(&self, slot: &'static str, click: Option<Rc<dyn Fn()>>) {
+        let mut clicks = self.inner.activity_clicks.borrow_mut();
+        clicks.retain(|(s, _)| *s != slot);
+        if let Some(click) = click {
+            clicks.push((slot, click));
+        }
     }
 
     /// Draws the open notch showing `page` into PNG bytes, without showing anything on screen: the shape is laid out

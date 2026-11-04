@@ -36,6 +36,12 @@ pub fn driven_by_pi(env: impl Fn(&str) -> Option<String>) -> bool {
         && env("CLAUDE_CODE_ENTRYPOINT").is_some_and(|entry| entry.starts_with("sdk"))
 }
 
+/// Whether this hook runs inside a Claude Code that OpenBot drives for its bots. OpenBot answers their permission
+/// prompts itself, so of their events only the questions with choices come to the notch.
+pub fn driven_by_openbot(env: impl Fn(&str) -> Option<String>) -> bool {
+    env("CLAUDE_AGENT_SDK_CLIENT_APP").is_some_and(|app| app.starts_with("openbot"))
+}
+
 /// Reads the hook's input, tells the app, and for a permission request prints its answer. Always returns 0.
 /// `env` reads the hook's environment.
 pub fn run_hook(
@@ -59,6 +65,9 @@ pub fn run_hook(
     let Some(mut event) = parse_event(agent, &value, now_ms) else {
         return 0;
     };
+    if event.kind != EventKind::Question && driven_by_openbot(&env) {
+        return 0;
+    }
     event.terminal = Terminal::from_env(&env);
     let Ok(mut stream) = UnixStream::connect(socket) else {
         // The app is not running: the agent asks the user itself.
@@ -210,6 +219,15 @@ mod tests {
             ("CLAUDE_CODE_ENTRYPOINT", "sdk-ts")
         ])));
         assert!(!driven_by_pi(no_env));
+        assert!(driven_by_openbot(env(&[(
+            "CLAUDE_AGENT_SDK_CLIENT_APP",
+            "openbot/0.1.0"
+        )])));
+        assert!(!driven_by_openbot(env(&[(
+            "CLAUDE_AGENT_SDK_CLIENT_APP",
+            "other"
+        )])));
+        assert!(!driven_by_openbot(no_env));
     }
 
     #[test]

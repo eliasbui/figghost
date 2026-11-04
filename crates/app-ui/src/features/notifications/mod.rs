@@ -494,6 +494,17 @@ impl Feature {
                 priority: URGENT,
             }),
         );
+        // A click on it opens the app that sent it, as a click on its row in the tab does.
+        let click = look.path.clone().map(|path| {
+            let weak = self.me.clone();
+            Rc::new(move || {
+                workspace::open_path(&path);
+                if let Some(f) = weak.upgrade() {
+                    f.clear_notch();
+                }
+            }) as Rc<dyn Fn()>
+        });
+        notch.set_activity_click(SLOT, click);
         let weak = self.me.clone();
         app::after(f64::from(config.seconds), move || {
             if let Some(f) = weak.upgrade()
@@ -532,6 +543,7 @@ impl Feature {
     fn clear_notch(&self) {
         if let Some(notch) = self.notch.upgrade() {
             notch.set_activity(SLOT, None);
+            notch.set_activity_click(SLOT, None);
         }
     }
 
@@ -591,10 +603,12 @@ fn lines(language: Language, notice: &Notice, app: &str, preview: bool) -> (Stri
     if !preview {
         return (app.to_owned(), language.notifications_hidden().to_owned());
     }
+    // The closed notch has one line each: the line breaks of a long message become spaces.
+    let one_line = |text: &str| text.split_whitespace().collect::<Vec<_>>().join(" ");
     let title = if notice.title.is_empty() {
         app.to_owned()
     } else {
-        notice.title.clone()
+        one_line(&notice.title)
     };
     let words = notice.words();
     (
@@ -602,7 +616,7 @@ fn lines(language: Language, notice: &Notice, app: &str, preview: bool) -> (Stri
         if words.is_empty() {
             app.to_owned()
         } else {
-            words.to_owned()
+            one_line(words)
         },
     )
 }
@@ -739,6 +753,12 @@ mod tests {
             lines(Language::English, &bare, "Xcode", true),
             ("Xcode".into(), "Build failed".into()),
             "no title: the app; no body: the subtitle"
+        );
+        let long = notice(3, "Lan\nNguyen", "", "one\n\ntwo\tthree ");
+        assert_eq!(
+            lines(Language::English, &long, "Messages", true),
+            ("Lan Nguyen".into(), "one two three".into()),
+            "one line each on the closed notch"
         );
     }
 
