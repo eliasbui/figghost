@@ -13,11 +13,21 @@ use objc2_app_kit::{
 };
 use objc2_foundation::{
     NSAppleEventManager, NSArray, NSNotification, NSNotificationCenter, NSObject, NSObjectProtocol,
-    NSRunLoop, NSRunLoopCommonModes, NSString, NSTimer, NSURL,
+    NSOperatingSystemVersion, NSProcessInfo, NSRunLoop, NSRunLoopCommonModes, NSString, NSTimer,
+    NSURL,
 };
 use std::{cell::RefCell, collections::HashMap, ptr::NonNull, rc::Rc, time::Instant};
 
 const APP_NAME: &str = "Figghost";
+
+/// Whether the system is this version or a later one.
+pub fn os_at_least(major: isize, minor: isize) -> bool {
+    NSProcessInfo::processInfo().isOperatingSystemAtLeastVersion(NSOperatingSystemVersion {
+        majorVersion: major,
+        minorVersion: minor,
+        patchVersion: 0,
+    })
+}
 
 type MenuHandler = Rc<dyn Fn()>;
 
@@ -352,4 +362,15 @@ pub fn after(seconds: f64, f: impl FnOnce() + 'static) {
             f();
         }
     });
+}
+
+#[cfg(test)]
+mod tests {
+    use super::os_at_least;
+
+    #[test]
+    fn the_system_is_newer_than_ten_and_older_than_a_thousand() {
+        assert!(os_at_least(10, 0));
+        assert!(!os_at_least(999, 0));
+    }
 }

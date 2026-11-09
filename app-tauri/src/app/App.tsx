@@ -1,8 +1,9 @@
 import { lazy, Suspense, useEffect, useState } from 'react';
 import { MotionConfig } from 'motion/react';
-import { createBridge, insideTauri } from '@/bridge';
+import { createBridge, hosted } from '@/bridge';
 import { ConfirmHost, Toast } from '@/components/macos/Dialogs';
 import { useRecorder } from '@/components/macos/Hotkey';
+import { startHostDrag } from '@/lib/drag';
 import { startSheen } from '@/lib/sheen';
 import { canvasLoader } from '@/pages/canvases';
 import { connect, useApp } from '@/stores/app';
@@ -59,13 +60,15 @@ function useDisplayClasses(): void {
     list.toggle('reduce-transparency', reduceTransparency);
     list.toggle('reduce-motion', !!env.reduce_motion || motion);
     list.toggle('increase-contrast', !!env.increase_contrast || contrast);
-    list.toggle('glass', !!env.glass && !reduceTransparency);
+    // The Tauri window says it has glass in the state; the AppKit window has it where it takes the handler named glass.
+    const glass = !!env.glass || !!window.webkit?.messageHandlers?.glass;
+    list.toggle('glass', glass && !reduceTransparency);
   }, [env, transparency, motion, contrast]);
   useEffect(() => {
     startSheen();
     // In a browser, outside the app, a wallpaper stands in for the desktop, and ?theme=dark|light picks a theme.
     const list = document.documentElement.classList;
-    if (!insideTauri()) list.add('preview');
+    if (!hosted()) list.add('preview');
     const theme = new URLSearchParams(window.location.search).get('theme');
     if (theme === 'dark' || theme === 'light') list.add(theme);
   }, []);
@@ -95,7 +98,7 @@ function useDisplayClasses(): void {
 /** A feature that draws a window of its own gets this page told which canvas to show (`?canvas=network`); the window has
  *  no sidebar and no toolbar, and keeps its state and its language like any other. */
 const CANVAS = (() => {
-  const id = new URLSearchParams(window.location.search).get('canvas');
+  const id = window.__canvas ?? new URLSearchParams(window.location.search).get('canvas');
   if (!id) return null;
   const load = canvasLoader(id);
   if (!load) console.error(`no canvas is named ${id}`);
@@ -104,6 +107,7 @@ const CANVAS = (() => {
 
 export default function App() {
   useBridge();
+  useEffect(() => (window.fig ? startHostDrag(window.fig) : undefined), []);
   useDisplayClasses();
   useRecorder();
   const ready = useApp((s) => s.ready);

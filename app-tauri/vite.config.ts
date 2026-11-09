@@ -2,15 +2,74 @@ import { fileURLToPath, URL } from 'node:url';
 import tailwindcss from '@tailwindcss/vite';
 import react from '@vitejs/plugin-react';
 import { defineConfig } from 'vite';
+import type { Plugin } from 'vite';
+
+// The page of the AppKit app is one string (crates/macos-sys/src/webview.rs loads it with loadHTMLString and nothing may be
+// fetched), so the embed build puts the script, the styles, the fonts and the pictures into one HTML file, with the same
+// content security policy as the page it replaces (crates/app-ui/web/index.html). `<!--__PRELUDE__-->` is where the app
+// writes `window.__canvas = '...'` for a window that shows one canvas.
+const POLICY = "default-src 'none'; style-src 'unsafe-inline'; script-src 'unsafe-inline'; img-src data:; font-src data:";
+
+/** Text that goes inside a script element must not be able to close it or open a comment. */
+const inScript = (code: string) => code.replace(/<\/(script)/gi, '<\\/$1').replace(/<!--/g, '<\\!--');
+
+function oneFile(): Plugin {
+  return {
+    name: 'figghost-one-file',
+    apply: 'build',
+    enforce: 'post',
+    generateBundle(_options, bundle) {
+      const page = bundle['index.html'];
+      if (!page || page.type !== 'asset') throw new Error('one-file: the build has no index.html');
+      let html = String(page.source);
+      for (const [name, file] of Object.entries(bundle)) {
+        if (name === 'index.html') continue;
+        if (file.type === 'chunk') {
+          const tag = new RegExp(`<script[^>]*src="[^"]*${name.replace(/[.*+?^${}()|[\]\\]/g, '\\$&')}"[^>]*></script>`);
+          if (!tag.test(html)) throw new Error(`one-file: no script tag for ${name}`);
+          // With the chunks gone there is nothing to preload, and Vite leaves its placeholder for the list of what to preload.
+          const code = file.code.replace(/__VITE_PRELOAD__/g, 'void 0');
+          html = html.replace(tag, () => `<script type="module">${inScript(code)}</script>`);
+        } else if (name.endsWith('.css')) {
+          const tag = new RegExp(`<link[^>]*href="[^"]*${name.replace(/[.*+?^${}()|[\]\\]/g, '\\$&')}"[^>]*>`);
+          if (!tag.test(html)) throw new Error(`one-file: no link tag for ${name}`);
+          html = html.replace(tag, () => `<style>${String(file.source).replace(/<\/(style)/gi, '<\\/$1')}</style>`);
+        } else {
+          throw new Error(`one-file: ${name} was not inlined`);
+        }
+        delete bundle[name];
+      }
+      html = html
+        .replace('<head>', `<head>\n    <meta http-equiv="Content-Security-Policy" content="${POLICY}" />`)
+        .replace('<div id="root"></div>', '<div id="root"></div>\n    <!--__PRELUDE__-->');
+      page.source = html;
+    },
+  };
+}
 
 // Tauri loads the dev server at devUrl (src-tauri/tauri.conf.json), so the port is fixed.
-export default defineConfig({
-  plugins: [react(), tailwindcss()],
-  resolve: { alias: { '@': fileURLToPath(new URL('./src', import.meta.url)) } },
-  clearScreen: false,
-  server: {
-    port: 1420,
-    strictPort: true,
-    watch: { ignored: ['**/src-tauri/**'] },
-  },
+export default defineConfig(({ mode }) => {
+  const embed = mode === 'embed';
+  return {
+    plugins: [react(), tailwindcss(), ...(embed ? [oneFile()] : [])],
+    resolve: { alias: { '@': fileURLToPath(new URL('./src', import.meta.url)) } },
+    clearScreen: false,
+    server: {
+      port: 1420,
+      strictPort: true,
+      watch: { ignored: ['**/src-tauri/**'] },
+    },
+    build: embed
+      ? {
+          // Beside the page it replaces; the whole folder is this build's, so it is emptied first.
+          outDir: '../crates/app-ui/web-next',
+          emptyOutDir: true,
+          cssCodeSplit: false,
+          assetsInlineLimit: Number.MAX_SAFE_INTEGER,
+          modulePreload: false,
+          chunkSizeWarningLimit: 8000,
+          rolldownOptions: { output: { codeSplitting: false } },
+        }
+      : undefined,
+  };
 });

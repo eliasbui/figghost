@@ -75,6 +75,23 @@ beats the kit. The style sheets of the pages (`src/pages/*/*.css`) are not in a 
 - `Icon.tsx`: Phosphor icons. A page names an icon with the SF Symbol names the old page used (`gearshape`), a short kit name
   (`open`, `plus`, `refresh`) or `pg.<page>` for a page's own. An unknown name draws nothing and warns in development.
 
+## In the AppKit app
+
+The same page runs in the web view of the AppKit app (`crates/macos-sys/src/webview.rs`). What differs from the Tauri window:
+
+- The page talks through `window.fig.send` and `window.__fig.recv` (`src/bridge/appkit.ts`), with the same messages.
+- The window has no title bar to drag by, so a press on a `data-tauri-drag-region` asks the app to drag (`window.fig.drag()`),
+  and a double click to zoom (`src/lib/drag.ts`).
+- The window's glass is the app's own; the page knows it has it from the handler named `glass`, and lays its veil over it as
+  in the Tauri window. The panes of glass that the previous page asked for (`lay_glass`) are not used.
+- A window that shows one canvas (the diagram of Network, the palette) is told so by `window.__canvas`, which the app writes
+  into the page where `<!--__PRELUDE__-->` is.
+- Nothing may be fetched (the content security policy is `default-src 'none'`), so `vite build --mode embed` puts the script,
+  the styles, the fonts and the pictures into the one file. `</script` and `<!--` are escaped inside the script, and Vite's
+  `__VITE_PRELOAD__` placeholder, which nothing replaces once there are no chunks, becomes `void 0`.
+- A page that fails to draw (`PageBoundary`) says so in its place and writes the cause in the app's log
+  (`settings page: page <id>: ...`), and the rest of the window goes on.
+
 ## Adding to it
 
 A page is `src/pages/<id>/index.tsx` with a default export; add it to `src/pages/registry.ts` and `meta.ts`. Use `Card`, `Row`

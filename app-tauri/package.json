@@ -1,11 +1,12 @@
 {
   "name": "figghost-tauri",
   "private": true,
-  "version": "2.2.21",
+  "version": "2.2.22",
   "type": "module",
   "scripts": {
     "dev": "vite",
     "build": "tsc --noEmit && vite build",
+    "build:embed": "tsc --noEmit && vite build --mode embed",
     "typecheck": "tsc --noEmit",
     "tauri": "tauri",
     "extract:i18n": "node tools/extract-i18n.mjs ../crates/app-ui src/i18n",

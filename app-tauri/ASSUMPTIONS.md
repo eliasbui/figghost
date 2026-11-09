@@ -30,6 +30,26 @@ pnpm 12.18 and Rust 1.99.
 - Words: every `t('...')` key a page uses was checked against both dictionaries by a script (five prefixes built at run time were
   not); the sample state holds every setting path a page reads (except the operations the backend handles by name).
 
+## In the AppKit app
+
+The page was also run as the settings window of the AppKit app (`crates/app-ui`, built in release mode, started as a bare
+binary on a profile of its own in `FIGGHOST_HOME`, once with a copy of the real configuration with every feature turned
+off). Through the accessibility tree and the system's event posting:
+
+- All 51 pages were opened, on a fresh profile and on the copy of the real configuration: no script error and no refused
+  message reached the app's log. Pages from the real state were looked at (Notch, Clipboard, Network, AI agents, Snippets,
+  Launcher, Weather, Typing, Music widget).
+- A switch wrote its change to `config.json`; the theme changed the window at once and the language the page; recording a
+  shortcut stored `ctrl+opt+9`; the menu of "Add app" listed the running apps with their icons; Command-K found a page by
+  one of its words and opened it at the row.
+- The diagram of Network opened in a window of its own with the real connections, apps and icons.
+- The window was dragged by the strip at its top and by the sidebar, and zoomed by a double click.
+- `FIGGHOST_CLASSIC_SETTINGS=1` loads the previous page.
+
+Not run: the palette window (its shortcut is taken by the installed app), the page on macOS 14.5 to 25 or on a system
+that has no Liquid Glass (a window without the handler named `glass` gets the solid colour), VoiceOver, and a longer use
+with the engines running.
+
 ## What nobody has looked at
 
 - The glass. The window is created with the system's Liquid Glass under a transparent web view (`window-vibrancy` 0.8.1,

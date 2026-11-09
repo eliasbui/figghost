@@ -5,9 +5,16 @@ react-aria-components for the behaviour of the controls and Motion for the few t
 the state and carries out the changes. It is a second program beside the current one. Nothing outside this folder was
 changed: the repository's workspace, its `Cargo.lock` and the crates keep building as they did.
 
-Status: it builds, type-checks, passes its Rust tests and runs as an app that opens its settings window; every page has been drawn
-in a browser in both themes. How the glass looks on a colourful wallpaper, and the pages other than General in the real window,
-have not been looked at (`ASSUMPTIONS.md` has the list). The design is in `DESIGN.md`.
+Status: it builds, type-checks, passes its Rust tests, and runs both as an app of its own and as the settings window of the
+AppKit app. Every page has been drawn in a browser in both themes and opened in the AppKit window. How the glass looks on a
+colourful wallpaper, and most pages in the Tauri window, have not been looked at (`ASSUMPTIONS.md` has the list). The design is
+in `DESIGN.md`.
+
+It is also the settings window of the AppKit app. `pnpm build:embed` builds the same page into one HTML file,
+`crates/app-ui/web-next/index.html` (committed, so that a build of the app needs no Node), and the app loads it in its own
+windows in place of the page it had, on macOS 14.5 or later (`light-dark()` needs that WebKit). On an older system, or
+when `FIGGHOST_CLASSIC_SETTINGS` is set, the app keeps loading the previous page, `crates/app-ui/web`. Run
+`pnpm build:embed` after any change to `src` here and commit the file with it.
 
 ## Why Tauri when the main README chose AppKit
 
@@ -48,6 +55,7 @@ src/
   app/                    the shell: App (and canvas mode), Sidebar, Toolbar, Search, PageHost
   bridge/                 the only place that knows how the page talks to the backend
     tauri.ts              invoke('fig_send') and listen('fig:recv'): the only use of invoke
+    appkit.ts             window.fig.send and window.__fig.recv of the AppKit app's web view
     fixture.ts            a stand-in in a plain browser, with the sample state
     messages.ts           the messages, typed
   stores/                 the zustand store of the state pushed by the backend, and its hooks
@@ -90,6 +98,7 @@ pnpm tauri dev        # the window, with the backend; the data goes to ~/Library
 pnpm dev              # the page alone in a browser with the sample state; /?theme=dark&lang=vi, ?canvas=network, ?canvas=kit
 pnpm typecheck
 pnpm build            # type-check, then the page into dist/
+pnpm build:embed      # the page as one HTML file for the AppKit app: ../crates/app-ui/web-next/index.html
 cargo test --manifest-path src-tauri/Cargo.toml
 tools/bundle-local.sh             # Figghost Tauri.app under src-tauri/target/release/bundle/macos, signed ad hoc, not notarized
 ```

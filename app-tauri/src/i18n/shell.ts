@@ -3,6 +3,7 @@ export const shell = {
   en: {
     'fault.unsupported': 'That is not available in this version yet.',
     'fault.action_failed': 'That did not work.',
+    'fault.page_failed': 'This page could not be drawn.',
     'ui.ready': 'Ready',
     'ui.found': 'Found',
     'ui.missing': 'Not installed',
@@ -13,6 +14,7 @@ export const shell = {
   vi: {
     'fault.unsupported': 'Chức năng này chưa có trong phiên bản này.',
     'fault.action_failed': 'Không thực hiện được.',
+    'fault.page_failed': 'Không vẽ được trang này.',
     'ui.ready': 'Sẵn sàng',
     'ui.found': 'Đã có',
     'ui.missing': 'Chưa cài',

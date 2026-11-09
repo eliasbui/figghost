@@ -4,6 +4,11 @@
 use macos_sys::widgets::{base64, image_png, symbol_png};
 use serde_json::{Map, Value, json};
 
+/// The page of the settings window that `app-tauri` builds (`pnpm build:embed` there writes this file): one HTML file with
+/// its script, styles, fonts and pictures inline. It talks to the app with the same messages as the page below. The place
+/// marked `PRELUDE` is where a window that shows one canvas says which.
+const NEXT: &str = include_str!("../../web-next/index.html");
+const PRELUDE: &str = "<!--__PRELUDE__-->";
 const INDEX: &str = include_str!("../../web/index.html");
 const STYLE: &str = include_str!("../../web/app.css");
 const SCRIPT: &str = include_str!("../../web/app.js");
@@ -424,15 +429,30 @@ fn assets() -> String {
     )
 }
 
+/// Which page the windows get. The new one uses `light-dark()`, which WebKit has from Safari 17.5 (macOS 14.5); the page
+/// below is for an older system, and for whoever sets `FIGGHOST_CLASSIC_SETTINGS` to compare the two.
+fn new_page() -> bool {
+    std::env::var_os("FIGGHOST_CLASSIC_SETTINGS").is_none() && macos_sys::app::os_at_least(14, 5)
+}
+
 pub fn html() -> String {
-    page_with("")
+    if new_page() {
+        NEXT.replace(PRELUDE, "")
+    } else {
+        page_with("")
+    }
 }
 
 /// The same page for a window that shows only the canvas of one feature (`network`).
 #[allow(dead_code)]
 pub fn html_canvas(id: &str) -> String {
     let id: String = id.chars().filter(char::is_ascii_lowercase).collect();
-    page_with(&format!("window.__canvas = '{id}';\n"))
+    let prelude = format!("window.__canvas = '{id}';\n");
+    if new_page() {
+        NEXT.replace(PRELUDE, &format!("<script>{prelude}</script>"))
+    } else {
+        page_with(&prelude)
+    }
 }
 
 fn page_with(prelude: &str) -> String {
@@ -469,15 +489,41 @@ mod tests {
         assert!(html_canvas("x'; alert(1)//").contains("window.__canvas = 'xalert';"), "only letters reach the script");
     }
 
-    #[test]
-    fn the_page_is_one_self_contained_document() {
-        let page = html();
-        assert!(!page.contains("/*__CSS__*/") && !page.contains("/*__JS__*/"));
-        assert!(page.contains("Content-Security-Policy"));
-        // Nothing may be fetched: no external scripts, styles, images or fonts.
-        for forbidden in ["src=\"http", "href=\"http", "url(http", "@import", "<link "] {
-            assert!(!page.contains(forbidden), "found {forbidden}");
+    /// The page with what is inside its script and style elements taken out: the elements themselves are what can fetch.
+    fn bare(page: &str) -> String {
+        let mut out = String::new();
+        let mut rest = page;
+        while let Some(start) = rest.find("<script").or_else(|| rest.find("<style")) {
+            let (head, tail) = rest.split_at(start);
+            out.push_str(head);
+            let close = if tail.starts_with("<script") { "</script>" } else { "</style>" };
+            rest = tail.find(close).map_or("", |end| &tail[end + close.len()..]);
         }
+        out.push_str(rest);
+        out
+    }
+
+    #[test]
+    fn each_page_is_one_self_contained_document() {
+        for page in [page_with(""), NEXT.to_owned()] {
+            assert!(!page.contains("/*__CSS__*/") && !page.contains("/*__JS__*/"));
+            assert!(page.contains("Content-Security-Policy"));
+            // Nothing may be fetched: no external scripts, styles, images or fonts.
+            for forbidden in ["src=\"http", "href=\"http", "url(http", "@import"] {
+                assert!(!page.contains(forbidden), "found {forbidden}");
+            }
+            assert!(!bare(&page).contains("<link "), "an element that fetches");
+        }
+    }
+
+    #[test]
+    fn the_new_page_has_one_script_that_cannot_close_early() {
+        // The build writes `<\/script` and `<\!--` inside the script; the only real ones are the page's own.
+        assert_eq!(NEXT.matches("</script").count(), 1);
+        assert_eq!(NEXT.matches("<!--").count(), 1, "only the place for the canvas");
+        assert!(NEXT.contains(PRELUDE));
+        let canvas = NEXT.replace(PRELUDE, "<script>window.__canvas = 'network';\n</script>");
+        assert_eq!(canvas.matches("</script").count(), 2);
     }
 
     #[test]
