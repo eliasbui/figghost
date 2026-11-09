@@ -1,0 +1,35 @@
+[package]
+name = "figghost-tauri"
+version = "2.2.21"
+description = "Figghost on Tauri 2: the settings window, with a backend that keeps its state"
+edition = "2021"
+rust-version = "1.85"
+publish = false
+
+# A workspace of its own: the repository's workspace (crates/*) is left as it is, and so is its Cargo.lock.
+[workspace]
+
+[lib]
+name = "figghost_tauri"
+
+[build-dependencies]
+tauri-build = { version = "2", features = [] }
+
+[dependencies]
+# macos-private-api: a transparent window on macOS, which the glass shows through. image-png: the menu bar icon is a PNG.
+tauri = { version = "2", features = ["macos-private-api", "tray-icon", "image-png"] }
+serde = { version = "1", features = ["derive"] }
+serde_json = "1"
+# The layouts of window tiling and their default shortcuts, from the crate the current app places windows with. It has no
+# dependencies. Its manifest takes its version from the repository's workspace, which cargo finds from the path.
+core-window = { path = "../../crates/core-window" }
+
+[target.'cfg(target_os = "macos")'.dependencies]
+# Liquid Glass on macOS 26 (`apply_liquid_glass` and `LiquidGlassOptions` came in 0.7 and 0.8).
+window-vibrancy = "0.8"
+
+# The same release profile as the workspace of the current app.
+[profile.release]
+lto = "thin"
+codegen-units = 1
+strip = true

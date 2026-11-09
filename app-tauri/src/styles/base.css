@@ -1,0 +1,144 @@
+/* The base: a reset, the type, and the window. Tailwind's preflight comes first (index.css); this is what the app adds. */
+@layer base {
+  html,
+  body,
+  #root {
+    height: 100%;
+  }
+
+  html {
+    font-family: var(--font);
+    font-size: var(--fs-body);
+    -webkit-text-size-adjust: 100%;
+  }
+
+  body {
+    margin: 0;
+    overflow: hidden;
+    color: var(--fg);
+    background: var(--solid-bg);
+    font: 400 var(--fs-body) / 1.35 var(--font);
+    letter-spacing: -0.003em;
+    -webkit-font-smoothing: antialiased;
+    -webkit-user-select: none;
+    user-select: none;
+    cursor: default;
+  }
+
+  /* On the system's glass the window is transparent and the page lays a veil over it. */
+  html.glass,
+  html.glass body {
+    background: transparent;
+  }
+  html.glass body {
+    background: var(--veil);
+  }
+
+  button,
+  input,
+  select,
+  textarea {
+    font: inherit;
+    color: inherit;
+    letter-spacing: inherit;
+  }
+  button {
+    cursor: default;
+    background: none;
+    border: 0;
+    padding: 0;
+  }
+  button:disabled {
+    cursor: default;
+  }
+  input,
+  textarea,
+  pre,
+  .selectable {
+    -webkit-user-select: text;
+    user-select: text;
+    cursor: text;
+  }
+  input[type="range"],
+  input[type="checkbox"],
+  input[type="radio"] {
+    cursor: default;
+  }
+  h1,
+  h2,
+  h3,
+  p {
+    margin: 0;
+  }
+  kbd {
+    font-family: var(--font);
+  }
+  [hidden] {
+    display: none !important;
+  }
+
+  :focus {
+    outline: none;
+  }
+  :focus-visible {
+    outline: 2px solid var(--accent-ring);
+    outline-offset: 2px;
+  }
+
+  ::selection {
+    background: color-mix(in srgb, var(--accent) 32%, transparent);
+  }
+
+  /* Scroll bars float over the content and thin out until they are used. */
+  ::-webkit-scrollbar {
+    width: 12px;
+    height: 12px;
+  }
+  ::-webkit-scrollbar-track {
+    background: transparent;
+  }
+  ::-webkit-scrollbar-thumb {
+    background: var(--fg-3);
+    border: 3.5px solid transparent;
+    background-clip: content-box;
+    border-radius: 99px;
+    min-height: 32px;
+  }
+  ::-webkit-scrollbar-thumb:hover {
+    background: var(--fg-2);
+    background-clip: content-box;
+  }
+  ::-webkit-scrollbar-corner {
+    background: transparent;
+  }
+
+  .sr-only {
+    position: absolute;
+    width: 1px;
+    height: 1px;
+    margin: -1px;
+    padding: 0;
+    overflow: hidden;
+    clip: rect(0 0 0 0);
+    white-space: nowrap;
+    border: 0;
+  }
+
+  /* Nothing moves under Reduce motion. */
+  html.reduce-motion *,
+  html.reduce-motion *::before,
+  html.reduce-motion *::after {
+    transition-duration: 0.01ms !important;
+    animation-duration: 0.01ms !important;
+    animation-iteration-count: 1 !important;
+  }
+}
+
+/* Looking at the page in a browser, outside the app: a wallpaper stands in for the desktop behind the system's glass. */
+html.preview {
+  background:
+    radial-gradient(1100px 700px at 8% 0%, rgb(120 150 255 / 0.9), transparent 60%),
+    radial-gradient(900px 700px at 100% 10%, rgb(255 140 190 / 0.75), transparent 60%),
+    radial-gradient(1000px 800px at 40% 110%, rgb(70 210 190 / 0.8), transparent 60%),
+    light-dark(#cfd6ee, #1b2142);
+}

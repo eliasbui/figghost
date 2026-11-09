@@ -1,0 +1,320 @@
+[
+ {
+  "id": "smart",
+  "icon": "text.magnifyingglass",
+  "slots": [],
+  "canvas": false,
+  "file": "smart.js"
+ },
+ {
+  "id": "translate",
+  "icon": "character.bubble.fill",
+  "slots": [],
+  "canvas": false,
+  "file": "translate.js"
+ },
+ {
+  "id": "rewrite",
+  "icon": "pencil.line",
+  "slots": [],
+  "canvas": false,
+  "file": "rewrite.js"
+ },
+ {
+  "id": "palette",
+  "icon": "command.square",
+  "slots": [],
+  "canvas": true,
+  "file": "palette.js"
+ },
+ {
+  "id": "mirror",
+  "icon": "person.crop.rectangle",
+  "slots": [],
+  "canvas": false,
+  "file": "mirror.js"
+ },
+ {
+  "id": "commands",
+  "icon": "terminal",
+  "slots": [],
+  "canvas": false,
+  "file": "commands.js"
+ },
+ {
+  "id": "capture",
+  "icon": "camera.viewfinder",
+  "slots": [],
+  "canvas": false,
+  "file": "capture.js"
+ },
+ {
+  "id": "vision",
+  "icon": "eyedropper.halffull",
+  "slots": [],
+  "canvas": false,
+  "file": "vision.js"
+ },
+ {
+  "id": "lyrics",
+  "icon": null,
+  "slots": [
+   "media"
+  ],
+  "canvas": false,
+  "file": "lyrics.js"
+ },
+ {
+  "id": "calendar",
+  "icon": "calendar",
+  "slots": [],
+  "canvas": false,
+  "file": "calendar.js"
+ },
+ {
+  "id": "snap",
+  "icon": null,
+  "slots": [
+   "tiling"
+  ],
+  "canvas": false,
+  "file": "snap.js"
+ },
+ {
+  "id": "pin",
+  "icon": "pin.fill",
+  "slots": [],
+  "canvas": false,
+  "file": "pin.js"
+ },
+ {
+  "id": "cursor",
+  "icon": "cursorarrow.rays",
+  "slots": [],
+  "canvas": false,
+  "file": "cursor.js"
+ },
+ {
+  "id": "musicwidget",
+  "icon": "music.quarternote.3",
+  "slots": [],
+  "canvas": false,
+  "file": "musicwidget.js"
+ },
+ {
+  "id": "menubar",
+  "icon": null,
+  "slots": [
+   "menubar"
+  ],
+  "canvas": false,
+  "file": "menubar.js"
+ },
+ {
+  "id": "stack",
+  "icon": null,
+  "slots": [
+   "clipboard"
+  ],
+  "canvas": false,
+  "file": "stack.js"
+ },
+ {
+  "id": "mascot",
+  "icon": null,
+  "slots": [
+   "clipboard"
+  ],
+  "canvas": false,
+  "file": "mascot.js"
+ },
+ {
+  "id": "wheel",
+  "icon": "chart.pie.fill",
+  "slots": [],
+  "canvas": false,
+  "file": "wheel.js"
+ },
+ {
+  "id": "mole",
+  "icon": "wand.and.stars",
+  "slots": [],
+  "canvas": false,
+  "file": "mole.js"
+ },
+ {
+  "id": "islands",
+  "icon": "bell.badge.fill",
+  "slots": [],
+  "canvas": false,
+  "file": "islands.js"
+ },
+ {
+  "id": "utilities",
+  "icon": "slider.horizontal.3",
+  "slots": [],
+  "canvas": false,
+  "file": "utilities.js"
+ },
+ {
+  "id": "breaks",
+  "icon": "eye",
+  "slots": [],
+  "canvas": false,
+  "file": "breaks.js"
+ },
+ {
+  "id": "dictation",
+  "icon": "mic",
+  "slots": [],
+  "canvas": false,
+  "file": "dictation.js"
+ },
+ {
+  "id": "jarvis",
+  "icon": "sparkles",
+  "slots": [],
+  "canvas": false,
+  "file": "jarvis.js"
+ },
+ {
+  "id": "network",
+  "icon": "network",
+  "slots": [],
+  "canvas": true,
+  "file": "network.js"
+ },
+ {
+  "id": "browser",
+  "icon": "safari",
+  "slots": [],
+  "canvas": false,
+  "file": "browser.js"
+ },
+ {
+  "id": "notes",
+  "icon": "note.text",
+  "slots": [],
+  "canvas": false,
+  "file": "notes.js"
+ },
+ {
+  "id": "launcher",
+  "icon": "square.grid.2x2.fill",
+  "slots": [],
+  "canvas": false,
+  "file": "launcher.js"
+ },
+ {
+  "id": "weather",
+  "icon": "cloud.sun.fill",
+  "slots": [],
+  "canvas": false,
+  "file": "weather.js"
+ },
+ {
+  "id": "prs",
+  "icon": "arrow.triangle.pull",
+  "slots": [],
+  "canvas": false,
+  "file": "prs.js"
+ },
+ {
+  "id": "updates",
+  "icon": "shippingbox.fill",
+  "slots": [],
+  "canvas": false,
+  "file": "updates.js"
+ },
+ {
+  "id": "pomodoro",
+  "icon": "timer",
+  "slots": [],
+  "canvas": false,
+  "file": "pomodoro.js"
+ },
+ {
+  "id": "screentime",
+  "icon": "hourglass",
+  "slots": [],
+  "canvas": false,
+  "file": "screentime.js"
+ },
+ {
+  "id": "dayprogress",
+  "icon": "sun.horizon.fill",
+  "slots": [],
+  "canvas": false,
+  "file": "dayprogress.js"
+ },
+ {
+  "id": "devices",
+  "icon": "airpodspro",
+  "slots": [],
+  "canvas": false,
+  "file": "devices.js"
+ },
+ {
+  "id": "displays",
+  "icon": "sun.max.fill",
+  "slots": [],
+  "canvas": false,
+  "file": "displays.js"
+ },
+ {
+  "id": "present",
+  "icon": "rectangle.on.rectangle",
+  "slots": [],
+  "canvas": false,
+  "file": "present.js"
+ },
+ {
+  "id": "notifications",
+  "icon": "bell.badge.fill",
+  "slots": [],
+  "canvas": false,
+  "file": "notifications.js"
+ },
+ {
+  "id": "outlook",
+  "icon": "envelope.fill",
+  "slots": [],
+  "canvas": false,
+  "file": "outlook.js"
+ },
+ {
+  "id": "video",
+  "icon": "play.rectangle.fill",
+  "slots": [],
+  "canvas": false,
+  "file": "video.js"
+ },
+ {
+  "id": "system",
+  "icon": "cpu.fill",
+  "slots": [],
+  "canvas": false,
+  "file": "system.js"
+ },
+ {
+  "id": "typing",
+  "icon": "keyboard",
+  "slots": [],
+  "canvas": false,
+  "file": "typing.js"
+ },
+ {
+  "id": "snippets",
+  "icon": "text.cursor",
+  "slots": [],
+  "canvas": false,
+  "file": "snippets.js"
+ },
+ {
+  "id": "download",
+  "icon": "arrow.down.circle.fill",
+  "slots": [],
+  "canvas": false,
+  "file": "download.js"
+ }
+]

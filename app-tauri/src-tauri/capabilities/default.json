@@ -1,0 +1,7 @@
+{
+  "$schema": "../gen/schemas/desktop-schema.json",
+  "identifier": "default",
+  "description": "What the windows of the settings may do beyond calling the commands of the app: listen to its events and drag the window by its top.",
+  "windows": ["main", "palette", "network"],
+  "permissions": ["core:default", "core:window:allow-start-dragging"]
+}

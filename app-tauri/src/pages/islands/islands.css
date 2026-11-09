@@ -1,0 +1,2 @@
+/* Live islands. Styles for the page in web/features/islands.js, using the variables at the top of app.css. */
+.islands-note { padding: 14px 18px; color: var(--text-2); font-size: var(--fs-small); }

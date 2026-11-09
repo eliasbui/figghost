@@ -1,0 +1,16 @@
+/* Tailwind supplies the theme, a reset and the utilities; the rest is the app's own, in layers so that a utility on an element
+   always beats what the kit says about it. The style sheets of the pages are not in a layer and so come after all of it. */
+@layer theme, base, components, utilities;
+@import "tailwindcss/theme.css" layer(theme);
+@import "tailwindcss/preflight.css" layer(base);
+@import "tailwindcss/utilities.css" layer(utilities);
+/* The old pages use `block` for a row whose control takes a line of its own, not for `display: block`. */
+@source not inline("block");
+
+@import "./fonts.css";
+@import "./tokens.css";
+@import "./base.css";
+@import "./glass.css";
+@import "./shell.css";
+@import "./kit.css";
+@import "./legacy.css";

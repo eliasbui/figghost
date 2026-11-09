@@ -1,0 +1,4 @@
+/* Pull requests. Styles for the page in web/features/prs.js, using the variables at the top of app.css. */
+.prs-tool { color: var(--text-2); font-size: var(--fs-small); white-space: nowrap; margin-right: 10px; }
+.prs-tool[data-state="ready"] { color: var(--green, #30d158); }
+.prs-tool[data-state="signed_out"], .prs-tool[data-state="slow"] { color: var(--orange, #ff9f0a); }

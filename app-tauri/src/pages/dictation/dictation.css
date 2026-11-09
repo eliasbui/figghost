@@ -1,0 +1,2 @@
+/* Dictation. Styles for the page in web/features/dictation.js, using the variables at the top of app.css. */
+.dictation-access { display: flex; flex-wrap: wrap; gap: 8px; align-items: center; justify-content: flex-end; }

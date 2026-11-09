@@ -1,0 +1,577 @@
+/* The window: a floating sidebar of glass, a floating toolbar, and the page under them. Everything is on a 4 point grid. */
+@layer components {
+  #app {
+    position: fixed;
+    inset: 0;
+    overflow: hidden;
+  }
+
+  /* The strip of the title bar that moves the window. It sits under the sidebar's and the toolbar's own controls. */
+  .dragzone {
+    position: absolute;
+    inset: 0 0 auto 0;
+    height: 52px;
+    z-index: 4;
+  }
+
+  /* -- the sidebar */
+  #sidebar {
+    position: absolute;
+    z-index: 5;
+    left: 8px;
+    top: 8px;
+    bottom: 8px;
+    width: 224px;
+    display: flex;
+    flex-direction: column;
+    padding: 44px 8px 8px;
+    border-radius: var(--r-panel);
+    overflow: hidden;
+  }
+  #nav {
+    flex: 1;
+    min-height: 0;
+    overflow-y: auto;
+    overflow-x: hidden;
+    display: flex;
+    flex-direction: column;
+    gap: 1px;
+    margin: 0 -4px;
+    padding: 4px 4px 12px;
+    -webkit-mask-image: linear-gradient(transparent, #000 10px, #000 calc(100% - 16px), transparent);
+    mask-image: linear-gradient(transparent, #000 10px, #000 calc(100% - 16px), transparent);
+  }
+  #nav {
+    scrollbar-width: none;
+  }
+  #nav::-webkit-scrollbar {
+    display: none;
+  }
+  .nav-sep {
+    height: 1px;
+    margin: 8px 12px;
+    background: var(--hair);
+    flex: none;
+  }
+  .nav-item {
+    position: relative;
+    display: flex;
+    flex: none;
+    align-items: center;
+    gap: 10px;
+    height: 32px;
+    padding: 0 10px;
+    border-radius: 11px;
+    font-size: 13px;
+    text-align: left;
+    color: var(--fg);
+    transition: background-color var(--motion-fast) var(--ease-out);
+  }
+  .nav-item:hover:not([aria-current="page"]) {
+    background: var(--fill);
+  }
+  .nav-item .glyph {
+    position: relative;
+    z-index: 1;
+    font-size: 18px;
+    color: var(--fg-2);
+    transition: color var(--motion-fast);
+  }
+  .nav-item[aria-current="page"] .glyph {
+    color: var(--accent);
+  }
+  .nav-label {
+    position: relative;
+    z-index: 1;
+    flex: 1;
+    min-width: 0;
+    overflow: hidden;
+    text-overflow: ellipsis;
+    white-space: nowrap;
+  }
+  .nav-item[aria-current="page"] .nav-label {
+    font-weight: 600;
+  }
+  .nav-pill {
+    position: absolute;
+    inset: 0;
+    z-index: 0;
+    border-radius: inherit;
+    background: linear-gradient(180deg, var(--ctl-bg-hi), var(--ctl-bg-hi));
+    box-shadow:
+      inset 0 0 0 0.5px var(--ctl-edge),
+      inset 0 1px 0 var(--glass-rim),
+      0 1px 2px rgb(0 0 0 / 0.1),
+      0 4px 10px -4px rgb(0 0 0 / 0.16);
+  }
+  /* A feature that is off: a ring where the switch would be on. */
+  .nav-off {
+    position: relative;
+    z-index: 1;
+    flex: none;
+    width: 7px;
+    height: 7px;
+    border-radius: 50%;
+    box-shadow: inset 0 0 0 1.5px var(--fg-3);
+  }
+
+  /* The app at the foot of the sidebar, and whether it has the access it needs. */
+  .me {
+    flex: none;
+    display: flex;
+    align-items: center;
+    gap: 10px;
+    height: 40px;
+    margin-top: 4px;
+    padding: 0 10px 0 6px;
+    border-radius: 14px;
+    text-align: left;
+    transition: background-color var(--motion-fast);
+  }
+  .me:hover {
+    background: var(--fill);
+  }
+  .me[aria-current="page"] {
+    background: var(--ctl-bg-hi);
+  }
+  .me-icon {
+    width: 28px;
+    height: 28px;
+    border-radius: 8px;
+    flex: none;
+  }
+  .me-name {
+    flex: 1;
+    font-size: 13px;
+    font-weight: 600;
+  }
+  .me-dot {
+    width: 8px;
+    height: 8px;
+    border-radius: 50%;
+    background: var(--good);
+    box-shadow: 0 0 0 3px color-mix(in srgb, var(--good) 22%, transparent);
+  }
+  .me-dot.warn {
+    background: var(--warn);
+    box-shadow: 0 0 0 3px color-mix(in srgb, var(--warn) 24%, transparent);
+  }
+
+  /* -- the main area */
+  #main {
+    position: absolute;
+    left: 240px;
+    right: 0;
+    top: 0;
+    bottom: 0;
+  }
+  #scroller {
+    position: absolute;
+    inset: 0;
+    overflow-x: hidden;
+    overflow-y: auto;
+    padding: 64px 24px 48px;
+    scroll-padding-top: 72px;
+    scrollbar-gutter: stable both-edges;
+  }
+  .page {
+    width: 100%;
+    max-width: var(--col);
+    margin: 0 auto;
+    animation: page-in 320ms var(--ease-out);
+  }
+  .page > :first-child {
+    margin-top: 0;
+  }
+
+  /* -- the toolbar: glass capsules over the content */
+  .toolbar {
+    position: absolute;
+    z-index: 6;
+    top: 8px;
+    left: 4px;
+    right: 16px;
+    height: 36px;
+    display: flex;
+    align-items: center;
+    gap: 10px;
+    pointer-events: none;
+  }
+  .toolbar > * {
+    pointer-events: auto;
+  }
+  .nav-buttons {
+    display: inline-flex;
+    height: 36px;
+    padding: 3px;
+    gap: 2px;
+    border-radius: 99px;
+  }
+  .nav-buttons button {
+    width: 30px;
+    height: 30px;
+    border-radius: 99px;
+    display: grid;
+    place-items: center;
+    font-size: 16px;
+    color: var(--fg-2);
+    transition:
+      background-color var(--motion-fast),
+      transform var(--motion) var(--spring),
+      color var(--motion-fast);
+  }
+  .nav-buttons button:hover:not(:disabled) {
+    background: var(--fill);
+    color: var(--fg);
+  }
+  .nav-buttons button:active:not(:disabled) {
+    transform: scale(0.9);
+  }
+  .nav-buttons button:disabled {
+    opacity: 0.35;
+  }
+  .toolbar-spacer {
+    flex: 1;
+  }
+
+  /* The search: a capsule of glass that opens as it is used. */
+  .search {
+    position: relative;
+  }
+  .top-search {
+    display: flex;
+    align-items: center;
+    gap: 8px;
+    width: 188px;
+    height: 36px;
+    padding: 0 12px 0 11px;
+    border-radius: 99px;
+    transition:
+      width 420ms var(--spring),
+      box-shadow var(--motion-fast);
+    cursor: text;
+  }
+  .top-search:focus-within {
+    width: 280px;
+    outline: 2px solid var(--accent-ring);
+    outline-offset: 1px;
+  }
+  .top-search .glyph {
+    font-size: 16px;
+    color: var(--fg-2);
+  }
+  .top-search input {
+    flex: 1;
+    min-width: 0;
+    height: 100%;
+    border: 0;
+    outline: none;
+    background: transparent;
+    font-size: 13px;
+  }
+  .top-search input::placeholder {
+    color: var(--fg-3);
+  }
+  .top-search input::-webkit-search-cancel-button {
+    display: none;
+  }
+  .top-search kbd {
+    font-size: 11px;
+    color: var(--fg-3);
+    transition: opacity var(--motion-fast);
+  }
+  .top-search:focus-within kbd {
+    opacity: 0;
+  }
+
+  #search-results {
+    position: absolute;
+    z-index: 20;
+    top: 44px;
+    right: 0;
+    width: 300px;
+    max-height: 380px;
+    overflow: auto;
+    padding: 6px;
+    border-radius: var(--r-pop);
+    animation: pop-in 180ms var(--ease-out);
+  }
+  .result {
+    display: flex;
+    align-items: center;
+    gap: 10px;
+    width: 100%;
+    height: 40px;
+    padding: 0 10px 0 8px;
+    border-radius: 11px;
+    text-align: left;
+  }
+  .result[aria-selected="true"] {
+    background: var(--accent);
+    color: #fff;
+  }
+  .result .pico {
+    width: 26px;
+    height: 26px;
+    font-size: 16px;
+  }
+  .result[aria-selected="true"] .pico {
+    background: rgb(255 255 255 / 0.22);
+    color: #fff;
+  }
+  .result-text {
+    flex: 1;
+    min-width: 0;
+    display: flex;
+    flex-direction: column;
+  }
+  .result-name {
+    font-size: 13px;
+    font-weight: 500;
+  }
+  .result-cat {
+    font-size: 11px;
+    opacity: 0.65;
+  }
+  .result-key {
+    opacity: 0.6;
+    font-size: 12px;
+  }
+  .search-empty {
+    padding: 14px 12px;
+    color: var(--fg-2);
+    font-size: 12px;
+  }
+
+  /* -- the top of a page */
+  .hero {
+    display: flex;
+    align-items: center;
+    gap: 14px;
+    padding: 4px 4px 22px;
+  }
+  .hero-text {
+    flex: 1;
+    min-width: 0;
+  }
+  .hero-title {
+    font-size: 26px;
+    line-height: 1.12;
+    font-weight: 700;
+    letter-spacing: -0.024em;
+  }
+  .hero-line {
+    margin-top: 2px;
+    font-size: 12.5px;
+    color: var(--fg-2);
+  }
+  .hero-logo {
+    width: 52px;
+    height: 52px;
+    border-radius: 15px;
+    flex: none;
+    filter: drop-shadow(0 6px 10px rgb(0 0 0 / 0.18));
+  }
+  /* The picture of a page: the accent as glass, with the picture in white. */
+  .pico {
+    display: inline-grid;
+    place-items: center;
+    flex: none;
+  }
+  .hero-tile {
+    width: 48px;
+    height: 48px;
+    border-radius: 15px;
+    font-size: 27px;
+    color: #fff;
+    background: linear-gradient(155deg, var(--accent-hi), var(--accent) 52%, var(--accent-lo));
+    box-shadow:
+      inset 0 0 0 0.5px color-mix(in srgb, var(--accent-lo) 70%, black),
+      inset 0 1.5px 0 rgb(255 255 255 / 0.55),
+      inset 0 -1px 0 rgb(0 0 0 / 0.12),
+      0 8px 18px -8px color-mix(in srgb, var(--accent) 70%, transparent);
+  }
+
+  /* -- groups and rows */
+  .section-title {
+    display: flex;
+    align-items: center;
+    gap: 6px;
+    margin: 24px 0 8px;
+    padding: 0 16px;
+    font-size: 12px;
+    font-weight: 600;
+    letter-spacing: 0.005em;
+    color: var(--fg-2);
+  }
+  .section-title.minor {
+    margin-top: 16px;
+    font-weight: 500;
+    color: var(--fg-3);
+  }
+  .card {
+    position: relative;
+    border-radius: var(--r-card);
+    background: var(--card);
+    -webkit-backdrop-filter: blur(18px) saturate(1.5);
+    backdrop-filter: blur(18px) saturate(1.5);
+    box-shadow:
+      inset 0 0 0 0.5px var(--card-edge),
+      0 1px 2px rgb(0 0 0 / 0.04),
+      0 8px 24px -14px rgb(18 24 50 / 0.14);
+  }
+  .card + .card,
+  .card + .section-title {
+    margin-top: 12px;
+  }
+  .card + .section-title {
+    margin-top: 24px;
+  }
+  .row {
+    position: relative;
+    display: flex;
+    align-items: center;
+    justify-content: space-between;
+    gap: 16px;
+    min-height: var(--row-h);
+    padding: 8px var(--row-inset);
+  }
+  .row + .row::before {
+    content: "";
+    position: absolute;
+    top: 0;
+    left: var(--row-inset);
+    right: 0;
+    height: 0.5px;
+    background: var(--hair);
+  }
+  .row-text {
+    flex: 1 1 auto;
+    min-width: 0;
+    display: flex;
+    flex-direction: column;
+    gap: 2px;
+  }
+  .row-title {
+    display: flex;
+    align-items: center;
+    gap: 6px;
+    font-size: 13px;
+    font-weight: 500;
+    line-height: 1.3;
+  }
+  .row-name {
+    min-width: 0;
+    text-wrap: pretty;
+  }
+  .row-sub {
+    font-size: 12px;
+    line-height: 1.35;
+    color: var(--fg-2);
+  }
+  .row-value {
+    max-width: 260px;
+    overflow: hidden;
+    text-overflow: ellipsis;
+    white-space: nowrap;
+    font-size: 12px;
+    color: var(--fg-2);
+    font-variant-numeric: tabular-nums;
+  }
+  .row-lead {
+    flex: none;
+    display: grid;
+    place-items: center;
+  }
+  .row-control {
+    flex: none;
+    display: flex;
+    align-items: center;
+    justify-content: flex-end;
+    gap: 8px;
+  }
+  .row.block {
+    flex-direction: column;
+    align-items: stretch;
+    gap: 10px;
+    padding-top: 12px;
+    padding-bottom: 12px;
+  }
+  .row.block .row-control {
+    justify-content: flex-start;
+    flex-wrap: wrap;
+  }
+  .row.disabled {
+    opacity: 0.4;
+    pointer-events: none;
+  }
+  .row.found {
+    animation: found 1.6s var(--ease-out);
+  }
+  .info-tip {
+    display: inline-grid;
+    place-items: center;
+    flex: none;
+    width: 16px;
+    height: 16px;
+    border-radius: 50%;
+    font-size: 15px;
+    color: var(--fg-3);
+    transition:
+      color var(--motion-fast),
+      transform var(--motion) var(--spring);
+  }
+  .info-tip:hover {
+    color: var(--accent);
+    transform: scale(1.14);
+  }
+  .info-tip-text {
+    display: inline-flex;
+    width: auto;
+    height: auto;
+    gap: 6px;
+    padding: 3px 10px 3px 4px;
+    border-radius: 99px;
+    font-size: 12px;
+    line-height: 16px;
+    color: var(--fg-2);
+    cursor: default;
+  }
+  .card-note {
+    display: flex;
+    margin: 8px 8px 0;
+    font-size: 12px;
+    line-height: 1.4;
+    color: var(--fg-2);
+  }
+  .page-foot {
+    display: flex;
+    justify-content: center;
+    margin-top: 28px;
+  }
+}
+
+@keyframes page-in {
+  from {
+    opacity: 0;
+    transform: translateY(8px);
+  }
+}
+@keyframes pop-in {
+  from {
+    opacity: 0;
+    transform: scale(0.94) translateY(-4px);
+  }
+}
+@keyframes pop-out {
+  to {
+    opacity: 0;
+    transform: scale(0.96);
+  }
+}
+@keyframes found {
+  0%,
+  60% {
+    background: var(--accent-soft);
+  }
+}

@@ -1,0 +1,6 @@
+/* The list of sites to block, as the snippets' editor draws its text. */
+textarea.browser-sites {
+  width: 100%; min-height: 96px; max-height: 320px; padding: 8px 12px; border: 0; border-radius: var(--r-field);
+  background: var(--field); color: var(--text); font: var(--fs-body) var(--mono); line-height: 1.45;
+  box-shadow: inset 0 0 0 1px var(--field-edge); resize: vertical;
+}

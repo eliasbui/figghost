@@ -1,0 +1,403 @@
+/* What the pages draw by hand, in the glass design. Each block is named for the page that draws it. */
+@layer components {
+  .dim {
+    opacity: 0.42;
+    pointer-events: none;
+    transition: opacity var(--motion);
+  }
+  .util-state {
+    color: var(--fg-2);
+    font-size: var(--fs-small);
+    white-space: nowrap;
+  }
+  /* A short word that says a value, in the colour of a note. */
+  .row-desc {
+    color: var(--fg-2);
+    font-size: 12px;
+    line-height: 1.4;
+  }
+  .hint {
+    color: var(--fg-3);
+  }
+  .minor {
+    color: var(--fg-3);
+  }
+
+  /* General: the features, one a line, the switch beside the name that opens the page. */
+  .feat-row {
+    padding-top: 6px;
+    padding-bottom: 6px;
+    cursor: default;
+  }
+  .feat-row:hover {
+    background: var(--fill);
+  }
+  .feat-row .pico {
+    width: 30px;
+    height: 30px;
+    border-radius: 9px;
+    font-size: 17px;
+    color: var(--accent);
+    background: var(--accent-soft);
+  }
+  .feat-row .row-text {
+    flex: 1;
+  }
+  .feat-name {
+    padding: 0;
+    font-size: 13px;
+    font-weight: 500;
+    text-align: left;
+    color: var(--fg);
+  }
+  .chev {
+    display: inline-block;
+    flex: none;
+    width: 7px;
+    height: 7px;
+    margin: 0 4px 0 2px;
+    border-top: 1.5px solid var(--fg-3);
+    border-right: 1.5px solid var(--fg-3);
+    transform: rotate(45deg);
+  }
+
+  /* About: the licence text. */
+  .license {
+    margin: 0;
+    padding: 4px 18px 16px;
+    white-space: pre-wrap;
+    font: 12px / 1.5 var(--mono);
+    color: var(--fg-2);
+    -webkit-user-select: text;
+    user-select: text;
+  }
+  .chips {
+    display: flex;
+    align-items: center;
+    gap: 6px;
+    flex-wrap: wrap;
+  }
+
+  /* Shortcuts: the keys that stay as they are. */
+  .cheats {
+    display: flex;
+    flex-direction: column;
+  }
+  .cheat {
+    position: relative;
+    display: flex;
+    align-items: center;
+    justify-content: space-between;
+    gap: 12px;
+    min-height: 42px;
+    padding: 8px var(--row-inset);
+    font-size: 13px;
+    font-weight: 500;
+  }
+  .cheat + .cheat::before {
+    content: "";
+    position: absolute;
+    top: 0;
+    left: var(--row-inset);
+    right: 0;
+    height: 0.5px;
+    background: var(--hair);
+  }
+  .card > .row-desc {
+    padding: 0 var(--row-inset) 12px;
+    font-size: 11.5px;
+    color: var(--fg-3);
+  }
+
+  /* Scrolling: the presets, the pad to try them on, and the curve. */
+  .presets {
+    display: flex;
+    flex-wrap: wrap;
+    gap: 8px;
+  }
+  .pad-wrap {
+    display: grid;
+    grid-template-columns: minmax(0, 1fr) 200px;
+    gap: 14px;
+    padding: 14px;
+  }
+  .pad {
+    position: relative;
+    height: 192px;
+    overflow-y: auto;
+    border-radius: 14px;
+    background: var(--field);
+    box-shadow: inset 0 0 0 0.5px var(--field-edge);
+    -webkit-user-select: none;
+    user-select: none;
+  }
+  .pad-line {
+    display: flex;
+    align-items: center;
+    height: 30px;
+    padding: 0 14px;
+    border-bottom: 0.5px solid var(--hair);
+    font-size: 11.5px;
+    color: var(--fg-3);
+    font-variant-numeric: tabular-nums;
+  }
+  .pad-line:nth-child(5n) {
+    color: var(--fg);
+    font-weight: 600;
+  }
+  .meter {
+    display: flex;
+    flex-direction: column;
+    gap: 8px;
+  }
+  .meter canvas {
+    display: block;
+    width: 100%;
+    height: 84px;
+    border-radius: 14px;
+    background: var(--field);
+    box-shadow: inset 0 0 0 0.5px var(--field-edge);
+  }
+  .stat {
+    display: flex;
+    justify-content: space-between;
+    font-size: var(--fs-small);
+    color: var(--fg-2);
+  }
+  .stat b {
+    font-weight: 600;
+    color: var(--fg);
+    font-variant-numeric: tabular-nums;
+  }
+
+  /* Window snapping: one row a layout, with a small picture of where the window goes. */
+  .tiles {
+    display: flex;
+    flex-direction: column;
+  }
+  .tile {
+    position: relative;
+    display: flex;
+    align-items: center;
+    justify-content: space-between;
+    gap: 12px;
+    min-height: 44px;
+    padding: 7px var(--row-inset);
+  }
+  .tile + .tile::before {
+    content: "";
+    position: absolute;
+    top: 0;
+    left: var(--row-inset);
+    right: 0;
+    height: 0.5px;
+    background: var(--hair);
+  }
+  .tile-top {
+    display: flex;
+    align-items: center;
+    gap: 12px;
+    min-width: 0;
+    flex: 1;
+  }
+  .tile-name {
+    min-width: 0;
+    overflow: hidden;
+    text-overflow: ellipsis;
+    white-space: nowrap;
+    font-size: 13px;
+    font-weight: 500;
+  }
+  .tile-actions {
+    display: flex;
+    align-items: center;
+    gap: 6px;
+    flex: none;
+  }
+  .mini {
+    position: relative;
+    flex: none;
+    width: 30px;
+    height: 20px;
+    overflow: hidden;
+    border-radius: 5px;
+    background: var(--fill-2);
+    box-shadow: inset 0 0 0 1px var(--fg-3);
+  }
+  .mini i {
+    position: absolute;
+    border-radius: 2px;
+    background: var(--accent);
+  }
+
+  /* The looks of the volume indicator and the music widget, each with a small picture. */
+  .style-wrap {
+    display: flex;
+    flex-direction: column;
+    gap: 10px;
+  }
+  .style-wrap.disabled {
+    opacity: 0.42;
+    pointer-events: none;
+  }
+  .style-wrap + .card {
+    margin-top: 12px;
+  }
+  .style-cards {
+    display: grid;
+    grid-template-columns: repeat(auto-fill, minmax(112px, 1fr));
+    gap: 10px;
+  }
+  .style-card {
+    display: flex;
+    flex-direction: column;
+    align-items: stretch;
+    gap: 2px;
+    padding: 8px;
+    border-radius: 16px;
+    background: var(--card);
+    box-shadow: inset 0 0 0 0.5px var(--card-edge);
+    text-align: left;
+    color: var(--fg);
+    transition:
+      transform var(--motion) var(--spring),
+      box-shadow var(--motion-fast);
+  }
+  .style-card:hover {
+    transform: translateY(-1px);
+    box-shadow: inset 0 0 0 1px var(--hair-2);
+  }
+  .style-card:active {
+    transform: scale(0.97);
+  }
+  .style-card[aria-pressed="true"] {
+    box-shadow:
+      inset 0 0 0 2px var(--accent),
+      0 6px 16px -8px color-mix(in srgb, var(--accent) 50%, transparent);
+  }
+  .sc-art {
+    position: relative;
+    display: flex;
+    flex-direction: column;
+    align-items: center;
+    height: 64px;
+    margin-bottom: 6px;
+    overflow: hidden;
+    border-radius: 11px;
+    background: linear-gradient(160deg, color-mix(in srgb, var(--accent) 30%, var(--field)), var(--field));
+  }
+  .sc-name {
+    font-size: 12.5px;
+    font-weight: 600;
+  }
+  /* A style says its name; what it is like is kept for the search and the reader of the screen. */
+  .sc-desc {
+    position: absolute;
+    width: 1px;
+    height: 1px;
+    margin: -1px;
+    overflow: hidden;
+    clip: rect(0 0 0 0);
+    white-space: nowrap;
+  }
+  .hud-art {
+    display: block;
+  }
+  .hud-art i {
+    position: absolute;
+    background: color-mix(in srgb, var(--fg) 40%, transparent);
+  }
+  .hud-place-box {
+    display: flex;
+    align-items: center;
+    gap: 12px;
+  }
+  .hud-places {
+    display: grid;
+    grid-template-columns: repeat(3, 28px);
+    grid-auto-rows: 20px;
+    gap: 4px;
+    padding: 5px;
+    border-radius: 10px;
+    background: var(--field);
+    box-shadow: inset 0 0 0 0.5px var(--field-edge);
+  }
+  .hud-place {
+    padding: 0;
+    border: 0;
+    border-radius: 5px;
+    background: color-mix(in srgb, var(--fg) 16%, transparent);
+    transition:
+      background-color var(--motion-fast),
+      transform var(--motion) var(--spring);
+  }
+  .hud-place:hover {
+    background: color-mix(in srgb, var(--fg) 28%, transparent);
+  }
+  .hud-place:active {
+    transform: scale(0.88);
+  }
+  .hud-place[aria-pressed="true"] {
+    background: var(--accent);
+  }
+
+  /* AI agents: the limits of one account. */
+  .acct-limit {
+    display: grid;
+    grid-template-columns: 36px minmax(60px, 120px) 40px auto;
+    align-items: center;
+    gap: 8px;
+    margin-top: 6px;
+    color: var(--fg-2);
+    font-size: var(--fs-small);
+  }
+  .acct-bar {
+    height: 6px;
+    border-radius: 99px;
+    background: var(--track);
+    overflow: hidden;
+  }
+  .acct-bar i {
+    display: block;
+    height: 100%;
+    border-radius: 99px;
+    background: linear-gradient(90deg, var(--accent-hi), var(--accent));
+  }
+  .acct-bar.warn i {
+    background: var(--warn);
+  }
+  .acct-bar.bad i {
+    background: var(--bad);
+  }
+  .acct-reset {
+    white-space: nowrap;
+  }
+  .acct-value {
+    color: var(--fg);
+    font-weight: 600;
+    text-align: right;
+    font-variant-numeric: tabular-nums;
+  }
+
+  /* Notch: the order and the page of a tab. */
+  .tab-order {
+    display: inline-flex;
+    gap: 2px;
+  }
+  .tab-order > * {
+    opacity: 1;
+  }
+  .banner {
+    display: flex;
+    align-items: center;
+    gap: 12px;
+    padding: 10px var(--row-inset);
+    border-radius: var(--r-card);
+    background: color-mix(in srgb, var(--warn) 12%, var(--card));
+    box-shadow: inset 0 0 0 0.5px color-mix(in srgb, var(--warn) 40%, transparent);
+  }
+  .banner .grow {
+    flex: 1;
+    font-size: var(--fs-small);
+  }
+}

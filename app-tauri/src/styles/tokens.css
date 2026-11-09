@@ -1,0 +1,166 @@
+/* The tokens of the glass design: one place for colour, shape, motion and the materials. Light and dark come from
+   `light-dark()`, so a theme is a `color-scheme`, not a second list; `html.light` and `html.dark` force one. The names the
+   style sheets of the pages already use (--text, --stroke, --tint, --group ...) are kept at the foot as aliases. */
+
+:root {
+  color-scheme: light dark;
+
+  --font: -apple-system, BlinkMacSystemFont, "SF Pro Text", "SF Pro Display", Inter, system-ui, sans-serif;
+  --mono: ui-monospace, "SF Mono", Menlo, monospace;
+  --fs-small: 11.5px;
+  --fs-body: 13px;
+
+  /* A 4 point grid; every size below is a multiple of it, or half of one. */
+  --u: 4px;
+  --row-h: 46px;
+  --row-inset: 16px;
+  --ctl: 28px;
+  --ctl-sm: 24px;
+  --ctl-lg: 34px;
+  --col: 660px;
+
+  /* Concentric shapes: the window, the panels 8 inside it, the cards, the tiles. */
+  --r-window: 26px;
+  --r-panel: 18px;
+  --r-card: 18px;
+  --r-pop: 16px;
+  --r-tile: 9px;
+  --r-field: 10px;
+
+  --ease-out: cubic-bezier(0.22, 1, 0.36, 1);
+  --spring: cubic-bezier(0.34, 1.45, 0.64, 1);
+  --motion-fast: 140ms;
+  --motion: 240ms;
+  --motion-slow: 380ms;
+
+  /* The accent is the system's where the web view knows it, and blue where it does not. */
+  --accent: #0a84ff;
+  --good: light-dark(#1f9d4d, #32d74b);
+  --warn: light-dark(#c77700, #ff9f0a);
+  --bad: light-dark(#d70015, #ff453a);
+  --accent-2: light-dark(#5856d6, #7d7aff);
+
+  --fg: light-dark(rgb(18 20 26 / 0.92), rgb(255 255 255 / 0.92));
+  --fg-2: light-dark(rgb(18 20 26 / 0.6), rgb(255 255 255 / 0.62));
+  --fg-3: light-dark(rgb(18 20 26 / 0.46), rgb(255 255 255 / 0.5));
+  --hair: light-dark(rgb(18 20 26 / 0.08), rgb(255 255 255 / 0.09));
+  --hair-2: light-dark(rgb(18 20 26 / 0.15), rgb(255 255 255 / 0.18));
+
+  /* The window: the system's glass shows through a veil of the window's own colour; without glass it is solid. */
+  --veil: light-dark(rgb(243 245 250 / 0.62), rgb(22 23 28 / 0.6));
+  --solid-bg: light-dark(#eef0f6, #17181d);
+
+  /* Grouped content is not glass: a pane a little lighter than the window, with a hairline. */
+  --card: light-dark(rgb(255 255 255 / 0.78), rgb(255 255 255 / 0.065));
+  --card-edge: light-dark(rgb(18 20 26 / 0.06), rgb(255 255 255 / 0.08));
+  --field: light-dark(rgb(18 20 26 / 0.05), rgb(255 255 255 / 0.075));
+  --field-edge: light-dark(rgb(18 20 26 / 0.1), rgb(255 255 255 / 0.12));
+
+  /* Glass: controls, the sidebar, the menus. */
+  --glass-bg: light-dark(rgb(255 255 255 / 0.5), rgb(255 255 255 / 0.1));
+  --glass-bg-hi: light-dark(rgb(255 255 255 / 0.72), rgb(255 255 255 / 0.17));
+  --glass-rim: light-dark(rgb(255 255 255 / 0.9), rgb(255 255 255 / 0.26));
+  --glass-edge: light-dark(rgb(18 20 26 / 0.1), rgb(0 0 0 / 0.5));
+  --glass-shadow: light-dark(rgb(30 40 80 / 0.16), rgb(0 0 0 / 0.5));
+  --panel-bg: light-dark(rgb(255 255 255 / 0.5), rgb(40 42 50 / 0.5));
+  --pop-bg: light-dark(rgb(250 251 253 / 0.8), rgb(44 46 54 / 0.8));
+  --glass-blur: blur(22px) saturate(1.7);
+  --glass-blur-thick: blur(36px) saturate(1.9);
+
+  --tile: light-dark(rgb(255 255 255 / 0.7), rgb(255 255 255 / 0.12));
+  --shadow: light-dark(rgb(18 24 50 / 0.16), rgb(0 0 0 / 0.5));
+  --track: light-dark(rgb(18 20 26 / 0.12), rgb(255 255 255 / 0.16));
+}
+
+@supports (color: -apple-system-control-accent) {
+  :root {
+    --accent: -apple-system-control-accent;
+  }
+}
+
+:root {
+  --accent-hi: color-mix(in oklab, var(--accent) 80%, white);
+  --accent-lo: color-mix(in oklab, var(--accent) 88%, black);
+  --accent-soft: color-mix(in srgb, var(--accent) 16%, transparent);
+  --accent-ring: color-mix(in srgb, var(--accent) 55%, transparent);
+}
+
+html.light {
+  color-scheme: light;
+}
+html.dark {
+  color-scheme: dark;
+}
+
+/* Reduce transparency: glass becomes a plain pane. Increase contrast: the edges get firm. */
+html.reduce-transparency {
+  --glass-bg: light-dark(rgb(250 251 253), rgb(52 54 62));
+  --glass-bg-hi: light-dark(#ffffff, rgb(66 68 78));
+  --panel-bg: light-dark(rgb(248 249 252), rgb(40 42 50));
+  --pop-bg: light-dark(#fbfcfe, rgb(46 48 56));
+  --card: light-dark(#ffffff, rgb(44 46 54));
+  --veil: var(--solid-bg);
+  --glass-blur: none;
+  --glass-blur-thick: none;
+}
+html.increase-contrast {
+  --hair: light-dark(rgb(0 0 0 / 0.28), rgb(255 255 255 / 0.32));
+  --card-edge: var(--hair);
+  --glass-edge: var(--hair-2);
+  --fg-2: light-dark(rgb(0 0 0 / 0.78), rgb(255 255 255 / 0.8));
+  --fg-3: light-dark(rgb(0 0 0 / 0.62), rgb(255 255 255 / 0.66));
+}
+
+/* Names the style sheets of the pages already use. */
+:root {
+  --text: var(--fg);
+  --text-2: var(--fg-2);
+  --text-3: var(--fg-3);
+  --stroke: var(--hair);
+  --boundary: var(--hair-2);
+  --tint: var(--accent);
+  --group: var(--card);
+  --group-edge: var(--card-edge);
+  --card-edge-legacy: var(--card-edge);
+  --solid: light-dark(#ffffff, #1f2025);
+  --solid-2: light-dark(#f2f4f8, #2a2c33);
+  --canvas: var(--solid-bg);
+  --fill: light-dark(rgb(18 20 26 / 0.05), rgb(255 255 255 / 0.08));
+  --fill-2: light-dark(rgb(18 20 26 / 0.03), rgb(255 255 255 / 0.05));
+  --control: var(--glass-bg);
+  --orange: var(--warn);
+  --green: var(--good);
+  --line: var(--hair);
+  --h-control: var(--ctl);
+  --h-small: var(--ctl-sm);
+  --r-control: 999px;
+  --r-thumb: 6px;
+  --titlebar: 52px;
+}
+
+/* What Tailwind may name: `bg-card`, `text-fg-2`, `border-hair`, `rounded-card`, `ease-spring`. They read the variables above
+   at run time, so a theme change reaches them without a new class. */
+@theme inline {
+  --font-sans: var(--font);
+  --font-mono: var(--mono);
+  --color-accent: var(--accent);
+  --color-accent-hi: var(--accent-hi);
+  --color-accent-lo: var(--accent-lo);
+  --color-accent-soft: var(--accent-soft);
+  --color-good: var(--good);
+  --color-warn: var(--warn);
+  --color-bad: var(--bad);
+  --color-fg: var(--fg);
+  --color-fg-2: var(--fg-2);
+  --color-fg-3: var(--fg-3);
+  --color-hair: var(--hair);
+  --color-hair-2: var(--hair-2);
+  --color-card: var(--card);
+  --color-glass: var(--glass-bg);
+  --color-glass-hi: var(--glass-bg-hi);
+  --radius-card: var(--r-card);
+  --radius-pop: var(--r-pop);
+  --radius-tile: var(--r-tile);
+  --radius-field: var(--r-field);
+  --ease-spring: var(--spring);
+}

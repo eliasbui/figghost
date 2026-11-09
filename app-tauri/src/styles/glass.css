@@ -1,0 +1,121 @@
+/* The materials. Real glass (a blur of what is behind) is for the big floating things: the sidebar, the toolbar, the menus,
+   the sheets. A control that sits on a flat card has nothing behind it worth blurring, so it gets the look of glass instead:
+   a lit rim, a soft drop and a highlight that follows the pointer. Neither draws content. */
+@layer components {
+  .glass,
+  .gl {
+    position: relative;
+    isolation: isolate;
+  }
+
+  /* The sheen: a soft light under the pointer. Set by src/lib/sheen.ts, which writes --mx and --my. */
+  .glass::before,
+  .gl::before {
+    content: "";
+    position: absolute;
+    inset: 0;
+    z-index: -1;
+    border-radius: inherit;
+    pointer-events: none;
+    opacity: 0;
+    background: radial-gradient(110px circle at var(--mx, 50%) var(--my, 0%), light-dark(rgb(255 255 255 / 0.7), rgb(255 255 255 / 0.2)), transparent 70%);
+    transition: opacity var(--motion) var(--ease-out);
+  }
+  .glass:hover::before,
+  .gl:hover::before {
+    opacity: 1;
+  }
+
+  /* Real glass. */
+  .glass {
+    background: var(--glass-bg);
+    -webkit-backdrop-filter: var(--glass-blur);
+    backdrop-filter: var(--glass-blur);
+    box-shadow:
+      inset 0 0 0 0.5px var(--glass-edge),
+      inset 1px 1.5px 0.5px -1px var(--glass-rim),
+      inset -1px -1px 0.5px -1px color-mix(in srgb, var(--glass-rim) 55%, transparent),
+      0 1px 2px color-mix(in srgb, var(--glass-shadow) 45%, transparent),
+      0 8px 24px -8px var(--glass-shadow);
+  }
+  .glass-thick {
+    background: var(--panel-bg);
+    -webkit-backdrop-filter: var(--glass-blur-thick);
+    backdrop-filter: var(--glass-blur-thick);
+  }
+  /* A pane that floats over everything: menus, the sheet, the toast. */
+  .glass-pop {
+    background: var(--pop-bg);
+    -webkit-backdrop-filter: var(--glass-blur-thick);
+    backdrop-filter: var(--glass-blur-thick);
+    box-shadow:
+      inset 0 0 0 0.5px var(--glass-edge),
+      inset 1px 1.5px 0.5px -1px var(--glass-rim),
+      0 2px 6px color-mix(in srgb, var(--glass-shadow) 50%, transparent),
+      0 24px 56px -12px var(--glass-shadow);
+  }
+
+  /* The look of glass for a control on a card. */
+  .gl {
+    background: linear-gradient(180deg, var(--ctl-bg-hi), var(--ctl-bg));
+    box-shadow:
+      inset 0 0 0 0.5px var(--ctl-edge),
+      inset 0 1px 0 var(--glass-rim),
+      0 0.5px 1px rgb(0 0 0 / 0.1),
+      0 2px 6px -2px rgb(0 0 0 / 0.1);
+    transition:
+      transform var(--motion) var(--spring),
+      background-color var(--motion-fast) var(--ease-out),
+      box-shadow var(--motion-fast) var(--ease-out),
+      opacity var(--motion-fast);
+  }
+  .gl:where(:hover:not(:disabled, [aria-disabled="true"], [data-disabled])) {
+    background: linear-gradient(180deg, var(--ctl-bg-hi), var(--ctl-bg-hi));
+  }
+  .gl:where(:active:not(:disabled, [aria-disabled="true"], [data-disabled])) {
+    transform: scale(0.965);
+    transition-duration: 80ms;
+  }
+
+  /* The accent as glass: the prominent button, the switch that is on, the thumb of the open choice. */
+  .gl-tint {
+    color: #fff;
+    background: linear-gradient(180deg, var(--accent-hi), var(--accent) 48%, var(--accent-lo));
+    box-shadow:
+      inset 0 0 0 0.5px color-mix(in srgb, var(--accent-lo) 70%, black),
+      inset 0 1px 0 rgb(255 255 255 / 0.5),
+      inset 0 -1px 0 rgb(0 0 0 / 0.14),
+      0 1px 2px rgb(0 0 0 / 0.2),
+      0 6px 14px -4px color-mix(in srgb, var(--accent) 55%, transparent);
+  }
+  .gl-tint:where(:hover:not(:disabled, [aria-disabled="true"], [data-disabled])) {
+    background: linear-gradient(180deg, color-mix(in oklab, var(--accent-hi) 82%, white), var(--accent-hi) 48%, var(--accent));
+  }
+
+  /* The pane that sits behind the content under a floating toolbar: the content fades and blurs as it goes under. */
+  .scroll-edge {
+    position: absolute;
+    inset: 0 0 auto 0;
+    height: 72px;
+    pointer-events: none;
+    z-index: 2;
+    -webkit-backdrop-filter: blur(14px);
+    backdrop-filter: blur(14px);
+    -webkit-mask-image: linear-gradient(#000 30%, transparent);
+    mask-image: linear-gradient(#000 30%, transparent);
+    background: linear-gradient(var(--veil), transparent);
+  }
+
+  @media (prefers-reduced-motion: reduce) {
+    .gl {
+      transition-duration: 0.01ms;
+    }
+  }
+}
+
+/* Control surfaces, light and dark. */
+:root {
+  --ctl-bg: light-dark(rgb(255 255 255 / 0.78), rgb(255 255 255 / 0.12));
+  --ctl-bg-hi: light-dark(rgb(255 255 255 / 0.98), rgb(255 255 255 / 0.19));
+  --ctl-edge: light-dark(rgb(18 20 26 / 0.13), rgb(255 255 255 / 0.16));
+}
