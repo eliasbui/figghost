@@ -390,7 +390,7 @@ dependencies = [
 
 [[package]]
 name = "core-window"
-version = "2.2.22"
+version = "2.2.23"
 
 [[package]]
 name = "cpufeatures"
@@ -731,7 +731,7 @@ dependencies = [
 
 [[package]]
 name = "figghost-tauri"
-version = "2.2.22"
+version = "2.2.23"
 dependencies = [
  "core-window",
  "serde",

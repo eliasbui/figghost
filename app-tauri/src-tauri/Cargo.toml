@@ -1,6 +1,6 @@
 [package]
 name = "figghost-tauri"
-version = "2.2.22"
+version = "2.2.23"
 description = "Figghost on Tauri 2: the settings window, with a backend that keeps its state"
 edition = "2021"
 rust-version = "1.85"
