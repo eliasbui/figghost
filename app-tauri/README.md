@@ -1,35 +1,43 @@
 # Figghost on Tauri
 
-The settings window of Figghost, rebuilt as a Tauri 2 app: a React 19 and TypeScript page, Tailwind 4 for the theme,
-react-aria-components for the behaviour of the controls and Motion for the few things that move, and a Rust backend that holds
-the state and carries out the changes. It is a second program beside the current one. Nothing outside this folder was
-changed: the repository's workspace, its `Cargo.lock` and the crates keep building as they did.
+The pages of Figghost, written once as React 19 and TypeScript, with Tailwind 4 for the theme, react-aria-components for the
+behaviour of the controls and Motion for the few things that move. They come in two forms:
 
-Status: it builds, type-checks, passes its Rust tests, and runs both as an app of its own and as the settings window of the
-AppKit app. Every page has been drawn in a browser in both themes and opened in the AppKit window. How the glass looks on a
-colourful wallpaper, and most pages in the Tauri window, have not been looked at (`ASSUMPTIONS.md` has the list). The design is
-in `DESIGN.md`.
+- A Tauri 2 app of its own, a second program beside the AppKit one: the settings window with a Rust backend that holds the
+  state and carries out the changes.
+- The pages that the programs of this repository carry inside them. `pnpm build:embed` builds each into one HTML file, with
+  its script, styles, fonts and pictures inline, beside the Rust code that includes it. The files are committed, so that a
+  build of the apps needs no Node. They are build output: change `src` here and run `pnpm build:embed`.
 
-It is also the settings window of the AppKit app. `pnpm build:embed` builds the same page into one HTML file,
-`crates/app-ui/web-next/index.html` (committed, so that a build of the app needs no Node), and the app loads it in its own
-windows in place of the page it had, on macOS 14.5 or later (`light-dark()` needs that WebKit). On an older system, or
-when `FIGGHOST_CLASSIC_SETTINGS` is set, the app keeps loading the previous page, `crates/app-ui/web`. Run
-`pnpm build:embed` after any change to `src` here and commit the file with it.
+| Surface | Source | File it builds | Opened by |
+| --- | --- | --- | --- |
+| settings, and its canvases | `src/main.tsx`, `src/pages` | `crates/app-ui/web/settings.html` | the settings, Network and palette windows of the AppKit app |
+| tray | `src/surfaces/tray` | `crates/app-ui/web/tray.html` | the panel under the menu bar item |
+| permissions | `src/surfaces/permissions` | `crates/app-ui/web/permissions.html` | the permissions window |
+| update | `src/surfaces/update` | `crates/app-ui/web/update.html` | the popup that asks whether to update |
+| whatsnew | `src/surfaces/whatsnew` | `crates/app-ui/web/whatsnew.html` | what is new in the version that just ran |
+| outlook | `src/surfaces/outlook` | `crates/app-ui/web/outlook.html` | the card of a mail that fell from the notch |
+| widget | `src/surfaces/widget` | `crates/app-ui/web/widget.html` | the music widget |
+| desktop | `src/surfaces/desktop` | `crates/desktop/web/index.html` | the beta for Windows and Linux |
 
-## Why Tauri when the main README chose AppKit
+Nothing in this repository is hand-written HTML, JavaScript or CSS outside this folder, except the service worker of the
+browser extension (`crates/app-ui/assets/browser-extension/background.js`), which a browser only takes as a script.
 
-The README of the repository chose AppKit on purpose, for Vietnamese typing in `NSSearchField`, for panels that do not take
-focus, and for memory. None of that moves here. The notch, the panels and the event tap stay in `crates/macos-sys` and are
-meant to be reached through an adapter later. What changes host is the settings window, which already was a web page in a
-`WKWebView`: it becomes a Tauri window, and its code becomes typed components instead of one script per feature.
+Status: it builds, type-checks, passes its tests, and every surface has been drawn headless in WebKit, the engine of the
+AppKit app, in both themes and both languages. The settings window has also been run in the AppKit app. How the glass looks on
+a colourful wallpaper, the other surfaces in their real windows, and the beta on Windows and Linux, have not been looked at
+(`ASSUMPTIONS.md` has the list). The design is in `DESIGN.md`.
+
+The settings window needs a WebKit that draws what Tailwind 4 writes: Safari 16.4, which is macOS 13.3. The product says
+macOS 13; on 13.0 to 13.2 the pages have not been tried and may not look right. `light-dark()` is lowered by the build, so
+the macOS 14.5 that it once seemed to need is not needed.
 
 ## What is in it
 
 - 51 pages of the settings (the sidebar's, the tabs of the notch, About) and two windows of their own, the diagram of Network
   and the command palette, drawn by the same page told which canvas to show (`?canvas=network`).
-- The protocol of the current page, unchanged: JSON messages with a `t` field in, the whole state out. One backend can serve
-  this page and the old one, and the extracted dictionaries (2353 keys, English and Vietnamese) are the old ones. The styles
-  are new.
+- The protocol the settings page has always had: JSON messages with a `t` field in, the whole state out. The AppKit app and
+  the Tauri backend both speak it. The dictionaries (2353 keys, English and Vietnamese) are in `src/i18n`.
 - A backend that keeps the settings in a file, checks every change against the rules of the current app (ranges, words,
   shortcuts and their conflicts, snippets, the wires of Network), and, while a window is open, looks at the state every two
   seconds and tells the page when it has changed.
@@ -39,7 +47,7 @@ meant to be reached through an adapter later. What changes host is the settings 
 
 ## What is not in it
 
-The engines. The page shows the sample state of `crates/app-ui/web/fixture.json` where a number or a name can only come from
+The engines. The page shows the sample state of `src/data/state.sample.json` where a number or a name can only come from
 an engine (the connections of Network, the accounts of the agents, the calendars, the clipboard count), and the actions that
 need one answer with a fault ("not available in this version yet"). The list is at the end of `ASSUMPTIONS.md`. Also missing:
 global shortcuts (a shortcut is checked and kept, not registered), the login item, the updater, the `figghost://` address,
@@ -51,8 +59,11 @@ asks the system for the microphone, the camera, the calendar and so on.
 ```
 package.json  vite.config.ts  tsconfig.json  index.html
 src/
-  main.tsx                the entry
+  main.tsx                the entry of the settings
   app/                    the shell: App (and canvas mode), Sidebar, Toolbar, Search, PageHost
+  surfaces/               the other pages: tray, permissions, update, whatsnew, outlook, widget, desktop; each folder has
+                          an index.tsx (its entry) and, where it decides anything, a logic.ts that imports nothing, so that
+                          tests/ can run it as it is; host.ts is the line to the AppKit app that they share
   bridge/                 the only place that knows how the page talks to the backend
     tauri.ts              invoke('fig_send') and listen('fig:recv'): the only use of invoke
     appkit.ts             window.fig.send and window.__fig.recv of the AppKit app's web view
@@ -62,10 +73,10 @@ src/
   components/macos/       the kit: Button, Controls (a barrel), Switch, Segmented, Select, Slider, Overlay (tips and menus),
                           Layout, Page, Common, Hotkey, Apps, Dialogs, Icon, Keys
   pages/<id>/             one folder per page; Canvas.tsx beside index.tsx for a window of its own
-  i18n/                   en.json and vi.json (extracted), shell.ts (words this shell adds), plugins.json (which features
-                          add a window or a place on another page; extracted, not read at run time)
-  data/state.sample.json  the sample state (extracted)
-  styles/                 tokens, base, glass, shell, kit, legacy (see DESIGN.md)
+  i18n/                   en.json and vi.json, shell.ts (words this shell adds), plugins.json (which features add a window or
+                          a place on another page; not read at run time)
+  data/state.sample.json  the sample state; crates/app-ui checks it against the real state
+  styles/                 tokens, base, glass, shell, kit, legacy (see DESIGN.md); surface.css for the small surfaces
   lib/                    small helpers
 src-tauri/
   Cargo.toml              its own workspace; depends on core-window by path
@@ -78,7 +89,8 @@ src-tauri/
     windows.rs            the three windows, the theme, the Dock icon
     actions.rs            the actions the backend carries out
     glass.rs  native.rs   the only code that touches the system (Liquid Glass, Accessibility, open)
-tools/                    extract-i18n.mjs, extract-state.mjs, make-tray-icon.mjs
+tools/                    build-embed.mjs (the pages for the apps), make-tray-icon.mjs, bundle-local.sh
+tests/                    node:test files for the logic of the surfaces
 ```
 
 The rules of the architecture it follows: `invoke` appears in one file; native code appears in two files of the backend; at
@@ -96,16 +108,21 @@ cd app-tauri
 pnpm install
 pnpm tauri dev        # the window, with the backend; the data goes to ~/Library/Application Support/vn.figghost.tauri
 pnpm dev              # the page alone in a browser with the sample state; /?theme=dark&lang=vi, ?canvas=network, ?canvas=kit
-pnpm typecheck
+pnpm typecheck        # the app, then the tests
+pnpm test             # the logic of the surfaces, with Node's own test runner
 pnpm build            # type-check, then the page into dist/
-pnpm build:embed      # the page as one HTML file for the AppKit app: ../crates/app-ui/web-next/index.html
+pnpm build:embed      # every page the apps carry, each as one HTML file; `node tools/build-embed.mjs tray` builds one
 cargo test --manifest-path src-tauri/Cargo.toml
 tools/bundle-local.sh             # Figghost Tauri.app under src-tauri/target/release/bundle/macos, signed ad hoc, not notarized
 ```
 
 `FIGGHOST_TAURI_HOME=/some/folder pnpm tauri dev` keeps the data of a run apart. If the Rust build complains that `../dist`
-does not exist, run `pnpm build` once. Regenerating what was extracted from the old page:
-`pnpm extract:i18n`, `pnpm extract:state`, `node tools/make-tray-icon.mjs`.
+does not exist, run `pnpm build` once. The icon of the Tauri menu bar item is made by `node tools/make-tray-icon.mjs`.
+
+To see a surface without opening a window, the programs in `crates/app-ui/examples` draw one in WebKit to a picture
+(`tray_preview`, `update_preview`, `widget_preview`, `settings_preview`; build the example after `pnpm build:embed`, since the
+page is compiled into it). The beta's page and the permissions and mail cards are drawn the same way by loading the built file
+with a stand-in for `window.fig` and posting the messages the app would.
 
 ## The protocol
 

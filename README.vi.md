@@ -485,7 +485,7 @@ Ngoài lần xem bản mới mỗi ngày (một yêu cầu tới api.github.com 
 
 ## Lựa chọn công nghệ
 
-Lớp vỏ dùng AppKit qua `objc2`, không dùng GPUI hay Tauri. Ô tìm kiếm phải nhận được kiểu gõ Telex và VNI, điều `NSSearchField` xử lý sẵn. Panel không kích hoạt, theo dõi chuột và vòng đời ứng dụng đã được kiểm chứng trong kho này, và bộ nhớ nhàn rỗi vẫn thấp. Cửa sổ cài đặt là một WKWebView vì một màn hình cài đặt có số đo trực tiếp và hai ngôn ngữ làm và tinh chỉnh nhanh hơn nhiều dưới dạng một trang, và trang chỉ là một máy khách mỏng: mọi quy tắc nằm trong mã Rust có kiểm thử. SQLite là thư viện của hệ thống (với FTS5 và bộ tách trigram), không phải bản đóng kèm.
+Lớp vỏ dùng AppKit qua `objc2`, không dùng GPUI hay Tauri. Ô tìm kiếm phải nhận được kiểu gõ Telex và VNI, điều `NSSearchField` xử lý sẵn. Panel không kích hoạt, theo dõi chuột và vòng đời ứng dụng đã được kiểm chứng trong kho này, và bộ nhớ nhàn rỗi vẫn thấp. Cửa sổ cài đặt là một WKWebView vì một màn hình cài đặt có số đo trực tiếp và hai ngôn ngữ làm và tinh chỉnh nhanh hơn nhiều dưới dạng một trang, và trang chỉ là một máy khách mỏng: mọi quy tắc nằm trong mã Rust có kiểm thử. Các trang được viết trong `app-tauri` (React, TypeScript và Tailwind) và dựng thành một tệp HTML cho mỗi cửa sổ, đặt cạnh mã Rust nạp nó, nên dựng ứng dụng không cần Node. SQLite là thư viện của hệ thống (với FTS5 và bộ tách trigram), không phải bản đóng kèm.
 
 ## Bước tiếp theo
 

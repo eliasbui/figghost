@@ -44,11 +44,13 @@ off). Through the accessibility tree and the system's event posting:
   one of its words and opened it at the row.
 - The diagram of Network opened in a window of its own with the real connections, apps and icons.
 - The window was dragged by the strip at its top and by the sidebar, and zoomed by a double click.
-- `FIGGHOST_CLASSIC_SETTINGS=1` loads the previous page.
 
-Not run: the palette window (its shortcut is taken by the installed app), the page on macOS 14.5 to 25 or on a system
+Not run: the palette window (its shortcut is taken by the installed app), the page on macOS 13 to 25 or on a system
 that has no Liquid Glass (a window without the handler named `glass` gets the solid colour), VoiceOver, and a longer use
-with the engines running.
+with the engines running. The page is built so that it needs no more than Safari 16.4 (macOS 13.3): `light-dark()` is
+lowered to custom properties by the build (no `light-dark(` is left in the style of any built page, checked), and the
+scripts use none of the newer built-ins that were looked for (`Promise.withResolvers`, `Object.groupBy`, `Set` methods and the
+like). That is a reading of the build, not a run on those systems.
 
 ## What nobody has looked at
 
@@ -69,6 +71,28 @@ with the engines running.
 - Quitting with Command-Q, opening the window again from the menu bar item and from the Dock.
 - The Rust code that touches the system (`glass.rs`, `native.rs`, the tray and the windows) has no tests; the 23 tests are of the
   rules and the store.
+
+## The other surfaces
+
+The tray panel, the permissions window, the update popup, the news of a version, the card of a mail and the music widget were
+rewritten in React (`src/surfaces`) in place of six hand-written pages, and the window of the beta for Windows and Linux in
+place of its own three files.
+
+Run: each was drawn in WebKit without a window, from the built file, and looked at. The tray, the update popup, the news and the
+widget were drawn by the programs in `crates/app-ui/examples`, which load the file the app includes and answer the page the way the
+app does (the tray with the real SF Symbols of a Mac with every feature on, light and dark, with the entry that asks for
+Accessibility and with a recording running; the update popup in its four states, light and dark, English and Vietnamese; the
+news as a list and as slides, light and dark; the widget in its five styles and with nothing playing). The permissions window,
+the card of a mail (with the fall, which ended with `landed`) and the beta (all five pages, light and dark, English and
+Vietnamese) were drawn by loading the file with a stand-in for `window.fig` and posting the messages the app sends.
+`cargo test -p app-ui` and `-p figghost-desktop` pass, and `pnpm test` runs the logic of the surfaces (the arrangement of the
+menu, the buttons of each state of the update, the slides, the widget's bar and picture, the beta's times and notes).
+
+Not run: any of them in its real window. That is the position and size of the panel under the menu bar item, the fall of the
+drop from the notch and the click-through of its panel, the drag of the widget and its resize grip, the drag of each window by
+its top, the keys (Escape, Enter, the arrows) in a panel that does not take the focus, the SF Symbols as masks on the system's
+glass over a real wallpaper, and the beta on Windows and Linux at all (WebView2 and WebKitGTK; only the page was drawn, in
+WebKit on a Mac, and the custom protocol and the ipc handler of wry were not run).
 
 ## Assumptions about behaviour
 
@@ -97,7 +121,7 @@ with the engines running.
 
 ## What the page shows that nobody measured
 
-The state starts from the sample of the old page's preview. Until an engine exists, these are samples, not facts: the count of
+The state starts from `src/data/state.sample.json`. Until an engine exists, these are samples, not facts: the count of
 the clipboard, the shelf, the notch's tabs and screens, the apps of the scroll rules and the ignored apps, the agents and their
 accounts, the calendars, the weather, the connections, wires and history of Network, the disk scan of Mole, the sources of Screen
 Time. The facts the backend does know are filled in: the version, whether it runs from a bundle, the Accessibility permission,
@@ -122,7 +146,7 @@ none, so the lists of apps show no icon; a shortcut is checked and kept but not 
 The Breaks page asks for the shortcut of `breaks:now`, and its page reads `breaks.shortcuts.now`, while the state holds it as
 `breaks.shortcut`. The shortcut it shows is therefore always empty there, even when one is set. This port reads it from where
 the state keeps it (`shortcutOf` and `withShortcut` in `src/lib/shortcuts.ts`, and `slots` in the backend), which is a
-difference from the old page, and a fix that the old page could take as well.
+difference from the page it replaced, and a fix that the AppKit app's own model could take as well.
 
 ## Differences from the current app, on purpose
 

@@ -487,7 +487,7 @@ Apart from the daily look for a new version (one request to api.github.com that 
 
 ## Technology choices
 
-The shell uses AppKit through `objc2`, not GPUI or Tauri. The search field must accept Telex and VNI typing, which `NSSearchField` handles natively. Non-activating panels, mouse tracking and the app lifecycle are proven in this repository, and idle memory stays low. The settings window is a WKWebView because a settings screen with live readings and two languages is far quicker to build and refine as a page, and the page is a thin client: every rule lives in tested Rust. SQLite is the system library (with FTS5 and the trigram tokenizer), not a bundled build.
+The shell uses AppKit through `objc2`, not GPUI or Tauri. The search field must accept Telex and VNI typing, which `NSSearchField` handles natively. Non-activating panels, mouse tracking and the app lifecycle are proven in this repository, and idle memory stays low. The settings window is a WKWebView because a settings screen with live readings and two languages is far quicker to build and refine as a page, and the page is a thin client: every rule lives in tested Rust. The pages are written in `app-tauri` (React, TypeScript and Tailwind) and built into one HTML file for each window, committed beside the Rust that includes it, so building the app needs no Node. SQLite is the system library (with FTS5 and the trigram tokenizer), not a bundled build.
 
 ## Next steps
 

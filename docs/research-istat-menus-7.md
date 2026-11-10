@@ -1,6 +1,6 @@
 # iStat Menus 7 và phần Hệ thống của Figghost
 
-Nghiên cứu iStat Menus 7 (từ bản 7.0 ngày 31/07/2024 tới bản 7.5 ngày 14/09/2026) để đưa cách trình bày của nó vào tab System của notch và các số liệu trên thanh menu. Bản vẽ đề xuất đi kèm: [redesign-system-istat.html](redesign-system-istat.html).
+Nghiên cứu iStat Menus 7 (từ bản 7.0 ngày 31/07/2024 tới bản 7.5 ngày 14/09/2026) để đưa cách trình bày của nó vào tab System của notch và các số liệu trên thanh menu. Bản vẽ đề xuất đi kèm đã được bỏ khi giao diện được viết lại bằng `app-tauri`.
 
 ## Nguồn
 

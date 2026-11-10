@@ -72,7 +72,7 @@ beats the kit. The style sheets of the pages (`src/pages/*/*.css`) are not in a 
   explain draws them as one line each under it, unless explaining is all it has.
 - `Common.tsx`: `PermissionRow` (a name, a pill that says granted or not, a way to the place that grants it), `AccessRow`,
   `ShortcutRow`, `TryRow`.
-- `Icon.tsx`: Phosphor icons. A page names an icon with the SF Symbol names the old page used (`gearshape`), a short kit name
+- `Icon.tsx`: Phosphor icons. A page names an icon with SF Symbol names (`gearshape`), a short kit name
   (`open`, `plus`, `refresh`) or `pg.<page>` for a page's own. An unknown name draws nothing and warns in development.
 
 ## In the AppKit app
@@ -83,7 +83,7 @@ The same page runs in the web view of the AppKit app (`crates/macos-sys/src/webv
 - The window has no title bar to drag by, so a press on a `data-tauri-drag-region` asks the app to drag (`window.fig.drag()`),
   and a double click to zoom (`src/lib/drag.ts`).
 - The window's glass is the app's own; the page knows it has it from the handler named `glass`, and lays its veil over it as
-  in the Tauri window. The panes of glass that the previous page asked for (`lay_glass`) are not used.
+  in the Tauri window. The panes of glass that the earlier page asked for (`lay_glass`) are not used.
 - A window that shows one canvas (the diagram of Network, the palette) is told so by `window.__canvas`, which the app writes
   into the page where `<!--__PRELUDE__-->` is.
 - Nothing may be fetched (the content security policy is `default-src 'none'`), so `vite build --mode embed` puts the script,
@@ -92,18 +92,36 @@ The same page runs in the web view of the AppKit app (`crates/macos-sys/src/webv
 - A page that fails to draw (`PageBoundary`) says so in its place and writes the cause in the app's log
   (`settings page: page <id>: ...`), and the rest of the window goes on.
 
+## The other surfaces
+
+The small windows of the AppKit app and the window of the beta are pages of their own, in `src/surfaces/<name>/index.tsx`,
+built one by one by `tools/build-embed.mjs` (see the README). They sit on the system's own glass or on a plain window, so their
+style sheet, `src/styles/surface.css`, paints no background: the tokens, the reset and the materials are the settings
+window's, the utilities are only those of `src/surfaces` and the button recipe, and a surface imports no part of the kit that
+reads the store (the kit's `Button` recipe is in `button-style.ts` for that reason). A surface talks to the app through
+`src/surfaces/host.ts`: `window.fig.send` out, `window.__fig.recv` in, and what only the system can draw (`window.__icon`, the SF
+Symbols of the permissions as `window.__symbols`) written into the page by the app before it runs
+(`crates/app-ui/src/web.rs`).
+
+- The tray, the permissions window, the update popup and the news keep the way of their old pages: the same messages, the same
+  words, a state on the system's glass. The colour tiles of the permissions and of the slides of the news are the accent now: no
+  colour belongs to one page there either.
+- The mail card is as black as the notch it comes from in both themes, and the widget is white on whatever its glass shows.
+- The beta for Windows and Linux has its own fonts (Segoe UI, Inter, Cantarell), paints its own background (`html.opaque`), and
+  has no glass.
+
 ## Adding to it
 
 A page is `src/pages/<id>/index.tsx` with a default export; add it to `src/pages/registry.ts` and `meta.ts`. Use `Card`, `Row`
-and the `*Row` helpers; put words in `src/i18n/shell.ts` only if the extracted dictionaries do not have them (they are
-regenerated from the old page by `pnpm extract:i18n`).
+and the `*Row` helpers; put words in `src/i18n/shell.ts` only if the dictionaries `en.json` and `vi.json` do not have them (they hold
+the same keys; a key is in both or in neither).
 
 Preview: `pnpm dev`, then `/?theme=dark&lang=vi`. In development `window.__go('network')` opens a page, and `/?canvas=kit`
 shows every button and control.
 
 ## Pitfalls met
 
-- Tailwind scans the whole source for class names and turns any that are a utility into a rule. The old pages use the class
+- Tailwind scans the whole source for class names and turns any that are a utility into a rule. The pages use the class
   names `block` (a row whose control takes a line of its own) and `text-field`. `block` would become `display: block` and
   `text-field` would become a text colour (when a colour called `field` exists in the theme). `index.css` has
   `@source not inline("block")` and the theme has no `--color-field`. `python3 -I` over the built CSS can list the utilities
