@@ -9,7 +9,8 @@
     "build:embed": "tsc --noEmit && node tools/build-embed.mjs",
     "typecheck": "tsc --noEmit && tsc -p tsconfig.test.json",
     "tauri": "tauri",
-    "test": "node --test \"tests/*.test.ts\""
+    "test": "node --test \"tests/*.test.ts\"",
+    "check:embed": "node tools/build-embed.mjs && git diff --exit-code -- ../crates/app-ui/web ../crates/desktop/web"
   },
   "dependencies": {
     "@phosphor-icons/react": "^2.1.10",

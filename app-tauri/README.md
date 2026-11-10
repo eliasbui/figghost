@@ -112,6 +112,7 @@ pnpm typecheck        # the app, then the tests
 pnpm test             # the logic of the surfaces, with Node's own test runner
 pnpm build            # type-check, then the page into dist/
 pnpm build:embed      # every page the apps carry, each as one HTML file; `node tools/build-embed.mjs tray` builds one
+pnpm check:embed      # builds them again and fails if a committed file is not what the source makes (the build is deterministic)
 cargo test --manifest-path src-tauri/Cargo.toml
 tools/bundle-local.sh             # Figghost Tauri.app under src-tauri/target/release/bundle/macos, signed ad hoc, not notarized
 ```
