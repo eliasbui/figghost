@@ -288,7 +288,14 @@ mod tests {
     #[test]
     fn the_permissions_page_is_self_contained() {
         let content = html();
-        assert!(!content.contains("/*__ICON__*/") && !content.contains("/*__SYMBOLS__*/"));
+        assert!(!content.contains("<!--__PRELUDE__-->"));
+        assert!(content.contains("window.__icon = \"data:image/png;base64,"));
+        for &(id, _) in PERMISSION_SYMBOLS {
+            assert!(
+                content.contains(&format!("\"{id}\":\"data:image/png;base64,")),
+                "the page has no symbol for {id}"
+            );
+        }
         assert!(content.contains("Content-Security-Policy"));
         for forbidden in ["src=\"http", "href=\"http", "url(http", "@import", "<link "] {
             assert!(!content.contains(forbidden), "found {forbidden}");
