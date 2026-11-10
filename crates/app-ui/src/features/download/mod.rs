@@ -784,8 +784,7 @@ mod tests {
             keys
         };
         let fixture: Value =
-            serde_json::from_str(include_str!("../../../web/features/download.fixture.json"))
-                .unwrap();
+            crate::settings::sample("download");
         assert_eq!(
             keys(&fixture["jobs"][0]),
             keys(&json),

@@ -12,7 +12,7 @@ use crate::settings::model::Fault;
 use serde_json::{Value, json};
 
 /// The state under the key "launcher". `runtime` is `Feature::runtime()`, or null when the feature is not running.
-/// `web/features/launcher.fixture.json` must have exactly the same keys; a unit test checks it.
+/// The `launcher` part of `app-tauri/src/data/state.sample.json` must have exactly the same keys; a unit test checks it.
 pub fn state(config: &Config, runtime: &Value) -> Value {
     let config = config.clone().sanitized();
     let groups: Vec<Value> = config
@@ -121,9 +121,7 @@ mod tests {
 
     #[test]
     fn the_fixture_has_exactly_the_keys_of_the_state() {
-        let fixture: Value =
-            serde_json::from_str(include_str!("../../../web/features/launcher.fixture.json"))
-                .unwrap();
+        let fixture: Value = crate::settings::sample("launcher");
         let config = Config {
             groups: vec![Group {
                 name: String::new(),

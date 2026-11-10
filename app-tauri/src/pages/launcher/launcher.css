@@ -1,4 +1,4 @@
-/* Launcher. Styles for the page in web/features/launcher.js, using the variables at the top of app.css. */
+/* Launcher. Styles for the page, using the variables of styles/tokens.css. */
 .launcher-items { display: flex; flex-direction: column; width: 100%; }
 .launcher-item { display: flex; align-items: center; gap: 10px; padding: 6px 0; }
 .launcher-item + .launcher-item { border-top: 1px solid var(--line, rgba(128, 128, 128, 0.18)); }

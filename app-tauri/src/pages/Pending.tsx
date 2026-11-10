@@ -1,7 +1,7 @@
 import { InfoRow, Card } from '@/components/macos/Layout';
 import { useApp } from '@/stores/app';
 
-/** The page of a feature that has not been moved over from the old settings window yet. */
+/** The page of a feature that has no folder under pages/ yet. */
 export default function Pending() {
   const page = useApp((s) => s.page);
   return (

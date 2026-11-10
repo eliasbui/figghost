@@ -1,4 +1,4 @@
-// The messages between the page and the app, as the page of the current app (web/app.js) and its bridge
+// The messages between the page and the app, as the page of the AppKit app and its bridge
 // (crates/app-ui/src/settings/model.rs, `Message`) speak them, so that one backend can serve both: JSON objects with a
 // `t` field that names the kind.
 

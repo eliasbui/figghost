@@ -1,13 +1,10 @@
 //! Runs the real settings page in WebKit without showing a window.
 //!
-//!   settings_preview selftest
-//!       runs the page's own checks against sample data; exits with status 1 on a failure
 //!   settings_preview snap <page> <out.png> [--dark] [--lang vi] [--size 1000x700] [--backdrop light|dark|color]
 //!                         [--eval "script"] [--patch '{"mouse":{"smooth":false}}'] [--wait seconds]
 //!       renders one page to a PNG; pages: general scroll clipboard notch tiling about
 //!
-//! The sample data is `web/fixture.json` plus `web/features/*.fixture.json`; a unit test keeps it in step with
-//! the real state.
+//! The sample data is `app-tauri/src/data/state.sample.json`; a unit test keeps it in step with the real state.
 
 use macos_sys::{MainThreadMarker, app, webview::HiddenStage};
 use serde_json::{Value, json};
@@ -15,6 +12,8 @@ use std::{cell::RefCell, env, fs, process, rc::Rc};
 
 #[path = "../src/settings/page.rs"]
 mod page;
+#[path = "../src/web.rs"]
+mod web;
 
 fn merge(into: &mut Value, patch: &Value) {
     match (into, patch) {
@@ -42,41 +41,12 @@ fn backdrop_css(kind: &str, dark: bool) -> &'static str {
     }
 }
 
-/// Runs the page's own checks. A page that has not finished loading has no checks to run yet (on a busy
-/// machine that takes longer than a second), so a missing answer is asked for again for a while before it counts.
-fn run_selftest(stage: Rc<HiddenStage>, attempt: u32) {
-    let again = Rc::clone(&stage);
-    stage
-        .host
-        .eval_string("JSON.stringify(window.__selftest())", move |result| {
-            if result.is_none() && attempt < 30 {
-                app::after(0.5, move || run_selftest(again, attempt + 1));
-                return;
-            }
-            let failures: Vec<String> = result
-                .and_then(|r| serde_json::from_str(&r).ok())
-                .unwrap_or_else(|| vec!["the self-test did not return".into()]);
-            for failure in &failures {
-                println!("FAIL: {failure}");
-            }
-            println!(
-                "{}",
-                if failures.is_empty() {
-                    "settings page ok"
-                } else {
-                    "settings page broken"
-                }
-            );
-            process::exit(i32::from(!failures.is_empty()));
-        });
-}
-
 fn main() {
     let mtm = MainThreadMarker::new().expect("main thread");
     let args: Vec<String> = env::args().skip(1).collect();
     let mode = args.first().cloned().unwrap_or_default();
-    if mode != "selftest" && mode != "snap" {
-        eprintln!("usage: settings_preview selftest | snap <page> <out.png> [options]");
+    if mode != "snap" {
+        eprintln!("usage: settings_preview snap <page> <out.png> [options]");
         process::exit(2);
     }
     let dark = args.iter().any(|a| a == "--dark");
@@ -87,7 +57,8 @@ fn main() {
         })
         .and_then(|(w, h)| Some((w?, h?)))
         .unwrap_or((1000.0, 700.0));
-    let mut state: Value = page::fixture();
+    let mut state: Value = serde_json::from_str(include_str!("../../../app-tauri/src/data/state.sample.json"))
+        .expect("the sample state is JSON");
     if let Some(patch) = option(&args, "--patch") {
         merge(
             &mut state,
@@ -152,46 +123,43 @@ fn main() {
         ));
         *slot.borrow_mut() = Some(Rc::clone(&stage));
 
-        if mode == "selftest" {
-            let stage = Rc::clone(&stage);
-            app::after(1.0, move || run_selftest(stage, 0));
-        } else {
-            let page_id = args.get(1).cloned().unwrap_or_else(|| "general".into());
-            let out = args
-                .get(2)
-                .cloned()
-                .unwrap_or_else(|| "/tmp/settings.png".into());
-            let backdrop = option(&args, "--backdrop");
-            let script = option(&args, "--eval");
-            let stage_nav = Rc::clone(&stage);
-            app::after(0.8, move || {
-                if let Some(kind) = &backdrop {
-                    stage_nav.host.eval(&format!(
-                        "document.documentElement.style.background = '{}'",
-                        backdrop_css(kind, dark)
-                    ));
-                }
-                stage_nav.host.eval(&format!("go('{page_id}')"));
-                if let Some(script) = &script {
-                    stage_nav.host.eval(script);
-                }
+        let page_id = args.get(1).cloned().unwrap_or_else(|| "general".into());
+        let out = args
+            .get(2)
+            .cloned()
+            .unwrap_or_else(|| "/tmp/settings.png".into());
+        let backdrop = option(&args, "--backdrop");
+        let script = option(&args, "--eval");
+        let stage_nav = Rc::clone(&stage);
+        app::after(0.8, move || {
+            if let Some(kind) = &backdrop {
+                stage_nav.host.eval(&format!(
+                    "document.documentElement.style.background = '{}'",
+                    backdrop_css(kind, dark)
+                ));
+            }
+            stage_nav
+                .host
+                .post(&json!({ "t": "go", "page": page_id }).to_string());
+            if let Some(script) = &script {
+                stage_nav.host.eval(script);
+            }
+        });
+        let stage_shot = Rc::clone(&stage);
+        let wait: f64 = option(&args, "--wait")
+            .and_then(|w| w.parse().ok())
+            .unwrap_or(2.5);
+        app::after(0.8 + wait, move || {
+            stage_shot.host.snapshot_png(mtm, width, move |png| {
+                let Some(png) = png else {
+                    println!("the snapshot failed");
+                    process::exit(1);
+                };
+                fs::write(&out, &png).expect("write png");
+                println!("wrote {out} ({} bytes)", png.len());
+                process::exit(0);
             });
-            let stage_shot = Rc::clone(&stage);
-            let wait: f64 = option(&args, "--wait")
-                .and_then(|w| w.parse().ok())
-                .unwrap_or(2.5);
-            app::after(0.8 + wait, move || {
-                stage_shot.host.snapshot_png(mtm, width, move |png| {
-                    let Some(png) = png else {
-                        println!("the snapshot failed");
-                        process::exit(1);
-                    };
-                    fs::write(&out, &png).expect("write png");
-                    println!("wrote {out} ({} bytes)", png.len());
-                    process::exit(0);
-                });
-            });
-        }
+        });
         stage
     });
 }

@@ -10,7 +10,7 @@ fn invalid(detail: &str) -> Fault {
 
 /// The state under the key "musicwidget". `runtime` is `Feature::runtime()`, or null when the feature is not
 /// running; the size it carries is the one on screen, which the user may have changed by dragging a corner.
-/// `web/features/musicwidget.fixture.json` must have exactly the same keys; a unit test checks it.
+/// The `musicwidget` part of `app-tauri/src/data/state.sample.json` must have exactly the same keys; a unit test checks it.
 pub fn state(config: &Config, runtime: &Value) -> Value {
     let shown = |key: &str, set: f64| runtime.get(key).and_then(Value::as_f64).unwrap_or(set);
     json!({
@@ -85,10 +85,7 @@ mod tests {
 
     #[test]
     fn the_fixture_has_the_keys_of_the_state() {
-        let fixture: Value = serde_json::from_str(include_str!(
-            "../../../web/features/musicwidget.fixture.json"
-        ))
-        .unwrap();
+        let fixture: Value = crate::settings::sample("musicwidget");
         let real = state(&Config::default(), &Value::Null);
         let keys = |v: &Value| {
             let mut k: Vec<String> = v.as_object().unwrap().keys().cloned().collect();

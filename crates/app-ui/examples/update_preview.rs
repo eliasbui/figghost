@@ -1,7 +1,5 @@
 //! Runs the real update popup in WebKit without showing a window.
 //!
-//!   update_preview selftest [news]
-//!       runs the page's own checks; exits with status 1 on a failure
 //!   update_preview snap <available|installing|ready|blocked|news> <out.png> [--dark] [--lang vi] [--few] [--slide N]
 //!       renders one state to a PNG; --few shows a short list of changes instead of a long one
 
@@ -11,6 +9,8 @@ use std::{cell::RefCell, env, fs, process, rc::Rc};
 
 #[path = "../src/update/page.rs"]
 mod page;
+#[path = "../src/web.rs"]
+mod web;
 
 const WIDTH: f64 = 460.0;
 const HEIGHT: f64 = 540.0;
@@ -89,35 +89,6 @@ fn sample(state: &str, lang: &str, few: bool) -> Value {
     })
 }
 
-/// Runs the page's own checks. A page that has not finished loading has no checks to run yet, so a missing
-/// answer is asked for again for a while before it counts.
-fn run_selftest(stage: Rc<HiddenStage>, attempt: u32) {
-    let again = Rc::clone(&stage);
-    stage
-        .host
-        .eval_string("JSON.stringify(window.__selftest())", move |result| {
-            if result.is_none() && attempt < 30 {
-                app::after(0.5, move || run_selftest(again, attempt + 1));
-                return;
-            }
-            let failures: Vec<String> = result
-                .and_then(|r| serde_json::from_str(&r).ok())
-                .unwrap_or_else(|| vec!["the self-test did not return".into()]);
-            for failure in &failures {
-                println!("FAIL: {failure}");
-            }
-            println!(
-                "{}",
-                if failures.is_empty() {
-                    "update popup ok"
-                } else {
-                    "update popup broken"
-                }
-            );
-            process::exit(i32::from(!failures.is_empty()));
-        });
-}
-
 fn main() {
     let mtm = MainThreadMarker::new().expect("main thread");
     let args: Vec<String> = env::args().skip(1).collect();
@@ -127,13 +98,10 @@ fn main() {
     let slide: u32 = option(&args, "--slide")
         .and_then(|n| n.parse().ok())
         .unwrap_or(0);
-    if mode != "selftest" && mode != "snap" {
-        eprintln!(
-            "usage: update_preview selftest | snap <state> <out.png> [--dark] [--lang vi] [--few]"
-        );
+    if mode != "snap" {
+        eprintln!("usage: update_preview snap <state> <out.png> [--dark] [--lang vi] [--few] [--slide N]");
         process::exit(2);
     }
-    let snapping = mode == "snap";
     let dark = args.iter().any(|a| a == "--dark");
     let few = args.iter().any(|a| a == "--few");
     let lang = option(&args, "--lang").unwrap_or_else(|| "en".into());
@@ -161,7 +129,7 @@ fn main() {
                 };
                 let message: Value = serde_json::from_str(&text).unwrap_or(Value::Null);
                 match message["t"].as_str() {
-                    Some("ready") if snapping => stage.host.post(&shown.to_string()),
+                    Some("ready") => stage.host.post(&shown.to_string()),
                     Some("js_error") => println!("PAGE ERROR: {text}"),
                     _ => {}
                 }
@@ -176,39 +144,36 @@ fn main() {
         ));
         *slot.borrow_mut() = Some(Rc::clone(&stage));
 
-        if !snapping {
-            let stage = Rc::clone(&stage);
-            app::after(1.0, move || run_selftest(stage, 0));
-        } else {
-            // The window of the app is glass; the page itself is transparent, so give the picture a ground,
-            // once the page has loaded.
-            let ground = if dark { "#2b2b30" } else { "#ececf1" };
-            let paint = Rc::clone(&stage);
-            app::after(0.8, move || {
-                paint.host.eval(&format!(
-                    "document.documentElement.style.background = '{ground}'"
-                ));
+        // The window of the app is glass; the page itself is transparent, so give the picture a ground,
+        // once the page has loaded.
+        let ground = if dark { "#2b2b30" } else { "#ececf1" };
+        let paint = Rc::clone(&stage);
+        app::after(0.8, move || {
+            paint.host.eval(&format!(
+                "document.documentElement.style.background = '{ground}'"
+            ));
+        });
+        // Slides: step forward to the one asked for, with the slide's own motion given time to end.
+        let step = Rc::clone(&stage);
+        app::after(0.9, move || {
+            for _ in 0..slide {
+                step.host.eval(
+                    "window.dispatchEvent(new KeyboardEvent('keydown', { key: 'ArrowRight' }))",
+                );
+            }
+        });
+        let shot = Rc::clone(&stage);
+        app::after(2.2, move || {
+            shot.host.snapshot_png(mtm, width, move |png| {
+                let Some(png) = png else {
+                    println!("the snapshot failed");
+                    process::exit(1);
+                };
+                fs::write(&out, &png).expect("write png");
+                println!("wrote {out} ({} bytes)", png.len());
+                process::exit(0);
             });
-            // Slides: step forward to the one asked for, with the slide's own motion given time to end.
-            let step = Rc::clone(&stage);
-            app::after(0.9, move || {
-                for _ in 0..slide {
-                    step.host.eval("document.getElementById('next').click()");
-                }
-            });
-            let shot = Rc::clone(&stage);
-            app::after(2.2, move || {
-                shot.host.snapshot_png(mtm, width, move |png| {
-                    let Some(png) = png else {
-                        println!("the snapshot failed");
-                        process::exit(1);
-                    };
-                    fs::write(&out, &png).expect("write png");
-                    println!("wrote {out} ({} bytes)", png.len());
-                    process::exit(0);
-                });
-            });
-        }
+        });
         stage
     });
 }

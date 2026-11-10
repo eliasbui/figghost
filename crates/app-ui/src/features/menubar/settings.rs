@@ -6,7 +6,7 @@ use crate::settings::model::Fault;
 use serde_json::{Value, json};
 
 /// The state under the key "menubar". `runtime` is `Feature::runtime()`, or null when the feature is not running.
-/// `web/features/menubar.fixture.json` must have exactly the same keys; a unit test checks it.
+/// The `menubar` part of `app-tauri/src/data/state.sample.json` must have exactly the same keys; a unit test checks it.
 pub fn state(config: &Config, runtime: &Value) -> Value {
     json!({
         "enabled": config.enabled,
@@ -118,9 +118,7 @@ mod tests {
 
     #[test]
     fn the_sample_data_has_the_keys_of_the_state() {
-        let sample: Value =
-            serde_json::from_str(include_str!("../../../web/features/menubar.fixture.json"))
-                .unwrap();
+        let sample: Value = crate::settings::sample("menubar");
         let real = state(&Config::default(), &json!({ "status": "showing" }));
         let names = |v: &Value| {
             let mut k: Vec<String> = v.as_object().unwrap().keys().cloned().collect();

@@ -5,7 +5,7 @@ use crate::{config::parse_hotkey, settings::model::Fault};
 use serde_json::{Value, json};
 
 /// The state under the key "rewrite". `runtime` carries `accessibility` and what the model of Jarvis lacks.
-/// `web/features/rewrite.fixture.json` must have exactly the same keys; a unit test checks it.
+/// The `rewrite` part of `app-tauri/src/data/state.sample.json` must have exactly the same keys; a unit test checks it.
 pub fn state(config: &Config, runtime: &Value) -> Value {
     let config = config.clone().sanitized();
     json!({
@@ -78,9 +78,7 @@ mod tests {
 
     #[test]
     fn the_fixture_has_exactly_the_keys_of_the_state() {
-        let fixture: Value =
-            serde_json::from_str(include_str!("../../../web/features/rewrite.fixture.json"))
-                .unwrap();
+        let fixture: Value = crate::settings::sample("rewrite");
         let state = state(&Config::default(), &Value::Null);
         assert_eq!(keys(&fixture), keys(&state));
         assert_eq!(keys(&fixture["model"]), keys(&state["model"]));

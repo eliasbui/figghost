@@ -26,7 +26,7 @@ fn listing(config: &Config, runtime: &Value, key: &str) -> Vec<Value> {
 }
 
 /// The state under the key "calendar". `runtime` is `Feature::runtime()`, or null when the feature is not running.
-/// `web/features/calendar.fixture.json` must have exactly the same keys; a unit test checks it.
+/// The `calendar` part of `app-tauri/src/data/state.sample.json` must have exactly the same keys; a unit test checks it.
 pub fn state(config: &Config, runtime: &Value) -> Value {
     let config = config.clone().sanitized();
     let access = |key: &str| runtime[key].as_str().unwrap_or("unknown").to_owned();

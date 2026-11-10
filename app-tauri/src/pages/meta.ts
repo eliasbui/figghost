@@ -1,5 +1,5 @@
 // What the shell knows about the pages without loading any of them: the order of the sidebar, the tabs of the notch, the
-// symbol of each page. It is taken from NAV, TAB_PAGES and PAGE_SYMBOLS of web/app.js.
+// symbol of each page. The sidebar and the tabs are the order the settings have always had.
 
 /** The sidebar: its groups in order, under the heading of each (none for the first). */
 export const NAV: Array<{ sec: string; pages: string[] }> = [

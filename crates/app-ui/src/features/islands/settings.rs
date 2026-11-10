@@ -6,7 +6,7 @@ use crate::settings::model::Fault;
 use serde_json::{Value, json};
 
 /// The state under the key "islands". `runtime` is `Feature::runtime()`, or null when the feature is not running.
-/// `web/features/islands.fixture.json` must have exactly the same keys; a unit test checks it.
+/// The `islands` part of `app-tauri/src/data/state.sample.json` must have exactly the same keys; a unit test checks it.
 pub fn state(config: &Config, runtime: &Value) -> Value {
     json!({
         "enabled": config.enabled,
@@ -77,8 +77,7 @@ mod tests {
     #[test]
     fn the_fixture_has_exactly_the_keys_of_the_state() {
         let fixture: Value =
-            serde_json::from_str(include_str!("../../../web/features/islands.fixture.json"))
-                .unwrap();
+            crate::settings::sample("islands");
         assert_eq!(
             keys(&fixture),
             keys(&state(&Config::default(), &Value::Null))

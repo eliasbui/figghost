@@ -1,4 +1,4 @@
-/* Snippets. Styles for the page in web/features/snippets.js, using the variables at the top of app.css. */
+/* Snippets. Styles for the page, using the variables of styles/tokens.css. */
 .snip-form { display: flex; flex-direction: column; gap: 8px; width: 100%; }
 .snip-form.disabled { opacity: 0.5; pointer-events: none; }
 .snip-caption { display: inline-flex; align-items: center; gap: 6px; }

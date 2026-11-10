@@ -8,7 +8,7 @@ use super::{
 use crate::settings::model::Fault;
 use serde_json::{Value, json};
 
-/// The state under the key "system". `web/features/system.fixture.json` must have exactly the same keys; a unit
+/// The state under the key "system". the `system` part of `app-tauri/src/data/state.sample.json` must have exactly the same keys; a unit
 /// test checks it.
 pub fn state(config: &Config) -> Value {
     let config = config.clone().sanitized();
@@ -92,9 +92,7 @@ mod tests {
 
     #[test]
     fn the_fixture_has_exactly_the_keys_of_the_state() {
-        let fixture: Value =
-            serde_json::from_str(include_str!("../../../web/features/system.fixture.json"))
-                .unwrap();
+        let fixture: Value = crate::settings::sample("system");
         assert_eq!(keys(&fixture), keys(&state(&Config::default())));
     }
 

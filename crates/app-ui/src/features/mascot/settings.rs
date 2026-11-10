@@ -22,7 +22,7 @@ fn sheets() -> &'static Value {
 }
 
 /// The state under the key "mascot". `runtime` is `Feature::runtime()`, or null when the feature is not
-/// running. `web/features/mascot.fixture.json` must have exactly the same keys; a unit test checks it.
+/// running. the `mascot` part of `app-tauri/src/data/state.sample.json` must have exactly the same keys; a unit test checks it.
 pub fn state(config: &Config, runtime: &Value) -> Value {
     json!({
         "enabled": config.enabled,
@@ -79,9 +79,7 @@ mod tests {
 
     #[test]
     fn the_fixture_has_the_keys_of_the_state() {
-        let fixture: Value =
-            serde_json::from_str(include_str!("../../../web/features/mascot.fixture.json"))
-                .unwrap();
+        let fixture: Value = crate::settings::sample("mascot");
         let keys = |v: &Value| {
             let mut keys: Vec<String> = v.as_object().unwrap().keys().cloned().collect();
             keys.sort();

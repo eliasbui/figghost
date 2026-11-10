@@ -116,7 +116,11 @@ fn main() {
     let icon = image_png(APP_ICON, 28.0, 2.0)
         .map(|png| format!("data:image/png;base64,{}", base64(&png)))
         .unwrap_or_default();
-    let page = PAGE.replace("/*__ICON__*/", &icon);
+    // The app writes the icon into the page the same way (src/web.rs).
+    let page = PAGE.replace(
+        "<!--__PRELUDE__-->",
+        &format!("<script>window.__icon = {};</script>", json!(icon)),
+    );
     app::run_accessory(mtm, move || {
         let slot: Rc<RefCell<Option<Rc<HiddenStage>>>> = Rc::default();
         let on_message = {
@@ -155,7 +159,7 @@ fn main() {
             ));
             if let Some(n) = hover {
                 shot.host.eval(&format!(
-                    "document.querySelectorAll('.tool')[{n}].dispatchEvent(new PointerEvent('pointerenter'))"
+                    "document.querySelectorAll('[data-tool]')[{n}].dispatchEvent(new PointerEvent('pointerover', {{ bubbles: true }}))"
                 ));
             }
         });

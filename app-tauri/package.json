@@ -6,11 +6,10 @@
   "scripts": {
     "dev": "vite",
     "build": "tsc --noEmit && vite build",
-    "build:embed": "tsc --noEmit && vite build --mode embed",
-    "typecheck": "tsc --noEmit",
+    "build:embed": "tsc --noEmit && node tools/build-embed.mjs",
+    "typecheck": "tsc --noEmit && tsc -p tsconfig.test.json",
     "tauri": "tauri",
-    "extract:i18n": "node tools/extract-i18n.mjs ../crates/app-ui src/i18n",
-    "extract:state": "node tools/extract-state.mjs ../crates/app-ui src/data/state.sample.json"
+    "test": "node --test \"tests/*.test.ts\""
   },
   "dependencies": {
     "@phosphor-icons/react": "^2.1.10",

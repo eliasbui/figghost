@@ -25,7 +25,7 @@ fn invalid(detail: &str) -> Fault {
 }
 
 /// The state under the key "cursor". `runtime` is `Feature::runtime()`, or null when the feature is not
-/// running. `web/features/cursor.fixture.json` must have exactly the same keys; a unit test checks it.
+/// running. the `cursor` part of `app-tauri/src/data/state.sample.json` must have exactly the same keys; a unit test checks it.
 pub fn state(config: &Config, runtime: &Value) -> Value {
     let file = Path::new(&config.custom_path)
         .file_name()
@@ -88,9 +88,7 @@ mod tests {
 
     #[test]
     fn the_fixture_has_the_keys_of_the_state() {
-        let fixture: Value =
-            serde_json::from_str(include_str!("../../../web/features/cursor.fixture.json"))
-                .unwrap();
+        let fixture: Value = crate::settings::sample("cursor");
         let real = state(&Config::default(), &Value::Null);
         let keys = |v: &Value| {
             let mut k: Vec<String> = v.as_object().unwrap().keys().cloned().collect();

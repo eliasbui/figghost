@@ -1,7 +1,7 @@
 //! Features that live in a folder of their own, so that several can be built at the same time without touching
 //! the same files. Shared code (the settings model and window, the menu, the composition root) reaches them
 //! only through this file. A feature owns everything under `features/<name>/`, its page, strings and styles
-//! under `web/features/<name>.*`, and its part of the macOS layer in `macos-sys`.
+//! under `app-tauri/src/pages/<name>`, and its part of the macOS layer in `macos-sys`.
 
 use crate::{
     clipboard::Clipboard, config::Config, media::MediaFeature, settings::model::Fault,

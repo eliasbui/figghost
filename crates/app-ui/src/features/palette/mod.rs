@@ -1,7 +1,7 @@
 //! The command palette: one shortcut opens a small window with a field to type in; what is typed picks a command, such as a
 //! tab of the notch, a page of the settings, a feature to turn on or off, the agent that waits, a speed test of a connection
 //! or a reminder written in a few words. The list is made by the page from what the app says it has (see
-//! `web/features/palette.js`); this side keeps the shortcut, and the address `figghost://...` which asks for a few of the
+//! `app-tauri/src/pages/palette`); this side keeps the shortcut, and the address `figghost://...` which asks for a few of the
 //! same things (`url.rs`).
 
 use super::AttachEnv;

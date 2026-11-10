@@ -1,5 +1,5 @@
 //! The words of the lyrics area on the media tab, in both languages. The words of the Settings page are in
-//! `web/features/lyrics.js`.
+//! `app-tauri/src/pages/media`.
 
 use crate::i18n::Language;
 

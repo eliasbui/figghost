@@ -1,7 +1,7 @@
 //! The permissions check popup: displays all system permissions Figghost uses, checks their live status,
 //! and lets the user grant or open the corresponding System Settings pane directly.
 
-use crate::i18n;
+use crate::{i18n, web};
 use macos_sys::{
     MainThreadMarker, app, permissions,
     webview::{WebWindow, WindowSpec},
@@ -50,8 +50,10 @@ fn html() -> String {
             ))
         })
         .collect();
-    PAGE.replace("/*__ICON__*/", &icon)
-        .replace("/*__SYMBOLS__*/", &Value::Object(symbols).to_string())
+    web::with(
+        PAGE,
+        &[("icon", json!(icon)), ("symbols", Value::Object(symbols))],
+    )
 }
 
 pub struct PermissionsPopup {

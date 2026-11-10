@@ -4,6 +4,7 @@ use crate::{
     context::AppContext,
     i18n,
     settings::{SettingsFeature, base64},
+    web,
 };
 use core_mouse::Settings;
 use macos_sys::{
@@ -14,6 +15,7 @@ use macos_sys::{
     widgets::image_png,
     workspace,
 };
+use serde_json::json;
 use std::{cell::RefCell, fs, rc::Rc, sync::Arc};
 
 /// The panel the menu bar item opens; it lays the entries of the menu out by what they are.
@@ -33,7 +35,7 @@ fn tray_page() -> String {
 }
 
 fn page_with_icon(icon: &str) -> String {
-    TRAY_PAGE.replace("/*__ICON__*/", icon)
+    web::with(TRAY_PAGE, &[("icon", json!(icon))])
 }
 
 type ChangeSettings = Rc<dyn Fn(&dyn Fn(&mut Settings))>;
@@ -311,7 +313,7 @@ mod tests {
     #[test]
     fn the_panel_is_one_self_contained_page_with_the_app_icon() {
         let page = page_with_icon("data:image/png;base64,AAAA");
-        assert!(!page.contains("/*__ICON__*/"));
+        assert!(!page.contains("<!--__PRELUDE__-->"));
         assert!(page.contains("data:image/png;base64,AAAA"));
         // Nothing may be fetched: no external scripts, styles, images or fonts.
         for forbidden in ["src=\"http", "href=\"http", "url(http", "@import", "<link "] {

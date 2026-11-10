@@ -4,16 +4,16 @@ import react from '@vitejs/plugin-react';
 import { defineConfig } from 'vite';
 import type { Plugin } from 'vite';
 
-// The page of the AppKit app is one string (crates/macos-sys/src/webview.rs loads it with loadHTMLString and nothing may be
-// fetched), so the embed build puts the script, the styles, the fonts and the pictures into one HTML file, with the same
-// content security policy as the page it replaces (crates/app-ui/web/index.html). `<!--__PRELUDE__-->` is where the app
-// writes `window.__canvas = '...'` for a window that shows one canvas.
+// The pages of the AppKit app are strings (crates/macos-sys/src/webview.rs loads each with loadHTMLString and nothing may be
+// fetched), so the embed build puts the script, the styles, the fonts and the pictures of one surface into one HTML file.
+// tools/build-embed.mjs runs it once for each surface and names the surface in SURFACE and the content security policy in
+// SURFACE_CSP. `<!--__PRELUDE__-->` is where the app writes what the page needs before it runs (`window.__canvas`, `window.__icon`).
 const POLICY = "default-src 'none'; style-src 'unsafe-inline'; script-src 'unsafe-inline'; img-src data:; font-src data:";
 
 /** Text that goes inside a script element must not be able to close it or open a comment. */
 const inScript = (code: string) => code.replace(/<\/(script)/gi, '<\\/$1').replace(/<!--/g, '<\\!--');
 
-function oneFile(): Plugin {
+function oneFile(policy: string): Plugin {
   return {
     name: 'figghost-one-file',
     apply: 'build',
@@ -40,18 +40,27 @@ function oneFile(): Plugin {
         delete bundle[name];
       }
       html = html
-        .replace('<head>', `<head>\n    <meta http-equiv="Content-Security-Policy" content="${POLICY}" />`)
+        .replace('<head>', `<head>\n    <meta http-equiv="Content-Security-Policy" content="${policy}" />`)
         .replace('<div id="root"></div>', '<div id="root"></div>\n    <!--__PRELUDE__-->');
       page.source = html;
     },
   };
 }
 
+/** The one index.html starts `src/main.tsx` (the settings); a surface build starts its own entry instead. */
+function surfaceEntry(entry: string): Plugin {
+  return {
+    name: 'figghost-surface-entry',
+    transformIndexHtml: { order: 'pre', handler: (html) => html.replace('/src/main.tsx', entry) },
+  };
+}
+
 // Tauri loads the dev server at devUrl (src-tauri/tauri.conf.json), so the port is fixed.
 export default defineConfig(({ mode }) => {
   const embed = mode === 'embed';
+  const entry = process.env.SURFACE_ENTRY;
   return {
-    plugins: [react(), tailwindcss(), ...(embed ? [oneFile()] : [])],
+    plugins: [react(), tailwindcss(), ...(embed ? [oneFile(process.env.SURFACE_CSP ?? POLICY)] : []), ...(entry ? [surfaceEntry(entry)] : [])],
     resolve: { alias: { '@': fileURLToPath(new URL('./src', import.meta.url)) } },
     clearScreen: false,
     server: {
@@ -61,9 +70,7 @@ export default defineConfig(({ mode }) => {
     },
     build: embed
       ? {
-          // Beside the page it replaces; the whole folder is this build's, so it is emptied first.
-          outDir: '../crates/app-ui/web-next',
-          emptyOutDir: true,
+          // tools/build-embed.mjs gives each surface its own folder and copies the page from it to where the app includes it.
           cssCodeSplit: false,
           assetsInlineLimit: Number.MAX_SAFE_INTEGER,
           modulePreload: false,

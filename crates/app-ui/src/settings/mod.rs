@@ -3,6 +3,24 @@
 pub mod model;
 mod page;
 
+/// The state that `app-tauri` previews its pages with (`app-tauri/src/data/state.sample.json`). The tests keep it in step
+/// with the real state, so that what a page is drawn with while it is built is what the app sends.
+#[cfg(test)]
+pub fn sample_state() -> serde_json::Value {
+    serde_json::from_str(include_str!(
+        "../../../../app-tauri/src/data/state.sample.json"
+    ))
+    .expect("the sample state is JSON")
+}
+
+/// The part of the sample state that belongs to one feature.
+#[cfg(test)]
+pub fn sample(id: &str) -> serde_json::Value {
+    let all = sample_state();
+    assert!(all.get(id).is_some(), "the sample state has no part for {id}");
+    all[id].clone()
+}
+
 use crate::{context::AppContext, i18n, trace};
 use core_agents::Agent;
 use macos_sys::{

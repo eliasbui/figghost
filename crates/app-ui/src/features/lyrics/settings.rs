@@ -5,7 +5,7 @@ use super::Config;
 use crate::settings::model::Fault;
 use serde_json::{Value, json};
 
-/// The state under the key "lyrics". `web/features/lyrics.fixture.json` must have exactly the same keys.
+/// The state under the key "lyrics". the `lyrics` part of `app-tauri/src/data/state.sample.json` must have exactly the same keys.
 pub fn state(config: &Config, _runtime: &Value) -> Value {
     json!({ "enabled": config.enabled, "fetch": config.fetch })
 }

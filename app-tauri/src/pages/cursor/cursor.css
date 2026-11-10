@@ -1,4 +1,4 @@
-/* Custom cursor. Styles for the page in web/features/cursor.js, using the variables at the top of app.css. */
+/* Custom cursor. Styles for the page, using the variables of styles/tokens.css. */
 .cursor-tiles { display: grid; grid-template-columns: repeat(auto-fill, minmax(104px, 1fr)); gap: 10px; width: 100%; }
 .cursor-tile {
   display: flex; flex-direction: column; align-items: center; justify-content: center; gap: 8px;

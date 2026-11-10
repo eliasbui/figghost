@@ -1,4 +1,4 @@
-/* The clipboard mascot. Styles for the card in web/features/mascot.js, using the variables at the top of app.css. */
+/* The clipboard mascot. Styles for the card, using the variables of styles/tokens.css. */
 .mascot-pick { display: flex; align-items: center; gap: 14px; flex-wrap: wrap; }
 /* A sheet is twelve frames of 48 pixels in a row, drawn here at one and a half times with hard edges. */
 .mascot-sprite {

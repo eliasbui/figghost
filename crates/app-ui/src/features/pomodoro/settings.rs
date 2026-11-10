@@ -9,7 +9,7 @@ use crate::{config::parse_hotkey, settings::model::Fault};
 use serde_json::{Value, json};
 
 /// The state under the key "pomodoro". `runtime` is `Feature::runtime()`, or null when the feature is not running.
-/// `web/features/pomodoro.fixture.json` must have exactly the same keys; a unit test checks it.
+/// The `pomodoro` part of `app-tauri/src/data/state.sample.json` must have exactly the same keys; a unit test checks it.
 pub fn state(config: &Config, runtime: &Value) -> Value {
     let config = config.clone().sanitized();
     let number = |key: &str| runtime.get(key).and_then(Value::as_u64).unwrap_or(0);
@@ -91,9 +91,7 @@ mod tests {
 
     #[test]
     fn the_fixture_has_exactly_the_keys_of_the_state() {
-        let fixture: Value =
-            serde_json::from_str(include_str!("../../../web/features/pomodoro.fixture.json"))
-                .unwrap();
+        let fixture: Value = crate::settings::sample("pomodoro");
         let state = state(&Config::default(), &Value::Null);
         assert_eq!(keys(&fixture), keys(&state));
         assert_eq!(keys(&fixture["shortcuts"]), keys(&state["shortcuts"]));

@@ -4,7 +4,7 @@ use super::Config;
 use crate::{config::parse_hotkey, settings::model::Fault};
 use serde_json::{Value, json};
 
-/// The state under the key "palette". `web/features/palette.fixture.json` must have exactly the same keys.
+/// The state under the key "palette". the `palette` part of `app-tauri/src/data/state.sample.json` must have exactly the same keys.
 pub fn state(config: &Config) -> Value {
     let config = config.clone().sanitized();
     json!({ "enabled": config.enabled, "shortcut": config.shortcut })
@@ -46,9 +46,7 @@ mod tests {
 
     #[test]
     fn the_fixture_has_exactly_the_keys_of_the_state() {
-        let fixture: Value =
-            serde_json::from_str(include_str!("../../../web/features/palette.fixture.json"))
-                .unwrap();
+        let fixture: Value = crate::settings::sample("palette");
         let keys = |v: &Value| v.as_object().unwrap().keys().cloned().collect::<Vec<_>>();
         assert_eq!(keys(&fixture), keys(&state(&Config::default())));
     }

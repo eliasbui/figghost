@@ -1,4 +1,4 @@
-/* Calendar, reminders and meeting alerts on the notch. Styles for the page in web/features/calendar.js, using the variables at the top of app.css. */
+/* Calendar, reminders and meeting alerts on the notch. Styles for the page, using the variables of styles/tokens.css. */
 .cal-list { display: flex; flex-direction: column; }
 .cal-row { position: relative; display: flex; align-items: center; gap: 10px; padding: 8px var(--row-inset); }
 .cal-row + .cal-row::before { content: ""; position: absolute; left: var(--row-inset); right: var(--row-inset); top: 0; border-top: 0.5px solid var(--stroke); }

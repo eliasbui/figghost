@@ -1,4 +1,4 @@
-/* Weather. Styles for the page in web/features/weather.js, using the variables at the top of app.css. */
+/* Weather. Styles for the page, using the variables of styles/tokens.css. */
 .weather-search { display: flex; gap: 8px; align-items: center; width: 100%; }
 .weather-search input.text-field { flex: 1 1 auto; width: auto; min-width: 0; }
 .weather-found { width: 100%; }

@@ -1,4 +1,4 @@
-/* Video download. Styles for the page in web/features/download.js, using the variables at the top of app.css. */
+/* Video download. Styles for the page, using the variables of styles/tokens.css. */
 .download-link { display: flex; gap: 8px; align-items: center; width: 100%; }
 .download-link input.text-field { flex: 1 1 auto; width: auto; min-width: 0; }
 .download-folder { display: flex; align-items: center; gap: 8px; }

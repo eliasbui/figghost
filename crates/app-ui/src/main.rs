@@ -25,6 +25,7 @@ mod trace;
 mod update;
 mod usage;
 mod volume_hud;
+mod web;
 
 use agents::AgentsFeature;
 use audio::AudioFeature;

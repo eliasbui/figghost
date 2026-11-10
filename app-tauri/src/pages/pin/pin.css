@@ -1,2 +1,2 @@
-/* Always on top. Styles for the page in web/features/pin.js, using the variables at the top of app.css. */
+/* Always on top. Styles for the page, using the variables of styles/tokens.css. */
 .pin-now { max-width: 240px; overflow: hidden; text-overflow: ellipsis; white-space: nowrap; }

@@ -6,7 +6,7 @@ use crate::{config::parse_hotkey, settings::model::Fault};
 use serde_json::{Value, json};
 
 /// The state under the key "utilities". `runtime` is `Feature::runtime()`, or null when the feature is not
-/// running. `web/features/utilities.fixture.json` must have exactly the same keys; a unit test checks it.
+/// running. the `utilities` part of `app-tauri/src/data/state.sample.json` must have exactly the same keys; a unit test checks it.
 pub fn state(config: &Config, runtime: &Value) -> Value {
     let fact = |key: &str| runtime.get(key).and_then(Value::as_bool).unwrap_or(false);
     json!({
@@ -126,9 +126,7 @@ mod tests {
 
     #[test]
     fn the_fixture_has_exactly_the_keys_of_the_state() {
-        let fixture: Value =
-            serde_json::from_str(include_str!("../../../web/features/utilities.fixture.json"))
-                .unwrap();
+        let fixture: Value = crate::settings::sample("utilities");
         let state = state(&Config::default(), &Value::Null);
         assert_eq!(keys(&fixture), keys(&state));
         assert_eq!(keys(&fixture["shortcuts"]), keys(&state["shortcuts"]));

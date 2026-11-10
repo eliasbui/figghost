@@ -16,7 +16,7 @@ const WHEELS: [(&str, Kind); 3] = [
 
 /// The state under the key "wheel": the switch of the feature, and for each wheel its switch, its key and the
 /// slots hidden, as they will be used (an unknown key name shows as the wheel's own key). `runtime` is
-/// `Feature::runtime()`, or null when the feature is not running. `web/features/wheel.fixture.json` must have
+/// `Feature::runtime()`, or null when the feature is not running. the `wheel` part of `app-tauri/src/data/state.sample.json` must have
 /// exactly the same keys; a unit test checks it.
 pub fn state(config: &Config, _runtime: &Value) -> Value {
     let wheel = |kind: Kind| {
@@ -329,8 +329,7 @@ mod tests {
 
     #[test]
     fn the_sample_data_has_the_keys_of_the_state() {
-        let sample: Value =
-            serde_json::from_str(include_str!("../../../web/features/wheel.fixture.json")).unwrap();
+        let sample: Value = crate::settings::sample("wheel");
         let real = state(&Config::default(), &Value::Null);
         let names = |v: &Value| {
             let mut k: Vec<String> = v.as_object().unwrap().keys().cloned().collect();
@@ -346,7 +345,7 @@ mod tests {
     /// The page lists the slots itself; this keeps its list and the catalog's the same.
     #[test]
     fn the_page_lists_exactly_the_slots_of_the_catalog() {
-        let page = include_str!("../../../web/features/wheel.js");
+        let page = include_str!("../../../../../app-tauri/src/pages/wheel/index.tsx");
         let mut total = 0;
         for (_, kind) in WHEELS {
             for (group, id) in catalog::all_ids(kind) {

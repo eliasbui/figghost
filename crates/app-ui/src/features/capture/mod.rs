@@ -4,7 +4,7 @@
 //! instead; a recording records what was picked until it is stopped.
 //!
 //! This folder belongs to one task. Shared code reaches it only through `features/mod.rs`, so everything the
-//! feature needs lives here, in `web/features/capture.*` and in its own files of `macos-sys`.
+//! feature needs lives here, in `app-tauri/src/pages/capture` and in its own files of `macos-sys`.
 
 mod record;
 mod scroll;

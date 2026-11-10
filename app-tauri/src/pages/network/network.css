@@ -1,4 +1,4 @@
-/* Network. Styles for the page in web/features/network.js, using the variables at the top of app.css. A glyph takes its colour
+/* Network. Styles for the page, using the variables of styles/tokens.css. A glyph takes its colour
    from `color` here, where the page this comes from painted it with `background` through a mask. */
 .network-total { font-variant-numeric: tabular-nums; }
 .network-table-row { padding-top: 0; }

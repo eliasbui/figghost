@@ -401,7 +401,7 @@ impl Feature {
     }
 }
 
-/// The state under the key "mole". `web/features/mole.fixture.json` must have exactly the same keys.
+/// The state under the key "mole". the `mole` part of `app-tauri/src/data/state.sample.json` must have exactly the same keys.
 pub mod settings {
     use serde_json::{Value, json};
 
@@ -703,7 +703,7 @@ mod tests {
     #[test]
     fn the_state_has_the_keys_of_the_fixture() {
         let fixture: Value =
-            serde_json::from_str(include_str!("../../../web/features/mole.fixture.json")).unwrap();
+            crate::settings::sample("mole");
         let state = settings::state(&Value::Null);
         let keys = |v: &Value| v.as_object().unwrap().keys().cloned().collect::<Vec<_>>();
         assert_eq!(keys(&state), keys(&fixture));

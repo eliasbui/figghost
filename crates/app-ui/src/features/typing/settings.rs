@@ -6,7 +6,7 @@ use crate::settings::model::Fault;
 use serde_json::{Value, json};
 
 /// The state under the key "typing". `runtime` is `Feature::runtime()`, or null when the feature is not running.
-/// `web/features/typing.fixture.json` must have exactly the same keys; a unit test checks it.
+/// The `typing` part of `app-tauri/src/data/state.sample.json` must have exactly the same keys; a unit test checks it.
 pub fn state(config: &Config, runtime: &Value) -> Value {
     let flag = |key: &str| runtime.get(key).and_then(Value::as_bool).unwrap_or(false);
     let apps = runtime.get("apps").cloned().unwrap_or_else(|| {
@@ -112,9 +112,7 @@ mod tests {
 
     #[test]
     fn the_fixture_has_the_keys_of_the_state() {
-        let fixture: Value =
-            serde_json::from_str(include_str!("../../../web/features/typing.fixture.json"))
-                .unwrap();
+        let fixture: Value = crate::settings::sample("typing");
         let keys = |v: &Value| {
             let mut keys: Vec<String> = v.as_object().unwrap().keys().cloned().collect();
             keys.sort();

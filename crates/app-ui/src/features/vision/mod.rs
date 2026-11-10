@@ -1,7 +1,7 @@
 //! Colour picker, and background removal for images.
 //!
 //! This folder belongs to one task. Shared code reaches it only through `features/mod.rs`, so everything the
-//! feature needs lives here, in `web/features/vision.*` and in its own files of `macos-sys`.
+//! feature needs lives here, in `app-tauri/src/pages/vision` and in its own files of `macos-sys`.
 
 use super::AttachEnv;
 use crate::{config::parse_hotkey, i18n, settings::model::Fault};

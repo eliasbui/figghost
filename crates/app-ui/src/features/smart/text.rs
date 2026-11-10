@@ -1,5 +1,5 @@
 //! Everything Smart Select says in the native window, in both languages. The Settings page has its own strings
-//! in `web/features/smart.js`.
+//! in `app-tauri/src/pages/smart`.
 
 use crate::i18n::Language;
 use core_smart::{translate::Failure, units::Dim};

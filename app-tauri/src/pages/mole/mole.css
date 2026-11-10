@@ -1,4 +1,4 @@
-/* Mole: the health and clean-up page. Styles for web/features/mole.js, using the variables at the top of app.css. */
+/* Mole: the health and clean-up page. Styles for the page, using the variables of styles/tokens.css. */
 .mole-meters { display: grid; grid-template-columns: repeat(3, 1fr); gap: 16px; padding: 12px var(--row-inset); }
 .mole-meter-label { display: flex; justify-content: space-between; min-height: 1.3em; color: var(--text-2); font-size: var(--fs-small); }
 .mole-meter-label b { color: var(--text); font-weight: 600; }

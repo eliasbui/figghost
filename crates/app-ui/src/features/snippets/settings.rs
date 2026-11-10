@@ -20,7 +20,7 @@ fn shadowed_by<'a>(items: &'a [Item], item: &Item) -> Option<&'a str> {
 }
 
 /// The state under the key "snippets". `runtime` is `Feature::runtime()`, or null when the feature is not running.
-/// `web/features/snippets.fixture.json` must have exactly the same keys; a unit test checks it.
+/// The `snippets` part of `app-tauri/src/data/state.sample.json` must have exactly the same keys; a unit test checks it.
 pub fn state(config: &Config, runtime: &Value) -> Value {
     let config = config.clone().sanitized();
     let flag = |key: &str| runtime.get(key).and_then(Value::as_bool).unwrap_or(false);
@@ -124,9 +124,7 @@ mod tests {
 
     #[test]
     fn the_fixture_has_exactly_the_keys_of_the_state() {
-        let fixture: Value =
-            serde_json::from_str(include_str!("../../../web/features/snippets.fixture.json"))
-                .unwrap();
+        let fixture: Value = crate::settings::sample("snippets");
         let config = Config {
             items: vec![item(";a", "A")],
             ..Config::default()

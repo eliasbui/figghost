@@ -6,7 +6,7 @@ use crate::settings::model::Fault;
 use serde_json::{Map, Value, json};
 
 /// The state under the key "capture". `runtime` is `Feature::runtime()`, or null when the feature is not running.
-/// `web/features/capture.fixture.json` must have exactly the same keys; a unit test checks it.
+/// The `capture` part of `app-tauri/src/data/state.sample.json` must have exactly the same keys; a unit test checks it.
 pub fn state(config: &Config, runtime: &Value) -> Value {
     let mut shortcuts: Map<String, Value> = Kind::ALL
         .into_iter()
@@ -190,9 +190,7 @@ mod tests {
                 }
             }
         }
-        let sample: Value =
-            serde_json::from_str(include_str!("../../../web/features/capture.fixture.json"))
-                .unwrap();
+        let sample: Value = crate::settings::sample("capture");
         let (mut a, mut b) = (Vec::new(), Vec::new());
         keys(&sample, "", &mut a);
         keys(&state(&Config::default(), &Value::Null), "", &mut b);

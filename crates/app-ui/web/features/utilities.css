@@ -1,2 +1,0 @@
-/* Utilities. Styles for the page in web/features/utilities.js, using the variables at the top of app.css. */
-.util-state { color: var(--text-2); font-size: var(--fs-small); white-space: nowrap; }

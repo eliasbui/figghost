@@ -6,7 +6,7 @@ use crate::settings::model::Fault;
 use serde_json::{Value, json};
 
 /// The state under the key "pin". `runtime` is `Feature::runtime()`, or null when the feature is not running.
-/// `web/features/pin.fixture.json` must have exactly the same keys; a unit test checks it.
+/// The `pin` part of `app-tauri/src/data/state.sample.json` must have exactly the same keys; a unit test checks it.
 pub fn state(config: &Config, runtime: &Value) -> Value {
     let fact = |key: &str| runtime.get(key).and_then(Value::as_bool).unwrap_or(false);
     json!({
@@ -62,8 +62,7 @@ mod tests {
 
     #[test]
     fn the_fixture_has_exactly_the_keys_of_the_state() {
-        let fixture: Value =
-            serde_json::from_str(include_str!("../../../web/features/pin.fixture.json")).unwrap();
+        let fixture: Value = crate::settings::sample("pin");
         assert_eq!(
             keys(&fixture),
             keys(&state(&Config::default(), &Value::Null))

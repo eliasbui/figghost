@@ -14,7 +14,7 @@ use core_netcontrol::rules::{
 use serde_json::{Value, json};
 
 /// The state under the key "network". `runtime` is `Feature::runtime()`, or null when the feature is not running.
-/// `web/features/network.fixture.json` must have exactly the same keys; a unit test checks it.
+/// The `network` part of `app-tauri/src/data/state.sample.json` must have exactly the same keys; a unit test checks it.
 pub fn state(config: &Config, runtime: &Value) -> Value {
     let config = config.clone().sanitized();
     let list = |key: &str| {
@@ -305,8 +305,7 @@ mod tests {
     #[test]
     fn the_fixture_has_exactly_the_keys_of_the_state() {
         let fixture: Value =
-            serde_json::from_str(include_str!("../../../web/features/network.fixture.json"))
-                .unwrap();
+            crate::settings::sample("network");
         let state = state(&Config::default(), &Value::Null);
         assert_eq!(keys(&fixture), keys(&state));
         assert_eq!(keys(&fixture["tether"]), keys(&state["tether"]));

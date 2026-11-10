@@ -43,9 +43,8 @@ use wry::{
 
 const ICON: &[u8] = include_bytes!("../assets/icon-64.png");
 const WINDOW_ICON: &[u8] = include_bytes!("../assets/icon-256.png");
+/// The page, built by `app-tauri` (`pnpm build:embed` there) with its script and styles inline.
 const INDEX_HTML: &str = include_str!("../web/index.html");
-const APP_JS: &str = include_str!("../web/app.js");
-const APP_CSS: &str = include_str!("../web/app.css");
 /// Windows serves a custom protocol of the web view under http.
 const PAGE_URL: &str = if cfg!(windows) {
     "http://figghost.localhost/"
@@ -268,13 +267,11 @@ fn decode_png(bytes: &[u8]) -> Option<(Vec<u8>, u32, u32)> {
     Some((image.into_raw(), width, height))
 }
 
-/// The page, its script and style, the icon, and the pictures of the history (by their hashed names only).
+/// The page, the icon, and the pictures of the history (by their hashed names only).
 fn serve(images: &Path, request: &Request<Vec<u8>>) -> Response<Cow<'static, [u8]>> {
     let path = request.uri().path();
     let found: Option<(&str, Cow<'static, [u8]>)> = match path {
         "/" | "/index.html" => Some(("text/html; charset=utf-8", INDEX_HTML.as_bytes().into())),
-        "/app.js" => Some(("text/javascript; charset=utf-8", APP_JS.as_bytes().into())),
-        "/app.css" => Some(("text/css; charset=utf-8", APP_CSS.as_bytes().into())),
         "/icon.png" => Some(("image/png", WINDOW_ICON.into())),
         _ => path
             .strip_prefix("/image/")
@@ -799,5 +796,16 @@ mod tests {
             .body(Vec::new())
             .unwrap();
         assert_eq!(serve(&images, &page).status(), 200);
+    }
+
+    #[test]
+    fn the_page_is_one_document_with_its_script_and_styles_inside() {
+        assert!(INDEX_HTML.contains("<div id=\"root\">"));
+        assert!(INDEX_HTML.contains("Content-Security-Policy"));
+        for fetched in ["src=\"app.js\"", "href=\"app.css\"", "src=\"http", "href=\"http"] {
+            assert!(!INDEX_HTML.contains(fetched), "found {fetched}");
+        }
+        // The only closing script tag is the page's own, so nothing inside the script can end it early.
+        assert_eq!(INDEX_HTML.to_lowercase().matches("</script").count(), 1);
     }
 }

@@ -1068,7 +1068,7 @@ mod tests {
 
     #[test]
     fn the_sample_state_used_for_previews_has_the_shape_of_the_real_one() {
-        let sample = super::super::page::fixture();
+        let sample = super::super::sample_state();
         let mut config = Config::default();
         config
             .mouse
@@ -1160,7 +1160,7 @@ mod tests {
         b.sort();
         assert_eq!(
             a, b,
-            "web/fixture.json is out of date with settings::model::state"
+            "app-tauri/src/data/state.sample.json is out of date with settings::model::state"
         );
     }
 

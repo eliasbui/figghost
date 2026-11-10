@@ -21,6 +21,14 @@ use std::{cell::RefCell, env, process, rc::Rc};
 
 #[path = "../src/settings/page.rs"]
 mod page;
+#[path = "../src/web.rs"]
+mod web;
+
+/// The sample state that `app-tauri` previews its pages with.
+fn sample() -> Value {
+    serde_json::from_str(include_str!("../../../app-tauri/src/data/state.sample.json"))
+        .expect("the sample state is JSON")
+}
 
 fn option(args: &[String], name: &str) -> Option<String> {
     args.iter()
@@ -63,11 +71,11 @@ fn main() {
                 let message: Value = serde_json::from_str(&text).unwrap_or(Value::Null);
                 match message["t"].as_str() {
                     Some("ready") => {
-                        let state = json!({ "t": "state", "state": page::fixture() });
+                        let state = json!({ "t": "state", "state": sample() });
                         window.host.post(&state.to_string());
                         window
                             .host
-                            .eval(&format!("setTimeout(() => go('{page_id}'), 50)"));
+                            .post(&json!({ "t": "go", "page": page_id }).to_string());
                     }
                     Some("icons") => window
                         .host

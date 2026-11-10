@@ -31,7 +31,7 @@ fn canonical<S: AsRef<str>>(ids: &[S], custom: &[CustomLayout]) -> Vec<String> {
 }
 
 /// The state under the key "snap". `runtime` is `Feature::runtime()`, or null when the feature is not running.
-/// `web/features/snap.fixture.json` must have exactly the same keys; a unit test checks it.
+/// The `snap` part of `app-tauri/src/data/state.sample.json` must have exactly the same keys; a unit test checks it.
 pub fn state(config: &Config, runtime: &Value) -> Value {
     let valid: Vec<&CustomLayout> = config
         .custom
@@ -423,10 +423,21 @@ mod tests {
         );
     }
 
+    /// Every number as a float: the sample is a JSON file that a script wrote, in which 1.0 is 1.
+    fn floats(value: &Value) -> Value {
+        match value {
+            Value::Number(n) => json!(n.as_f64()),
+            Value::Array(items) => Value::Array(items.iter().map(floats).collect()),
+            Value::Object(map) => {
+                Value::Object(map.iter().map(|(k, v)| (k.clone(), floats(v))).collect())
+            }
+            other => other.clone(),
+        }
+    }
+
     #[test]
     fn the_sample_data_has_the_keys_of_the_state() {
-        let sample: Value =
-            serde_json::from_str(include_str!("../../../web/features/snap.fixture.json")).unwrap();
+        let sample: Value = crate::settings::sample("snap");
         let real = state(&Config::default(), &json!({ "accessibility": true }));
         let names = |v: &Value| {
             let mut k: Vec<String> = v.as_object().unwrap().keys().cloned().collect();
@@ -435,7 +446,8 @@ mod tests {
         };
         assert_eq!(names(&sample), names(&real));
         assert_eq!(
-            sample["built_in"], real["built_in"],
+            floats(&sample["built_in"]),
+            floats(&real["built_in"]),
             "the drawings of the built-in layouts are the real ones"
         );
     }

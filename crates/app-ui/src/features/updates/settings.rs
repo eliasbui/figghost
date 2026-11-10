@@ -4,7 +4,7 @@ use super::Config;
 use crate::settings::model::Fault;
 use serde_json::{Value, json};
 
-/// The state under the key "updates". `web/features/updates.fixture.json` must have exactly the same keys.
+/// The state under the key "updates". the `updates` part of `app-tauri/src/data/state.sample.json` must have exactly the same keys.
 pub fn state(config: &Config, runtime: &Value) -> Value {
     json!({
         "enabled": config.enabled,
@@ -36,9 +36,7 @@ mod tests {
 
     #[test]
     fn the_fixture_has_exactly_the_keys_of_the_state() {
-        let fixture: Value =
-            serde_json::from_str(include_str!("../../../web/features/updates.fixture.json"))
-                .unwrap();
+        let fixture: Value = crate::settings::sample("updates");
         let keys = |v: &Value| {
             let mut k: Vec<String> = v.as_object().unwrap().keys().cloned().collect();
             k.sort();
