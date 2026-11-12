@@ -87,6 +87,24 @@
   .switch:disabled {
     opacity: 0.4;
   }
+  /* The small switch of the menu bar panel: the same glass pill at 38 by 22. */
+  .switch.sm {
+    width: 38px;
+    height: 22px;
+  }
+  .switch.sm::after {
+    width: 22px;
+    height: 18px;
+  }
+  .switch.sm[aria-checked="true"]::after {
+    transform: translateX(12px);
+  }
+  .switch.sm:active:not(:disabled)::after {
+    width: 26px;
+  }
+  .switch.sm[aria-checked="true"]:active:not(:disabled)::after {
+    transform: translateX(8px);
+  }
 
   /* -- the segmented control */
   .seg {

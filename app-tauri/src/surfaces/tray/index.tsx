@@ -33,11 +33,8 @@ function useReportedHeight(ready: boolean) {
 }
 
 function Knob({ on }: { on: boolean }) {
-  return (
-    <span aria-hidden="true" className={cn('relative h-[18px] w-[30px] shrink-0 rounded-full transition-colors duration-150', on ? 'bg-accent' : 'bg-[var(--track)]')}>
-      <span className={cn('absolute top-0.5 left-0.5 size-3.5 rounded-full bg-white shadow-[0_1px_3px_rgb(0_0_0/0.3)] transition-transform duration-150 ease-out', on && 'translate-x-3')} />
-    </span>
-  );
+  // The kit's switch at the size of a row of the panel; the row itself is the control, so this one is for the eye.
+  return <span aria-hidden="true" aria-checked={on} className="switch sm" />;
 }
 
 function Entry({ item, bad }: { item: Item; bad?: boolean }) {
