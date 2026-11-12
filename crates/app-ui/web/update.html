@@ -64,7 +64,8 @@ ul {
   list-style: disc;
   background: var(--card);
   border: 0.5px solid var(--stroke);
-  border-radius: 12px;
+  border-radius: 18px;
+  box-shadow: inset 0 1px 0 rgba(255, 255, 255, 0.5);
   -webkit-user-select: text;
   user-select: text;
 }
@@ -80,14 +81,18 @@ button {
   color: var(--text);
   background: var(--control);
   border: 0.5px solid var(--stroke);
-  border-radius: 7px;
+  border-radius: 999px;
   cursor: default;
+  transition: background 0.12s, transform 0.2s cubic-bezier(0.28, 1.35, 0.48, 1), filter 0.12s;
 }
 button:hover { background: var(--control-hover); }
-button.primary { color: #fff; font-weight: 500; background: var(--accent); border-color: transparent; }
+button:active:not(:disabled) { transform: scale(0.97); }
+button:focus-visible { outline: 2px solid var(--accent); outline-offset: 2px; }
+button.primary { color: #fff; font-weight: 500; background: var(--accent); border-color: transparent; box-shadow: inset 0 1px 0 rgba(255, 255, 255, 0.25); }
 button.primary:hover { filter: brightness(1.08); }
 button:disabled { opacity: 0.45; }
 button[hidden] { display: none; }
+@media (prefers-reduced-motion: reduce) { * { transition: none !important; } }
 </style>
 </head>
 <body>

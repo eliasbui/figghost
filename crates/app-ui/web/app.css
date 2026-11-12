@@ -645,109 +645,247 @@ kbd {
 .menu .menu-icon { width: 16px; height: 16px; }
 .menu .section-title { color: var(--text-2); font-size: var(--fs-small); margin: 4px 8px; }
 
-/* NOTCH STAGE: modern macOS dark nebula wallpaper */
+/* NOTCH STAGE: a small live screen. It draws the notch as the settings below describe it (a hardware notch or a
+   floating pill, its size style, material, shadow and motion) and opens on hover, on focus or on a press. app.js
+   sets --rw/--rh (closed) and --ow/--oh (open); the drawing scales a real screen down to this one. */
 .notch-stage {
+  --rw: 150px;
+  --rh: 22px;
+  --ow: 358px;
+  --oh: 140px;
+  --ear: 0px;
   position: relative;
-  height: 180px;
+  height: 208px;
   overflow: hidden;
-  border-radius: var(--r-card);
+  isolation: isolate;
+  container-type: inline-size;
+  border-radius: 26px;
+  cursor: pointer;
+  color: #fff;
   background:
-    radial-gradient(ellipse 80% 60% at 50% 120%, rgba(120, 119, 198, 0.35), transparent),
-    radial-gradient(circle at 15% 25%, rgba(99, 102, 241, 0.3) 0%, transparent 40%),
-    radial-gradient(circle at 85% 75%, rgba(236, 72, 153, 0.25) 0%, transparent 40%),
-    linear-gradient(135deg, #1e1b4b 0%, #0f172a 50%, #020617 100%);
-  box-shadow: inset 0 0 0 0.5px rgba(255, 255, 255, 0.1), 0 8px 24px -12px rgba(0, 0, 0, 0.5);
+    radial-gradient(ellipse 70% 60% at 50% 125%, rgba(130, 120, 220, 0.5), transparent),
+    radial-gradient(circle at 12% 30%, rgba(99, 102, 241, 0.42) 0%, transparent 42%),
+    radial-gradient(circle at 88% 70%, rgba(236, 72, 153, 0.34) 0%, transparent 42%),
+    linear-gradient(135deg, #1e1b4b 0%, #0f172a 52%, #020617 100%);
+  box-shadow: 0 18px 36px -22px rgba(0, 0, 0, 0.6), inset 0 0 0 0.5px rgba(255, 255, 255, 0.12);
+  transition: filter var(--motion), opacity var(--motion);
+  -webkit-user-select: none;
+  user-select: none;
 }
+.notch-stage::after {
+  content: "";
+  position: absolute;
+  inset: 0;
+  z-index: 4;
+  padding: 1px;
+  border-radius: inherit;
+  background: var(--rim);
+  -webkit-mask: linear-gradient(#000 0 0) content-box, linear-gradient(#000 0 0);
+  -webkit-mask-composite: xor;
+  mask-composite: exclude;
+  opacity: 0.55;
+  pointer-events: none;
+}
+.hero + .notch-stage { margin-top: 6px; }
+.notch-stage:focus-visible { outline: 2px solid var(--tint); outline-offset: 3px; }
+.notch-stage.off { filter: saturate(0.4) brightness(0.8); }
+.notch-stage.off .notch { opacity: 0 !important; }
+
+/* Things behind the glass, so the material shows what it does to them. */
+.ns-win, .ns-orb { position: absolute; pointer-events: none; }
+.ns-win {
+  left: 8%;
+  top: 46px;
+  width: 34%;
+  height: 120px;
+  border-radius: 14px;
+  background: linear-gradient(160deg, rgba(255, 255, 255, 0.22), rgba(255, 255, 255, 0.07));
+  box-shadow: inset 0 0 0 0.5px rgba(255, 255, 255, 0.22), 0 12px 24px -12px rgba(0, 0, 0, 0.5);
+}
+.ns-win::before {
+  content: "";
+  position: absolute;
+  left: 11px;
+  top: 10px;
+  width: 6px;
+  height: 6px;
+  border-radius: 50%;
+  background: #ff5f57;
+  box-shadow: 11px 0 #febc2e, 22px 0 #28c840;
+}
+.ns-win::after {
+  content: "";
+  position: absolute;
+  left: 12px;
+  right: 40%;
+  top: 34px;
+  height: 7px;
+  border-radius: 4px;
+  background: rgba(255, 255, 255, 0.34);
+  box-shadow: 0 16px rgba(255, 255, 255, 0.2), 0 32px rgba(255, 255, 255, 0.2);
+}
+.ns-win.b { left: auto; right: 7%; top: 70px; width: 26%; height: 96px; }
+.ns-orb { left: 52%; top: 80px; width: 64px; height: 64px; border-radius: 50%; background: radial-gradient(circle at 35% 30%, #ffd1f0, #ff5fa8 55%, #7a2cff); filter: blur(0.5px); opacity: 0.9; }
+
 .menubar {
   position: absolute;
+  z-index: 1;
   left: 0;
   right: 0;
   top: 0;
-  height: 22px;
-  background: rgba(255, 255, 255, 0.14);
-  -webkit-backdrop-filter: blur(12px);
-  backdrop-filter: blur(12px);
+  height: 24px;
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  padding: 0 14px;
+  font-size: 10.5px;
+  font-weight: 500;
+  line-height: 1;
+  background: rgba(255, 255, 255, 0.13);
+  -webkit-backdrop-filter: blur(14px) saturate(1.6);
+  backdrop-filter: blur(14px) saturate(1.6);
+  box-shadow: inset 0 -0.5px 0 rgba(255, 255, 255, 0.14);
 }
+.mb-l, .mb-r { display: flex; align-items: center; gap: 12px; opacity: 0.92; }
+.mb-l b { font-weight: 700; }
+.mb-dot { width: 9px; height: 9px; border-radius: 50%; background: #fff; opacity: 0.9; }
+.mb-ico { width: 11px; height: 8px; border-radius: 3px; background: rgba(255, 255, 255, 0.85); }
+.mb-ico.wide { width: 19px; }
+@container (max-width: 520px) { .mb-l span:nth-of-type(n+3) { display: none; } }
+
 .notch {
   position: absolute;
   left: 50%;
   top: 0;
   z-index: 2;
-  width: 150px;
-  height: 22px;
+  width: calc(var(--rw) + var(--ear) * 2);
+  height: var(--rh);
   transform: translateX(-50%);
   background: #000;
   border-radius: 0 0 14px 14px;
   overflow: hidden;
   color: #fff;
-  transition: width 0.5s var(--spring), height 0.5s var(--spring), border-radius 0.5s var(--spring), background 0.3s;
+  transition: width 0.5s var(--spring), height 0.5s var(--spring), border-radius 0.5s var(--spring), background 0.3s, box-shadow 0.4s, opacity 0.3s, -webkit-backdrop-filter 0.3s, backdrop-filter 0.3s;
 }
-.notch-stage:hover .notch, .notch.open {
-  width: 360px;
-  height: 140px;
-  border-radius: 0 0 22px 22px;
+/* A hardware notch is the screen's own cutout: square at the top, with the camera in it. */
+.notch-stage.hw .notch { border-radius: 0 0 11px 11px; }
+.notch-stage.hw .notch::after {
+  content: "";
+  position: absolute;
+  left: 50%;
+  top: 7px;
+  width: 5px;
+  height: 5px;
+  margin-left: -2.5px;
+  border-radius: 50%;
+  background: radial-gradient(circle at 35% 30%, #2b3a63, #0a0f1d);
+  transition: opacity 0.2s;
 }
-.notch-stage:hover .notch.mat-glass, .notch.open.mat-glass {
-  background: rgba(24, 24, 28, 0.65);
-  -webkit-backdrop-filter: blur(18px) saturate(1.7);
-  backdrop-filter: blur(18px) saturate(1.7);
-  box-shadow: inset 0 0 0 0.5px rgba(255, 255, 255, 0.3), 0 10px 26px -10px rgba(0, 0, 0, 0.6);
+/* A pill that is set to Hidden stays a faint hint of itself until it opens. */
+.notch-stage.shy .notch { opacity: 0.2; }
+
+.notch-rest {
+  position: absolute;
+  inset: 0 0 auto 0;
+  height: var(--rh);
+  display: grid;
+  grid-template-columns: 1fr var(--cut, 0px) 1fr;
+  align-items: center;
+  padding: 0 11px;
+  font-size: 10px;
+  font-weight: 500;
+  font-variant-numeric: tabular-nums;
+  white-space: nowrap;
+  color: rgba(255, 255, 255, 0.86);
+  transition: opacity 0.2s;
 }
-.notch-stage:hover .notch.mat-clear, .notch.open.mat-clear {
-  background: rgba(24, 24, 28, 0.28);
-  -webkit-backdrop-filter: blur(8px) saturate(1.5);
-  backdrop-filter: blur(8px) saturate(1.5);
-  box-shadow: inset 0 0 0 0.5px rgba(255, 255, 255, 0.45);
+.notch-rest span:first-child { text-align: left; }
+.notch-rest span:last-child { text-align: right; }
+.notch-stage:not(.clock) .notch-rest { display: none; }
+.notch-stage:not(.hw) .notch-rest { grid-template-columns: 1fr; text-align: center; }
+.notch-stage:not(.hw) .notch-rest span:first-child { display: none; }
+.notch-stage:not(.hw) .notch-rest span:last-child { text-align: center; }
+
+.notch-stage:hover .notch, .notch-stage:focus-visible .notch, .notch-stage.open .notch {
+  width: min(var(--ow), 94cqw);
+  height: var(--oh);
+  border-radius: 0 0 26px 26px;
+  opacity: 1;
 }
-.notch-stage:hover .notch.mat-ink, .notch.open.mat-ink {
-  background: rgba(12, 12, 14, 0.8);
-  -webkit-backdrop-filter: blur(20px) saturate(1.5);
-  backdrop-filter: blur(20px) saturate(1.5);
-  box-shadow: inset 0 0 0 0.5px rgba(255, 255, 255, 0.22), 0 10px 26px -10px rgba(0, 0, 0, 0.6);
+.notch-stage:hover .notch-rest, .notch-stage:focus-visible .notch-rest, .notch-stage.open .notch-rest,
+.notch-stage:hover .notch::after, .notch-stage:focus-visible .notch::after, .notch-stage.open .notch::after { opacity: 0; }
+/* The rim of light of Liquid Glass, brightest where it is lit from the top left. */
+.notch-stage:hover .notch.rimmed, .notch-stage:focus-visible .notch.rimmed, .notch-stage.open .notch.rimmed {
+  box-shadow: inset 0 1px 0 rgba(255, 255, 255, 0.3), inset 0 0 0 0.5px rgba(255, 255, 255, 0.28);
 }
-.notch-stage:hover .notch.mat-accent, .notch.open.mat-accent {
-  background: color-mix(in srgb, var(--tint) 48%, transparent);
-  -webkit-backdrop-filter: blur(10px) saturate(1.6);
-  backdrop-filter: blur(10px) saturate(1.6);
-  box-shadow: inset 0 0 0 0.5px rgba(255, 255, 255, 0.45);
+.notch-stage.sh:hover .notch, .notch-stage.sh:focus-visible .notch, .notch-stage.sh.open .notch {
+  box-shadow: inset 0 1px 0 rgba(255, 255, 255, 0.16), 0 14px 28px -10px rgba(0, 0, 0, 0.7);
 }
-.notch-stage:hover .notch.mat-black, .notch.open.mat-black {
+.notch-stage.sh:hover .notch.rimmed, .notch-stage.sh:focus-visible .notch.rimmed, .notch-stage.sh.open .notch.rimmed {
+  box-shadow: inset 0 1px 0 rgba(255, 255, 255, 0.3), inset 0 0 0 0.5px rgba(255, 255, 255, 0.28), 0 14px 28px -10px rgba(0, 0, 0, 0.7);
+}
+.notch-stage:hover .notch.mat-glass, .notch-stage:focus-visible .notch.mat-glass, .notch-stage.open .notch.mat-glass {
+  background: linear-gradient(180deg, rgba(40, 40, 48, 0.66), rgba(22, 22, 28, 0.76));
+  -webkit-backdrop-filter: blur(20px) saturate(1.8);
+  backdrop-filter: blur(20px) saturate(1.8);
+}
+.notch-stage:hover .notch.mat-clear, .notch-stage:focus-visible .notch.mat-clear, .notch-stage.open .notch.mat-clear {
+  background: linear-gradient(180deg, rgba(40, 40, 48, 0.3), rgba(24, 24, 28, 0.22));
+  -webkit-backdrop-filter: blur(9px) saturate(1.6);
+  backdrop-filter: blur(9px) saturate(1.6);
+}
+.notch-stage:hover .notch.mat-ink, .notch-stage:focus-visible .notch.mat-ink, .notch-stage.open .notch.mat-ink {
+  background: rgba(12, 12, 14, 0.82);
+  -webkit-backdrop-filter: blur(22px) saturate(1.5);
+  backdrop-filter: blur(22px) saturate(1.5);
+}
+.notch-stage:hover .notch.mat-accent, .notch-stage:focus-visible .notch.mat-accent, .notch-stage.open .notch.mat-accent {
+  background: linear-gradient(180deg, color-mix(in srgb, var(--tint) 56%, transparent), color-mix(in srgb, var(--tint) 40%, transparent));
+  -webkit-backdrop-filter: blur(12px) saturate(1.7);
+  backdrop-filter: blur(12px) saturate(1.7);
+}
+.notch-stage:hover .notch.mat-black, .notch-stage:focus-visible .notch.mat-black, .notch-stage.open .notch.mat-black {
   background: linear-gradient(180deg, #000, #222428);
 }
 .notch-stage.mo-smooth .notch { transition-timing-function: var(--ease-out); }
-.notch-stage.mo-none .notch, .notch-stage.mo-none .notch-body { transition: none; }
+.notch-stage.mo-none .notch, .notch-stage.mo-none .notch-body, .notch-stage.mo-none .notch-rest { transition: none; }
 .tab-order { display: flex; gap: 4px; }
 .tab-order .btn.icon:disabled { opacity: 0.3; }
 .notch-body {
   position: absolute;
-  left: 0;
-  right: 0;
-  top: 30px;
+  left: 50%;
+  top: calc(var(--rh) + 8px);
+  width: min(var(--ow), 94cqw);
   padding: 0 16px;
+  transform: translateX(-50%);
   opacity: 0;
   transition: opacity 0.25s 0.08s;
 }
-.notch-stage:hover .notch-body, .notch.open .notch-body { opacity: 1; }
+.notch-stage:hover .notch-body, .notch-stage:focus-visible .notch-body, .notch-stage.open .notch-body { opacity: 1; }
 .notch-tabs {
   display: flex;
   gap: 4px;
   padding: 3px;
   margin: 0 auto 10px;
   width: max-content;
-  border-radius: 8px;
+  max-width: 100%;
+  overflow: hidden;
+  border-radius: 999px;
   background: rgba(255, 255, 255, 0.12);
 }
 .notch-tabs span {
   padding: 2px 9px;
-  border-radius: 5px;
+  border-radius: 999px;
   font-size: var(--fs-small);
+  white-space: nowrap;
   color: rgba(255, 255, 255, 0.78);
 }
-.notch-tabs span:first-child { background: rgba(255, 255, 255, 0.24); color: #fff; }
-.notch-line { height: 18px; border-radius: 5px; margin-bottom: 6px; background: rgba(255, 255, 255, 0.1); }
+.notch-tabs span:first-child { background: rgba(255, 255, 255, 0.26); color: #fff; box-shadow: inset 0 0.5px 0 rgba(255, 255, 255, 0.3); }
+.notch-line { height: 18px; border-radius: 9px; margin-bottom: 6px; background: rgba(255, 255, 255, 0.1); }
 .notch-line:first-of-type { background: color-mix(in srgb, var(--accent) 85%, black); }
 .notch-note {
   position: absolute;
+  z-index: 3;
   left: 0;
   right: 0;
   bottom: 12px;
@@ -756,7 +894,11 @@ kbd {
   font-size: var(--fs-small);
   font-weight: 500;
   text-shadow: 0 1px 4px rgba(0, 0, 0, 0.5);
+  transition: opacity var(--motion);
 }
+.notch-stage:hover .notch-note, .notch-stage:focus-visible .notch-note, .notch-stage.open .notch-note { opacity: 0.55; }
+html.reduce-transparency .notch-stage .notch { -webkit-backdrop-filter: none !important; backdrop-filter: none !important; background: #1b1b20 !important; }
+html.increase-contrast .notch-stage .notch { box-shadow: inset 0 0 0 1px #fff !important; }
 
 /* WINDOW SNAPPING: 2-column shortcuts table */
 .tiles {
@@ -1497,19 +1639,22 @@ html.increase-contrast .card { box-shadow: 0 0 0 1px var(--stroke); }
   gap: 3px;
   padding: 10px 10px 12px;
   border: 0.5px solid var(--card-edge);
-  border-radius: 14px;
+  border-radius: 20px;
   text-align: left;
   color: var(--text);
   background: var(--card-glass);
   box-shadow: var(--card-shadow), inset 0 1px 0 var(--card-hi);
-  transition: background var(--motion-fast), box-shadow var(--motion-fast);
+  transition: background var(--motion-fast), box-shadow var(--motion) var(--ease-out), transform var(--motion) var(--spring), border-color var(--motion-fast);
 }
-.style-card:hover { background: var(--fill-2, var(--fill)); }
+.style-card:hover { background: var(--fill-2, var(--fill)); transform: translateY(-1px); }
+.style-card:active { transform: scale(0.98); transition-duration: var(--motion-fast); }
+.style-card:focus-visible { outline-offset: 2px; }
 .style-card[aria-pressed="true"] {
   background: color-mix(in srgb, var(--tint) 16%, var(--fill));
   border-color: var(--tint);
-  box-shadow: inset 0 0 0 1.5px var(--tint), 0 2px 8px color-mix(in srgb, var(--tint) 25%, transparent);
+  box-shadow: inset 0 0 0 1.5px var(--tint), inset 0 1px 0 var(--card-hi), 0 6px 16px -6px color-mix(in srgb, var(--tint) 45%, transparent);
 }
+.style-card[aria-pressed="true"]:hover { transform: none; }
 .sc-art {
   position: relative;
   display: flex;
@@ -1518,11 +1663,11 @@ html.increase-contrast .card { box-shadow: 0 0 0 1px var(--stroke); }
   height: 76px;
   margin-bottom: 6px;
   overflow: hidden;
-  border-radius: 10px;
+  border-radius: 12px;
   background: linear-gradient(180deg, rgba(0, 0, 0, 0.18), rgba(0, 0, 0, 0.06));
 }
-.sc-pill { flex: none; background: #000; border-radius: 0 0 6px 6px; max-width: 100%; }
-.sc-open { flex: none; margin-top: 4px; max-width: 94%; max-height: 62px; background: color-mix(in srgb, var(--text) 22%, transparent); border-radius: 4px 4px 10px 10px; box-shadow: inset 0 0 0 0.5px var(--card-edge); }
+.sc-pill { flex: none; background: #000; border-radius: 0 0 7px 7px; max-width: 100%; transition: width var(--motion) var(--ease-out), height var(--motion) var(--ease-out); }
+.sc-open { flex: none; margin-top: 4px; max-width: 94%; max-height: 62px; background: color-mix(in srgb, var(--text) 22%, transparent); border-radius: 4px 4px 11px 11px; box-shadow: inset 0 1px 0 var(--card-hi), inset 0 0 0 0.5px var(--card-edge); transition: width var(--motion) var(--ease-out), height var(--motion) var(--ease-out); }
 .sc-name { font-size: 13px; font-weight: 650; }
 .sc-desc { font-size: 11px; color: var(--text-2); line-height: 1.3; }
 @media (max-width: 920px) { .style-cards { grid-template-columns: repeat(2, minmax(0, 1fr)); } }
@@ -1542,7 +1687,8 @@ html.increase-contrast .card { box-shadow: 0 0 0 1px var(--stroke); }
 .hud-wide i { left: 50%; bottom: 10px; width: 92px; height: 9px; margin-left: -46px; border-radius: 5px; }
 .hud-place-box { display: flex; align-items: center; gap: 12px; }
 .hud-places { display: grid; grid-template-columns: repeat(3, 26px); grid-auto-rows: 18px; gap: 4px; padding: 5px; border-radius: 8px; background: var(--fill); border: 0.5px solid var(--card-edge); }
-.hud-place { border: 0; border-radius: 4px; background: color-mix(in srgb, var(--text) 18%, transparent); padding: 0; }
+.hud-place { border: 0; border-radius: 5px; background: color-mix(in srgb, var(--text) 18%, transparent); padding: 0; transition: background var(--motion-fast), transform var(--motion) var(--spring); }
+.hud-place:active { transform: scale(0.92); }
 .hud-place:hover { background: color-mix(in srgb, var(--text) 30%, transparent); }
 .hud-place[aria-pressed="true"] { background: var(--tint); }
 .hud-cards { grid-template-columns: repeat(5, minmax(0, 1fr)); }
@@ -1661,3 +1807,36 @@ html[data-sky="night"] { --aurora-1: rgba(112, 124, 238, 0.30); --aurora-2: rgba
 .acct-bar.bad i { background: var(--bad); }
 .acct-value { color: var(--text); font-weight: 600; text-align: right; font-variant-numeric: tabular-nums; }
 .acct-reset { overflow: hidden; white-space: nowrap; text-overflow: ellipsis; }
+
+/* Liquid Glass for what floats above the page: menus, the toast and dialogs are glass like the search results,
+   with the same rim, and the small surfaces inside cards take radii that sit inside the card's own. */
+.menu {
+  padding: 6px;
+  border-radius: 16px;
+  background: color-mix(in srgb, var(--solid) 84%, transparent);
+  -webkit-backdrop-filter: blur(40px) saturate(210%);
+  backdrop-filter: blur(40px) saturate(210%);
+  box-shadow: 0 18px 44px -12px rgba(10, 20, 50, 0.35), 0 2px 8px rgba(10, 20, 50, 0.1), inset 0 0 0 0.5px var(--card-edge), inset 0 1px 0 var(--card-hi);
+  animation: rise var(--motion) var(--spring) backwards;
+}
+.menu button { height: 26px; border-radius: 9px; transition: background var(--motion-fast); }
+#toast .glass {
+  background: color-mix(in srgb, var(--solid) 80%, transparent);
+  -webkit-backdrop-filter: blur(30px) saturate(190%);
+  backdrop-filter: blur(30px) saturate(190%);
+  box-shadow: 0 10px 28px -10px rgba(10, 20, 50, 0.35), inset 0 0 0 0.5px var(--card-edge), inset 0 1px 0 var(--card-hi);
+}
+.dialog {
+  border-radius: 26px;
+  background: color-mix(in srgb, var(--solid) 86%, transparent);
+  -webkit-backdrop-filter: blur(40px) saturate(200%);
+  backdrop-filter: blur(40px) saturate(200%);
+  box-shadow: 0 30px 70px -20px var(--shadow), inset 0 0 0 0.5px var(--card-edge), inset 0 1px 0 var(--card-hi);
+}
+.tile { border-radius: 14px; transition: background var(--motion-fast), transform var(--motion) var(--spring); }
+.tile:active { transform: scale(0.99); }
+.mini { border-radius: 5px; }
+.pad, .meter canvas, .code { border-radius: 14px; }
+html.reduce-transparency .menu,
+html.reduce-transparency .dialog,
+html.reduce-transparency #toast .glass { background: var(--solid); -webkit-backdrop-filter: none; backdrop-filter: none; }

@@ -174,7 +174,7 @@ const I18N = {
     'key.filters.val': '@image @link @code @file @pin',
 
     'notch.panel.title': 'Notch panel', 'notch.panel.desc': 'Move the pointer to the top edge of the screen to open it. Off removes it entirely.',
-    'notch.preview': 'Hover the top edge', 'sec.tabs': 'Tabs', 'tab.waiting': 'Not in the notch yet: its tab appears when its feature is turned on, under Notch tabs.', 'tab.clipboard': 'Clipboard', 'tab.clipboard.desc': 'The same list as the popup, with search.',
+    'notch.preview': 'Hover or press to open the notch', 'sec.tabs': 'Tabs', 'tab.waiting': 'Not in the notch yet: its tab appears when its feature is turned on, under Notch tabs.', 'tab.clipboard': 'Clipboard', 'tab.clipboard.desc': 'The same list as the popup, with search.',
     'tab.shelf': 'Shelf', 'tab.shelf.desc': 'Drop files to keep them handy and drag them out again. Right-click a file to compress it or convert an image. Only references are stored.', 'tab.media': 'Media', 'tab.media.desc': 'Previous, play and next for whatever is playing; track details for Music and Spotify.',
     'sec.volume': 'Volume', 'vol.title': 'Volume indicator in the notch', 'vol.desc': 'Replaces the system volume display. Needs Accessibility. Shift + Option moves in finer steps.',
     'vol.style.title': 'Indicator style', 'vol.style.desc': 'How the volume panel looks while the keys are pressed.',
@@ -300,7 +300,7 @@ const I18N = {
     'key.filters.val': '@image @link @code @file @pin',
 
     'notch.panel.title': 'Bảng notch', 'notch.panel.desc': 'Đưa con trỏ lên mép trên màn hình để mở. Tắt thì bảng biến mất hoàn toàn.',
-    'notch.preview': 'Rê chuột lên mép trên', 'sec.tabs': 'Các tab', 'tab.waiting': 'Chưa có trong notch: tab hiện ra khi bật tính năng của nó, ở mục Tab của notch.', 'tab.clipboard': 'Clipboard', 'tab.clipboard.desc': 'Cùng danh sách như cửa sổ nhỏ, có tìm kiếm.',
+    'notch.preview': 'Rê chuột hoặc bấm để mở notch', 'sec.tabs': 'Các tab', 'tab.waiting': 'Chưa có trong notch: tab hiện ra khi bật tính năng của nó, ở mục Tab của notch.', 'tab.clipboard': 'Clipboard', 'tab.clipboard.desc': 'Cùng danh sách như cửa sổ nhỏ, có tìm kiếm.',
     'tab.shelf': 'Khay', 'tab.shelf.desc': 'Thả tệp vào để giữ tạm và kéo ra lại. Nhấp chuột phải vào tệp để nén hoặc đổi định dạng ảnh. Chỉ lưu đường dẫn tham chiếu.', 'tab.media': 'Media', 'tab.media.desc': 'Trước, phát và sau cho ứng dụng đang phát; thông tin bài hát cho Music và Spotify.',
     'sec.volume': 'Âm lượng', 'vol.title': 'Chỉ báo âm lượng trong notch', 'vol.desc': 'Thay màn hình âm lượng của hệ thống. Cần quyền Trợ năng. Shift + Option để chỉnh từng bước nhỏ.',
     'vol.style.title': 'Kiểu chỉ báo', 'vol.style.desc': 'Bảng âm lượng trông thế nào trong lúc nhấn phím.',
@@ -1379,15 +1379,62 @@ function pageKeys() {
 
 function tabTitle(page) { return I18N.en['tab.' + page.id] ? t('tab.' + page.id) : page.title; }
 
+/** The live preview of the notch: a small screen that draws the settings (hardware notch or floating pill, size
+ *  style, material, shadow, motion, the date in the closed shape) and opens on hover, focus or a press. */
 function notchStage() {
   const tabs = h('div', { class: 'notch-tabs' });
+  const restLeft = h('span', { text: 'Tue 5' });
+  const restRight = h('span', { text: '9:41' });
   const notch = h('div', { class: 'notch' },
+    h('div', { class: 'notch-rest', 'aria-hidden': 'true' }, restLeft, restRight),
     h('div', { class: 'notch-body' }, tabs, h('div', { class: 'notch-line' }), h('div', { class: 'notch-line' }), h('div', { class: 'notch-line' })));
-  const stage = h('div', { class: 'notch-stage', 'aria-hidden': 'true' }, h('div', { class: 'menubar' }), notch, h('div', { class: 'notch-note', text: t('notch.preview') }));
+  const note = h('div', { class: 'notch-note' });
+  const stage = h('div', { class: 'notch-stage', role: 'button', tabindex: '0', 'aria-pressed': 'false' },
+    h('div', { class: 'ns-win', 'aria-hidden': 'true' }), h('div', { class: 'ns-win b', 'aria-hidden': 'true' }), h('div', { class: 'ns-orb', 'aria-hidden': 'true' }),
+    h('div', { class: 'menubar', 'aria-hidden': 'true' },
+      h('div', { class: 'mb-l' }, h('i', { class: 'mb-dot' }), h('b', { text: 'Finder' }), h('span', { text: 'File' }), h('span', { text: 'Edit' }), h('span', { text: 'View' })),
+      h('div', { class: 'mb-r' }, h('i', { class: 'mb-ico' }), h('i', { class: 'mb-ico' }), h('i', { class: 'mb-ico wide' }))),
+    notch, note);
+  // A press keeps it open (hover alone opens it for as long as the pointer is there); Return and Space do the same.
+  const toggle = () => {
+    const open = !stage.classList.contains('open');
+    stage.classList.toggle('open', open);
+    stage.setAttribute('aria-pressed', String(open));
+  };
+  stage.addEventListener('click', toggle);
+  stage.addEventListener('keydown', (e) => {
+    if (e.key === 'Enter' || e.key === ' ') { e.preventDefault(); toggle(); }
+  });
   reg(() => {
-    notch.className = 'notch mat-' + S.notch.material;
-    stage.className = 'notch-stage mo-' + S.notch.motion;
-    tabs.replaceChildren(...S.notch.pages.filter((p) => p.on && !p.waiting).slice(0, 6).map((p) => h('span', { text: tabTitle(p) })));
+    const n = S.notch;
+    // The scale of this screen to a real one: a closed pill of 200 x 24 pt draws 150 x 22, an open shape of 560 x 440 draws 358 x 141.
+    const hw = !!n.hardware;
+    const rest = hw ? [180, 32] : [n.rest_width || 200, n.rest_height || 24];
+    const px = (v) => Math.round(v) + 'px';
+    stage.style.setProperty('--rw', px(rest[0] * 0.75));
+    stage.style.setProperty('--rh', px(Math.max(14, rest[1] * 0.92)));
+    stage.style.setProperty('--ow', px((n.width || 560) * 0.64));
+    stage.style.setProperty('--oh', px(Math.min(160, (n.height || 440) * 0.32)));
+    stage.style.setProperty('--cut', px(180 * 0.75));
+    // A hardware notch with the date has an ear on each side of the cutout; the pill with it needs no more room.
+    stage.style.setProperty('--ear', hw && n.rest_clock ? '54px' : '0px');
+    const c = stage.classList;
+    c.toggle('hw', hw);
+    c.toggle('clock', !!n.rest_clock);
+    c.toggle('shy', !hw && n.rest === 'hidden' && !n.rest_clock);
+    c.toggle('sh', !!n.shadow);
+    c.toggle('off', !n.enabled);
+    for (const m of ['spring', 'smooth', 'none']) c.toggle('mo-' + m, n.motion === m);
+    notch.className = 'notch mat-' + n.material + (n.material === 'black' ? '' : ' rimmed');
+    note.textContent = t('notch.preview');
+    stage.setAttribute('aria-label', t('notch.preview'));
+    // As many tab names as the open shape has room for, then how many more there are.
+    const shown = n.pages.filter((p) => p.on && !p.waiting);
+    const room = Math.max(3, Math.min(7, Math.floor(((n.width || 560) * 0.64 - 90) / 70)));
+    const names = shown.length > room ? shown.slice(0, room - 1) : shown;
+    tabs.replaceChildren(
+      ...names.map((p) => h('span', { text: tabTitle(p) })),
+      ...(shown.length > names.length ? [h('span', { text: '+' + (shown.length - names.length) })] : []));
   });
   return stage;
 }
@@ -1611,7 +1658,8 @@ function pageNotch() {
         path: 'notch.material', title: t('notch.material.title'), desc: t('notch.material.desc'), when: on,
         options: () => ['glass', 'clear', 'ink', 'accent', 'black'].map((v) => ({ value: v, label: t('notch.material.' + v) })),
       }),
-      segRow('notch.motion', t('notch.motion.title'), t('notch.motion.desc'), ['spring', 'smooth', 'none'], { when: on }),      toggleRow('notch.shadow', t('notch.shadow.title'), t('notch.shadow.desc'), { when: on })),
+      segRow('notch.motion', t('notch.motion.title'), t('notch.motion.desc'), ['spring', 'smooth', 'none'], { when: on }),
+      toggleRow('notch.shadow', t('notch.shadow.title'), t('notch.shadow.desc'), { when: on })),
     sectionTitle(t('sec.notch.display')),
     card(
       selectRow({

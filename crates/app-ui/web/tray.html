@@ -20,13 +20,15 @@ button { font: inherit; color: inherit; cursor: default; }
 .head { display: flex; align-items: center; gap: 8px; height: 34px; padding: 0 2px 0 4px; }
 .logo { width: 28px; height: 28px; flex: none; }
 .head b { flex: 1; font-size: 14px; font-weight: 650; letter-spacing: -.01em; }
-.icon-btn { display: grid; place-items: center; width: 28px; height: 28px; padding: 0; border: 0; border-radius: 8px; background: none; color: var(--text-2); }
+.icon-btn { display: grid; place-items: center; width: 28px; height: 28px; padding: 0; border: 0; border-radius: 14px; background: none; color: var(--text-2); transition: background .12s, transform .2s cubic-bezier(.28,1.35,.48,1); }
+.icon-btn:active { transform: scale(.94); }
 .icon-btn:hover { background: var(--fill); color: var(--text); }
-.warn { display: flex; align-items: flex-start; gap: 8px; width: 100%; margin-top: 4px; padding: 8px 10px; border: 0; border-radius: 10px; background: color-mix(in srgb, var(--tint) 14%, transparent); text-align: left; font-size: 12px; line-height: 1.3; }
+.warn { display: flex; align-items: flex-start; gap: 8px; width: 100%; margin-top: 4px; padding: 8px 10px; border: 0; border-radius: 12px; background: color-mix(in srgb, var(--tint) 14%, transparent); text-align: left; font-size: 12px; line-height: 1.3; }
 .warn .ic { width: 15px; height: 15px; margin-top: 1px; color: var(--tint); }
 .warn span { text-wrap: balance; }
 .group { margin-top: 6px; padding-top: 6px; border-top: .5px solid var(--line); }
-.row { display: flex; align-items: center; gap: 10px; width: 100%; height: 30px; padding: 0 10px; border: 0; border-radius: 8px; background: none; text-align: left; }
+.row { display: flex; align-items: center; gap: 10px; width: 100%; height: 30px; padding: 0 10px; border: 0; border-radius: 10px; background: none; text-align: left; transition: background .12s; }
+.row:active { background: var(--line); }
 .row:hover { background: var(--fill); }
 .row .ic { width: 15px; height: 15px; color: var(--text-2); }
 .row:hover .ic { color: var(--text); }
@@ -37,7 +39,8 @@ button { font: inherit; color: inherit; cursor: default; }
 .switch::after { content: ""; position: absolute; top: 2px; left: 2px; width: 14px; height: 14px; border-radius: 50%; background: #fff; box-shadow: 0 1px 3px rgba(0,0,0,.3); transition: transform .12s ease-out; }
 .switch.on { background: var(--tint); } .switch.on::after { transform: translateX(12px); }
 .tools { display: grid; grid-template-columns: repeat(6, 1fr); gap: 6px; padding: 2px 0; }
-.tool { position: relative; display: grid; place-items: center; height: 36px; padding: 0; border: 0; border-radius: 10px; background: none; color: var(--text-2); }
+.tool { position: relative; display: grid; place-items: center; height: 36px; padding: 0; border: 0; border-radius: 12px; background: none; color: var(--text-2); transition: transform .2s cubic-bezier(.28,1.35,.48,1); }
+.tool:active { transform: scale(.95); }
 /* The hover fill fades by opacity only, which the compositor does without repainting the glass glyph mask each frame. */
 .tool::before { content: ""; position: absolute; inset: 0; border-radius: inherit; background: var(--fill); box-shadow: inset 0 0.5px 0 rgba(255,255,255,.22); opacity: .45; transition: opacity .12s; }
 .tool:hover { color: var(--text); }

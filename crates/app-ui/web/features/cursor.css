@@ -2,14 +2,15 @@
 .cursor-tiles { display: grid; grid-template-columns: repeat(auto-fill, minmax(104px, 1fr)); gap: 10px; width: 100%; }
 .cursor-tile {
   display: flex; flex-direction: column; align-items: center; justify-content: center; gap: 8px;
-  height: 96px; padding: 8px 6px; border-radius: var(--r-tile);
-  background: var(--fill-2); box-shadow: inset 0 0 0 1px var(--glass-edge);
+  height: 96px; padding: 8px 6px; border-radius: 18px;
+  background: var(--card-glass); box-shadow: var(--card-shadow), inset 0 0 0 0.5px var(--card-edge), inset 0 1px 0 var(--card-hi);
   color: var(--text); font: inherit; font-size: var(--fs-small); cursor: default;
   appearance: none; -webkit-appearance: none; border: 0; margin: 0;
-  transition: background var(--motion-fast), box-shadow var(--motion-fast);
+  transition: background var(--motion-fast), box-shadow var(--motion) var(--ease-out), transform var(--motion) var(--spring);
 }
-.cursor-tile:hover { background: var(--fill); }
-.cursor-tile[aria-checked="true"] { box-shadow: inset 0 0 0 2px var(--tint); background: var(--fill); }
+.cursor-tile:hover { background: var(--fill-2); transform: translateY(-1px); }
+.cursor-tile:active { transform: scale(0.97); transition-duration: var(--motion-fast); }
+.cursor-tile[aria-checked="true"] { box-shadow: inset 0 0 0 2px var(--tint), 0 6px 16px -6px color-mix(in srgb, var(--tint) 45%, transparent); background: color-mix(in srgb, var(--tint) 12%, var(--card-glass)); transform: none; }
 .cursor-tile .cursor-label { max-width: 100%; overflow: hidden; text-overflow: ellipsis; white-space: nowrap; }
 .cursor-art { width: 48px; height: 48px; display: flex; align-items: center; justify-content: center; flex: none; }
 /* A sheet is twelve frames of 48 pixels in a row; the cursor stands and blinks, on whole frames. */

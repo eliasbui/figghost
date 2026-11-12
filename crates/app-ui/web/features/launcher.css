@@ -1,7 +1,7 @@
 /* Launcher. Styles for the page in web/features/launcher.js, using the variables at the top of app.css. */
 .launcher-items { display: flex; flex-direction: column; width: 100%; }
 .launcher-item { display: flex; align-items: center; gap: 10px; padding: 6px 0; }
-.launcher-item + .launcher-item { border-top: 1px solid var(--line, rgba(128, 128, 128, 0.18)); }
+.launcher-item + .launcher-item { border-top: 0.5px solid var(--stroke); }
 .launcher-kind { min-width: 74px; color: var(--text-3); font-size: var(--fs-small); }
 .launcher-name { flex: 1 1 auto; color: var(--text); font-size: var(--fs-body, 13px); min-width: 0; overflow: hidden; text-overflow: ellipsis; white-space: nowrap; }
 .launcher-tools { display: flex; gap: 4px; }
