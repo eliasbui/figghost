@@ -218,7 +218,7 @@
  "key.filters.val": "@image @link @code @file @pin",
  "notch.panel.title": "Notch panel",
  "notch.panel.desc": "Move the pointer to the top edge of the screen to open it. Off removes it entirely.",
- "notch.preview": "Hover the top edge",
+ "notch.preview": "Hover or press to open the notch",
  "sec.tabs": "Tabs",
  "tab.waiting": "Not in the notch yet: its tab appears when its feature is turned on, on its page.",
  "tab.clipboard": "Clipboard",

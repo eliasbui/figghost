@@ -218,7 +218,7 @@
  "key.filters.val": "@image @link @code @file @pin",
  "notch.panel.title": "Bảng notch",
  "notch.panel.desc": "Đưa con trỏ lên mép trên màn hình để mở. Tắt thì bảng biến mất hoàn toàn.",
- "notch.preview": "Rê chuột lên mép trên",
+ "notch.preview": "Rê chuột hoặc bấm để mở notch",
  "sec.tabs": "Các tab",
  "tab.waiting": "Chưa có trong notch: tab hiện ra khi bật tính năng của nó, ở trang của nó.",
  "tab.clipboard": "Clipboard",

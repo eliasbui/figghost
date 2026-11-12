@@ -7,6 +7,8 @@ import { PageIcon } from '@/components/macos/Page';
 import { hasKey } from '@/i18n';
 import { isPage, PAGE_SYMBOLS } from '@/pages/meta';
 import { change, openPage, patch, send } from '@/stores/app';
+import { NotchPreview } from './NotchPreview';
+import type { PreviewNotch } from './NotchPreview';
 import { useSection, useT } from '@/stores/hooks';
 import type { TFunction } from '@/stores/hooks';
 
@@ -153,6 +155,7 @@ export default function Notch() {
 
   return (
     <>
+      <NotchPreview notch={notch as unknown as PreviewNotch} />
       <SectionTitle>{t('sec.notch.look')}</SectionTitle>
       <Card>
         <SizeRows notch={notch} on={on} />
