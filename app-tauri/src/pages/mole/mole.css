@@ -14,7 +14,7 @@
 .mole-all { display: flex; align-items: center; gap: 8px; flex: 1; min-width: 0; color: var(--text-2); font-size: var(--fs-small); }
 .mole-count { overflow: hidden; text-overflow: ellipsis; white-space: nowrap; font-variant-numeric: tabular-nums; }
 .mole-path { flex: 1; min-width: 0; font-weight: 600; overflow: hidden; text-overflow: ellipsis; white-space: nowrap; }
-.mole-toolbar input.mole-search { flex: none; width: 160px; }
+.mole-toolbar .mole-search { flex: none; width: 160px; }
 .mole-list { max-height: 360px; overflow-y: auto; border-top: 0.5px solid var(--stroke); }
 .mole-item { display: flex; align-items: center; gap: 10px; padding: 7px var(--row-inset); cursor: default; }
 .mole-item + .mole-item { border-top: 0.5px solid var(--stroke); }

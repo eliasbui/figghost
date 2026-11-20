@@ -1,9 +1,9 @@
 import { MusicNote, Pause, Play, SkipBack, SkipForward } from '@phosphor-icons/react';
 import { useEffect, useRef, useState } from 'react';
-import type { PointerEvent as ReactPointerEvent, ReactNode } from 'react';
 import { createRoot } from 'react-dom/client';
+import type { PointerEvent as ReactPointerEvent, ReactNode } from 'react';
 import { cn } from '@/lib/cn';
-import '@/styles/surface.css';
+import '@/styles/panel.css';
 import { send, startWindow, useHost } from '../host';
 import { FIRST_VIEW, clock, isStyle, next, position, seekTo } from './logic';
 import type { State, Style, View } from './logic';

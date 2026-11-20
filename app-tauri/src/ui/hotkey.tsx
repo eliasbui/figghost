@@ -1,9 +1,8 @@
 import { useEffect } from 'react';
 import { isModifierCode, keyLabel, shortcutOf, shortcutOfEvent, shortcutParts } from '@/lib/shortcuts';
-import { cx } from '@/lib/text';
 import { send, showToast, startRecording, stopRecording, tr, useApp } from '@/stores/app';
 import { useT } from '@/stores/hooks';
-import { Keycaps } from './Controls';
+import { Button, Keycaps } from './controls';
 
 /** The field of a shortcut: the keys it holds, or what to do to give it some. A press on it starts capturing. */
 export function HotkeyButton({ target, allowClear, label }: { target: string; allowClear?: boolean; label?: string }) {
@@ -12,14 +11,15 @@ export function HotkeyButton({ target, allowClear, label }: { target: string; al
   const recording = useApp((s) => s.recording?.target === target);
   const spoken = shortcut ? shortcutParts(shortcut).map(keyLabel).join(' ') : t('tiling.none');
   return (
-    <button
-      type="button"
-      className={cx('hotkey gl', recording && 'recording')}
-      aria-label={`${label ?? ''} ${spoken}`.trim()}
-      onClick={() => startRecording(target, !!allowClear)}
-    >
-      {recording ? <span className="hint">{t('rec.press')}</span> : shortcut ? <Keycaps shortcut={shortcut} /> : <span className="none">{t('tiling.none')}</span>}
-    </button>
+    <span className="hotkey" data-recording={recording ? '' : undefined}>
+      <Button
+        variant={recording ? 'primary' : 'secondary'}
+        aria-label={`${label ?? ''} ${spoken}`.trim()}
+        onClick={() => startRecording(target, !!allowClear)}
+      >
+        {recording ? t('rec.press') : shortcut ? <Keycaps shortcut={shortcut} /> : t('tiling.none')}
+      </Button>
+    </span>
   );
 }
 
@@ -52,7 +52,7 @@ export function useRecorder(): void {
       stopRecording();
     };
     const onAway = (e: MouseEvent) => {
-      if (!(e.target instanceof Element) || !e.target.closest('.hotkey.recording')) stopRecording();
+      if (!(e.target instanceof Element) || !e.target.closest('.hotkey[data-recording]')) stopRecording();
     };
     window.addEventListener('keydown', onKey, true);
     window.addEventListener('mousedown', onAway, true);

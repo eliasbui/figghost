@@ -1,0 +1,7 @@
+/* What the app tells Astryx that its theme does not know. The theme's own font comes from Google Fonts, which a page that
+   fetches nothing cannot use (tools/build-embed.mjs refuses an address in a style), so the type is the one of the app. */
+:root {
+  --font-family-body: var(--font);
+  --font-family-heading: var(--font);
+  --font-family-code: var(--mono);
+}

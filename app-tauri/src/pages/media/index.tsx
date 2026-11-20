@@ -1,5 +1,5 @@
-import { ToggleRow } from '@/components/macos/Controls';
-import { Card, SectionTitle } from '@/components/macos/Layout';
+import { Card, SectionTitle } from '@/ui/layout';
+import { ToggleRow } from '@/ui/rows';
 import { useT } from '@/stores/hooks';
 
 /** What plays, on a tab of the notch: the page holds the two switches of the lyrics. */

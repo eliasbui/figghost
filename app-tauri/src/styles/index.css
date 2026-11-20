@@ -1,16 +1,19 @@
-/* Tailwind supplies the theme, a reset and the utilities; the rest is the app's own, in layers so that a utility on an element
-   always beats what the kit says about it. The style sheets of the pages are not in a layer and so come after all of it. */
-@layer theme, base, components, utilities;
+/* Astryx supplies the components and the theme, Tailwind the layout utilities. The order of the layers is the one Astryx
+   documents, so that a utility on an element beats what a component says about it, and what the app adds (the window, the
+   shell) comes after both. The style sheets of the pages are not in a layer and so come after all of it. */
+@layer reset, theme, base, astryx-base, astryx-theme, components, utilities;
 @import "tailwindcss/theme.css" layer(theme);
 @import "tailwindcss/preflight.css" layer(base);
+@import "@astryxdesign/core/reset.css";
+@import "@astryxdesign/core/astryx.css";
+@import "@astryxdesign/theme-neutral/theme.css";
 @import "tailwindcss/utilities.css" layer(utilities);
-/* The old pages use `block` for a row whose control takes a line of its own, not for `display: block`. */
-@source not inline("block");
 
 @import "./fonts.css";
 @import "./tokens.css";
+@import "./theme.css";
+@import "./astryx.css";
 @import "./base.css";
-@import "./glass.css";
 @import "./shell.css";
-@import "./kit.css";
-@import "./legacy.css";
+@import "./ui.css";
+@import "./pages.css";

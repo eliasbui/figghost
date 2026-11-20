@@ -1,6 +1,6 @@
 import { lazy, Suspense, useLayoutEffect, useRef } from 'react';
 import type { ComponentType, LazyExoticComponent } from 'react';
-import { PageHero } from '@/components/macos/Page';
+import { PageHero } from '@/ui/page';
 import { hasOwnTop, pageLoader } from '@/pages/registry';
 import { useApp } from '@/stores/app';
 import { useT } from '@/stores/hooks';

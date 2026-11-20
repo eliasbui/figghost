@@ -1,5 +1,6 @@
-import { Button, Select, ToggleRow } from '@/components/macos/Controls';
-import { Card, InfoRow, Pill, Row, SectionTitle } from '@/components/macos/Layout';
+import { Button, Select } from '@/ui/controls';
+import { Card, Pill, Row, SectionTitle } from '@/ui/layout';
+import { ToggleRow } from '@/ui/rows';
 import { cx } from '@/lib/text';
 import { change, patch, send } from '@/stores/app';
 import { useSection, useT } from '@/stores/hooks';
@@ -132,7 +133,7 @@ export default function Calendar() {
 
       <SectionTitle>{t('cal.sec.note')}</SectionTitle>
       <Card>
-        <InfoRow title={t('cal.note.title')} desc={t('cal.note.body')} />
+        <Row title={t('cal.note.title')} desc={t('cal.note.body')} />
       </Card>
     </>
   );

@@ -1,6 +1,7 @@
 import { useEffect, useRef, useState } from 'react';
-import { SelectRow, ToggleRow, ActionIcon } from '@/components/macos/Controls';
-import { Card, Row, SectionTitle } from '@/components/macos/Layout';
+import { ActionIcon } from '@/ui/controls';
+import { Block, Card, Row, SectionTitle } from '@/ui/layout';
+import { SelectRow, ToggleRow } from '@/ui/rows';
 import { change } from '@/stores/app';
 import { useSection, useT } from '@/stores/hooks';
 import { useChipEditor } from './ChipEditor';
@@ -10,6 +11,7 @@ import { Phone } from './Phone';
 import { linkName, size, speed } from './helpers';
 import type { NetworkState } from './types';
 import './network.css';
+import { Field } from '@/ui/field';
 
 const DNS_CHOICES = ['cloudflare', 'quad9', 'adguard', 'google', 'nextdns', 'custom'];
 const CAPS = [0, 500, 1000, 2000, 5000, 10000, 20000, 50000];
@@ -24,9 +26,9 @@ function DnsField({ path, value, label, hint }: { path: string; value: string; l
   }, [value]);
   return (
     <Row title={label}>
-      <input
+      <Field
         type="text"
-        className="text-field network-dns-input"
+        className="network-dns-input"
         placeholder={hint}
         aria-label={label}
         spellCheck={false}
@@ -84,14 +86,14 @@ export default function Network() {
     <>
       <Card>
         <Row title={t('network.open')} desc={t('network.open.desc')} when={on}>
-          <ActionIcon name="network_canvas_open" icon="open" variant="prominent" label={t('network.open')} />
+          <ActionIcon name="network_canvas_open" icon="open" variant="primary" label={t('network.open')} />
         </Row>
       </Card>
 
       <SectionTitle>{t('sec.network.summary')}</SectionTitle>
       <Card>
         <Row title={<div className="network-total">{`${t('network.total')}: ${speed(n.total_down)} / ${speed(n.total_up)}`}</div>} when={on} />
-        <div className="row block network-table-row">
+        <Block className="network-table-row">
           <div className="network-table" role="table">
             {apps.length ? (
               <>
@@ -116,7 +118,7 @@ export default function Network() {
               <div className="row-desc network-empty">{t('network.apps.none')}</div>
             )}
           </div>
-        </div>
+        </Block>
       </Card>
 
       <SectionTitle>{t('sec.network.metered')}</SectionTitle>
@@ -166,7 +168,7 @@ export default function Network() {
         {n.dns === 'custom' ? <DnsField path="network.dns_custom" value={n.dns_custom} label={t('network.dns.custom.url')} hint={t('network.dns.custom.hint')} /> : null}
         <Row title={t('network.dns.install')} desc={t('network.dns.warn')}>
           <div className="network-allow">
-            <ActionIcon name="network_dns_install" icon="download" variant="prominent" label={t('network.dns.install')} disabled={dnsBlocked} />
+            <ActionIcon name="network_dns_install" icon="download" variant="primary" label={t('network.dns.install')} disabled={dnsBlocked} />
             <ActionIcon name="network_dns_settings" icon="open" label={t('network.dns.settings')} />
           </div>
         </Row>
@@ -178,14 +180,14 @@ export default function Network() {
         <Row title={t('network.anomaly.ignore.title')} desc={t('network.anomaly.ignore.desc')} when={on && n.anomaly}>
           {ignore.controls}
         </Row>
-        <div className="row block">{ignore.chips}</div>
+        <Block>{ignore.chips}</Block>
       </Card>
 
       <SectionTitle info={t('network.links.desc')}>{t('sec.network.links')}</SectionTitle>
       <Card>
-        <div className="row block">
+        <Block>
           <Links network={n} />
-        </div>
+        </Block>
       </Card>
 
       <SectionTitle>{t('sec.network.history')}</SectionTitle>
@@ -227,9 +229,9 @@ export default function Network() {
 
       <SectionTitle info={`${t('network.tether.desc')} ${t('network.tether.apps')} ${t('network.tether.iphone')}`}>{t('sec.network.tether')}</SectionTitle>
       <Card>
-        <div className="row block">
+        <Block>
           <Phone network={n} />
-        </div>
+        </Block>
       </Card>
     </>
   );

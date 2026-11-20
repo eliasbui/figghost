@@ -1,6 +1,6 @@
 import { useEffect, useState } from 'react';
-import { createRoot } from 'react-dom/client';
 import '@/styles/surface.css';
+import { mount } from '../mount';
 import { appIcon, send, startWindow, useHost } from '../host';
 import { say } from '../text';
 import type { Words } from '../text';
@@ -65,7 +65,7 @@ function Row({ item, lang }: { item: Permission; lang: string }) {
           {t('settings')}
         </Btn>
       ) : (
-        <Btn size="sm" variant="prominent" onClick={() => send({ t: 'request', id: item.id })}>
+        <Btn size="sm" variant="primary" onClick={() => send({ t: 'request', id: item.id })}>
           {t('grant')}
         </Btn>
       )}
@@ -118,7 +118,7 @@ function Permissions() {
         </span>
         <span className="flex gap-2">
           <Btn onClick={() => send({ t: 'refresh' })}>{t('recheck')}</Btn>
-          <Btn variant="prominent" onClick={() => send({ t: 'close' })}>
+          <Btn variant="primary" onClick={() => send({ t: 'close' })}>
             {t('done')}
           </Btn>
         </span>
@@ -128,4 +128,4 @@ function Permissions() {
 }
 
 startWindow();
-createRoot(document.getElementById('root')!).render(<Permissions />);
+mount(<Permissions />);

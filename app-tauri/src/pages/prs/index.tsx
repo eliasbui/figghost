@@ -1,5 +1,6 @@
-import { ActionIcon, SelectRow, Switch, ToggleRow } from '@/components/macos/Controls';
-import { Card, Row, SectionTitle } from '@/components/macos/Layout';
+import { ActionIcon, Switch } from '@/ui/controls';
+import { Card, Row, SectionTitle } from '@/ui/layout';
+import { SelectRow, ToggleRow } from '@/ui/rows';
 import { useSection, useT } from '@/stores/hooks';
 import './prs.css';
 

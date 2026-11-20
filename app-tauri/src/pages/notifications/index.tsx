@@ -1,7 +1,8 @@
-import { SegRow, SelectRow, ToggleRow, ActionIcon } from '@/components/macos/Controls';
-import { Card, InfoRow, Row, SectionTitle } from '@/components/macos/Layout';
+import { PermissionRow } from '@/ui/common';
+import { ActionIcon } from '@/ui/controls';
+import { Card, Row, SectionTitle } from '@/ui/layout';
+import { SegRow, SelectRow, ToggleRow } from '@/ui/rows';
 import { useSection, useT } from '@/stores/hooks';
-import { PermissionRow } from '@/components/macos/Common';
 
 interface NotificationsState {
   enabled: boolean;
@@ -43,7 +44,7 @@ export default function Notifications() {
 
       <SectionTitle>{t('sec.notifications.privacy')}</SectionTitle>
       <Card>
-        <InfoRow title={t('notifications.privacy.title')} desc={t('notifications.privacy.desc')} />
+        <Row title={t('notifications.privacy.title')} desc={t('notifications.privacy.desc')} />
       </Card>
     </>
   );

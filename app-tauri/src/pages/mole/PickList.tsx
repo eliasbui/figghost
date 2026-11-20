@@ -1,14 +1,15 @@
 import { useEffect, useState } from 'react';
 import type { ReactNode } from 'react';
-import { Button, IconButton } from '@/components/macos/Controls';
-import { confirmDialog } from '@/components/macos/Dialogs';
-import { Card, Row, SectionTitle } from '@/components/macos/Layout';
+import { Button, IconButton } from '@/ui/controls';
+import { confirmDialog } from '@/ui/dialogs';
+import { Card, Row, SectionTitle } from '@/ui/layout';
 import { cx } from '@/lib/text';
 import { send } from '@/stores/app';
 import { useT } from '@/stores/hooks';
 import { size, sum, tilde } from './format';
 import type { Item } from './types';
 import { setChosen, useMoleUi } from './ui';
+import { Field } from '@/ui/field';
 
 const act = (name: string) => send({ t: 'action', name });
 
@@ -110,9 +111,9 @@ export function PickList({ kind, items, home, busy, detail, lead, open, head, fi
             <span className="mole-count">{count}</span>
           </label>
           {filter ? (
-            <input
+            <Field
               type="search"
-              className="text-field mole-search"
+              className="mole-search"
               placeholder={t('mole.search')}
               aria-label={t('mole.search')}
               spellCheck={false}
@@ -137,7 +138,7 @@ export function PickList({ kind, items, home, busy, detail, lead, open, head, fi
             </Button>
           ))}
           {removeButton}
-          <IconButton size="sm" variant="glass" icon="refresh" label={t('mole.refresh')} disabled={isBusy(key)} onClick={() => act(`mole_scan:${key}`)} />
+          <IconButton size="sm" variant="secondary" icon="refresh" label={t('mole.refresh')} disabled={isBusy(key)} onClick={() => act(`mole_scan:${key}`)} />
         </div>
         <div className="mole-list" data-kind={kind}>
           {!items ? (

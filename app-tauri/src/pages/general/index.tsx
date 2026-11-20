@@ -1,7 +1,9 @@
 import { Fragment } from 'react';
-import { Button, IconButton, Segmented, SegRow, Switch, SwitchButton, ToggleRow } from '@/components/macos/Controls';
-import { Card, Pill, Row, SectionTitle } from '@/components/macos/Layout';
-import { AppHead, PageIcon } from '@/components/macos/Page';
+import { ListItem } from '@astryxdesign/core/List';
+import { Button, IconButton, Segmented, Switch, SwitchButton } from '@/ui/controls';
+import { Card, Pill, Row, SectionTitle } from '@/ui/layout';
+import { AppHead, PageIcon } from '@/ui/page';
+import { SegRow, ToggleRow } from '@/ui/rows';
 import { resolveLang } from '@/i18n';
 import { masterPath, NAV, TAB_PAGES } from '@/pages/meta';
 import { change, openPage, send, useApp } from '@/stores/app';
@@ -13,26 +15,12 @@ function FeatureLine({ id }: { id: string }) {
   const master = useApp((s) => masterPath(id, s.state));
   const name = t(`nav.${id}`);
   return (
-    <div
-      className="row feat-row"
-      data-page={id}
-      onClick={(e) => {
-        if (!(e.target as Element).closest('button')) openPage(id);
-      }}
-    >
-      <div className="row-lead">
-        <PageIcon id={id} />
-      </div>
-      <div className="row-text">
-        <button type="button" className="feat-name" onClick={() => openPage(id)}>
-          {name}
-        </button>
-      </div>
-      <div className="row-control">
-        {master ? <Switch path={master} label={name} /> : null}
-        <span className="chev" aria-hidden="true" />
-      </div>
-    </div>
+    <ListItem
+      label={name}
+      startContent={<PageIcon id={id} />}
+      endContent={master ? <Switch path={master} label={name} /> : undefined}
+      onClick={() => openPage(id)}
+    />
   );
 }
 
@@ -74,7 +62,7 @@ export default function General() {
         {/* Checking for a new version shows its progress where it lives, on About. */}
         <IconButton
           icon="refresh"
-          variant="glass"
+          variant="secondary"
           label={t('about.update.check')}
           onClick={() => {
             send({ t: 'action', name: 'check_updates' });
@@ -87,10 +75,10 @@ export default function General() {
       <Card>
         <Row title={t('access.title')} desc={t('access.desc')}>
           <Pill good={env.accessibility}>{t(env.accessibility ? 'access.granted' : 'access.missing')}</Pill>
-          <IconButton icon="open" variant="glass" label={t('access.open')} onClick={() => send({ t: 'action', name: 'open_accessibility' })} />
+          <IconButton icon="open" variant="secondary" label={t('access.open')} onClick={() => send({ t: 'action', name: 'open_accessibility' })} />
         </Row>
         <Row title={t('perm.all_title')} desc={t('perm.all_desc')}>
-          <IconButton icon="checkmark.shield" variant="glass" label={t('perm.all_btn')} onClick={() => send({ t: 'action', name: 'check_permissions' })} />
+          <IconButton icon="checkmark.shield" variant="secondary" label={t('perm.all_btn')} onClick={() => send({ t: 'action', name: 'check_permissions' })} />
         </Row>
       </Card>
 
@@ -98,7 +86,7 @@ export default function General() {
       <Card>
         <Row title={t('login.title')} desc={t('login.desc')} below={needsApproval ? t('login.approval') : unavailable ? t('login.unavailable') : null} when={!unavailable}>
           {needsApproval ? (
-            <IconButton icon="open" variant="glass" label={t('login.open')} onClick={() => send({ t: 'action', name: 'open_login_settings' })} />
+            <IconButton icon="open" variant="secondary" label={t('login.open')} onClick={() => send({ t: 'action', name: 'open_login_settings' })} />
           ) : null}
           <SwitchButton
             checked={loginOn}
@@ -130,7 +118,7 @@ export default function General() {
         </Row>
         {resolveLang(language) !== env.language ? (
           <Row title={t('lang.restart')}>
-            <Button variant="prominent" icon="refresh" onClick={() => send({ t: 'action', name: 'restart' })}>
+            <Button variant="primary" icon="refresh" onClick={() => send({ t: 'action', name: 'restart' })}>
               {t('lang.restart.btn')}
             </Button>
           </Row>
@@ -143,7 +131,7 @@ export default function General() {
       <SectionTitle>{t('sec.data')}</SectionTitle>
       <Card>
         <Row title={t('data.title')} desc={t('data.desc')}>
-          <IconButton icon="folder" variant="glass" label={t('data.open')} onClick={() => send({ t: 'action', name: 'open_config' })} />
+          <IconButton icon="folder" variant="secondary" label={t('data.open')} onClick={() => send({ t: 'action', name: 'open_config' })} />
         </Row>
       </Card>
     </>

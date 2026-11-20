@@ -1,10 +1,10 @@
 import { lazy, Suspense, useEffect, useState } from 'react';
-import { MotionConfig } from 'motion/react';
-import { createBridge, hosted } from '@/bridge';
-import { ConfirmHost, Toast } from '@/components/macos/Dialogs';
-import { useRecorder } from '@/components/macos/Hotkey';
+import { Theme } from '@astryxdesign/core/theme';
+import { neutralTheme } from '@astryxdesign/theme-neutral/built';
+import { createBridge } from '@/bridge';
+import { ConfirmHost, Toast } from '@/ui/dialogs';
+import { useRecorder } from '@/ui/hotkey';
 import { startHostDrag } from '@/lib/drag';
-import { startSheen } from '@/lib/sheen';
 import { canvasLoader } from '@/pages/canvases';
 import { connect, useApp } from '@/stores/app';
 import { PageHost } from './PageHost';
@@ -46,52 +46,25 @@ function useMedia(query: string): boolean {
   return on;
 }
 
-/** The facts about the display and the window that the style sheet follows: the classes of the root element. The app says
- *  what the system is set to; the browser says it too, and either is enough. */
+/** The facts about the window that the style sheet follows: whether the system asks for less motion (the app says what the system
+ *  is set to; the browser says it too, and either is enough), the language of the page, and the menu of the browser. */
 function useDisplayClasses(): void {
   const env = useApp((s) => s.state.env);
   const lang = useApp((s) => s.lang);
-  const transparency = useMedia('(prefers-reduced-transparency: reduce)');
   const motion = useMedia('(prefers-reduced-motion: reduce)');
-  const contrast = useMedia('(prefers-contrast: more)');
   useEffect(() => {
-    const list = document.documentElement.classList;
-    const reduceTransparency = !!env.reduce_transparency || transparency;
-    list.toggle('reduce-transparency', reduceTransparency);
-    list.toggle('reduce-motion', !!env.reduce_motion || motion);
-    list.toggle('increase-contrast', !!env.increase_contrast || contrast);
-    // The Tauri window says it has glass in the state; the AppKit window has it where it takes the handler named glass.
-    const glass = !!env.glass || !!window.webkit?.messageHandlers?.glass;
-    list.toggle('glass', glass && !reduceTransparency);
-  }, [env, transparency, motion, contrast]);
-  useEffect(() => {
-    startSheen();
-    // In a browser, outside the app, a wallpaper stands in for the desktop, and ?theme=dark|light picks a theme.
-    const list = document.documentElement.classList;
-    if (!hosted()) list.add('preview');
-    const theme = new URLSearchParams(window.location.search).get('theme');
-    if (theme === 'dark' || theme === 'light') list.add(theme);
-  }, []);
+    document.documentElement.classList.toggle('reduce-motion', !!env.reduce_motion || motion);
+  }, [env, motion]);
   useEffect(() => {
     document.documentElement.lang = lang;
   }, [lang]);
   useEffect(() => {
-    // In a window that is not in front, the selection turns grey, as in any Mac sidebar.
-    const list = document.documentElement.classList;
-    const away = () => list.add('inactive');
-    const back = () => list.remove('inactive');
     // This is an app, not a web page: no browser menu, except where the person may want to copy text.
     const menu = (e: MouseEvent) => {
       if (!(e.target instanceof Element) || !e.target.closest('.code')) e.preventDefault();
     };
-    window.addEventListener('blur', away);
-    window.addEventListener('focus', back);
     document.addEventListener('contextmenu', menu);
-    return () => {
-      window.removeEventListener('blur', away);
-      window.removeEventListener('focus', back);
-      document.removeEventListener('contextmenu', menu);
-    };
+    return () => document.removeEventListener('contextmenu', menu);
   }, []);
 }
 
@@ -105,6 +78,10 @@ const CANVAS = (() => {
   return { Page: load ? lazy(load) : null };
 })();
 
+/** The theme of Astryx follows the system; `?theme=dark|light` pins it, for looking at a page in a browser. */
+const PINNED = new URLSearchParams(window.location.search).get('theme');
+const MODE = PINNED === 'dark' || PINNED === 'light' ? PINNED : 'system';
+
 export default function App() {
   useBridge();
   useEffect(() => (window.fig ? startHostDrag(window.fig) : undefined), []);
@@ -116,29 +93,28 @@ export default function App() {
   if (CANVAS) {
     const { Page } = CANVAS;
     return (
-      <MotionConfig reducedMotion="user">
+      <Theme theme={neutralTheme} mode={MODE}>
         {Page ? (
           <Suspense fallback={null}>
             <Page />
           </Suspense>
         ) : null}
         <Toast />
-      </MotionConfig>
+      </Theme>
     );
   }
   return (
-    <MotionConfig reducedMotion="user">
+    <Theme theme={neutralTheme} mode={MODE}>
       <div id="app">
         <div className="dragzone" data-tauri-drag-region="" />
         <Sidebar />
         <main id="main">
           <PageHost />
-          <div className="scroll-edge" aria-hidden="true" />
           <Toolbar />
         </main>
       </div>
       <Toast />
       <ConfirmHost />
-    </MotionConfig>
+    </Theme>
   );
 }

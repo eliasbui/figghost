@@ -1,6 +1,7 @@
-import { AddAppButton, AppList, RuleRow } from '@/components/macos/Apps';
-import { Segmented, Select, SliderRow, Switch, ToggleRow } from '@/components/macos/Controls';
-import { Card, Row, SectionTitle } from '@/components/macos/Layout';
+import { AddAppButton, AppList, RuleRow } from '@/ui/apps';
+import { Segmented, Select, Switch } from '@/ui/controls';
+import { Card, Row, SectionTitle } from '@/ui/layout';
+import { SliderRow, ToggleRow } from '@/ui/rows';
 import { change, useApp } from '@/stores/app';
 import { useSetting, useT } from '@/stores/hooks';
 import { ScrollPad } from './ScrollPad';

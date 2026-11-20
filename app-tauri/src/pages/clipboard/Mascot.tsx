@@ -1,5 +1,6 @@
-import { Button, Segmented, SegRow, ToggleRow } from '@/components/macos/Controls';
-import { Card, InfoRow, Row, SectionTitle } from '@/components/macos/Layout';
+import { Button, Segmented } from '@/ui/controls';
+import { Card, Row, SectionTitle } from '@/ui/layout';
+import { SegRow, ToggleRow } from '@/ui/rows';
 import { change, send } from '@/stores/app';
 import { useSection, useT } from '@/stores/hooks';
 import './mascot.css';
@@ -36,7 +37,7 @@ export function MascotCards() {
         <Row title={t('mascot.aim.title')} block>
           <div className="row-desc">{t(mascot.accessibility ? 'mascot.aim.on' : 'mascot.aim.off')}</div>
         </Row>
-        <InfoRow title={t('mascot.finder.title')} desc={t('mascot.finder.desc')} />
+        <Row title={t('mascot.finder.title')} desc={t('mascot.finder.desc')} />
       </Card>
     </>
   );

@@ -1,5 +1,6 @@
-import { SelectRow, SliderRow, ToggleRow, ActionIcon } from '@/components/macos/Controls';
-import { Card, Row, SectionTitle } from '@/components/macos/Layout';
+import { ActionIcon } from '@/ui/controls';
+import { Card, Row, SectionTitle } from '@/ui/layout';
+import { SelectRow, SliderRow, ToggleRow } from '@/ui/rows';
 import { cx } from '@/lib/text';
 import { change } from '@/stores/app';
 import { useSection, useT } from '@/stores/hooks';

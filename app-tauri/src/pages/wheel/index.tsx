@@ -1,6 +1,6 @@
 import { Fragment, useEffect, useState } from 'react';
-import { Button, Keycaps, Segmented, SwitchButton } from '@/components/macos/Controls';
-import { Card, Row, SectionTitle } from '@/components/macos/Layout';
+import { Button, Keycaps, Segmented, SwitchButton } from '@/ui/controls';
+import { Card, Row, SectionTitle } from '@/ui/layout';
 import { isModifierCode, keyName } from '@/lib/shortcuts';
 import { cx } from '@/lib/text';
 import { change, send, showToast } from '@/stores/app';
@@ -187,7 +187,7 @@ function WheelCard({ wheel, state }: { wheel: WheelName; state: WheelState }) {
     change(`wheel.${wheel}.key`, key);
   };
   return (
-    <section className="card">
+    <Card>
       <Row title={t(`wheel.${wheel}.title`)} desc={t(`wheel.${wheel}.desc`)}>
         <SwitchButton
           checked={!!w.enabled}
@@ -211,7 +211,7 @@ function WheelCard({ wheel, state }: { wheel: WheelName; state: WheelState }) {
       </Row>
       <Row title={t('wheel.slots.title')} desc={t('wheel.slots.desc')} block when={w.enabled} />
       <Slots wheel={wheel} hidden={w.hidden} on={w.enabled} />
-    </section>
+    </Card>
   );
 }
 

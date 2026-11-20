@@ -1,5 +1,5 @@
-import { ToggleRow } from '@/components/macos/Controls';
-import { Card, SectionTitle } from '@/components/macos/Layout';
+import { Card, SectionTitle } from '@/ui/layout';
+import { ToggleRow } from '@/ui/rows';
 import { useSetting, useT } from '@/stores/hooks';
 
 /** Displays: a tab of the notch with the brightness and contrast of the external displays, the colour profile of every

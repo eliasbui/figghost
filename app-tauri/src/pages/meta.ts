@@ -37,7 +37,7 @@ export function secOf(id: string): string {
   return group ? group.sec : TAB_PAGES.includes(id) ? 'tabs' : 'overview';
 }
 
-/** The picture of each page: its name in components/macos/Icon.tsx (`pg.<page>`), all of one set and none used twice. */
+/** The picture of each page: its name in ui/Icon.tsx (`pg.<page>`), all of one set and none used twice. */
 export const PAGE_SYMBOLS: Record<string, string> = {
   about: 'pg.about',
   agents: 'pg.agents',

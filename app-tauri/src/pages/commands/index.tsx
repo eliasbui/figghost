@@ -1,9 +1,10 @@
 import { useEffect, useRef, useState } from 'react';
-import { Button, IconButton } from '@/components/macos/Controls';
-import { Card, Row, SectionTitle } from '@/components/macos/Layout';
+import { Button, IconButton } from '@/ui/controls';
+import { Block, Card, Row, SectionTitle } from '@/ui/layout';
 import { send } from '@/stores/app';
 import { useSection, useT } from '@/stores/hooks';
 import './commands.css';
+import { Field } from '@/ui/field';
 
 interface Item {
   name: string;
@@ -48,13 +49,13 @@ export default function Commands() {
     <>
       <SectionTitle info={t('commands.items.desc')}>{t('sec.commands.items')}</SectionTitle>
       <Card>
-        <div className="row block">
+        <Block>
           <div className="commands-list">
             {draft.map((item, k) => (
               <div className="commands-item" key={k}>
-                <input
+                <Field
                   type="text"
-                  className="text-field commands-name"
+                  className="commands-name"
                   placeholder={t('commands.name')}
                   aria-label={t('commands.name')}
                   maxLength={40}
@@ -66,9 +67,9 @@ export default function Commands() {
                     save(draft);
                   }}
                 />
-                <input
+                <Field
                   type="text"
-                  className="text-field commands-line"
+                  className="commands-line"
                   placeholder={t('commands.line')}
                   aria-label={t('commands.line')}
                   maxLength={500}
@@ -96,9 +97,9 @@ export default function Commands() {
           <div className="row-desc commands-note" role="status" style={{ display: bad ? '' : 'none' }}>
             {bad ? t('commands.bad') : ''}
           </div>
-        </div>
+        </Block>
         <Row title={t('commands.add')} when={on}>
-          <IconButton icon="plus" variant="glass" label={t('commands.add')} disabled={!on || draft.length >= commands.max} onClick={() => draft.length < commands.max && setDraft([...draft, { name: '', command: '' }])} />
+          <IconButton icon="plus" variant="secondary" label={t('commands.add')} disabled={!on || draft.length >= commands.max} onClick={() => draft.length < commands.max && setDraft([...draft, { name: '', command: '' }])} />
         </Row>
       </Card>
     </>

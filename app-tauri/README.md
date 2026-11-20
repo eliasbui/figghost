@@ -1,7 +1,7 @@
 # Figghost on Tauri
 
-The pages of Figghost, written once as React 19 and TypeScript, with Tailwind 4 for the theme, react-aria-components for the
-behaviour of the controls and Motion for the few things that move. They come in two forms:
+The pages of Figghost, written once as React 19 and TypeScript, drawn with [Astryx](https://github.com/meta/astryx) (its
+components and its neutral theme) and Tailwind 4 for layout. They come in two forms:
 
 - A Tauri 2 app of its own, a second program beside the AppKit one: the settings window with a Rust backend that holds the
   state and carries out the changes.
@@ -24,13 +24,13 @@ Nothing in this repository is hand-written HTML, JavaScript or CSS outside this 
 browser extension (`crates/app-ui/assets/browser-extension/background.js`), which a browser only takes as a script.
 
 Status: it builds, type-checks, passes its tests, and every surface has been drawn headless in WebKit, the engine of the
-AppKit app, in both themes and both languages. The settings window has also been run in the AppKit app. How the glass looks on
-a colourful wallpaper, the other surfaces in their real windows, and the beta on Windows and Linux, have not been looked at
-(`ASSUMPTIONS.md` has the list). The design is in `DESIGN.md`.
+AppKit app, in both themes and both languages. The settings window has also been run in the AppKit app before the move to
+Astryx; after it, the surfaces have been drawn headless only. The other surfaces in their real windows, and the beta on Windows
+and Linux, have not been looked at (`ASSUMPTIONS.md` has the list). The design is in `DESIGN.md`.
 
-The settings window needs a WebKit that draws what Tailwind 4 writes: Safari 16.4, which is macOS 13.3. The product says
-macOS 13; on 13.0 to 13.2 the pages have not been tried and may not look right. `light-dark()` is lowered by the build, so
-the macOS 14.5 that it once seemed to need is not needed.
+Astryx needs the Popover API (Safari 17), `light-dark()` (17.5, which the build lowers in the style sheet) and CSS anchor
+positioning (Safari 26) for menus, pop-ups and tooltips. The product says macOS 13; on a WebKit older than 26 an overlay opens
+but may not sit beside what opened it, and no old WebKit has been tried. `DESIGN.md` says how this can be mended.
 
 ## What is in it
 
@@ -41,9 +41,8 @@ the macOS 14.5 that it once seemed to need is not needed.
 - A backend that keeps the settings in a file, checks every change against the rules of the current app (ranges, words,
   shortcuts and their conflicts, snippets, the wires of Network), and, while a window is open, looks at the state every two
   seconds and tells the page when it has changed.
-- A new look, written for macOS 26 (`DESIGN.md`): Liquid Glass under the window (`window-vibrancy` 0.8) with the page laying a
-  veil of its own colour over it; a floating glass sidebar and toolbar; one accent colour; buttons in eight kinds and four
-  sizes; Phosphor icons; and as little text as can be, with what a row would say kept behind an "i".
+- The look of Astryx's neutral theme (`DESIGN.md`): a sidebar, a toolbar and cards of rows, Phosphor icons, and as little text
+  as can be, with what a row would say kept behind an "i".
 
 ## What is not in it
 
@@ -70,13 +69,14 @@ src/
     fixture.ts            a stand-in in a plain browser, with the sample state
     messages.ts           the messages, typed
   stores/                 the zustand store of the state pushed by the backend, and its hooks
-  components/macos/       the kit: Button, Controls (a barrel), Switch, Segmented, Select, Slider, Overlay (tips and menus),
-                          Layout, Page, Common, Hotkey, Apps, Dialogs, Icon, Keys
+  ui/                     what joins Astryx to the state of the app: rows, buttons and controls in the words the pages use,
+                          dialogs, the shortcut field, the lists of apps, Icon (see DESIGN.md)
   pages/<id>/             one folder per page; Canvas.tsx beside index.tsx for a window of its own
   i18n/                   en.json and vi.json, shell.ts (words this shell adds), plugins.json (which features add a window or
                           a place on another page; not read at run time)
   data/state.sample.json  the sample state; crates/app-ui checks it against the real state
-  styles/                 tokens, base, glass, shell, kit, legacy (see DESIGN.md); surface.css for the small surfaces
+  styles/                 index (the layers, Astryx), tokens, base, shell, ui, pages (see DESIGN.md); surface.css and panel.css
+                          for the small surfaces
   lib/                    small helpers
 src-tauri/
   Cargo.toml              its own workspace; depends on core-window by path
@@ -94,9 +94,8 @@ tests/                    node:test files for the logic of the surfaces
 ```
 
 The rules of the architecture it follows: `invoke` appears in one file; native code appears in two files of the backend; at
-run time only the store and the shell use the bridge (a page imports its types, and the kit and the store); the levels of
-glass are the window (system glass and the veil), the navigation (sidebar and toolbar capsules, menus and tips) and the
-controls, and content is never glass.
+run time only the store and the shell use the bridge (a page imports its types, `src/ui` and the store); components are
+Astryx's and are not restyled.
 
 TanStack Query, Router and Virtual, and React Hook Form with Zod are not used: the state is one object pushed by the backend,
 the pages are kept in a trail in memory, and the lists are short. Add them where a page needs them.

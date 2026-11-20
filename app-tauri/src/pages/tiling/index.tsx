@@ -1,5 +1,5 @@
-import { Button, IconButton } from '@/components/macos/Controls';
-import { HotkeyButton } from '@/components/macos/Hotkey';
+import { Button, IconButton } from '@/ui/controls';
+import { HotkeyButton } from '@/ui/hotkey';
 import { cx } from '@/lib/text';
 import { shortcutOf } from '@/lib/shortcuts';
 import { send, useApp } from '@/stores/app';

@@ -1,6 +1,7 @@
-import { Button, Select, ToggleRow } from '@/components/macos/Controls';
-import { Advanced, confirmDialog } from '@/components/macos/Dialogs';
-import { Card, InfoRow, Pill, Row, SectionTitle } from '@/components/macos/Layout';
+import { Button, Select } from '@/ui/controls';
+import { Advanced, confirmDialog } from '@/ui/dialogs';
+import { Card, Pill, Row, SectionTitle } from '@/ui/layout';
+import { ToggleRow } from '@/ui/rows';
 import { compact, cx, usd } from '@/lib/text';
 import { change, send } from '@/stores/app';
 import { useLang, useSection, useT } from '@/stores/hooks';
@@ -210,7 +211,7 @@ function AccountsCard({ accounts }: { accounts: Accounts }) {
   const status = accounts.busy ? t('accounts.asking') : !accounts.keychain ? t('accounts.nokeychain') : accounts.updated ? t('accounts.updated', { when: accounts.updated }) : '';
   return (
     <Card>
-      <InfoRow
+      <Row
         title={t('accounts.intro.title')}
         desc={t('accounts.intro.body')}
         below={
@@ -252,7 +253,7 @@ function SpendRow({ spend }: { spend: Spend }) {
   const line = (key: string, tokens: number, cost: number | null) => t(key, { tokens: compact(tokens, lang) }) + (cost == null ? '' : ` ${DOT} ${usd(cost, lang)}`);
   return (
     <Row title={t(`agents.spend.${spend.agent}`)} below={line('agents.spend.today', spend.today, spend.today_cost)}>
-      <span className="row-title">{line('agents.spend.week', spend.week, spend.week_cost)}</span>
+      <span className="row-value">{line('agents.spend.week', spend.week, spend.week_cost)}</span>
     </Row>
   );
 }
@@ -290,7 +291,7 @@ export default function Agents() {
 
       <SectionTitle>{t('sec.agents.note')}</SectionTitle>
       <Card>
-        <InfoRow title={t('agents.note.title')} desc={t('agents.note.body')} />
+        <Row title={t('agents.note.title')} desc={t('agents.note.body')} />
       </Card>
 
       <Advanced>

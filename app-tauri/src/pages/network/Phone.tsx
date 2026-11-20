@@ -1,6 +1,5 @@
-import { ActionButton, ActionIcon } from '@/components/macos/Controls';
-import { Icon } from '@/components/macos/Icon';
-import { InfoTip } from '@/components/macos/Overlay';
+import { ActionButton, ActionIcon, InfoTip } from '@/ui/controls';
+import { Icon } from '@/ui/Icon';
 import { useT } from '@/stores/hooks';
 import { size, speed } from './helpers';
 import type { NetworkState } from './types';

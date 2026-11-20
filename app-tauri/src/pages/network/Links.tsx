@@ -1,5 +1,6 @@
-import { IconButton, Select } from '@/components/macos/Controls';
-import { InfoTip } from '@/components/macos/Overlay';
+import { HStack } from '@astryxdesign/core/HStack';
+import { IconButton, InfoTip, Select } from '@/ui/controls';
+import { Row } from '@/ui/layout';
 import { send } from '@/stores/app';
 import { useT } from '@/stores/hooks';
 import { mbps } from './helpers';
@@ -28,25 +29,30 @@ function LinkRow({ link: l, network }: { link: Link; network: NetworkState }) {
   const mark = (m.marked ?? []).includes(l.name) ? 'metered' : (m.unmarked ?? []).includes(l.name) ? 'not' : 'auto';
   const running = !!(test && test.state === 'running');
   return (
-    <div className="row">
-      <div className="row-text">
-        <div className="row-title">
-          <span className="row-name">{`${l.label} (${l.name})`}</span>
+    <Row
+      title={
+        <HStack gap={1} align="center">
+          {`${l.label} (${l.name})`}
           {w ? <InfoTip>{`${t(`network.wifi.grade.${w.grade}`)}: ${t('network.wifi.line', { standard: w.standard || '802.11', channel: w.channel, band: w.band, width: w.width, rssi: w.rssi, noise: w.noise, rate: w.rate })}`}</InfoTip> : null}
           {problem ? (
             <InfoTip bad text={t('ui.problem')}>
               {t(`network.web.${problem}`)}
             </InfoTip>
           ) : null}
-        </div>
-        <div className="row-sub">{[l.ip, q].filter(Boolean).join(' - ')}</div>
-        {result && !running ? (
-          <div className="row-sub network-speed-result" data-state={test ? test.state : ''}>
-            {result}
-          </div>
-        ) : null}
-      </div>
-      <div className="row-control network-link-control">
+        </HStack>
+      }
+      below={
+        <>
+          <div>{[l.ip, q].filter(Boolean).join(' - ')}</div>
+          {result && !running ? (
+            <div className="network-speed-result" data-state={test ? test.state : ''}>
+              {result}
+            </div>
+          ) : null}
+        </>
+      }
+    >
+      <div className="network-link-control">
         {m.enabled ? (
           <Select
             small
@@ -57,14 +63,14 @@ function LinkRow({ link: l, network }: { link: Link; network: NetworkState }) {
           />
         ) : null}
         <IconButton
-          variant="glass"
+          variant="secondary"
           icon={test ? 'refresh' : 'play'}
           loading={running}
           label={running ? t('network.speed.running') : test ? t('network.speed.again') : t('network.speed.test')}
           onClick={() => act(`network_speed_test:${l.name}`)}
         />
       </div>
-    </div>
+    </Row>
   );
 }
 

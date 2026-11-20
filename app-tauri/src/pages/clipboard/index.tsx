@@ -1,8 +1,9 @@
-import { Button, CodeBlock, Select, ToggleRow } from '@/components/macos/Controls';
-import { AddAppButton, AppList, IgnoredRow } from '@/components/macos/Apps';
-import { Advanced, confirmDialog } from '@/components/macos/Dialogs';
-import { HotkeyButton } from '@/components/macos/Hotkey';
-import { Card, Row, SectionTitle } from '@/components/macos/Layout';
+import { AddAppButton, AppList, IgnoredRow } from '@/ui/apps';
+import { Button, CodeBlock, Select } from '@/ui/controls';
+import { Advanced, confirmDialog } from '@/ui/dialogs';
+import { HotkeyButton } from '@/ui/hotkey';
+import { Card, Row, SectionTitle } from '@/ui/layout';
+import { ToggleRow } from '@/ui/rows';
 import { keysText } from '@/lib/shortcuts';
 import { cx } from '@/lib/text';
 import { change, send, showToast } from '@/stores/app';
@@ -65,7 +66,7 @@ export default function Clipboard() {
           <Select label={t('limit.title')} value={limit} options={limits.map((v) => ({ value: v, label: v.toLocaleString() }))} onChange={(v) => change('clipboard.history_limit', v)} />
         </Row>
         <Row title={t('count.title')}>
-          <span className="row-title">{count.toLocaleString()}</span>
+          <span className="row-value">{count.toLocaleString()}</span>
         </Row>
         <Row title={t('clear.title')} desc={t('clear.desc')}>
           <Button

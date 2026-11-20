@@ -1,13 +1,14 @@
 import { useEffect, useMemo, useRef, useState } from 'react';
 import type { AppState } from '@/bridge/messages';
-import { Icon } from '@/components/macos/Icon';
-import { PageIcon } from '@/components/macos/Page';
+import { Icon } from '@/ui/Icon';
+import { PageIcon } from '@/ui/page';
 import { folded } from '@/lib/text';
 import { PAGE_ORDER } from '@/pages/meta';
 import { send, useApp } from '@/stores/app';
 import { useT } from '@/stores/hooks';
 import type { TFunction } from '@/stores/hooks';
 import './palette.css';
+import { Field } from '@/ui/field';
 
 interface Command {
   id: string;
@@ -146,7 +147,7 @@ export default function PaletteCanvas() {
       <div className="palette-head" data-tauri-drag-region="deep">
         <label className="palette-field gl">
           <Icon name="search" className="palette-mag" />
-          <input
+          <Field
             ref={input}
             type="text"
             className="palette-input"

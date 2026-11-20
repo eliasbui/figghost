@@ -1,18 +1,22 @@
 /* The style sheet of the small surfaces that the AppKit app opens besides the settings: the menu bar panel, the permissions
-   window, the update and the news, the mail card and the music widget. They sit on the system's own glass, so nothing here
-   paints a background; the tokens, the reset and the materials are the settings window's. */
-@layer theme, base, components, utilities;
+   window, the update and the news, the mail card, the music widget, and the beta for Windows and Linux. The first six sit on the
+   system's own glass, so nothing here paints a background; the colours are the tokens of Astryx, whose theme each surface
+   mounts (see surfaces/mount.tsx). */
+@layer reset, theme, base, astryx-base, astryx-theme, components, utilities;
 @import "tailwindcss/theme.css" layer(theme);
 @import "tailwindcss/preflight.css" layer(base);
-/* Only the surfaces and the kit's recipes are read for the classes they use, not the pages of the settings. */
+@import "@astryxdesign/core/reset.css";
+@import "@astryxdesign/core/astryx.css";
+@import "@astryxdesign/theme-neutral/theme.css";
+/* Only the surfaces are read for the classes they use, not the pages of the settings. */
 @import "tailwindcss/utilities.css" layer(utilities) source(none);
 @source "../surfaces";
-@source "../components/macos/button-style.ts";
 
+@import "./fonts.css";
 @import "./tokens.css";
+@import "./theme.css";
+@import "./astryx.css";
 @import "./base.css";
-@import "./glass.css";
-@import "./kit.css";
 
 @layer base {
   html,

@@ -1,0 +1,75 @@
+/* The few classes the helpers of src/ui and the pages share. */
+@layer components {
+  .glyph {
+    display: inline-flex;
+    flex: none;
+    align-items: center;
+    justify-content: center;
+    width: 1.15em;
+    height: 1.15em;
+  }
+  .glyph > svg {
+    display: block;
+    width: 100%;
+    height: 100%;
+  }
+
+  .app-icon {
+    width: 28px;
+    height: 28px;
+    flex: none;
+    border-radius: 7px;
+    object-fit: contain;
+    background: var(--field);
+  }
+  .app-icon.blank {
+    display: grid;
+    place-items: center;
+    font-size: 18px;
+    color: var(--fg-3);
+  }
+
+  .empty {
+    padding: 18px 16px;
+    text-align: center;
+    color: var(--fg-3);
+    font-size: 12.5px;
+  }
+
+  .code {
+    margin: 0;
+    padding: 12px 14px;
+    overflow: auto;
+    max-height: 220px;
+    border-radius: var(--r-field);
+    background: var(--field);
+    font: 12px / 1.5 var(--mono);
+  }
+
+  /* A line of a card that the page fills itself. */
+  .block-row {
+    list-style: none;
+    padding: 10px var(--row-inset);
+  }
+  .block-row + .block-row,
+  li + .block-row {
+    border-top: 1px solid var(--color-border);
+  }
+
+  /* What a row says in a word beside its control: a count, a folder, the name of what is pinned. */
+  .row-value {
+    min-width: 0;
+    max-width: 320px;
+    overflow: hidden;
+    text-overflow: ellipsis;
+    white-space: nowrap;
+    color: var(--color-text-secondary);
+    font-size: var(--fs-small);
+  }
+
+  /* A field that takes what a line leaves it. */
+  .field-grow {
+    flex: 1 1 auto;
+    min-width: 0;
+  }
+}

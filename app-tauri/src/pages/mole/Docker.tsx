@@ -1,6 +1,6 @@
-import { Button, IconButton } from '@/components/macos/Controls';
-import { confirmDialog } from '@/components/macos/Dialogs';
-import { Card, Row, SectionTitle } from '@/components/macos/Layout';
+import { Button, IconButton } from '@/ui/controls';
+import { confirmDialog } from '@/ui/dialogs';
+import { Card, Row, SectionTitle } from '@/ui/layout';
 import { send } from '@/stores/app';
 import { useT } from '@/stores/hooks';
 import { size } from './format';
@@ -63,7 +63,7 @@ export function DockerCard({ mole }: { mole: MoleState }) {
           <Button small danger icon="trash" hidden={!ok} disabled={working} onClick={() => ask('cache', () => act('mole_docker_prune:cache'))}>
             {t('mole.docker.cache')}
           </Button>
-          <IconButton size="sm" variant="glass" icon="refresh" label={t('mole.refresh')} disabled={busy('docker')} onClick={() => act('mole_scan:docker')} />
+          <IconButton size="sm" variant="secondary" icon="refresh" label={t('mole.refresh')} disabled={busy('docker')} onClick={() => act('mole_scan:docker')} />
         </div>
       </Card>
     </>

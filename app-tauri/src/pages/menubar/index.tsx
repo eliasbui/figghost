@@ -1,5 +1,6 @@
-import { Button, Select, ToggleRow } from '@/components/macos/Controls';
-import { Card, InfoRow, Pill, Row, SectionTitle } from '@/components/macos/Layout';
+import { Button, Select } from '@/ui/controls';
+import { Card, Pill, Row, SectionTitle } from '@/ui/layout';
+import { ToggleRow } from '@/ui/rows';
 import { change, send } from '@/stores/app';
 import { useSection, useT } from '@/stores/hooks';
 
@@ -42,8 +43,8 @@ export default function Menubar() {
         </Row>
       </Card>
       <Card>
-        <InfoRow title={t('menubar.how.title')} desc={t('menubar.how.body')} />
-        <InfoRow title={t('menubar.limits.title')} desc={t('menubar.limits.body')} />
+        <Row title={t('menubar.how.title')} desc={t('menubar.how.body')} />
+        <Row title={t('menubar.limits.title')} desc={t('menubar.limits.body')} />
       </Card>
     </>
   );

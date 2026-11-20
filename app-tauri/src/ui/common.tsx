@@ -1,10 +1,11 @@
 import { useEffect, useRef, useState } from 'react';
+import type { ReactNode } from 'react';
+import { TextInput } from '@astryxdesign/core/TextInput';
 import { change, send } from '@/stores/app';
 import { useT } from '@/stores/hooks';
-import type { ReactNode } from 'react';
-import { ActionButton, ActionIcon, IconButton, Select } from './Controls';
-import { HotkeyButton } from './Hotkey';
-import { Pill, Row } from './Layout';
+import { ActionButton, ActionIcon, IconButton, Select } from './controls';
+import { HotkeyButton } from './hotkey';
+import { Pill, Row } from './layout';
 
 // Rows that most features have, named by the prefix their words share in the dictionary (`smart.access.title`).
 
@@ -20,7 +21,7 @@ export function AccessRow({ ns, granted }: { ns: string; granted: boolean }) {
   return (
     <Row title={t(`${ns}.access.title`)} desc={t(`${ns}.access.desc`)}>
       <AccessPill granted={granted} />
-      <IconButton icon="open" label={t(`${ns}.access.open`)} variant={granted ? 'plain' : 'glass'} onClick={() => send({ t: 'action', name: 'open_accessibility' })} />
+      <IconButton icon="open" label={t(`${ns}.access.open`)} variant={granted ? 'ghost' : 'secondary'} onClick={() => send({ t: 'action', name: 'open_accessibility' })} />
     </Row>
   );
 }
@@ -87,23 +88,19 @@ export function ListField({ values, onCommit, label, placeholder }: { values: st
     else setText(shown);
   };
   return (
-    <input
-      type="text"
-      className="text-field"
-      aria-label={label}
+    <TextInput
+      label={label}
+      isLabelHidden
+      size="sm"
+      width={260}
       placeholder={placeholder}
-      spellCheck={false}
-      autoComplete="off"
-      autoCapitalize="off"
       value={text}
       onFocus={() => {
         editing.current = true;
       }}
-      onChange={(e) => setText(e.target.value)}
+      onChange={setText}
       onBlur={commit}
-      onKeyDown={(e) => {
-        if (e.key === 'Enter') e.currentTarget.blur();
-      }}
+      onEnter={commit}
     />
   );
 }

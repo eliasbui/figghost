@@ -1,7 +1,7 @@
 import { useEffect } from 'react';
 import type { CSSProperties, ReactNode } from 'react';
-import { Button } from '@/components/macos/Controls';
-import { Card, SectionTitle } from '@/components/macos/Layout';
+import { Button } from '@/ui/controls';
+import { Card, SectionTitle } from '@/ui/layout';
 import { clamp, cx } from '@/lib/text';
 import { send, useApp } from '@/stores/app';
 import { useT } from '@/stores/hooks';

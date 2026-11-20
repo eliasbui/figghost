@@ -1,9 +1,10 @@
 import { useState } from 'react';
-import { Button, IconButton, Segmented, SegRow, SelectRow, SliderRow, SwitchButton, ToggleRow } from '@/components/macos/Controls';
-import { Advanced } from '@/components/macos/Dialogs';
-import { HotkeyButton } from '@/components/macos/Hotkey';
-import { Card, Row, SectionTitle } from '@/components/macos/Layout';
-import { PageIcon } from '@/components/macos/Page';
+import { Button, IconButton, Segmented, SwitchButton } from '@/ui/controls';
+import { Advanced } from '@/ui/dialogs';
+import { HotkeyButton } from '@/ui/hotkey';
+import { Card, Row, SectionTitle } from '@/ui/layout';
+import { PageIcon } from '@/ui/page';
+import { SegRow, SelectRow, SliderRow, ToggleRow } from '@/ui/rows';
 import { hasKey } from '@/i18n';
 import { isPage, PAGE_SYMBOLS } from '@/pages/meta';
 import { change, openPage, patch, send } from '@/stores/app';

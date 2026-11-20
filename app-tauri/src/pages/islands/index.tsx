@@ -1,5 +1,6 @@
-import { ActionIcon, SliderRow, Switch } from '@/components/macos/Controls';
-import { Card, Row, SectionTitle } from '@/components/macos/Layout';
+import { ActionIcon, Switch } from '@/ui/controls';
+import { Card, Row, SectionTitle } from '@/ui/layout';
+import { SliderRow } from '@/ui/rows';
 import { useSection, useT } from '@/stores/hooks';
 import './islands.css';
 

@@ -1,6 +1,6 @@
-import { IconButton, Segmented, ActionIcon } from '@/components/macos/Controls';
-import { HotkeyButton } from '@/components/macos/Hotkey';
-import { Card, Pill, Row, SectionTitle } from '@/components/macos/Layout';
+import { ActionIcon, IconButton, Segmented } from '@/ui/controls';
+import { HotkeyButton } from '@/ui/hotkey';
+import { Card, Pill, Row, SectionTitle } from '@/ui/layout';
 import { change, send } from '@/stores/app';
 import { useSection, useT } from '@/stores/hooks';
 import './vision.css';

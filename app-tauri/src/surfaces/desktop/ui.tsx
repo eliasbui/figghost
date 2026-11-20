@@ -1,4 +1,9 @@
-import type { ButtonHTMLAttributes, HTMLAttributes, InputHTMLAttributes, ReactNode, Ref, SelectHTMLAttributes } from 'react';
+import type { HTMLAttributes, MouseEvent, ReactNode, Ref } from 'react';
+import { Banner } from '@astryxdesign/core/Banner';
+import { Card as AstryxCard } from '@astryxdesign/core/Card';
+import { NumberInput } from '@astryxdesign/core/NumberInput';
+import { Selector } from '@astryxdesign/core/Selector';
+import { Switch } from '@astryxdesign/core/Switch';
 import { cn } from '@/lib/cn';
 import { Btn } from '../ui';
 
@@ -20,9 +25,9 @@ export function Section({ children }: { children?: ReactNode }) {
 
 export function Card({ children, className, ...rest }: { children: ReactNode; className?: string } & HTMLAttributes<HTMLDivElement>) {
   return (
-    <div className={cn('overflow-hidden rounded-[var(--r-card)] bg-card shadow-[inset_0_0_0_0.5px_var(--card-edge)]', className)} {...rest}>
+    <AstryxCard padding={0} className={className} {...rest}>
       {children}
-    </div>
+    </AstryxCard>
   );
 }
 
@@ -40,34 +45,37 @@ export const Hint = ({ children, className }: { children: ReactNode; className?:
 
 /** A notice: something the person should know before they start. */
 export function Notice({ children }: { children: ReactNode }) {
-  return <div className="mb-4 rounded-[var(--r-field)] bg-[color-mix(in_srgb,var(--warn)_12%,transparent)] px-3.5 py-2.5 shadow-[inset_0_0_0_1px_var(--warn)]">{children}</div>;
-}
-
-export function Toggle({ checked, onChange, label }: { checked: boolean; onChange: (on: boolean) => void; label: string }) {
-  return <button type="button" role="switch" aria-checked={checked} aria-label={label} className="switch" onClick={() => onChange(!checked)} />;
-}
-
-const field = 'h-7 rounded-[var(--r-field)] bg-[var(--field)] px-2.5 shadow-[inset_0_0_0_0.5px_var(--field-edge)] focus:bg-card focus:shadow-[inset_0_0_0_0.5px_var(--accent),0_0_0_3px_var(--accent-ring)]';
-
-export function Select({ value, options, onChange, label }: { value: string; options: { id: string; text: string }[]; onChange: (id: string) => void; label: string } & Omit<SelectHTMLAttributes<HTMLSelectElement>, 'value' | 'onChange'>) {
   return (
-    <select aria-label={label} className={cn(field, 'cursor-default')} value={value} onChange={(event) => onChange(event.target.value)}>
-      {options.map((o) => (
-        <option key={o.id} value={o.id}>
-          {o.text}
-        </option>
-      ))}
-    </select>
+    <div className="mb-4">
+      <Banner status="warning" title={children} collapsible={false} />
+    </div>
   );
 }
 
-export function Input({ className, ...rest }: InputHTMLAttributes<HTMLInputElement> & { ref?: Ref<HTMLInputElement> }) {
-  return <input className={cn(field, className)} {...rest} />;
+export function Toggle({ checked, onChange, label }: { checked: boolean; onChange: (on: boolean) => void; label: string }) {
+  return <Switch label={label} isLabelHidden size="sm" value={checked} onChange={onChange} />;
+}
+
+export function Select({ value, options, onChange, label }: { value: string; options: { id: string; text: string }[]; onChange: (id: string) => void; label: string }) {
+  return <Selector label={label} isLabelHidden size="sm" variant="secondary" value={value} options={options.map((o) => ({ value: o.id, label: o.text }))} onChange={onChange} />;
+}
+
+/** A line of text. */
+export { Field as Input } from '@/ui/field';
+
+/** A number, which is sent when the person is through with it. `key` the field by the value the app holds, so that what the app
+ *  says replaces what was typed. */
+export function NumberField({ value, min, max, onChange, label, width = 100 }: { value: number; min: number; max: number; onChange: (value: number) => void; label: string; width?: number }) {
+  return <NumberInput label={label} isLabelHidden size="sm" width={width} min={min} max={max} value={value} onChange={onChange} />;
 }
 
 /** A small button inside a row of tools. */
-export function Tool({ className, ...rest }: ButtonHTMLAttributes<HTMLButtonElement>) {
-  return <button type="button" className={cn('rounded-[5px] px-1.5 py-1 text-xs text-fg-2 hover:bg-[var(--fill)] hover:text-fg', className)} {...rest} />;
+export function Tool({ children, ...rest }: { children: ReactNode; className?: string; title?: string; onClick?: (event: MouseEvent) => void; 'aria-label'?: string; 'aria-pressed'?: boolean }) {
+  return (
+    <Btn variant="ghost" small {...rest}>
+      {children}
+    </Btn>
+  );
 }
 
 export const Mono = ({ children, className }: { children: ReactNode; className?: string }) => (

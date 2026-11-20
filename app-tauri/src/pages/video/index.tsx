@@ -1,7 +1,8 @@
 import { useEffect, useRef, useState } from 'react';
-import { Card, Row, SectionTitle } from '@/components/macos/Layout';
+import { Card, Row, SectionTitle } from '@/ui/layout';
 import { change } from '@/stores/app';
 import { useSection, useT } from '@/stores/hooks';
+import { Field } from '@/ui/field';
 
 /** Video (beta): a tab of the notch that plays one stream or video file, muted. */
 export default function Video() {
@@ -19,9 +20,8 @@ export default function Video() {
       <SectionTitle>{t('sec.video.source')}</SectionTitle>
       <Card>
         <Row title={t('video.url.title')} desc={t('video.url.desc')} block when={v.enabled}>
-          <input
+          <Field
             type="text"
-            className="text-field"
             aria-label={t('video.url.title')}
             placeholder={t('video.url.ph')}
             maxLength={2048}

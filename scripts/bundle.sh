@@ -37,6 +37,8 @@ cp "$ROOT/crates/app-ui/assets/GoNhanh-LICENSE.txt" "$APP/Contents/Resources/GoN
 # net-merge of Video download is the scheduler of net-merge written again, whose MIT License asks every copy to carry
 # its notice.
 cp "$ROOT/crates/app-ui/assets/net-merge-LICENSE.txt" "$APP/Contents/Resources/net-merge-LICENSE.txt"
+# The settings window is drawn with Astryx and StyleX (Meta, MIT License), whose notice every copy must carry.
+cp "$ROOT/crates/app-ui/assets/Astryx-LICENSE.txt" "$APP/Contents/Resources/Astryx-LICENSE.txt"
 # The licence of Figghost itself travels with the app, as the MIT License asks of every copy.
 cp "$ROOT/LICENSE" "$APP/Contents/Resources/LICENSE.txt"
 

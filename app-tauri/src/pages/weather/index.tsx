@@ -1,9 +1,11 @@
 import { useState } from 'react';
-import { Button, IconButton, SelectRow, ToggleRow } from '@/components/macos/Controls';
-import { Card, Row, SectionTitle } from '@/components/macos/Layout';
+import { Button, IconButton } from '@/ui/controls';
+import { Card, Row, SectionTitle } from '@/ui/layout';
+import { SelectRow, ToggleRow } from '@/ui/rows';
 import { send } from '@/stores/app';
 import { useSection, useT } from '@/stores/hooks';
 import './weather.css';
+import { Field } from '@/ui/field';
 
 interface Place {
   label: string;
@@ -31,7 +33,7 @@ export default function Weather() {
     send({ t: 'action', name: `weather_search:${text}` });
   };
   const tool = (verb: string, i: number, glyph: string, label: string, disabled: boolean, who: string) => (
-    <IconButton size="sm" variant="glass" icon={glyph} disabled={disabled} label={`${label}: ${who}`} onClick={() => send({ t: 'action', name: `weather_${verb}:${i}` })} />
+    <IconButton size="sm" variant="secondary" icon={glyph} disabled={disabled} label={`${label}: ${who}`} onClick={() => send({ t: 'action', name: `weather_${verb}:${i}` })} />
   );
   const status = w.searching ? t('weather.searching') : w.problem ? t(`weather.problem.${w.problem}`) : asked && !w.found.length ? t('weather.none') : '';
   return (
@@ -62,9 +64,9 @@ export default function Weather() {
       <Card>
         <Row title={t('weather.city.title')} desc={t('weather.city.desc')} block when={on}>
           <div className="weather-search">
-            <input
+            <Field
+              className="field-grow"
               type="text"
-              className="text-field"
               aria-label={t('weather.city.label')}
               placeholder={t('weather.city.ph')}
               maxLength={60}

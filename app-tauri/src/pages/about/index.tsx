@@ -1,8 +1,9 @@
 import { useState } from 'react';
-import { Button, IconButton, Switch, ToggleRow } from '@/components/macos/Controls';
-import { Advanced } from '@/components/macos/Dialogs';
-import { Card, Row, SectionTitle } from '@/components/macos/Layout';
-import { AppHead } from '@/components/macos/Page';
+import { Button, IconButton, Switch } from '@/ui/controls';
+import { Advanced } from '@/ui/dialogs';
+import { Card, Row, SectionTitle } from '@/ui/layout';
+import { AppHead } from '@/ui/page';
+import { ToggleRow } from '@/ui/rows';
 import license from '@/assets/LICENSE.txt?raw';
 import { bytes } from '@/lib/text';
 import { send, useApp } from '@/stores/app';
@@ -53,7 +54,7 @@ function UpdateRow({ version }: { version: string }) {
           {t('about.update.open')}
         </Button>
       ) : null}
-      <IconButton variant="glass" icon="refresh" loading={state === 'checking' || state === 'installing'} label={t('about.update.check')} onClick={ask('check_updates')} />
+      <IconButton variant="secondary" icon="refresh" loading={state === 'checking' || state === 'installing'} label={t('about.update.check')} onClick={ask('check_updates')} />
     </Row>
   );
 }
@@ -113,12 +114,12 @@ export default function About() {
         <UpdateRow version={app.version} />
         <ToggleRow path="update.auto" title={t('update.auto.title')} desc={t('update.auto.desc')} />
         <Row title={t('update.news.title')} desc={t('update.news.desc')}>
-          <IconButton variant="glass" icon="sparkles" label={t('update.news.show')} onClick={() => send({ t: 'action', name: 'show_whats_new' })} />
+          <IconButton variant="secondary" icon="sparkles" label={t('update.news.show')} onClick={() => send({ t: 'action', name: 'show_whats_new' })} />
           <Switch path="update.whats_new" label={t('update.news.title')} />
         </Row>
         <Row title={t('about.privacy')} desc={t('about.privacy.val')} />
         <Row title={t('data.title')} desc={app.config_dir}>
-          <IconButton variant="glass" icon="folder" label={t('data.open')} onClick={() => send({ t: 'action', name: 'open_config' })} />
+          <IconButton variant="secondary" icon="folder" label={t('data.open')} onClick={() => send({ t: 'action', name: 'open_config' })} />
         </Row>
       </Card>
 
@@ -128,7 +129,7 @@ export default function About() {
       <Licence t={t} />
       <Card>
         <Row title={t('about.quit')} desc={t('about.quit.desc')}>
-          <IconButton variant="danger" icon="power" label={t('about.quit')} onClick={() => send({ t: 'action', name: 'quit' })} />
+          <IconButton variant="destructive" icon="power" label={t('about.quit')} onClick={() => send({ t: 'action', name: 'quit' })} />
         </Row>
       </Card>
 

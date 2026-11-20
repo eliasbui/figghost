@@ -2,7 +2,7 @@ import { cn } from '@/lib/cn';
 import { post } from './bridge';
 import { ago } from './logic';
 import type { State } from './logic';
-import { Btn, Card, Grow, Header, Hint, Input, Mono, Notice, Row, Section, Toggle } from './ui';
+import { Btn, Card, Grow, Header, Hint, Mono, Notice, NumberField, Row, Section, Toggle } from './ui';
 
 interface Props {
   t: (key: string, vars?: Record<string, string | number>) => string;
@@ -38,7 +38,7 @@ export function AgentsPage({ t, state }: Props) {
         </Row>
         <Row>
           <Grow>{t('agents.wait')}</Grow>
-          <Input type="number" min={5} max={100} className="w-20" aria-label={t('agents.wait')} defaultValue={cfg.approval_wait_seconds} key={cfg.approval_wait_seconds} onChange={(event) => post({ t: 'set', key: 'agents.approval_wait_seconds', value: Number(event.target.value) })} />
+          <NumberField label={t('agents.wait')} min={5} max={100} value={cfg.approval_wait_seconds} onChange={(value) => post({ t: 'set', key: 'agents.approval_wait_seconds', value })} />
         </Row>
       </Card>
       <Section>{t('agents.hooks')}</Section>
@@ -68,10 +68,10 @@ export function AgentsPage({ t, state }: Props) {
                   <Btn onClick={() => post({ t: 'answer', id: q.id, allow: false })}>{t('agents.terminal')}</Btn>
                 ) : (
                   <div className="flex gap-1.5">
-                    <Btn variant="prominent" onClick={() => post({ t: 'answer', id: q.id, allow: true })}>
+                    <Btn variant="primary" onClick={() => post({ t: 'answer', id: q.id, allow: true })}>
                       {t('agents.allow')}
                     </Btn>
-                    <Btn variant="danger" onClick={() => post({ t: 'answer', id: q.id, allow: false })}>
+                    <Btn variant="destructive" onClick={() => post({ t: 'answer', id: q.id, allow: false })}>
                       {t('agents.deny')}
                     </Btn>
                   </div>

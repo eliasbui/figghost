@@ -1,5 +1,5 @@
-import { Button } from '@/components/macos/Controls';
-import { Card, Row, SectionTitle } from '@/components/macos/Layout';
+import { Button } from '@/ui/controls';
+import { Card, Row, SectionTitle } from '@/ui/layout';
 import { cx } from '@/lib/text';
 import { change, send } from '@/stores/app';
 import { useSetting, useT } from '@/stores/hooks';

@@ -1,7 +1,7 @@
 import { useEffect, useRef, useState } from 'react';
-import { createRoot } from 'react-dom/client';
 import { cn } from '@/lib/cn';
 import '@/styles/surface.css';
+import { mount } from '../mount';
 import { appIcon, send, startWindow, useHost } from '../host';
 import { say } from '../text';
 import type { Words } from '../text';
@@ -97,7 +97,7 @@ function Slides({ show, t }: { show: Show; t: (key: string, vars?: Record<string
       </div>
       <div className="mt-[18px] flex items-center justify-between gap-3">
         <div className="flex w-24 flex-none">
-          <Btn className={index === 0 ? 'invisible' : undefined} tabIndex={index === 0 ? -1 : undefined} onClick={() => go(index - 1)}>
+          <Btn style={index === 0 ? { visibility: 'hidden' } : undefined} onClick={() => go(index - 1)}>
             {t('back')}
           </Btn>
         </div>
@@ -113,7 +113,7 @@ function Slides({ show, t }: { show: Show; t: (key: string, vars?: Record<string
           </div>
         )}
         <div className="flex w-24 flex-none justify-end">
-          <Btn variant="prominent" onClick={advance}>
+          <Btn variant="primary" onClick={advance}>
             {t(nextLabel(index, count))}
           </Btn>
         </div>
@@ -151,7 +151,7 @@ function List({ show, t }: { show: Show; t: (key: string, vars?: Record<string, 
         })}
       </ul>
       <div className="flex justify-end">
-        <Btn variant="prominent" onClick={close}>
+        <Btn variant="primary" onClick={close}>
           {t('done')}
         </Btn>
       </div>
@@ -186,4 +186,4 @@ function News() {
 }
 
 startWindow();
-createRoot(document.getElementById('root')!).render(<News />);
+mount(<News />);

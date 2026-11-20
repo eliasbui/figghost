@@ -1,4 +1,5 @@
 import { Component } from 'react';
+import { Banner } from '@astryxdesign/core/Banner';
 import type { ReactNode } from 'react';
 import { send } from '@/stores/app';
 
@@ -29,16 +30,6 @@ export class PageBoundary extends Component<Props, { failed: boolean }> {
 
   render() {
     if (!this.state.failed) return this.props.children;
-    return (
-      <section className="card" role="alert">
-        <div className="row">
-          <div className="row-text">
-            <div className="row-title">
-              <span className="row-name">{this.props.message}</span>
-            </div>
-          </div>
-        </div>
-      </section>
-    );
+    return <Banner status="error" title={this.props.message} role="alert" />;
   }
 }

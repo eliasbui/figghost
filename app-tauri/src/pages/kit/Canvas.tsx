@@ -1,14 +1,13 @@
 import { useState } from 'react';
 import type { ReactNode } from 'react';
-import { Button, ButtonGroup, IconButton, MenuButton, Segmented, Select, SureButton, ToggleButton } from '@/components/macos/Controls';
-import { Slider, SwitchButton } from '@/components/macos/Controls';
-import { Card, Pill, Row, SectionTitle } from '@/components/macos/Layout';
-import { Keycaps } from '@/components/macos/Controls';
-import { Icon } from '@/components/macos/Icon';
-import { PageIcon } from '@/components/macos/Page';
+import { Button, ButtonGroup, IconButton, Keycaps, MenuButton, Segmented, Select, Slider, SureButton, SwitchButton, ToggleButton } from '@/ui/controls';
+import { ConfirmHost, confirmDialog } from '@/ui/dialogs';
+import { Card, Pill, Row, SectionTitle } from '@/ui/layout';
+import { PageIcon } from '@/ui/page';
+import { Icon } from '@/ui/Icon';
 import { PAGE_SYMBOLS } from '@/pages/meta';
 import { showToast } from '@/stores/app';
-import { ConfirmHost, confirmDialog } from '@/components/macos/Dialogs';
+import { Field } from '@/ui/field';
 
 /** The kit on one page, for looking at it: every kind of button, every control and a few rows. Open it with ?canvas=kit. */
 function Group({ title, children }: { title: string; children: ReactNode }) {
@@ -35,13 +34,13 @@ export default function Kit() {
 
         <Group title="Buttons">
           <Button>Glass</Button>
-          <Button variant="prominent">Prominent</Button>
-          <Button variant="tinted">Tinted</Button>
-          <Button variant="outline">Outline</Button>
-          <Button variant="plain">Plain</Button>
-          <Button variant="danger">Danger</Button>
+          <Button variant="primary">Prominent</Button>
+          <Button variant="secondary">Tinted</Button>
+          <Button variant="secondary">Outline</Button>
+          <Button variant="ghost">Plain</Button>
+          <Button variant="destructive">Danger</Button>
           <Button variant="destructive">Delete</Button>
-          <Button variant="link">Link</Button>
+          <Button variant="ghost">Link</Button>
           <Button disabled>Disabled</Button>
           <Button loading>Busy</Button>
         </Group>
@@ -49,18 +48,18 @@ export default function Kit() {
           <Button size="xs">Extra small</Button>
           <Button size="sm">Small</Button>
           <Button size="md">Medium</Button>
-          <Button size="lg" variant="prominent">Large</Button>
+          <Button size="lg" variant="primary">Large</Button>
           <Button shape="rounded">Rounded</Button>
           <Button icon="plus">With picture</Button>
           <Button iconEnd="chevron.down">Menu</Button>
-          <Button block variant="prominent">Block</Button>
+          <Button block variant="primary">Block</Button>
         </Group>
         <Group title="Pictures only">
-          <IconButton icon="plus" label="Add" variant="glass" />
+          <IconButton icon="plus" label="Add" variant="secondary" />
           <IconButton icon="refresh" label="Refresh" />
-          <IconButton icon="trash" label="Delete" variant="danger" />
+          <IconButton icon="trash" label="Delete" variant="destructive" />
           <IconButton icon="close" label="Close" size="sm" />
-          <IconButton icon="search" label="Search" variant="prominent" size="lg" />
+          <IconButton icon="search" label="Search" variant="primary" size="lg" />
           <ButtonGroup label="Group">
             <IconButton icon="chevron.left" label="Back" />
             <IconButton icon="chevron.right" label="Forward" />
@@ -88,7 +87,7 @@ export default function Kit() {
           <Select value={choice} onChange={(v) => setChoice(String(v))} label="Select" options={[{ value: 'one', label: 'One' }, { value: 'two', label: 'Two' }, { value: 'three', label: 'Three' }]} />
           <Select small value={choice} onChange={(v) => setChoice(String(v))} label="Small" options={[{ value: 'one', label: 'One' }, { value: 'two', label: 'Two' }]} />
           <Slider value={level} min={0} max={100} step={1} onChange={setLevel} label="Level" format={(v) => `${v} %`} />
-          <input className="text-field" style={{ width: 200 }} placeholder="Field" aria-label="Field" />
+          <Field className="text-field" style={{ width: 200 }} placeholder="Field" aria-label="Field" />
           <Keycaps shortcut="cmd+shift+c" />
           <Pill good>Granted</Pill>
           <Pill>Missing</Pill>
@@ -116,10 +115,10 @@ export default function Kit() {
           </Row>
           <Row title="Accessibility" desc="Needed for smooth scrolling.">
             <Pill good>Granted</Pill>
-            <IconButton icon="open" label="Open" variant="glass" />
+            <IconButton icon="open" label="Open" variant="secondary" />
           </Row>
           <Row title="Reset everything">
-            <Button variant="danger" onClick={() => confirmDialog({ title: 'Reset?', body: 'This cannot be undone.', confirm: 'Reset' }, () => showToast('Done'))}>
+            <Button variant="destructive" onClick={() => confirmDialog({ title: 'Reset?', body: 'This cannot be undone.', confirm: 'Reset' }, () => showToast('Done'))}>
               Reset
             </Button>
           </Row>

@@ -1,7 +1,8 @@
-import { SelectRow, ToggleRow, ActionIcon } from '@/components/macos/Controls';
-import { Card, InfoRow, Row, SectionTitle } from '@/components/macos/Layout';
+import { PermissionRow } from '@/ui/common';
+import { ActionIcon } from '@/ui/controls';
+import { Card, Row, SectionTitle } from '@/ui/layout';
+import { SelectRow, ToggleRow } from '@/ui/rows';
 import { useSection, useT } from '@/stores/hooks';
-import { PermissionRow } from '@/components/macos/Common';
 
 interface OutlookState {
   enabled: boolean;
@@ -41,7 +42,7 @@ export default function Outlook() {
 
       <SectionTitle>{t('sec.outlook.privacy')}</SectionTitle>
       <Card>
-        <InfoRow title={t('outlook.privacy.title')} desc={t('outlook.privacy.desc')} />
+        <Row title={t('outlook.privacy.title')} desc={t('outlook.privacy.desc')} />
       </Card>
     </>
   );

@@ -1,0 +1,21 @@
+/* What Tailwind may name: `text-fg-2`, `border-hair`, `bg-card`. They read the variables above at run time. */
+@theme inline {
+  --font-sans: var(--font);
+  --font-mono: var(--mono);
+  --color-accent: var(--accent);
+  --color-accent-soft: var(--accent-soft);
+  --color-good: var(--good);
+  --color-warn: var(--warn);
+  --color-bad: var(--bad);
+  --color-fg: var(--fg);
+  --color-fg-2: var(--fg-2);
+  --color-fg-3: var(--fg-3);
+  --color-hair: var(--hair);
+  --color-hair-2: var(--hair-2);
+  --color-card: var(--card);
+  --radius-card: var(--r-card);
+  --radius-pop: var(--r-pop);
+  --radius-tile: var(--r-tile);
+  --radius-field: var(--r-field);
+  --ease-spring: var(--spring);
+}

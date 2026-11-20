@@ -1,13 +1,14 @@
 import { useEffect, useRef, useState } from 'react';
 import type { RefObject } from 'react';
-import { Button, IconButton, ToggleRow, ActionIcon } from '@/components/macos/Controls';
-import { confirmDialog } from '@/components/macos/Dialogs';
-import { Card, InfoRow, Pill, Row, SectionTitle } from '@/components/macos/Layout';
-import { InfoTip } from '@/components/macos/Overlay';
+import { ActionIcon, Button, IconButton, InfoTip } from '@/ui/controls';
+import { confirmDialog } from '@/ui/dialogs';
+import { Card, Pill, Row, SectionTitle } from '@/ui/layout';
+import { ToggleRow } from '@/ui/rows';
 import { cx } from '@/lib/text';
 import { send } from '@/stores/app';
 import { useSection, useT } from '@/stores/hooks';
 import './snippets.css';
+import { Field } from '@/ui/field';
 
 interface Item {
   abbr: string;
@@ -91,10 +92,10 @@ function Form({ s, on, editing, fields, setEditing, setFields, abbrField }: {
           {t('snippets.abbr')}
           <InfoTip>{t('snippets.abbr.hint')}</InfoTip>
         </span>
-        <input
+        <Field
           ref={abbrField}
           type="text"
-          className="text-field snip-abbr"
+          className="snip-abbr"
           placeholder={t('snippets.abbr.ph')}
           aria-label={t('snippets.abbr')}
           spellCheck={false}
@@ -113,7 +114,7 @@ function Form({ s, on, editing, fields, setEditing, setFields, abbrField }: {
       </label>
       <label className="snip-label">
         {t('snippets.text')}
-        <textarea className="snip-text" rows={5} placeholder={t('snippets.text.ph')} aria-label={t('snippets.text')} spellCheck={false} value={fields.text} onChange={(e) => setFields({ ...fields, text: e.target.value })} />
+        <Field className="snip-text" rows={5} placeholder={t('snippets.text.ph')} aria-label={t('snippets.text')} spellCheck={false} value={fields.text} onChange={(e) => setFields({ ...fields, text: e.target.value })} />
       </label>
       <div className="row-desc snip-error" role="alert">
         {message}
@@ -145,10 +146,10 @@ function ItemRow({ item, onEdit }: { item: Item; onEdit: () => void }) {
         {item.shadowed_by ? <div className="row-desc snip-warn">{t('snippets.shadow', { abbr: item.shadowed_by })}</div> : null}
       </div>
       <span className="snip-tools">
-        <IconButton size="sm" variant="glass" icon="pencil" label={`${t('snippets.edit')}: ${item.abbr}`} onClick={onEdit} />
+        <IconButton size="sm" variant="secondary" icon="pencil" label={`${t('snippets.edit')}: ${item.abbr}`} onClick={onEdit} />
         <IconButton
           size="sm"
-          variant="glass"
+          variant="secondary"
           icon="trash"
           label={`${t('snippets.remove')}: ${item.abbr}`}
           onClick={() =>
@@ -208,10 +209,10 @@ export default function Snippets() {
 
       <SectionTitle>{t('sec.snippets.how')}</SectionTitle>
       <Card>
-        <InfoRow title={t('snippets.how.type.title')} desc={t('snippets.how.type.desc')} />
-        <InfoRow title={t('snippets.how.paste.title')} desc={t('snippets.how.paste.desc')} />
-        <InfoRow title={t('snippets.how.telex.title')} desc={t('snippets.how.telex.desc')} />
-        <InfoRow title={t('snippets.how.stop.title')} desc={t('snippets.how.stop.desc')} />
+        <Row title={t('snippets.how.type.title')} desc={t('snippets.how.type.desc')} />
+        <Row title={t('snippets.how.paste.title')} desc={t('snippets.how.paste.desc')} />
+        <Row title={t('snippets.how.telex.title')} desc={t('snippets.how.telex.desc')} />
+        <Row title={t('snippets.how.stop.title')} desc={t('snippets.how.stop.desc')} />
       </Card>
     </>
   );

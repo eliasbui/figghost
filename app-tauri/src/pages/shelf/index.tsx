@@ -1,5 +1,5 @@
-import { Button } from '@/components/macos/Controls';
-import { Card, Row, SectionTitle } from '@/components/macos/Layout';
+import { Button } from '@/ui/controls';
+import { Card, Row, SectionTitle } from '@/ui/layout';
 import { send } from '@/stores/app';
 import { useSetting, useT } from '@/stores/hooks';
 
@@ -12,7 +12,7 @@ export default function Shelf() {
       <SectionTitle>{t('sec.shelf')}</SectionTitle>
       <Card>
         <Row title={t('shelf.count')}>
-          <span className="row-title">{count}</span>
+          <span className="row-value">{count}</span>
         </Row>
         <Row title={t('shelf.clear')} desc={t('shelf.clear.desc')}>
           <Button small icon="trash" onClick={() => send({ t: 'action', name: 'clear_shelf' })}>

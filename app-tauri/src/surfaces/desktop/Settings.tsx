@@ -1,7 +1,7 @@
-import { useRef } from 'react';
+import { useState } from 'react';
 import { post } from './bridge';
 import type { State } from './logic';
-import { Btn, Card, Grow, Header, Hint, Input, Mono, Row, Section, Select, Toggle } from './ui';
+import { Btn, Card, Grow, Header, Hint, Input, Mono, NumberField, Row, Section, Select, Toggle } from './ui';
 
 interface Props {
   t: (key: string, vars?: Record<string, string | number>) => string;
@@ -12,7 +12,8 @@ const set = (key: string, value: unknown) => post({ t: 'set', key, value });
 
 export function SettingsPage({ t, state }: Props) {
   const { config: c, env } = state;
-  const hotkey = useRef<HTMLInputElement>(null);
+  // What is typed in the field of the shortcut, until it is saved or the app says another.
+  const [typed, setTyped] = useState<string | null>(null);
   const options = (ids: string[]) => ids.map((id) => ({ id, text: t(`opt.${id}`) }));
   return (
     <>
@@ -42,12 +43,12 @@ export function SettingsPage({ t, state }: Props) {
             <div>{t('settings.hotkey')}</div>
             <Hint>{env.hotkey_error ? t('error', { e: env.hotkey_error }) : t('settings.hotkey.hint')}</Hint>
           </Grow>
-          <Input ref={hotkey} key={c.hotkey} type="text" defaultValue={c.hotkey} aria-label={t('settings.hotkey')} spellCheck={false} />
-          <Btn onClick={() => set('hotkey', (hotkey.current?.value ?? '').trim())}>{t('settings.save')}</Btn>
+          <Input key={c.hotkey} value={typed ?? c.hotkey} aria-label={t('settings.hotkey')} onChange={(event) => setTyped(event.target.value)} />
+          <Btn onClick={() => set('hotkey', (typed ?? c.hotkey).trim())}>{t('settings.save')}</Btn>
         </Row>
         <Row>
           <Grow>{t('settings.limit')}</Grow>
-          <Input type="number" min={10} max={100000} className="w-28" aria-label={t('settings.limit')} defaultValue={c.history_limit} key={c.history_limit} onChange={(event) => set('history_limit', Number(event.target.value))} />
+          <NumberField label={t('settings.limit')} min={10} max={100000} width={120} value={c.history_limit} onChange={(value) => set('history_limit', value)} />
         </Row>
         <Row>
           <Grow>{t('settings.secrets')}</Grow>

@@ -556,7 +556,7 @@
  "about.license.show": "Xem nội dung giấy phép",
  "about.license.hide": "Ẩn nội dung giấy phép",
  "about.others.title": "Các giấy phép khác",
- "about.others.body": "Phông Inter đi kèm làm phông dự phòng cho cửa sổ này, theo SIL Open Font License 1.1 (bản quyền 2020 The Inter Project Authors); nội dung giấy phép nằm ở Resources/Inter-OFL.txt trong ứng dụng, còn của Figghost ở Resources/LICENSE.txt. Gõ tiếng Việt đặt dấu bằng bộ máy của Gõ Nhanh (bản quyền 2025 Gõ Nhanh Contributors), theo giấy phép BSD 3-Clause, nội dung nằm ở Resources/GoNhanh-LICENSE.txt. Biểu tượng của các trang do Figghost tự vẽ; các biểu tượng khác của giao diện là SF Symbols do macOS tự vẽ, không thuộc về Figghost. Các thư viện Rust dùng để xây dựng ứng dụng giữ giấy phép riêng của chúng.",
+ "about.others.body": "Phông Inter đi kèm làm phông dự phòng cho cửa sổ này, theo SIL Open Font License 1.1 (bản quyền 2020 The Inter Project Authors); nội dung giấy phép nằm ở Resources/Inter-OFL.txt trong ứng dụng, còn của Figghost ở Resources/LICENSE.txt. Các thành phần của cửa sổ này là Astryx và StyleX (bản quyền 2026 Meta Platforms, Inc.), theo giấy phép MIT, nội dung nằm ở Resources/Astryx-LICENSE.txt. Gõ tiếng Việt đặt dấu bằng bộ máy của Gõ Nhanh (bản quyền 2025 Gõ Nhanh Contributors), theo giấy phép BSD 3-Clause, nội dung nằm ở Resources/GoNhanh-LICENSE.txt. Biểu tượng của các trang do Figghost tự vẽ; các biểu tượng khác của giao diện là SF Symbols do macOS tự vẽ, không thuộc về Figghost. Các thư viện Rust dùng để xây dựng ứng dụng giữ giấy phép riêng của chúng.",
  "nav.smart": "Chọn thông minh",
  "page.smart": "Chọn thông minh",
  "page.smart.sub": "Chọn văn bản ở bất kỳ đâu rồi nhấn phím tắt để xem nó được quy đổi: đơn vị, tiền tệ và giờ, cùng bản dịch của văn bản khác.",

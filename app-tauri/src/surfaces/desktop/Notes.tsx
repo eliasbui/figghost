@@ -54,7 +54,7 @@ export function NotesPage({ t, notes, setNotes }: Props) {
     <>
       <Header title={t('page.notes')} sub={t('notes.sub')} />
       <p className="mb-3">
-        <Btn variant="prominent" onClick={add}>
+        <Btn variant="primary" onClick={add}>
           {t('notes.new')}
         </Btn>
       </p>
@@ -105,7 +105,7 @@ export function NotesPage({ t, notes, setNotes }: Props) {
                   <Hint>{t('notes.chars', { n: characters(note.text) })}</Hint>
                 </Grow>
                 <Btn
-                  variant="danger"
+                  variant="destructive"
                   onClick={() => {
                     if (!confirm(t('notes.delete.ask'))) return;
                     if (timer.current) clearTimeout(timer.current);

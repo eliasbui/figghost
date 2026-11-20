@@ -1,7 +1,8 @@
-import { AddAppButton, AppList, AppRow } from '@/components/macos/Apps';
-import { ActionButton, IconButton, SegRow, ToggleRow, ActionIcon } from '@/components/macos/Controls';
-import { HotkeyButton } from '@/components/macos/Hotkey';
-import { Card, InfoRow, Pill, Row, SectionTitle } from '@/components/macos/Layout';
+import { AddAppButton, AppList, AppRow } from '@/ui/apps';
+import { ActionButton, ActionIcon, IconButton } from '@/ui/controls';
+import { HotkeyButton } from '@/ui/hotkey';
+import { Card, Pill, Row, SectionTitle } from '@/ui/layout';
+import { SegRow, ToggleRow } from '@/ui/rows';
 import { send } from '@/stores/app';
 import { useSection, useT } from '@/stores/hooks';
 
@@ -65,7 +66,7 @@ export default function Typing() {
         </AppList>
       </Card>
       <Card>
-        <InfoRow title={t('typing.engine.title')} desc={t('typing.engine.desc')} />
+        <Row title={t('typing.engine.title')} desc={t('typing.engine.desc')} />
       </Card>
     </>
   );

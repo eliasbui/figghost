@@ -1,5 +1,5 @@
 import { useEffect, useState } from 'react';
-import { Button } from '@/components/macos/Controls';
+import { Button } from '@/ui/controls';
 import { cx } from '@/lib/text';
 import { send } from '@/stores/app';
 import { useT } from '@/stores/hooks';

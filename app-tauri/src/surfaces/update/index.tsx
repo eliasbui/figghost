@@ -1,6 +1,6 @@
 import { useEffect, useState } from 'react';
-import { createRoot } from 'react-dom/client';
 import '@/styles/surface.css';
+import { mount } from '../mount';
 import { appIcon, send, startWindow, useHost } from '../host';
 import { say } from '../text';
 import type { Words } from '../text';
@@ -94,7 +94,7 @@ function Update() {
       <footer className="flex justify-end gap-2">
         <Btn onClick={() => send({ t: 'action', name: quiet.action })}>{t(quiet.label)}</Btn>
         {main ? (
-          <Btn variant="prominent" onClick={() => send({ t: 'action', name: main.action })}>
+          <Btn variant="primary" onClick={() => send({ t: 'action', name: main.action })}>
             {t(main.label)}
           </Btn>
         ) : null}
@@ -104,4 +104,4 @@ function Update() {
 }
 
 startWindow();
-createRoot(document.getElementById('root')!).render(<Update />);
+mount(<Update />);

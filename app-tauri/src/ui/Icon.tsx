@@ -112,6 +112,8 @@ import {
   X,
 } from '@phosphor-icons/react';
 import type { Icon as PhosphorIcon, IconWeight } from '@phosphor-icons/react';
+import { Icon as AstryxIcon } from '@astryxdesign/core/Icon';
+import type { IconType } from '@astryxdesign/core/Icon';
 import { cn } from '@/lib/cn';
 
 // The pictures are Phosphor's. The names are the ones the pages already use, which are those of the SF Symbols of the page this
@@ -333,4 +335,27 @@ export function Icon({ name, className, weight, size }: { name: string; classNam
       <Glyph weight={weight ?? own ?? 'regular'} size={size ?? '100%'} />
     </span>
   );
+}
+
+const made = new Map<string, IconType>();
+
+/** The picture of a name as an Astryx icon, for the `icon` of an Astryx control (a button, a nav item): it is sized by the
+ *  control, as an Astryx icon is. A name that has no picture gives nothing. */
+export function iconType(name: string, weight?: IconWeight): IconType | undefined {
+  const entry = ICONS[name];
+  if (!entry) return undefined;
+  const key = `${name}:${weight ?? ''}`;
+  let component = made.get(key);
+  if (!component) {
+    const [Glyph, own] = entry;
+    component = (props) => <Glyph {...(props as object)} weight={weight ?? own ?? 'regular'} aria-hidden="true" />;
+    made.set(key, component);
+  }
+  return component;
+}
+
+/** `iconType` as an element, for the `icon` prop of an Astryx button. */
+export function glyph(name: string | undefined, weight?: IconWeight) {
+  const type = name ? iconType(name, weight) : undefined;
+  return type ? <AstryxIcon icon={type} /> : undefined;
 }

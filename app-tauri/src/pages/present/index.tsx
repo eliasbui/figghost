@@ -1,9 +1,10 @@
-import { SelectRow, ToggleRow, ActionIcon } from '@/components/macos/Controls';
-import { HotkeyButton } from '@/components/macos/Hotkey';
-import { Card, Row, SectionTitle } from '@/components/macos/Layout';
+import { PermissionRow } from '@/ui/common';
+import { ActionIcon } from '@/ui/controls';
+import { HotkeyButton } from '@/ui/hotkey';
+import { Card, Row, SectionTitle } from '@/ui/layout';
+import { SelectRow, ToggleRow } from '@/ui/rows';
 import { hasKey } from '@/i18n';
 import { useLang, useSection, useT } from '@/stores/hooks';
-import { PermissionRow } from '@/components/macos/Common';
 
 // The keys, in the order of the page: the one that starts first, then the ones that work while presenting.
 const ACTIONS = ['start', 'zoom_in', 'zoom_out', 'zoom_reset', 'auto', 'spotlight', 'ring', 'freeze', 'black', 'white'];

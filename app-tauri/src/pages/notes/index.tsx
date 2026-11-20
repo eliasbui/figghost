@@ -1,5 +1,6 @@
-import { SelectRow, ToggleRow, ActionIcon } from '@/components/macos/Controls';
-import { Card, Row, SectionTitle } from '@/components/macos/Layout';
+import { ActionIcon } from '@/ui/controls';
+import { Card, Row, SectionTitle } from '@/ui/layout';
+import { SelectRow, ToggleRow } from '@/ui/rows';
 import { useSection, useT } from '@/stores/hooks';
 
 /** Notes: a scratchpad in a tab of the notch, one plain text file for each note. */

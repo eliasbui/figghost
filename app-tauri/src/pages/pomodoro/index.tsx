@@ -1,6 +1,9 @@
-import { SelectRow, SureButton, ToggleRow } from '@/components/macos/Controls';
-import { HotkeyButton } from '@/components/macos/Hotkey';
-import { Card, Row, SectionTitle } from '@/components/macos/Layout';
+import { ListItem } from '@astryxdesign/core/List';
+import { VStack } from '@astryxdesign/core/VStack';
+import { SureButton } from '@/ui/controls';
+import { HotkeyButton } from '@/ui/hotkey';
+import { Name, Section } from '@/ui/layout';
+import { SelectRow, ToggleRow } from '@/ui/rows';
 import { send } from '@/stores/app';
 import { useSection, useT } from '@/stores/hooks';
 
@@ -12,9 +15,8 @@ export default function Pomodoro() {
   const on = p.enabled;
   const minutes = (list: number[]) => list.map((n) => ({ value: n, label: t('pomodoro.min', { n }) }));
   return (
-    <>
-      <SectionTitle>{t('sec.pomodoro.lengths')}</SectionTitle>
-      <Card>
+    <VStack gap={6}>
+      <Section title={t('sec.pomodoro.lengths')}>
         <SelectRow path="pomodoro.work" title={t('pomodoro.work.title')} desc={t('pomodoro.work.desc')} when={on} options={minutes([15, 20, 25, 30, 45, 50, 60])} />
         <SelectRow path="pomodoro.short_break" title={t('pomodoro.short.title')} desc={t('pomodoro.short.desc')} when={on} options={minutes([3, 5, 10, 15])} />
         <SelectRow path="pomodoro.long_break" title={t('pomodoro.long.title')} desc={t('pomodoro.long.desc')} when={on} options={minutes([10, 15, 20, 30])} />
@@ -25,25 +27,28 @@ export default function Pomodoro() {
           when={on}
           options={[2, 3, 4, 5, 6].map((n) => ({ value: n, label: t('pomodoro.sessions', { n }) }))}
         />
-      </Card>
+      </Section>
 
-      <SectionTitle>{t('sec.pomodoro.when')}</SectionTitle>
-      <Card>
+      <Section title={t('sec.pomodoro.when')}>
         <ToggleRow path="pomodoro.auto_start" title={t('pomodoro.auto.title')} desc={t('pomodoro.auto.desc')} when={on} />
         <ToggleRow path="pomodoro.sound" title={t('pomodoro.sound.title')} desc={t('pomodoro.sound.desc')} when={on} />
         <ToggleRow path="pomodoro.open_on_end" title={t('pomodoro.open.title')} desc={t('pomodoro.open.desc')} when={on} />
         <ToggleRow path="pomodoro.closed_notch" title={t('pomodoro.closed.title')} desc={t('pomodoro.closed.desc')} when={on} />
-        <Row title={t('pomodoro.shortcut.title')} desc={t('pomodoro.shortcut.desc')} when={on}>
-          <HotkeyButton target="pomodoro:toggle" allowClear label={t('pomodoro.shortcut.title')} />
-        </Row>
-      </Card>
+        <ListItem
+          label={<Name title={t('pomodoro.shortcut.title')} desc={t('pomodoro.shortcut.desc')} />}
+          isDisabled={!on}
+          endContent={<HotkeyButton target="pomodoro:toggle" allowClear label={t('pomodoro.shortcut.title')} />}
+        />
+      </Section>
 
-      <SectionTitle>{t('sec.pomodoro.stats')}</SectionTitle>
-      <Card>
-        <Row title={t('pomodoro.stats.title')} below={t('pomodoro.stats.desc', { today: p.today, streak: p.streak, days: p.days })} when={on}>
-          <SureButton label={t('pomodoro.clear')} sure={t('pomodoro.clear.sure')} onConfirm={() => send({ t: 'action', name: 'pomodoro_clear' })} />
-        </Row>
-      </Card>
-    </>
+      <Section title={t('sec.pomodoro.stats')}>
+        <ListItem
+          label={t('pomodoro.stats.title')}
+          description={t('pomodoro.stats.desc', { today: p.today, streak: p.streak, days: p.days })}
+          isDisabled={!on}
+          endContent={<SureButton label={t('pomodoro.clear')} sure={t('pomodoro.clear.sure')} onConfirm={() => send({ t: 'action', name: 'pomodoro_clear' })} />}
+        />
+      </Section>
+    </VStack>
   );
 }

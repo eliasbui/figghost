@@ -1,6 +1,6 @@
 import { useState } from 'react';
-import { ActionButton, Segmented, Select, SureButton } from '@/components/macos/Controls';
-import { Row } from '@/components/macos/Layout';
+import { ActionButton, Segmented, Select, SureButton } from '@/ui/controls';
+import { Block, Row } from '@/ui/layout';
 import { send } from '@/stores/app';
 import { useT } from '@/stores/hooks';
 import { linkName, size } from './helpers';
@@ -30,7 +30,7 @@ export function History({ network, on }: { network: NetworkState; on: boolean })
           />
         }
       />
-      <div className="row block network-table-row">
+      <Block className="network-table-row">
         <div className="network-table network-history-table" role="table">
           {list.length ? (
             <>
@@ -55,8 +55,8 @@ export function History({ network, on }: { network: NetworkState; on: boolean })
             <div className="row-desc network-empty">{t('network.history.none')}</div>
           )}
         </div>
-      </div>
-      <div className="row block network-bars-row">
+      </Block>
+      <Block className="network-bars-row">
         <div className="row-desc" hidden={view.empty !== false}>
           {t('network.history.daily')}
         </div>
@@ -68,7 +68,7 @@ export function History({ network, on }: { network: NetworkState; on: boolean })
             </span>
           ))}
         </div>
-      </div>
+      </Block>
     </>
   );
 }

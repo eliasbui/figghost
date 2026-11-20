@@ -1,6 +1,6 @@
-import { Button } from '@/components/macos/Controls';
-import { HotkeyButton } from '@/components/macos/Hotkey';
-import { Card, Row, SectionTitle } from '@/components/macos/Layout';
+import { Button } from '@/ui/controls';
+import { HotkeyButton } from '@/ui/hotkey';
+import { Block, Card, Row, SectionTitle } from '@/ui/layout';
 import { go, useApp } from '@/stores/app';
 import { useT } from '@/stores/hooks';
 
@@ -53,7 +53,8 @@ export default function Keys() {
       </Card>
 
       <SectionTitle info={t('keys.fixed.desc')}>{t('keys.sec.fixed')}</SectionTitle>
-      <section className="card">
+      <Card>
+<Block className="p-0">
         <div className="cheats">
           <Cheat keys={[RETURN]} text={t('keys.fixed.enter')} />
           <Cheat keys={[UP, DOWN]} text={t('keys.fixed.move')} />
@@ -62,7 +63,8 @@ export default function Keys() {
           <Cheat keys={[COMMAND, DELETE]} text={t('key.delete')} />
           <Cheat keys={['Esc']} text={t('key.close')} />
         </div>
-      </section>
+      </Block>
+</Card>
 
       <SectionTitle>{t('keys.sec.global')}</SectionTitle>
       <Card>

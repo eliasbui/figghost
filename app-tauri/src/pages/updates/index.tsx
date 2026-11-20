@@ -1,6 +1,8 @@
-import { useEffect, useRef, useState } from 'react';
-import { ActionButton, ActionIcon, Button, ToggleRow } from '@/components/macos/Controls';
-import { Card, Row, SectionTitle } from '@/components/macos/Layout';
+import { useEffect, useState } from 'react';
+import { CheckboxInput } from '@astryxdesign/core/CheckboxInput';
+import { ActionButton, ActionIcon, Button } from '@/ui/controls';
+import { Card, Row, SectionTitle } from '@/ui/layout';
+import { ToggleRow } from '@/ui/rows';
 import { send } from '@/stores/app';
 import { useSection, useT } from '@/stores/hooks';
 import './updates.css';
@@ -27,15 +29,11 @@ export default function Updates() {
   const on = u.enabled;
   const list = u.list ?? [];
   const [chosen, setChosen] = useState<string[]>([]);
-  const all = useRef<HTMLInputElement>(null);
 
   // A software that is no longer on the list is no longer chosen.
   useEffect(() => {
     setChosen((now) => (now.every((k) => list.some((x) => x.key === k)) ? now : now.filter((k) => list.some((x) => x.key === k))));
   }, [u.list]);
-  useEffect(() => {
-    if (all.current) all.current.indeterminate = chosen.length > 0 && chosen.length < list.length;
-  }, [chosen, list.length]);
 
   const toggle = (key: string, picked: boolean) => setChosen((now) => (picked ? [...now.filter((k) => k !== key), key] : now.filter((k) => k !== key)));
   return (
@@ -51,17 +49,14 @@ export default function Updates() {
       <SectionTitle>{t('sec.updates.list')}</SectionTitle>
       <Card>
         <div className="upd-toolbar">
-          <label className="upd-all">
-            <input
-              ref={all}
-              type="checkbox"
-              aria-label={t('updates.pick.all')}
-              checked={list.length > 0 && chosen.length === list.length}
-              disabled={!list.length || u.busy}
-              onChange={(e) => setChosen(e.target.checked ? list.map((x) => x.key) : [])}
+          <div className="upd-all">
+            <CheckboxInput
+              label={t('updates.pick.all')}
+              value={list.length > 0 && chosen.length === list.length ? true : chosen.length > 0 ? 'indeterminate' : false}
+              isDisabled={!list.length || u.busy}
+              onChange={(checked) => setChosen(checked ? list.map((x) => x.key) : [])}
             />
-            {t('updates.pick.all')}
-          </label>
+          </div>
           <Button small primary disabled={!chosen.length || u.busy} onClick={() => send({ t: 'action', name: `updates_run:${chosen.join('\n')}` })}>
             {u.busy ? t('updates.busy') : t('updates.run', { n: chosen.length })}
           </Button>
@@ -72,8 +67,14 @@ export default function Updates() {
         <div className="upd-list">
           {list.length ? (
             list.map((x) => (
-              <label className="upd-item" key={x.key}>
-                <input type="checkbox" aria-label={x.name} checked={chosen.includes(x.key)} onChange={(e) => toggle(x.key, e.target.checked)} />
+              <div
+                className="upd-item"
+                key={x.key}
+                onClick={(e) => {
+                  if (!(e.target as HTMLElement).closest('label, input')) toggle(x.key, !chosen.includes(x.key));
+                }}
+              >
+                <CheckboxInput label={x.name} isLabelHidden value={chosen.includes(x.key)} onChange={(checked) => toggle(x.key, checked)} />
                 <span className="upd-text">
                   <span className="upd-name">{x.name}</span>
                   <span className="upd-source">{x.source}</span>
@@ -83,7 +84,7 @@ export default function Updates() {
                   {x.current ? <span className="upd-arrow">-&gt;</span> : null}
                   <span className="upd-new">{x.latest}</span>
                 </span>
-              </label>
+              </div>
             ))
           ) : (
             <div className="empty">{t(on ? 'updates.empty' : 'updates.off')}</div>

@@ -1,9 +1,11 @@
 import { useEffect, useRef, useState } from 'react';
-import { ActionButton, Button, SelectRow, ToggleRow } from '@/components/macos/Controls';
-import { Card, Pill, Row, SectionTitle } from '@/components/macos/Layout';
+import { ActionButton, Button } from '@/ui/controls';
+import { Block, Card, Pill, Row, SectionTitle } from '@/ui/layout';
+import { SelectRow, ToggleRow } from '@/ui/rows';
 import { change, send, showToast } from '@/stores/app';
 import { useSection, useT } from '@/stores/hooks';
 import './download.css';
+import { Field } from '@/ui/field';
 
 interface Job {
   id: string;
@@ -132,11 +134,11 @@ export default function Download() {
 
       <SectionTitle>{t('sec.download.get')}</SectionTitle>
       <Card>
-        <div className="row block">
+        <Block>
           <div className="download-link">
-            <input
+            <Field
+              className="field-grow"
               type="text"
-              className="text-field"
               aria-label={t('download.link.label')}
               placeholder={t('download.link.ph')}
               maxLength={2048}
@@ -154,7 +156,7 @@ export default function Download() {
               {t('download.go')}
             </Button>
           </div>
-        </div>
+        </Block>
         <SelectRow
           path="download.quality"
           title={t('download.quality.title')}

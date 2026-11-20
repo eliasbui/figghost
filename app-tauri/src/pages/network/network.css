@@ -90,7 +90,7 @@ html.glass .network-canvas { background: transparent; }
 .network-arrow.normal { fill: var(--accent-2); }
 .network-arrow.low { fill: var(--warn); }
 
-.network-card.floating { position: absolute; right: 16px; bottom: 16px; width: min(560px, calc(100% - 32px)); z-index: 10; padding: 14px 16px; border-radius: var(--r-pop); background: var(--pop-bg); -webkit-backdrop-filter: var(--glass-blur-thick); backdrop-filter: var(--glass-blur-thick); box-shadow: 0 16px 48px -12px var(--shadow), inset 0 0 0 0.5px var(--glass-edge), inset 0 1px 0 var(--glass-rim); }
+.network-card.floating { position: absolute; right: 16px; bottom: 16px; width: min(560px, calc(100% - 32px)); z-index: 10; padding: 14px 16px; border-radius: var(--r-pop); background: var(--color-background-popover); box-shadow: 0 16px 48px -12px var(--shadow), inset 0 0 0 1px var(--hair); }
 .network-card { margin-top: 12px; padding: 12px 14px; border-radius: 10px; background: var(--solid-2); box-shadow: 0 0 0 1px var(--stroke); }
 .network-card[hidden] { display: none; }
 .network-card h3 { margin: 0 0 4px; font-size: 14px; }

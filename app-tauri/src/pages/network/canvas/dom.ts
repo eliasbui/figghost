@@ -1,7 +1,8 @@
 import { createElement } from 'react';
 import { renderToStaticMarkup } from 'react-dom/server';
-import { button as buttonClass } from '@/components/macos/Button';
-import { Icon } from '@/components/macos/Icon';
+import { Button as AstryxButton } from '@astryxdesign/core/Button';
+import { IconButton as AstryxIconButton } from '@astryxdesign/core/IconButton';
+import { glyph, Icon } from '@/ui/Icon';
 import { useApp, wantIcon } from '@/stores/app';
 
 // The diagram is drawn with the DOM directly, as the page it comes from drew everything: it moves hundreds of times a second
@@ -43,10 +44,21 @@ interface ButtonOptions {
   aria?: string;
 }
 
+/** An Astryx button as an element: it is drawn to markup once and the click is put on the element, since the diagram is not
+ *  React and moves too often for a render of its own. */
 export function button(label: string, onclick: (e: MouseEvent) => void, opts: ButtonOptions = {}): HTMLButtonElement {
   const only = !label && !!opts.icon;
-  const cls = buttonClass({ variant: opts.primary ? 'prominent' : opts.danger ? 'danger' : 'glass', size: opts.small ? 'sm' : 'md', only: only || undefined });
-  return h('button', { class: cls, type: 'button', onclick, 'aria-label': opts.aria, title: only ? opts.aria : undefined }, opts.icon ? iconEl(opts.icon) : null, label);
+  const variant = opts.primary ? 'primary' : opts.danger ? 'destructive' : 'secondary';
+  const markup = renderToStaticMarkup(
+    only
+      ? createElement(AstryxIconButton, { label: opts.aria ?? '', icon: glyph(opts.icon), variant, size: 'sm' })
+      : createElement(AstryxButton, { label, icon: glyph(opts.icon), variant, size: 'sm' }),
+  );
+  const template = document.createElement('template');
+  template.innerHTML = markup;
+  const el = template.content.firstElementChild as HTMLButtonElement;
+  el.addEventListener('click', onclick);
+  return el;
 }
 
 /** The icon of an app: asked of the app for, and drawn once it arrives (see `refreshIcons`). */

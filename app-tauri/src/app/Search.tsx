@@ -1,8 +1,14 @@
 import { useEffect, useRef, useState } from 'react';
 import type { KeyboardEvent } from 'react';
-import { IndexingContext } from '@/components/macos/Dialogs';
-import { Icon } from '@/components/macos/Icon';
-import { PageIcon } from '@/components/macos/Page';
+import { Card } from '@astryxdesign/core/Card';
+import { List, ListItem } from '@astryxdesign/core/List';
+import { Text } from '@astryxdesign/core/Text';
+import { Theme } from '@astryxdesign/core/theme';
+import { TextInput } from '@astryxdesign/core/TextInput';
+import { neutralTheme } from '@astryxdesign/theme-neutral/built';
+import { iconType } from '@/ui/Icon';
+import { IndexingContext } from '@/ui/layout';
+import { PageIcon } from '@/ui/page';
 import { translate } from '@/i18n';
 import type { Lang } from '@/i18n';
 import { folded } from '@/lib/text';
@@ -11,8 +17,8 @@ import { pageLoader } from '@/pages/registry';
 import { go, useApp } from '@/stores/app';
 import { LangOverride, useT } from '@/stores/hooks';
 
-// What each page says, folded: its name, the line under its title, and the titles and notes of its rows. Every page is
-// drawn once to a string, without a window and so without any of its effects, the first time a search needs it.
+// What each page says, folded: its name, the line under its title, and the words of its rows, with what a row keeps behind its
+// "i". Every page is drawn once to a string, without a window and so without any of its effects, the first time a search needs it.
 const indexes = new Map<Lang, Promise<Map<string, string>>>();
 
 async function readPages(lang: Lang): Promise<Map<string, string>> {
@@ -23,15 +29,17 @@ async function readPages(lang: Lang): Promise<Map<string, string>> {
     try {
       const { default: Page } = await pageLoader(id)();
       const html = renderToStaticMarkup(
-        <LangOverride.Provider value={lang}>
-          <IndexingContext.Provider value>
-            <Page />
-          </IndexingContext.Provider>
-        </LangOverride.Provider>,
+        <Theme theme={neutralTheme}>
+          <LangOverride.Provider value={lang}>
+            <IndexingContext.Provider value>
+              <Page />
+            </IndexingContext.Provider>
+          </LangOverride.Provider>
+        </Theme>,
       );
       const doc = new DOMParser().parseFromString(html, 'text/html');
-      for (const el of doc.querySelectorAll('.row-title, .row-desc, .row-info, .row-sub, .card-note, .section-title, .feat-name, label, button')) parts.push(el.textContent ?? '');
-      for (const el of doc.querySelectorAll('button[aria-label]')) parts.push(el.getAttribute('aria-label') ?? '');
+      parts.push(doc.body.textContent ?? '');
+      for (const el of doc.querySelectorAll('[aria-label]')) parts.push(el.getAttribute('aria-label') ?? '');
     } catch (error) {
       console.warn(`search: the page ${id} could not be read`, error);
     }
@@ -52,7 +60,7 @@ function pageTexts(lang: Lang): Promise<Map<string, string>> {
 /** On the page just opened from a search, brings the first row that says the words into view and marks it. The page
  *  may still be on its way, so it is looked for a few times. */
 function reveal(words: string[], tries = 12): void {
-  const rows = [...document.querySelectorAll('#scroller .row, #scroller .section-title')];
+  const rows = [...document.querySelectorAll('#scroller li, #scroller .section-title')];
   const hit = rows.find((row) => words.every((w) => folded(row.textContent ?? '').includes(w)));
   if (!hit) {
     if (tries > 0) setTimeout(() => reveal(words, tries - 1), 100);
@@ -131,56 +139,47 @@ export function Search() {
 
   return (
     <div className="search">
-      <label className="top-search glass">
-        <Icon name="search" />
-        <input
-          ref={input}
-          type="search"
-          id="search"
-          autoComplete="off"
-          spellCheck={false}
-          placeholder={t('side.search')}
-          aria-label={t('side.search')}
-          aria-controls="search-results"
-          value={query}
-          onChange={(e) => {
-            setQuery(e.target.value);
-            setSelected(0);
-          }}
-          onFocus={() => setFocused(true)}
-          onBlur={() => setFocused(false)}
-          onKeyDown={onKeyDown}
-        />
-        <kbd aria-hidden="true">{'\u2318'}K</kbd>
-      </label>
-      <div id="search-results" className="glass-pop" role="listbox" hidden={!open}>
-        {hits.length ? (
-          hits.map((id, i) => (
-            <button
-              key={id}
-              type="button"
-              className="result"
-              role="option"
-              data-page={id}
-              aria-selected={i === selected}
-              // The field keeps the focus, so the list stays open until the choice is made.
-              onMouseDown={(e) => e.preventDefault()}
-              onClick={() => openResult(id)}
-            >
-              <PageIcon id={id} weight="fill" />
-              <span className="result-text">
-                <span className="result-name">{t(`nav.${id}`)}</span>
-                <span className="result-cat">{t(`nav.sec.${secOf(id)}`)}</span>
-              </span>
-              <kbd className="result-key" aria-hidden="true">
-                {'\u21a9'}
-              </kbd>
-            </button>
-          ))
-        ) : (
-          <div className="search-empty">{t('side.none')}</div>
-        )}
-      </div>
+      <TextInput
+        ref={input}
+        type="search"
+        label={t('side.search')}
+        isLabelHidden
+        size="sm"
+        startIcon={iconType('search')}
+        placeholder={`${t('side.search')}  \u2318K`}
+        hasClear
+        value={query}
+        onChange={(value) => {
+          setQuery(value);
+          setSelected(0);
+        }}
+        onFocus={() => setFocused(true)}
+        onBlur={() => setFocused(false)}
+        onKeyDown={onKeyDown}
+      />
+      {open ? (
+        // The field keeps the focus, so the list stays open until the choice is made.
+        <div id="search-results" onMouseDown={(e) => e.preventDefault()}>
+          <Card padding={1} elevation="high">
+            {hits.length ? (
+              <List>
+                {hits.map((id, i) => (
+                  <ListItem
+                    key={id}
+                    label={t(`nav.${id}`)}
+                    description={t(`nav.sec.${secOf(id)}`)}
+                    startContent={<PageIcon id={id} weight="fill" />}
+                    isSelected={i === selected}
+                    onClick={() => openResult(id)}
+                  />
+                ))}
+              </List>
+            ) : (
+              <Text type="supporting">{t('side.none')}</Text>
+            )}
+          </Card>
+        </div>
+      ) : null}
     </div>
   );
 }

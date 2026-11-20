@@ -1,5 +1,5 @@
-import { Card, InfoRow, SectionTitle } from '@/components/macos/Layout';
-import { ShortcutRow } from '@/components/macos/Common';
+import { ShortcutRow } from '@/ui/common';
+import { Card, Row, SectionTitle } from '@/ui/layout';
 import { useSetting, useT } from '@/stores/hooks';
 import './palette.css';
 
@@ -14,7 +14,7 @@ export default function Palette() {
       </Card>
       <SectionTitle>{t('sec.palette.links')}</SectionTitle>
       <Card>
-        <InfoRow title={t('palette.links.title')} desc={t('palette.links.desc')} />
+        <Row title={t('palette.links.title')} desc={t('palette.links.desc')} />
       </Card>
     </>
   );

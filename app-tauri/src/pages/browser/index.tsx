@@ -1,9 +1,11 @@
 import { useEffect, useRef, useState } from 'react';
-import { ActionButton, Button, SelectRow, ToggleRow, ActionIcon } from '@/components/macos/Controls';
-import { Card, Pill, Row, SectionTitle } from '@/components/macos/Layout';
+import { ActionButton, ActionIcon, Button } from '@/ui/controls';
+import { Card, Pill, Row, SectionTitle } from '@/ui/layout';
+import { SelectRow, ToggleRow } from '@/ui/rows';
 import { send } from '@/stores/app';
 import { useSection, useT } from '@/stores/hooks';
 import './browser.css';
+import { Field } from '@/ui/field';
 
 interface Browser {
   id: string;
@@ -29,7 +31,7 @@ function Sites({ browser, on }: { browser: BrowserState; on: boolean }) {
     if (!focused.current) setText(browser.sites);
   }, [browser.sites]);
   return (
-    <textarea
+    <Field
       className="browser-sites"
       rows={6}
       aria-label={t('browser.sites.title')}

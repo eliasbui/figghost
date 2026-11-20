@@ -1,3 +1,4 @@
+import { Block, Card } from '@/ui/layout';
 import { useEffect, useRef } from 'react';
 import type { RefObject } from 'react';
 import { cssColor, cssVar } from '@/lib/dom';
@@ -127,7 +128,8 @@ export function ScrollPad() {
   );
 
   return (
-    <section className="card">
+    <Card>
+<Block className="p-0">
       <div className="pad-wrap">
         <div className="pad" ref={pad} tabIndex={0} role="region" aria-label={t('pad.hint')}>
           {Array.from({ length: 150 }, (_, i) => (
@@ -145,6 +147,7 @@ export function ScrollPad() {
           <div className="row-desc">{t('pad.hint')}</div>
         </div>
       </div>
-    </section>
+    </Block>
+</Card>
   );
 }

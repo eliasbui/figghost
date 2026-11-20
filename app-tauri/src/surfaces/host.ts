@@ -1,6 +1,5 @@
 import { useEffect, useRef } from 'react';
 import { startHostDrag } from '@/lib/drag';
-import { startSheen } from '@/lib/sheen';
 
 // What the surfaces of the AppKit app share. The app gives a page `window.fig.send` (see bridge/appkit.ts) and calls
 // `window.__fig.recv` with each message it sends; what only the system can draw (the app's icon, the symbols) is written
@@ -40,10 +39,8 @@ export function noContextMenu(): void {
   document.addEventListener('contextmenu', (event) => event.preventDefault());
 }
 
-/** What a window of its own needs besides that: it is moved by its drag regions (`data-tauri-drag-region`), and the glass of
- *  its controls follows the pointer. */
+/** What a window of its own needs besides that: it is moved by its drag regions (`data-tauri-drag-region`). */
 export function startWindow(): void {
   noContextMenu();
   if (window.fig) startHostDrag(window.fig);
-  startSheen();
 }

@@ -1,0 +1,54 @@
+/* The style sheet of the three panels that float over other apps on the system's own glass and draw with Tailwind alone: the
+   menu bar panel, the mail card and the music widget. They use no component of Astryx, so they do not carry it; the few colours
+   they read are named here, tuned for glass, and light and dark come from `light-dark()`. Nothing paints a background. */
+@layer theme, base, components, utilities;
+@import "tailwindcss/theme.css" layer(theme);
+@import "tailwindcss/preflight.css" layer(base);
+/* Only the panels are read for the classes they use, not the pages of the settings. */
+@import "tailwindcss/utilities.css" layer(utilities) source(none);
+@source "../surfaces";
+
+@import "./fonts.css";
+@import "./theme.css";
+
+:root {
+  color-scheme: light dark;
+  --font: -apple-system, BlinkMacSystemFont, "SF Pro Text", "SF Pro Display", Inter, system-ui, sans-serif;
+  --mono: ui-monospace, "SF Mono", Menlo, monospace;
+  --fs-body: 13px;
+  --r-card: 12px;
+  --r-pop: 12px;
+  --r-tile: 9px;
+  --r-field: 8px;
+  --spring: cubic-bezier(0.34, 1.45, 0.64, 1);
+
+  /* The accent is the system's where the web view knows it, and blue where it does not. */
+  --accent: #0a84ff;
+  --accent-soft: color-mix(in srgb, var(--accent) 16%, transparent);
+  --good: light-dark(#1f9d4d, #32d74b);
+  --warn: light-dark(#c77700, #ff9f0a);
+  --bad: light-dark(#d70015, #ff453a);
+  --fg: light-dark(rgb(18 20 26 / 0.92), rgb(255 255 255 / 0.92));
+  --fg-2: light-dark(rgb(18 20 26 / 0.6), rgb(255 255 255 / 0.62));
+  --fg-3: light-dark(rgb(18 20 26 / 0.46), rgb(255 255 255 / 0.5));
+  --hair: light-dark(rgb(18 20 26 / 0.08), rgb(255 255 255 / 0.09));
+  --hair-2: light-dark(rgb(18 20 26 / 0.15), rgb(255 255 255 / 0.18));
+  --fill: light-dark(rgb(18 20 26 / 0.05), rgb(255 255 255 / 0.08));
+  --track: light-dark(rgb(18 20 26 / 0.12), rgb(255 255 255 / 0.16));
+  --card: light-dark(rgb(255 255 255 / 0.78), rgb(255 255 255 / 0.065));
+}
+
+@supports (color: -apple-system-control-accent) {
+  :root {
+    --accent: -apple-system-control-accent;
+  }
+}
+
+@import "./base.css";
+
+@layer base {
+  html,
+  body {
+    background: transparent;
+  }
+}

@@ -1,6 +1,7 @@
-import { Button, SelectRow, SliderRow, ToggleRow, ActionIcon } from '@/components/macos/Controls';
-import { HotkeyButton } from '@/components/macos/Hotkey';
-import { Card, Pill, Row, SectionTitle } from '@/components/macos/Layout';
+import { ActionIcon, Button } from '@/ui/controls';
+import { HotkeyButton } from '@/ui/hotkey';
+import { Card, Pill, Row, SectionTitle } from '@/ui/layout';
+import { SelectRow, SliderRow, ToggleRow } from '@/ui/rows';
 import { send } from '@/stores/app';
 import { useSection, useT } from '@/stores/hooks';
 import type { TFunction } from '@/stores/hooks';

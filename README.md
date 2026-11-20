@@ -507,6 +507,8 @@ MIT, see [LICENSE](LICENSE).
 The settings window is set in SF Pro, the system's own font, so it reads as the rest of macOS does. Inter is bundled as the fallback for a machine without it, under the SIL Open Font License 1.1: see
 [crates/app-ui/assets/Inter-OFL.txt](crates/app-ui/assets/Inter-OFL.txt).
 
+The settings window and its small windows are drawn with [Astryx](https://github.com/meta/astryx) and StyleX, copyright 2026 Meta Platforms, Inc., under the MIT License: see [crates/app-ui/assets/Astryx-LICENSE.txt](crates/app-ui/assets/Astryx-LICENSE.txt), which also travels inside the app.
+
 Video download's net-merge (`crates/core-netmerge`) is the scheduler of [net-merge](https://github.com/net-merge/net-merge) written again in Rust, copyright 2026 Rohit Mahto, under the MIT License: see [crates/app-ui/assets/net-merge-LICENSE.txt](crates/app-ui/assets/net-merge-LICENSE.txt), which also travels inside the app.
 
 Vietnamese typing puts its marks with the Telex and VNI engine of [Gõ Nhanh](https://github.com/khaphanspace/gonhanh.org) (the `gonhanh-core` crate, used unchanged), copyright 2025 Gõ Nhanh Contributors, under the BSD 3-Clause License: see [crates/app-ui/assets/GoNhanh-LICENSE.txt](crates/app-ui/assets/GoNhanh-LICENSE.txt), which also travels inside the app. Figghost is not made or endorsed by the authors of Gõ Nhanh.

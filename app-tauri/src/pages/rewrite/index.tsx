@@ -1,6 +1,6 @@
-import { AccessRow, ShortcutRow, TryRow } from '@/components/macos/Common';
-import { SelectRow, ToggleRow } from '@/components/macos/Controls';
-import { Card, Pill, Row, SectionTitle } from '@/components/macos/Layout';
+import { AccessRow, ShortcutRow, TryRow } from '@/ui/common';
+import { Card, Pill, Row, SectionTitle } from '@/ui/layout';
+import { SelectRow, ToggleRow } from '@/ui/rows';
 import { useSection, useT } from '@/stores/hooks';
 
 interface RewriteState {

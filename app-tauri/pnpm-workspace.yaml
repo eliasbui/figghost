@@ -1,2 +1,5 @@
+allowBuilds:
+  '@astryxdesign/cli': false
+  '@astryxdesign/core': false
 minimumReleaseAgeExclude:
   - '@vitejs/plugin-react@6.3.0'

@@ -1,8 +1,8 @@
 import { useEffect, useRef, useState } from 'react';
-import type { ReactNode } from 'react';
 import { createRoot } from 'react-dom/client';
+import type { ReactNode } from 'react';
 import { cn } from '@/lib/cn';
-import '@/styles/surface.css';
+import '@/styles/panel.css';
 import { Glyph } from '../Glyph';
 import { appIcon, noContextMenu, send, useHost } from '../host';
 import { arrange, isStop, isTrash } from './logic';

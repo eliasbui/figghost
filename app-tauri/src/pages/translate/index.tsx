@@ -1,6 +1,6 @@
-import { AccessRow, LanguageSelect, ShortcutRow, TryRow } from '@/components/macos/Common';
-import { SelectRow } from '@/components/macos/Controls';
-import { Card, Row, SectionTitle } from '@/components/macos/Layout';
+import { AccessRow, LanguageSelect, ShortcutRow, TryRow } from '@/ui/common';
+import { Card, Row, SectionTitle } from '@/ui/layout';
+import { SelectRow } from '@/ui/rows';
 import { useSection, useT } from '@/stores/hooks';
 
 interface TranslateState {

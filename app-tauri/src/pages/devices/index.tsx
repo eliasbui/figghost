@@ -1,5 +1,5 @@
-import { SelectRow } from '@/components/macos/Controls';
-import { Card, SectionTitle } from '@/components/macos/Layout';
+import { Card, SectionTitle } from '@/ui/layout';
+import { SelectRow } from '@/ui/rows';
 import { useSetting, useT } from '@/stores/hooks';
 
 /** Devices: a tab of the notch with the charge of the Bluetooth devices that are connected. */

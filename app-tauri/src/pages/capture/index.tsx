@@ -1,8 +1,9 @@
-import { SliderRow, ToggleRow, ActionIcon } from '@/components/macos/Controls';
-import { HotkeyButton } from '@/components/macos/Hotkey';
-import { Card, InfoRow, Row, SectionTitle } from '@/components/macos/Layout';
+import { PermissionRow } from '@/ui/common';
+import { ActionIcon } from '@/ui/controls';
+import { HotkeyButton } from '@/ui/hotkey';
+import { Card, Row, SectionTitle } from '@/ui/layout';
+import { SliderRow, ToggleRow } from '@/ui/rows';
 import { useSection, useT } from '@/stores/hooks';
-import { PermissionRow } from '@/components/macos/Common';
 
 const KINDS = ['area', 'window', 'screen', 'timer', 'text', 'scroll', 'record', 'gif'];
 // Shortcuts that are not a kind of capture.
@@ -61,7 +62,7 @@ export default function Capture() {
 
       <SectionTitle>{t('sec.capture.record')}</SectionTitle>
       <Card>
-        {capture.recording_supported ? null : <InfoRow title={t('capture.record.unsupported')} />}
+        {capture.recording_supported ? null : <Row title={t('capture.record.unsupported')} />}
         {RECORD.map((key) => (
           <ToggleRow key={key} path={`capture.record.${key}`} title={t(`capture.record.${key}.title`)} desc={t(`capture.record.${key}.desc`)} when={on && capture.recording_supported} />
         ))}

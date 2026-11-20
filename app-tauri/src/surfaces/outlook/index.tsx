@@ -2,7 +2,7 @@ import { X } from '@phosphor-icons/react';
 import { useEffect, useRef, useState } from 'react';
 import { createRoot } from 'react-dom/client';
 import { cn } from '@/lib/cn';
-import '@/styles/surface.css';
+import '@/styles/panel.css';
 import { noContextMenu, send, useHost } from '../host';
 
 // The card of a mail that arrived. The app shows it in a clear panel; the drop comes out of the notch, falls to the middle of

@@ -1,6 +1,6 @@
-import { AccessRow, LanguageSelect, ListField, ShortcutRow, TryRow } from '@/components/macos/Common';
-import { Card, InfoRow, Row, SectionTitle } from '@/components/macos/Layout';
-import { ToggleRow } from '@/components/macos/Controls';
+import { AccessRow, LanguageSelect, ListField, ShortcutRow, TryRow } from '@/ui/common';
+import { Card, Row, SectionTitle } from '@/ui/layout';
+import { ToggleRow } from '@/ui/rows';
 import { change } from '@/stores/app';
 import { useLang, useSection, useT } from '@/stores/hooks';
 
@@ -55,10 +55,10 @@ export default function Smart() {
 
       <SectionTitle>{t('sec.smart.knows')}</SectionTitle>
       <Card>
-        <InfoRow title={t('smart.k.units')} desc={t('smart.k.units.desc')} />
-        <InfoRow title={t('smart.k.money')} desc={t('smart.k.money.desc')} />
-        <InfoRow title={t('smart.k.time')} desc={t('smart.k.time.desc')} />
-        <InfoRow title={t('smart.k.words')} desc={t('smart.k.words.desc')} />
+        <Row title={t('smart.k.units')} desc={t('smart.k.units.desc')} />
+        <Row title={t('smart.k.money')} desc={t('smart.k.money.desc')} />
+        <Row title={t('smart.k.time')} desc={t('smart.k.time.desc')} />
+        <Row title={t('smart.k.words')} desc={t('smart.k.words.desc')} />
       </Card>
     </>
   );

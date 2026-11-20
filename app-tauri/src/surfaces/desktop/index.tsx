@@ -1,7 +1,7 @@
 import { useEffect, useRef, useState } from 'react';
-import { createRoot } from 'react-dom/client';
 import { cn } from '@/lib/cn';
 import '@/styles/surface.css';
+import { mount } from '../mount';
 import { say } from '../text';
 import { AboutPage } from './About';
 import { AgentsPage } from './Agents';
@@ -117,7 +117,7 @@ function Desktop() {
   const os = OS_NAMES[state.env.os] ?? state.env.os;
   return (
     <div className="flex h-full">
-      <nav className="flex w-[210px] flex-none flex-col border-r-[0.5px] border-hair bg-[var(--panel-bg)] px-2.5 py-3.5">
+      <nav className="flex w-[210px] flex-none flex-col border-r-[0.5px] border-hair bg-[var(--color-background-surface)] px-2.5 py-3.5">
         <div className="flex items-center gap-2 px-2 pb-3.5 text-[15px] font-semibold">
           <img src="icon.png" alt="" className="size-7" />
           <span>Figghost</span>
@@ -167,4 +167,4 @@ function Desktop() {
   );
 }
 
-createRoot(document.getElementById('root')!).render(<Desktop />);
+mount(<Desktop />);

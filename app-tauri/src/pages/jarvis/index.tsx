@@ -1,10 +1,12 @@
 import { useEffect, useRef, useState } from 'react';
-import { ActionButton, Button, SegRow, SelectRow, ToggleRow } from '@/components/macos/Controls';
-import { HotkeyButton } from '@/components/macos/Hotkey';
-import { Card, Row, SectionTitle } from '@/components/macos/Layout';
+import { ActionButton, Button } from '@/ui/controls';
+import { HotkeyButton } from '@/ui/hotkey';
+import { Card, Row, SectionTitle } from '@/ui/layout';
+import { SegRow, SelectRow, ToggleRow } from '@/ui/rows';
 import { change, send } from '@/stores/app';
 import { useSection, useT } from '@/stores/hooks';
 import './jarvis.css';
+import { Field } from '@/ui/field';
 
 type Access = 'yes' | 'no' | 'ask';
 
@@ -32,9 +34,9 @@ function ModelField({ jarvis }: { jarvis: JarvisState }) {
     if (!focused.current) setText(jarvis.model);
   }, [jarvis.model]);
   return (
-    <input
+    <Field
       type="text"
-      className="text-field jarvis-model"
+      className="jarvis-model"
       aria-label={t('jarvis.model.title')}
       maxLength={80}
       spellCheck={false}
@@ -83,9 +85,9 @@ function KeyRow({ jarvis, on }: { jarvis: JarvisState; on: boolean }) {
       <div className="jarvis-key">
         <span className="row-desc jarvis-key-status">{status}</span>
         {needed ? (
-          <input
+          <Field
+            className="jarvis-model"
             type="password"
-            className="text-field"
             aria-label={t('jarvis.key.title')}
             placeholder={t('jarvis.key.ph')}
             maxLength={400}

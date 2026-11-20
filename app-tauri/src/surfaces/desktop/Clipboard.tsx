@@ -100,7 +100,7 @@ export function ClipboardPage(props: Props) {
           </Grow>
           {shortcut}
           <Btn
-            variant="danger"
+            variant="destructive"
             onClick={() => {
               if (confirm(t('clip.clear.ask'))) {
                 post({ t: 'clear' });

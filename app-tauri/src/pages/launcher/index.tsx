@@ -1,10 +1,12 @@
 import { useEffect, useRef, useState } from 'react';
-import { Button, IconButton, SegRow, Select, SelectRow, ToggleRow } from '@/components/macos/Controls';
-import { confirmDialog } from '@/components/macos/Dialogs';
-import { Card, Row, SectionTitle } from '@/components/macos/Layout';
+import { Button, IconButton, Select } from '@/ui/controls';
+import { confirmDialog } from '@/ui/dialogs';
+import { Card, Row, SectionTitle } from '@/ui/layout';
+import { SegRow, SelectRow, ToggleRow } from '@/ui/rows';
 import { send } from '@/stores/app';
 import { useSection, useT } from '@/stores/hooks';
 import './launcher.css';
+import { Field } from '@/ui/field';
 
 interface Group {
   name: string;
@@ -28,9 +30,9 @@ const act = (name: string) => send({ t: 'action', name });
 /** A line of text that is sent when Return is pressed in it (and not while an input method is composing). */
 function Entry({ value, onChange, onEnter, label, placeholder, max, className }: { value: string; onChange: (v: string) => void; onEnter: () => void; label: string; placeholder: string; max: number; className?: string }) {
   return (
-    <input
+    <Field
       type="text"
-      className={`text-field${className ? ` ${className}` : ''}`}
+      className={className}
       aria-label={label}
       placeholder={placeholder}
       maxLength={max}
@@ -79,7 +81,7 @@ export default function Launcher() {
   if (l.dock_display && !l.screens.includes(l.dock_display)) screens.push({ value: l.dock_display, label: t('launcher.dock_display.away', { name: l.dock_display }) });
 
   const tool = (verb: string, item: number, glyph: string, text: string, disabled: boolean, who: string) => (
-    <IconButton size="sm" variant="glass" icon={glyph} disabled={disabled} label={`${text}: ${who}`} onClick={() => act(`${verb}:${at}:${item}`)} />
+    <IconButton size="sm" variant="secondary" icon={glyph} disabled={disabled} label={`${text}: ${who}`} onClick={() => act(`${verb}:${at}:${item}`)} />
   );
 
   return (
@@ -90,7 +92,7 @@ export default function Launcher() {
           <div className="launcher-add">
             <Select label={t('launcher.group.pick')} value={at} options={l.groups.map((g, i) => ({ value: i, label: label(g, i) }))} onChange={(v) => setSel(Number(v))} />
             <IconButton
-              variant="glass"
+              variant="secondary"
               icon="chevron.up"
               disabled={at === 0}
               label={t('launcher.group.up')}
@@ -100,7 +102,7 @@ export default function Launcher() {
               }}
             />
             <IconButton
-              variant="glass"
+              variant="secondary"
               icon="chevron.down"
               disabled={at === l.groups.length - 1}
               label={t('launcher.group.down')}
@@ -110,7 +112,7 @@ export default function Launcher() {
               }}
             />
             <IconButton
-              variant="glass"
+              variant="secondary"
               icon="plus"
               disabled={l.groups_full}
               label={t('launcher.group.add')}
@@ -123,9 +125,9 @@ export default function Launcher() {
         </Row>
         <Row title={t('launcher.group.name')} when={on}>
           <div className="launcher-add nowrap">
-            <input
+            <Field
+              className="field-grow"
               type="text"
-              className="text-field"
               aria-label={t('launcher.group.name')}
               placeholder={t('launcher.group.ph')}
               maxLength={24}
@@ -143,9 +145,9 @@ export default function Launcher() {
                 if (e.key === 'Enter' && !e.nativeEvent.isComposing) rename();
               }}
             />
-            <IconButton variant="glass" icon="check" label={t('launcher.group.rename')} onClick={rename} />
+            <IconButton variant="secondary" icon="check" label={t('launcher.group.rename')} onClick={rename} />
             <IconButton
-              variant="danger"
+              variant="destructive"
               icon="trash"
               disabled={l.groups.length < 2}
               label={t('launcher.group.remove')}
@@ -187,15 +189,15 @@ export default function Launcher() {
       <Card>
         <Row title={t('launcher.add.title')} desc={t('launcher.add.desc')} when={on}>
           <div className="launcher-add">
-            <IconButton variant="glass" icon="app.dashed" disabled={cur.full} label={t('launcher.add.app')} onClick={() => act(`launcher_add_app:${at}`)} />
-            <IconButton variant="glass" icon="folder" disabled={cur.full} label={t('launcher.add.folder')} onClick={() => act(`launcher_add_folder:${at}`)} />
-            <IconButton variant="glass" icon="doc" disabled={cur.full} label={t('launcher.add.file')} onClick={() => act(`launcher_add_file:${at}`)} />
+            <IconButton variant="secondary" icon="app.dashed" disabled={cur.full} label={t('launcher.add.app')} onClick={() => act(`launcher_add_app:${at}`)} />
+            <IconButton variant="secondary" icon="folder" disabled={cur.full} label={t('launcher.add.folder')} onClick={() => act(`launcher_add_folder:${at}`)} />
+            <IconButton variant="secondary" icon="doc" disabled={cur.full} label={t('launcher.add.file')} onClick={() => act(`launcher_add_file:${at}`)} />
           </div>
         </Row>
         <Row title={t('launcher.url.title')} desc={t('launcher.url.desc')} when={on}>
           <div className="launcher-add nowrap">
             <Entry className="launcher-url" value={address} onChange={setAddress} onEnter={pinUrl} label={t('launcher.url.label')} placeholder={t('launcher.url.ph')} max={2000} />
-            <IconButton variant="glass" icon="pin" disabled={cur.full} label={t('launcher.url.add')} onClick={pinUrl} />
+            <IconButton variant="secondary" icon="pin" disabled={cur.full} label={t('launcher.url.add')} onClick={pinUrl} />
           </div>
         </Row>
         <Row title={t('launcher.shortcuts.title')} desc={t('launcher.shortcuts.desc')} when={on}>
@@ -206,7 +208,7 @@ export default function Launcher() {
             {l.shortcuts.length ? (
               <>
                 <Select label={t('launcher.shortcuts.pick')} value={Math.min(shortcut, l.shortcuts.length - 1)} options={l.shortcuts.map((n, i) => ({ value: i, label: n }))} onChange={(v) => setShortcut(Number(v))} />
-                <IconButton variant="glass" icon="pin" disabled={cur.full} label={t('launcher.shortcuts.add')} onClick={() => act(`launcher_add_shortcut:${at}:${Math.min(shortcut, l.shortcuts.length - 1)}`)} />
+                <IconButton variant="secondary" icon="pin" disabled={cur.full} label={t('launcher.shortcuts.add')} onClick={() => act(`launcher_add_shortcut:${at}:${Math.min(shortcut, l.shortcuts.length - 1)}`)} />
               </>
             ) : null}
           </div>

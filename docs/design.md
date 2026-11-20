@@ -8,9 +8,9 @@ Until 2.1.17 the window was "the ghost's world": a sky that followed the hour, h
 
 ## Where it is
 
-The look of every page is written in `app-tauri` (React, Tailwind) and its rules are in `app-tauri/DESIGN.md`: one accent
-colour, glass only for what floats, a row that is a name and one control with the explanation behind an "i", a 4 point grid,
-concentric shapes, text that reaches 4.5 to 1. This file is how the AppKit app gets those pages and how to look at them.
+The look of every page is written in `app-tauri` (React, with Astryx for the components and Tailwind for layout) and its rules
+are in `app-tauri/DESIGN.md`: Astryx's neutral theme as it is, a row that is a name and one control with the explanation behind
+an "i", components that are not restyled. This file is how the AppKit app gets those pages and how to look at them.
 
 - `app-tauri/src/pages/<id>` is a page of the settings. `app-tauri/src/surfaces/<name>` is one of the other windows: the menu bar
   panel, the permissions window, the update popup, the news of a version, the card of a mail, the music widget, and the beta for
@@ -18,16 +18,17 @@ concentric shapes, text that reaches 4.5 to 1. This file is how the AppKit app g
 - `pnpm build:embed` in `app-tauri` writes each as one HTML file in `crates/app-ui/web` (and `crates/desktop/web`), and the
   program includes it with `include_str!`. `crates/app-ui/src/web.rs` writes what only the system can draw into a page before it
   runs. The file is committed; a change to `app-tauri/src` is not in the app until the file is built again.
-- Liquid Glass: on macOS 26 the window is the system's glass under a veil of the window's own colour (`VEIL` in
-  `crates/macos-sys/src/webview.rs`); a page that finds the handler named `glass` lays its own veil over it. The panels
-  (`TrayPanel`, `DropPanel`, `WidgetPanel`) are the system's glass behind a transparent web view.
+- Liquid Glass: on macOS 26 the settings window still has the system's glass under a veil of the window's own colour (`VEIL` in
+  `crates/macos-sys/src/webview.rs`), but the page of the settings paints a solid background of its own over it, so it is not
+  seen. The panels (`TrayPanel`, `DropPanel`, `WidgetPanel`) are the system's glass behind a transparent web view, and their
+  pages (tray, mail card, widget) are drawn with Tailwind alone.
 
 ## Looking at it
 
 No window is needed, and the glass is not drawn (it only exists on screen):
 
 - `settings_preview snap <page> out.png [--dark] [--lang vi] [--size 1000x700] [--eval "script"]` draws a page of the settings
-  with the sample state of `app-tauri/src/data/state.sample.json` (`--eval "document.querySelector('.page-foot .btn').click()"`
+  with the sample state of `app-tauri/src/data/state.sample.json` (`--eval "document.querySelector('.page-foot button').click()"`
   opens its sheet).
 - `tray_preview`, `update_preview snap <state|news>` and `widget_preview <style>` draw the others with what the app would send.
 - Build the example again after `pnpm build:embed`: the page is compiled into it.

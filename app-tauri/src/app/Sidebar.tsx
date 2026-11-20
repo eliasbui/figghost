@@ -1,30 +1,30 @@
-import { Fragment } from 'react';
-import { motion } from 'motion/react';
-import { Icon } from '@/components/macos/Icon';
-import { AppLogo } from '@/components/macos/Page';
+import { SideNav, SideNavItem, SideNavSection } from '@astryxdesign/core/SideNav';
+import { StatusDot } from '@astryxdesign/core/StatusDot';
+import appIcon from '@/assets/app-icon.png';
 import { getIn } from '@/lib/path';
-import { cx } from '@/lib/text';
 import { masterPath, NAV, navPageOf, PAGE_SYMBOLS } from '@/pages/meta';
 import { openPage, send, useApp } from '@/stores/app';
 import { useT } from '@/stores/hooks';
+import { iconType } from '@/ui/Icon';
 
-/** One page in the sidebar. The open one has a pill of glass behind it that glides to the next; a feature that is off has a ring. */
+/** The app's own icon, in the shape of an icon of Astryx. */
+const AppMark = () => <img src={appIcon} alt="" width={20} height={20} draggable={false} />;
+
+/** One page in the sidebar. A feature that is off has a grey dot. */
 function NavItem({ id, lit }: { id: string; lit: string }) {
   const t = useT();
   const master = useApp((s) => masterPath(id, s.state));
   const on = useApp((s) => (master ? !!getIn(s.state, master) : true));
-  const open = lit === id;
+  const symbol = PAGE_SYMBOLS[id] ?? 'pg.general';
   return (
-    <button type="button" className="nav-item" data-page={id} aria-current={open ? 'page' : undefined} onClick={() => openPage(id)}>
-      {open ? <motion.span layoutId="nav-pill" className="nav-pill" transition={{ type: 'spring', stiffness: 540, damping: 42, mass: 0.9 }} /> : null}
-      <Icon name={PAGE_SYMBOLS[id] ?? 'pg.general'} weight={open ? 'fill' : 'regular'} />
-      <span className="nav-label">{t(`nav.${id}`)}</span>
-      {master && !on ? (
-        <span className="nav-off" title={t('nav.off')}>
-          <span className="sr-only">{t('nav.off')}</span>
-        </span>
-      ) : null}
-    </button>
+    <SideNavItem
+      label={t(`nav.${id}`)}
+      icon={iconType(symbol)}
+      selectedIcon={iconType(symbol, 'fill')}
+      isSelected={lit === id}
+      endContent={master && !on ? <StatusDot variant="neutral" label={t('nav.off')} /> : undefined}
+      onClick={() => openPage(id)}
+    />
   );
 }
 
@@ -33,20 +33,15 @@ function NavItem({ id, lit }: { id: string; lit: string }) {
 function Me({ lit }: { lit: string }) {
   const t = useT();
   const granted = useApp((s) => s.state.env.accessibility);
+  const word = t(granted ? 'chip.access.ok' : 'chip.access.no');
   return (
-    <button
-      type="button"
-      className="me"
-      data-page="about"
-      aria-current={lit === 'about' ? 'page' : undefined}
-      title={t(granted ? 'chip.access.ok' : 'chip.access.no')}
+    <SideNavItem
+      label="Figghost"
+      icon={AppMark}
+      isSelected={lit === 'about'}
+      endContent={<StatusDot variant={granted ? 'success' : 'warning'} label={word} tooltip={word} />}
       onClick={() => (granted ? openPage('about') : send({ t: 'action', name: 'open_accessibility' }))}
-    >
-      <AppLogo className="me-icon" />
-      <span className="me-name">Figghost</span>
-      <span className={cx('me-dot', !granted && 'warn')} />
-      <span className="sr-only">{t(granted ? 'chip.access.ok' : 'chip.access.no')}</span>
-    </button>
+    />
   );
 }
 
@@ -54,20 +49,16 @@ export function Sidebar() {
   const t = useT();
   const lit = navPageOf(useApp((s) => s.page));
   return (
-    <aside id="sidebar" className="glass glass-thick" data-tauri-drag-region="">
-      <nav id="nav" aria-label="Figghost">
-        {NAV.map(({ sec, pages }, i) => (
-          <Fragment key={sec}>
-            {i > 0 ? <div className="nav-sep" aria-hidden="true" /> : null}
-            <div role="group" aria-label={t(`nav.sec.${sec}`)} className="contents">
-              {pages.map((id) => (
-                <NavItem key={id} id={id} lit={lit} />
-              ))}
-            </div>
-          </Fragment>
+    <aside id="sidebar" data-tauri-drag-region="">
+      <SideNav footer={<Me lit={lit} />}>
+        {NAV.map(({ sec, pages }) => (
+          <SideNavSection key={sec} title={t(`nav.sec.${sec}`)}>
+            {pages.map((id) => (
+              <NavItem key={id} id={id} lit={lit} />
+            ))}
+          </SideNavSection>
         ))}
-      </nav>
-      <Me lit={lit} />
+      </SideNav>
     </aside>
   );
 }

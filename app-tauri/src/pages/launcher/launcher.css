@@ -9,4 +9,4 @@
 .launcher-add select.pick { max-width: 260px; }
 .launcher-add.nowrap { flex-wrap: nowrap; }
 .launcher-status { min-height: 1.2em; }
-.launcher-add .text-field { flex: 1 1 200px; min-width: 160px; }
+.launcher-add .field-grow { flex: 1 1 200px; min-width: 160px; }

@@ -505,6 +505,8 @@ MIT, xem [LICENSE](LICENSE).
 Cửa sổ cài đặt dùng SF Pro, phông của chính hệ thống, nên đọc như phần còn lại của macOS. Inter được đóng kèm làm phông dự phòng cho máy không có nó, theo SIL Open Font License 1.1: xem
 [crates/app-ui/assets/Inter-OFL.txt](crates/app-ui/assets/Inter-OFL.txt).
 
+Cửa sổ cài đặt và các cửa sổ nhỏ được vẽ bằng [Astryx](https://github.com/meta/astryx) và StyleX, bản quyền 2026 Meta Platforms, Inc., theo giấy phép MIT: xem [crates/app-ui/assets/Astryx-LICENSE.txt](crates/app-ui/assets/Astryx-LICENSE.txt), tệp này cũng đi kèm trong ứng dụng.
+
 net-merge của Tải video (`crates/core-netmerge`) là bộ lập lịch của [net-merge](https://github.com/net-merge/net-merge) viết lại bằng Rust, bản quyền 2026 Rohit Mahto, theo giấy phép MIT: xem [crates/app-ui/assets/net-merge-LICENSE.txt](crates/app-ui/assets/net-merge-LICENSE.txt), tệp này cũng đi kèm trong ứng dụng.
 
 Gõ tiếng Việt đặt dấu bằng bộ máy Telex và VNI của [Gõ Nhanh](https://github.com/khaphanspace/gonhanh.org) (crate `gonhanh-core`, dùng nguyên bản), bản quyền 2025 Gõ Nhanh Contributors, theo giấy phép BSD 3-Clause: xem [crates/app-ui/assets/GoNhanh-LICENSE.txt](crates/app-ui/assets/GoNhanh-LICENSE.txt), tệp này cũng đi kèm trong ứng dụng. Figghost không do tác giả của Gõ Nhanh làm ra hay bảo trợ.

@@ -3,7 +3,7 @@
 .cursor-tile {
   display: flex; flex-direction: column; align-items: center; justify-content: center; gap: 8px;
   height: 96px; padding: 8px 6px; border-radius: var(--r-tile);
-  background: var(--fill-2); box-shadow: inset 0 0 0 1px var(--glass-edge);
+  background: var(--fill-2); box-shadow: inset 0 0 0 1px var(--hair);
   color: var(--text); font: inherit; font-size: var(--fs-small); cursor: default;
   appearance: none; -webkit-appearance: none; border: 0; margin: 0;
   transition: background var(--motion-fast), box-shadow var(--motion-fast);

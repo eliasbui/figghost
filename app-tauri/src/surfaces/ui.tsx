@@ -1,21 +1,13 @@
-import type { ButtonHTMLAttributes, ReactNode } from 'react';
-import type { VariantProps } from 'tailwind-variants';
-import { button } from '@/components/macos/button-style';
-import { cn } from '@/lib/cn';
+import type { ReactNode } from 'react';
+import { Badge } from '@astryxdesign/core/Badge';
+import { Button } from '@/ui/button';
 
-type Recipe = VariantProps<typeof button>;
+/** The button of the kit's words, for a surface that has no store to lean on. */
+export { Button as Btn };
 
-/** The kit's button, for a surface that has no store to lean on. */
-export function Btn({ variant, size, shape, className, ...rest }: Omit<ButtonHTMLAttributes<HTMLButtonElement>, 'type'> & Pick<Recipe, 'variant' | 'size' | 'shape'>) {
-  return <button type="button" className={cn(button({ variant, size, shape }), className)} {...rest} />;
-}
+const TONE = { good: 'success', warn: 'warning', bad: 'error', off: 'neutral' } as const;
 
-/** A state said in a word and a dot (the kit's `.pill`). */
+/** A state said in a word. */
 export function Pill({ tone, children }: { tone: 'good' | 'warn' | 'bad' | 'off'; children: ReactNode }) {
-  return (
-    <span className="pill" data-tone={tone}>
-      <span className="dot" />
-      <span>{children}</span>
-    </span>
-  );
+  return <Badge variant={TONE[tone]} label={children} />;
 }

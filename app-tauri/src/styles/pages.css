@@ -1,4 +1,5 @@
-/* What the pages draw by hand, in the glass design. Each block is named for the page that draws it. */
+/* What the pages draw by hand. Each block is named for the page that draws it. Colours are the tokens of tokens.css, which are
+   Astryx's. */
 @layer components {
   .dim {
     opacity: 0.42;

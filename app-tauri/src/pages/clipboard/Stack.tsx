@@ -1,13 +1,15 @@
 import { useEffect, useState } from 'react';
-import { Button, IconButton, Segmented, Select, ToggleRow } from '@/components/macos/Controls';
-import { confirmDialog } from '@/components/macos/Dialogs';
-import { Card, Pill, Row, SectionTitle } from '@/components/macos/Layout';
-import { Icon } from '@/components/macos/Icon';
+import { Button, IconButton, Segmented, Select } from '@/ui/controls';
+import { confirmDialog } from '@/ui/dialogs';
+import { Block, Card, Pill, Row, SectionTitle } from '@/ui/layout';
+import { ToggleRow } from '@/ui/rows';
+import { Icon } from '@/ui/Icon';
 import { keysText } from '@/lib/shortcuts';
 import { change, send } from '@/stores/app';
 import { useSetting, useT } from '@/stores/hooks';
 import type { TFunction } from '@/stores/hooks';
 import './stack.css';
+import { Field } from '@/ui/field';
 
 // Clipboard extras: Copy Stack, pinned boards and sensitive data protection. Cards at the end of the Clipboard page;
 // the state is under `stack`, and every change is checked again by the app.
@@ -69,7 +71,7 @@ function BoardRow({ board, max }: { board: Board; max: number }) {
   };
   return (
     <div className="stack-board">
-      <input
+      <Field
         className="stack-input"
         type="text"
         value={name}
@@ -106,30 +108,26 @@ function AddBoardRow({ count, limit, max }: { count: number; limit: number; max:
     setName('');
   };
   return (
-    <div className="row">
-      <div className="row-text">
-        <input
-          className="stack-input"
-          type="text"
-          value={name}
-          maxLength={max}
-          spellCheck={false}
-          placeholder={t('stack.boards.new')}
-          aria-label={t('stack.boards.new')}
-          onChange={(e) => setName(e.target.value)}
-          onKeyDown={(e) => {
-            if (e.key === 'Enter') add();
-          }}
-        />
-      </div>
-      <div className="row-control">
-        <span className="stack-count">{t('stack.boards.count', { n: count, max: limit })}</span>
-        <Button small disabled={count >= limit} onClick={add}>
-          <Icon name="plus" />
-          {t('stack.boards.add')}
-        </Button>
-      </div>
-    </div>
+    <Block className="flex items-center gap-2.5">
+      <Field
+        className="stack-input"
+        type="text"
+        value={name}
+        maxLength={max}
+        spellCheck={false}
+        placeholder={t('stack.boards.new')}
+        aria-label={t('stack.boards.new')}
+        onChange={(e) => setName(e.target.value)}
+        onKeyDown={(e) => {
+          if (e.key === 'Enter') add();
+        }}
+      />
+      <span className="stack-count">{t('stack.boards.count', { n: count, max: limit })}</span>
+      <Button small disabled={count >= limit} onClick={add}>
+        <Icon name="plus" />
+        {t('stack.boards.add')}
+      </Button>
+    </Block>
   );
 }
 

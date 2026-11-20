@@ -1,5 +1,5 @@
 import { useEffect, useRef } from 'react';
-import { AppIcon } from '@/components/macos/Apps';
+import { AppIcon } from '@/ui/apps';
 import { showToast, send, tr } from '@/stores/app';
 import { useLang, useSection, useT } from '@/stores/hooks';
 import { AnalyzeHead, tintOf } from './Analyze';

@@ -1,6 +1,6 @@
-import { ActionButton, ActionIcon } from '@/components/macos/Controls';
-import { HotkeyButton } from '@/components/macos/Hotkey';
-import { Card, Pill, Row, SectionTitle } from '@/components/macos/Layout';
+import { ActionButton, ActionIcon } from '@/ui/controls';
+import { HotkeyButton } from '@/ui/hotkey';
+import { Card, Pill, Row, SectionTitle } from '@/ui/layout';
 import { useSection, useT } from '@/stores/hooks';
 import './pin.css';
 
@@ -23,7 +23,7 @@ export default function Pin() {
           <HotkeyButton target="pin" allowClear label={t('pin.shortcut.title')} />
         </Row>
         <Row title={t('pin.now.title')} when={on}>
-          <span className="row-title pin-now" title={pin.pinned || ''}>
+          <span className="row-value pin-now" title={pin.pinned || ''}>
             {pin.pinned || t('pin.now.none')}
           </span>
           <ActionButton name="pin_release" style={{ visibility: pin.pinned ? 'visible' : 'hidden' }}>

@@ -1,6 +1,7 @@
-import { SegRow, SliderRow, ToggleRow, ActionIcon } from '@/components/macos/Controls';
-import { Icon } from '@/components/macos/Icon';
-import { Card, InfoRow, Pill, Row, SectionTitle } from '@/components/macos/Layout';
+import { ActionIcon } from '@/ui/controls';
+import { Card, Pill, Row, SectionTitle } from '@/ui/layout';
+import { SegRow, SliderRow, ToggleRow } from '@/ui/rows';
+import { Icon } from '@/ui/Icon';
 import { change, send } from '@/stores/app';
 import { useSection, useT } from '@/stores/hooks';
 import './cursor.css';
@@ -82,7 +83,7 @@ export default function Cursor() {
         <SliderRow path="cursor.speed" title={t('cursor.speed.title')} desc={t('cursor.speed.desc')} min={0.25} max={3} step={0.05} format={(v) => `${v.toFixed(2).replace(/0$/, '')}x`} />
       </Card>
       <Card>
-        <InfoRow title={t('cursor.note.title')} desc={t('cursor.note.desc')} />
+        <Row title={t('cursor.note.title')} desc={t('cursor.note.desc')} />
       </Card>
     </>
   );

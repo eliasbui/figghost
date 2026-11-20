@@ -1,5 +1,5 @@
-import { SelectRow, ToggleRow } from '@/components/macos/Controls';
-import { Card, SectionTitle } from '@/components/macos/Layout';
+import { Card, SectionTitle } from '@/ui/layout';
+import { SelectRow, ToggleRow } from '@/ui/rows';
 import { useSetting, useT } from '@/stores/hooks';
 
 /** Day progress: a tab of the notch with how much of the day has gone and today's events laid along a line. */

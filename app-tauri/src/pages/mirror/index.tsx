@@ -1,7 +1,8 @@
-import { ActionIcon, SelectRow, ToggleRow } from '@/components/macos/Controls';
-import { PermissionRow } from '@/components/macos/Common';
-import { HotkeyButton } from '@/components/macos/Hotkey';
-import { Card, Pill, Row, SectionTitle } from '@/components/macos/Layout';
+import { PermissionRow } from '@/ui/common';
+import { ActionIcon } from '@/ui/controls';
+import { HotkeyButton } from '@/ui/hotkey';
+import { Card, Pill, Row, SectionTitle } from '@/ui/layout';
+import { SelectRow, ToggleRow } from '@/ui/rows';
 import { useSection, useT } from '@/stores/hooks';
 
 interface MirrorState {
@@ -25,7 +26,7 @@ export default function Mirror() {
         <SelectRow path="mirror.mirror_size" title={t('mirror.size.title')} desc={t('mirror.size.desc')} when={on} options={[200, 280, 360].map((n) => ({ value: n, label: t('mirror.size.n', { n }) }))} />
         <PermissionRow title={t('mirror.camera.title')} detail={t('mirror.camera.desc')} given={mirror.camera} action="open_camera_settings" label={t('mirror.camera.open')} />
         <Row title={t('mirror.toggle')} desc={t('mirror.toggle.desc')} when={on}>
-          <ActionIcon name="mirror_toggle" icon="play" variant="prominent" label={t('mirror.toggle')} />
+          <ActionIcon name="mirror_toggle" icon="play" variant="primary" label={t('mirror.toggle')} />
         </Row>
       </Card>
 
@@ -41,7 +42,7 @@ export default function Mirror() {
         <SelectRow path="mirror.speed" title={t('mirror.speed.title')} desc={t('mirror.speed.desc')} when={on} options={[1, 2, 3, 4, 5, 6].map((n) => ({ value: n, label: String(n) }))} />
         <ToggleRow path="mirror.hide_in_capture" title={t('mirror.hide.title')} desc={t('mirror.hide.desc')} when={on} />
         <Row title={t('mirror.prompter.toggle')} desc={t('mirror.prompter.toggle.desc')} when={on}>
-          <ActionIcon name="mirror_prompter" icon="play" variant="prominent" label={t('mirror.prompter.toggle')} />
+          <ActionIcon name="mirror_prompter" icon="play" variant="primary" label={t('mirror.prompter.toggle')} />
         </Row>
       </Card>
     </>

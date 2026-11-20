@@ -1,14 +1,15 @@
 import { useEffect, useState } from 'react';
 import { create } from 'zustand';
-import { Button, IconButton, Select, ToggleRow } from '@/components/macos/Controls';
-import { confirmDialog } from '@/components/macos/Dialogs';
-import { Card, Pill, Row, SectionTitle } from '@/components/macos/Layout';
-import { Icon } from '@/components/macos/Icon';
-import { InfoTip } from '@/components/macos/Overlay';
+import { Button, IconButton, InfoTip, Select } from '@/ui/controls';
+import { confirmDialog } from '@/ui/dialogs';
+import { Card, Pill, Row, SectionTitle } from '@/ui/layout';
+import { ToggleRow } from '@/ui/rows';
+import { Icon } from '@/ui/Icon';
 import { cx } from '@/lib/text';
 import { change, patch, send } from '@/stores/app';
 import { useSection, useT } from '@/stores/hooks';
 import './snap.css';
+import { Field } from '@/ui/field';
 
 // Dragging a window onto the notch to snap it into a layout. Cards at the end of "Window snapping" hold the switch, the
 // Accessibility state, the choice of layouts for each screen and the layouts a person makes from a grid.
@@ -329,11 +330,10 @@ function Editor({ snap, editing }: { snap: SnapState; editing: Editing }) {
   return (
     <div className="snap-editor">
       <div className="snap-edit-head">
-        <div className="row-title">{editing.id ? t('snap.edit.title.change') : t('snap.edit.title.new')}</div>
+        <div className="font-semibold">{editing.id ? t('snap.edit.title.change') : t('snap.edit.title.new')}</div>
       </div>
       <div className="snap-edit-fields">
-        <input
-          className="text-field"
+        <Field
           type="text"
           maxLength={MAX_NAME}
           value={editing.name}
@@ -402,7 +402,7 @@ function MineRow({ snap, layout }: { snap: SnapState; layout: Custom }) {
     <div className="snap-mine">
       <Mini cells={cellsOf(snap, layout.id)} big />
       <div className="snap-mine-name">
-        <div className="row-title">{layout.name}</div>
+        <div className="font-semibold">{layout.name}</div>
         <div className="row-desc">{t('snap.mine.cells', { n: layout.cells.length })}</div>
       </div>
       <div className="snap-actions">

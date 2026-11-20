@@ -1,6 +1,6 @@
 import { useState } from 'react';
 import type { ReactNode } from 'react';
-import { IconButton, Select } from '@/components/macos/Controls';
+import { IconButton, Select } from '@/ui/controls';
 import { send } from '@/stores/app';
 import type { NetworkState } from './types';
 
@@ -17,7 +17,7 @@ export function useChipEditor({ network, path, list, none, add, remove }: { netw
     controls: (
       <div className="network-allow">
         <Select label={add} value={value} disabled={!seen.length} options={seen.map((n) => ({ value: n, label: n }))} onChange={(v) => setPicked(String(v))} />
-        <IconButton variant="glass" icon="plus" disabled={!seen.length} label={add} onClick={() => value && write([...list, value])} />
+        <IconButton variant="secondary" icon="plus" disabled={!seen.length} label={add} onClick={() => value && write([...list, value])} />
       </div>
     ),
     chips: (
